@@ -336,41 +336,41 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   </div>
 
   <nav class="sidebar-nav">
-    <div class="sidebar-section">Overview</div>
+    <div class="sidebar-section" data-h="sidebar_overview">Overview</div>
     <button class="sidebar-item active" onclick="showPanel('dashboard', this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-      Dashboard
+      <span data-h="sidebar_dashboard">Dashboard</span>
     </button>
 
-    <div class="sidebar-section">Property</div>
+    <div class="sidebar-section" data-h="sidebar_property_sec">Property</div>
     <button class="sidebar-item" onclick="showPanel('property', this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/></svg>
-      Property Details
+      <span data-h="sidebar_property">Property Details</span>
     </button>
     <button class="sidebar-item" onclick="showPanel('rules', this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      House Rules
+      <span data-h="sidebar_rules">House Rules</span>
     </button>
     <button class="sidebar-item" onclick="showPanel('recos', this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88"/></svg>
-      Recommendations
+      <span data-h="sidebar_recos">Recommendations</span>
     </button>
 
-    <div class="sidebar-section">Guests</div>
+    <div class="sidebar-section" data-h="sidebar_guests_sec">Guests</div>
     <button class="sidebar-item" onclick="showPanel('checkins', this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      Check-in Data
-      <span class="badge-count" id="checkinCount">3</span>
+      <span data-h="sidebar_checkins">Check-in Data</span>
+      <span class="badge-count" id="checkinCount">0</span>
     </button>
     <button class="sidebar-item" onclick="showPanel('export', this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Export / Alloggiati
+      <span data-h="sidebar_export">Export / Alloggiati</span>
     </button>
 
-    <div class="sidebar-section">Share</div>
+    <div class="sidebar-section" data-h="sidebar_share_sec">Share</div>
     <button class="sidebar-item" onclick="showPanel('qrlink', this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3z"/><path d="M18 18h3v3h-3z"/><path d="M14 18h3v3h-3z"/></svg>
-      QR Code & Link
+      <span data-h="sidebar_qr">QR Code & Link</span>
     </button>
   </nav>
 
@@ -378,7 +378,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     <div class="sidebar-avatar">ML</div>
     <div>
       <div class="sidebar-user-name">Marco & Lucia</div>
-      <div class="sidebar-user-role">Property Manager</div>
+      <div class="sidebar-user-role" data-h="sidebar_role">Property Manager</div>
     </div>
   </div>
 </aside>
@@ -393,7 +393,12 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="main-subtitle" id="panelSubtitle">Overview of your property and guests</div>
       </div>
     </div>
-    <div class="header-actions" id="headerActions"></div>
+    <div class="header-actions" id="headerActions">
+      <div class="lang-toggle" style="display:flex;align-items:center;background:var(--cream-2);border-radius:20px;padding:3px;gap:2px;border:1px solid var(--border);">
+        <button class="lang-opt-h active" onclick="setHostLang('en')" style="padding:4px 10px;border-radius:16px;font-size:0.62rem;font-weight:600;letter-spacing:0.06em;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;background:var(--white);color:var(--warm);box-shadow:0 1px 3px rgba(30,16,8,0.06);">EN</button>
+        <button class="lang-opt-h" onclick="setHostLang('it')" style="padding:4px 10px;border-radius:16px;font-size:0.62rem;font-weight:600;letter-spacing:0.06em;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;background:none;color:var(--ink-soft);">IT</button>
+      </div>
+    </div>
   </div>
 
   <div class="content">
@@ -763,19 +768,183 @@ let propertyId = null;
 let propertyData = null;
 let allCheckins = [];
 let allChats = [];
+let hostLang = 'en';
+
+/* ══════════════════════════════════════
+   HOST CONSOLE i18n
+══════════════════════════════════════ */
+const HT = {
+  en: {
+    // Sidebar
+    sidebar_overview: 'Overview', sidebar_property_sec: 'Property', sidebar_guests_sec: 'Guests', sidebar_share_sec: 'Share',
+    sidebar_dashboard: 'Dashboard', sidebar_property: 'Property Details', sidebar_rules: 'House Rules',
+    sidebar_recos: 'Recommendations', sidebar_checkins: 'Check-in Data', sidebar_export: 'Export / Alloggiati',
+    sidebar_qr: 'QR Code & Link', sidebar_role: 'Property Manager',
+    // Panel titles
+    t_dashboard: 'Dashboard', s_dashboard: 'Overview of your property and guests',
+    t_property: 'Property Details', s_property: 'Edit your property information',
+    t_rules: 'House Rules', s_rules: 'Manage rules shown to guests',
+    t_recos: 'Recommendations', s_recos: 'Curate local tips for your guests',
+    t_checkins: 'Check-in Data', s_checkins: 'View and manage guest registrations',
+    t_export: 'Export & Compliance', s_export: 'Generate files for Italian authorities',
+    t_qrlink: 'QR Code & Link', s_qrlink: 'Share your guest portal',
+    // Dashboard
+    stat_checkins: 'Total Check-ins', stat_pending: 'Pending Documents', stat_filed: 'Alloggiati Filed',
+    stat_chat: 'Chat Messages', stat_alltime: 'All time', stat_attention: 'Needs attention',
+    stat_complete: 'All complete', stat_done: '% done', stat_no_guests: 'No guests yet',
+    stat_from_guests: 'from guests', recent_checkins: 'Recent Check-ins', view_all: 'View All →',
+    th_guest: 'Guest', th_type: 'Type', th_citizenship: 'Citizenship', th_document: 'Document',
+    th_docs: 'Docs', th_submitted: 'Submitted', th_birth: 'Birth', th_alloggiati: 'Alloggiati', th_actions: 'Actions',
+    no_checkins: 'No check-ins yet. Share your guest link to get started!',
+    doc_complete: '✓ Complete', doc_partial: '⏳ Partial', doc_missing: '✗ Missing',
+    alloggiati_filed: '✓ Filed', alloggiati_pending: 'Pending',
+    btn_view: 'View',
+    // Property
+    prop_basic: 'Basic Information', prop_basic_desc: 'This information will appear on the guest welcome screen.',
+    prop_name: 'Property Name', prop_type: 'Property Type', prop_address: 'Street Address',
+    prop_city: 'City / ZIP', prop_region: 'Region', prop_cir: 'CIR Code (Regional ID)', prop_cir_hint: 'Required for Puglia DMS reporting',
+    prop_times: 'Check-in / Check-out', prop_times_desc: 'Times and access instructions for your guests.',
+    prop_checkin_time: 'Check-in Time', prop_checkout_time: 'Check-out Time',
+    prop_access: 'Access Method', prop_keybox: 'Keybox Code', prop_keybox_hint: 'Sent to guest before arrival (not shown in app)',
+    prop_wifi: 'WiFi & Essentials', prop_wifi_name: 'WiFi Network', prop_wifi_pass: 'WiFi Password',
+    prop_welcome: 'Host Welcome Message', prop_emergency: 'Emergency Phone', prop_host: 'Host Name(s)',
+    btn_save_property: '💾 Save Property Details',
+    // Rules
+    rules_info: 'These rules appear in the guest app\'s "Rules" tab. Drag to reorder. Mark important rules so they\'re highlighted.',
+    btn_add_rule: '+ Add Rule', btn_save_rules: '💾 Save Rules',
+    // Recos
+    recos_info: 'These appear in the guest app\'s "Explore" tab. Add your favorite restaurants, bars, sights, beaches, and shops.',
+    btn_add_reco: '+ Add Recommendation', btn_save_recos: '💾 Save',
+    tab_food: '🍝 Food', tab_drink: '🍷 Drinks', tab_see: '👁 Sights', tab_beach: '🏖 Beach', tab_shop: '🛍 Shop',
+    // Checkins
+    checkins_warn: 'Italian law requires all guest data to be submitted to <strong>Alloggiati Web</strong> (State Police) within 24 hours of arrival. Puglia also requires <strong>Puglia DMS</strong> reporting.',
+    filter_all: 'All Bookings',
+    // Export
+    export_info: 'Generate files formatted for the Italian police portal (Alloggiati Web) and the regional tourism platform (Puglia DMS).',
+    export_alloggiati: 'Alloggiati Web Export',
+    export_alloggiati_desc: 'Generates a <strong>.txt file</strong> in the exact format required by the Polizia di Stato\'s Alloggiati Web portal.',
+    export_dms: 'Puglia DMS Export',
+    export_dms_desc: 'Generates a file for the <strong>Puglia regional tourism authority</strong>.',
+    export_csv: 'CSV Export', export_csv_desc: 'Download all guest check-in data as a <strong>CSV spreadsheet</strong>.',
+    export_istat: 'ISTAT / C59 Report', export_istat_desc: 'Monthly statistical report for <strong>ISTAT tourism statistics</strong>.',
+    date_range: 'Date Range', month: 'Month',
+    btn_gen_alloggiati: '📥 Generate Alloggiati File', btn_gen_dms: '📥 Generate DMS File',
+    btn_dl_csv: '📥 Download CSV', btn_gen_istat: '📥 Generate Report',
+    // QR
+    qr_title: 'Guest App Link',
+    qr_desc: 'Share this link with guests before arrival, or print the QR code and place it in the apartment.',
+    btn_copy_link: '📋 Copy Link', btn_print_qr: '🖨 Print QR',
+    template_title: 'Pre-Arrival Message Template',
+    template_desc: 'Send this to guests when they book. Customize as needed.',
+    btn_copy_template: '📋 Copy Template',
+    // Toasts
+    toast_property_saved: 'Property details saved!', toast_rules_saved: 'House rules saved to database!',
+    toast_recos_saved: 'Recommendations saved to database!', toast_link_copied: 'Link copied to clipboard!',
+    toast_template_copied: 'Template copied!', toast_istat: 'ISTAT report generated!',
+  },
+  it: {
+    sidebar_overview: 'Panoramica', sidebar_property_sec: 'Proprietà', sidebar_guests_sec: 'Ospiti', sidebar_share_sec: 'Condividi',
+    sidebar_dashboard: 'Dashboard', sidebar_property: 'Dettagli Proprietà', sidebar_rules: 'Regole della Casa',
+    sidebar_recos: 'Consigli', sidebar_checkins: 'Dati Check-in', sidebar_export: 'Export / Alloggiati',
+    sidebar_qr: 'QR Code & Link', sidebar_role: 'Gestore Proprietà',
+    t_dashboard: 'Dashboard', s_dashboard: 'Panoramica della proprietà e degli ospiti',
+    t_property: 'Dettagli Proprietà', s_property: 'Modifica le informazioni della proprietà',
+    t_rules: 'Regole della Casa', s_rules: 'Gestisci le regole mostrate agli ospiti',
+    t_recos: 'Consigli', s_recos: 'Cura i consigli locali per i tuoi ospiti',
+    t_checkins: 'Dati Check-in', s_checkins: 'Visualizza e gestisci le registrazioni degli ospiti',
+    t_export: 'Export & Conformità', s_export: 'Genera file per le autorità italiane',
+    t_qrlink: 'QR Code & Link', s_qrlink: 'Condividi il portale ospiti',
+    stat_checkins: 'Check-in Totali', stat_pending: 'Documenti in Attesa', stat_filed: 'Alloggiati Inviati',
+    stat_chat: 'Messaggi Chat', stat_alltime: 'Totale', stat_attention: 'Richiede attenzione',
+    stat_complete: 'Tutti completi', stat_done: '% fatto', stat_no_guests: 'Nessun ospite ancora',
+    stat_from_guests: 'dagli ospiti', recent_checkins: 'Check-in Recenti', view_all: 'Vedi Tutti →',
+    th_guest: 'Ospite', th_type: 'Tipo', th_citizenship: 'Cittadinanza', th_document: 'Documento',
+    th_docs: 'Docs', th_submitted: 'Inviato', th_birth: 'Nascita', th_alloggiati: 'Alloggiati', th_actions: 'Azioni',
+    no_checkins: 'Nessun check-in ancora. Condividi il link ospiti per iniziare!',
+    doc_complete: '✓ Completo', doc_partial: '⏳ Parziale', doc_missing: '✗ Mancante',
+    alloggiati_filed: '✓ Inviato', alloggiati_pending: 'In attesa',
+    btn_view: 'Vedi',
+    prop_basic: 'Informazioni Base', prop_basic_desc: 'Queste informazioni appariranno nella schermata di benvenuto.',
+    prop_name: 'Nome Proprietà', prop_type: 'Tipo Proprietà', prop_address: 'Indirizzo',
+    prop_city: 'Città / CAP', prop_region: 'Regione', prop_cir: 'Codice CIR (ID Regionale)', prop_cir_hint: 'Richiesto per la segnalazione Puglia DMS',
+    prop_times: 'Check-in / Check-out', prop_times_desc: 'Orari e istruzioni di accesso per gli ospiti.',
+    prop_checkin_time: 'Orario Check-in', prop_checkout_time: 'Orario Check-out',
+    prop_access: 'Metodo di Accesso', prop_keybox: 'Codice Lockbox', prop_keybox_hint: 'Inviato all\'ospite prima dell\'arrivo',
+    prop_wifi: 'WiFi & Essenziali', prop_wifi_name: 'Rete WiFi', prop_wifi_pass: 'Password WiFi',
+    prop_welcome: 'Messaggio di Benvenuto', prop_emergency: 'Telefono Emergenza', prop_host: 'Nome Host',
+    btn_save_property: '💾 Salva Dettagli Proprietà',
+    rules_info: 'Queste regole appaiono nella scheda "Regole" dell\'app ospiti. Trascina per riordinare. Segna le regole importanti.',
+    btn_add_rule: '+ Aggiungi Regola', btn_save_rules: '💾 Salva Regole',
+    recos_info: 'Questi appaiono nella scheda "Esplora" dell\'app ospiti. Aggiungi i tuoi ristoranti, bar, luoghi preferiti.',
+    btn_add_reco: '+ Aggiungi Consiglio', btn_save_recos: '💾 Salva',
+    tab_food: '🍝 Cibo', tab_drink: '🍷 Bevande', tab_see: '👁 Luoghi', tab_beach: '🏖 Spiaggia', tab_shop: '🛍 Shopping',
+    checkins_warn: 'La legge italiana richiede che tutti i dati degli ospiti siano inviati ad <strong>Alloggiati Web</strong> (Polizia di Stato) entro 24 ore dall\'arrivo. La Puglia richiede anche la segnalazione <strong>Puglia DMS</strong>.',
+    filter_all: 'Tutte le Prenotazioni',
+    export_info: 'Genera file formattati per il portale della polizia italiana (Alloggiati Web) e la piattaforma turistica regionale (Puglia DMS).',
+    export_alloggiati: 'Export Alloggiati Web',
+    export_alloggiati_desc: 'Genera un <strong>file .txt</strong> nel formato richiesto dal portale Alloggiati Web della Polizia di Stato.',
+    export_dms: 'Export Puglia DMS',
+    export_dms_desc: 'Genera un file per l\'<strong>autorità turistica regionale pugliese</strong>.',
+    export_csv: 'Export CSV', export_csv_desc: 'Scarica tutti i dati di check-in come <strong>foglio di calcolo CSV</strong>.',
+    export_istat: 'Report ISTAT / C59', export_istat_desc: 'Report statistico mensile per le <strong>statistiche turistiche ISTAT</strong>.',
+    date_range: 'Intervallo Date', month: 'Mese',
+    btn_gen_alloggiati: '📥 Genera File Alloggiati', btn_gen_dms: '📥 Genera File DMS',
+    btn_dl_csv: '📥 Scarica CSV', btn_gen_istat: '📥 Genera Report',
+    qr_title: 'Link App Ospiti',
+    qr_desc: 'Condividi questo link con gli ospiti prima dell\'arrivo, o stampa il QR code e mettilo nell\'appartamento.',
+    btn_copy_link: '📋 Copia Link', btn_print_qr: '🖨 Stampa QR',
+    template_title: 'Modello Messaggio Pre-Arrivo',
+    template_desc: 'Invia questo agli ospiti quando prenotano. Personalizza come preferisci.',
+    btn_copy_template: '📋 Copia Modello',
+    toast_property_saved: 'Dettagli proprietà salvati!', toast_rules_saved: 'Regole salvate nel database!',
+    toast_recos_saved: 'Consigli salvati nel database!', toast_link_copied: 'Link copiato!',
+    toast_template_copied: 'Modello copiato!', toast_istat: 'Report ISTAT generato!',
+  }
+};
+
+function h(key) { return HT[hostLang][key] || HT['en'][key] || key; }
+
+function setHostLang(l) {
+  hostLang = l;
+  // Update toggle buttons
+  document.querySelectorAll('.lang-opt-h').forEach(btn => {
+    const isActive = btn.textContent.trim() === l.toUpperCase();
+    btn.style.background = isActive ? 'var(--white)' : 'none';
+    btn.style.color = isActive ? 'var(--warm)' : 'var(--ink-soft)';
+    btn.style.boxShadow = isActive ? '0 1px 3px rgba(30,16,8,0.06)' : 'none';
+  });
+  // Update sidebar
+  document.querySelectorAll('[data-h]').forEach(el => { el.textContent = h(el.getAttribute('data-h')); });
+  // Re-render dynamic content
+  renderDashboard();
+  renderCheckins();
+  renderRules();
+  renderRecos();
+  // Update current panel title
+  const activePanel = document.querySelector('.panel.active')?.id?.replace('panel-','');
+  if (activePanel && titles[activePanel]) {
+    document.getElementById('panelTitle').textContent = titles[activePanel][0];
+    document.getElementById('panelSubtitle').textContent = titles[activePanel][1];
+  }
+}
 
 /* ══════════════════════════════════════
    NAV
 ══════════════════════════════════════ */
-const titles = {
-  dashboard: ['Dashboard', 'Overview of your property and guests'],
-  property: ['Property Details', 'Edit your property information'],
-  rules: ['House Rules', 'Manage rules shown to guests'],
-  recos: ['Recommendations', 'Curate local tips for your guests'],
-  checkins: ['Check-in Data', 'View and manage guest registrations'],
-  export: ['Export & Compliance', 'Generate files for Italian authorities'],
-  qrlink: ['QR Code & Link', 'Share your guest portal'],
+const titlesMap = {
+  dashboard: ['t_dashboard', 's_dashboard'],
+  property: ['t_property', 's_property'],
+  rules: ['t_rules', 's_rules'],
+  recos: ['t_recos', 's_recos'],
+  checkins: ['t_checkins', 's_checkins'],
+  export: ['t_export', 's_export'],
+  qrlink: ['t_qrlink', 's_qrlink'],
 };
+// Keep old titles object for compatibility
+const titles = {};
+Object.keys(titlesMap).forEach(k => {
+  Object.defineProperty(titles, k, { get: () => [h(titlesMap[k][0]), h(titlesMap[k][1])] });
+});
 
 function showPanel(id, btn) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
@@ -798,34 +967,34 @@ function renderDashboard() {
   document.getElementById('panel-dashboard').innerHTML = `
     <div class="stat-grid">
       <div class="stat-card">
-        <div class="stat-label">Total Check-ins</div>
+        <div class="stat-label">${h('stat_checkins')}</div>
         <div class="stat-value">${total}</div>
-        <div class="stat-change up">All time</div>
+        <div class="stat-change up">${h('stat_alltime')}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Pending Documents</div>
+        <div class="stat-label">${h('stat_pending')}</div>
         <div class="stat-value" style="color:${pending>0?'var(--amber)':'var(--green)'}">${pending}</div>
-        <div class="stat-change ${pending>0?'down':'up'}">${pending>0?'Needs attention':'All complete'}</div>
+        <div class="stat-change ${pending>0?'down':'up'}">${pending>0?h('stat_attention'):h('stat_complete')}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Alloggiati Filed</div>
+        <div class="stat-label">${h('stat_filed')}</div>
         <div class="stat-value" style="color:var(--green)">${filed}</div>
-        <div class="stat-change up">${total>0?Math.round(filed/total*100)+'% done':'No guests yet'}</div>
+        <div class="stat-change up">${total>0?Math.round(filed/total*100)+h('stat_done'):h('stat_no_guests')}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Chat Messages</div>
+        <div class="stat-label">${h('stat_chat')}</div>
         <div class="stat-value">${allChats.length}</div>
-        <div class="stat-change up">${allChats.filter(c=>c.sender==='guest').length} from guests</div>
+        <div class="stat-change up">${allChats.filter(c=>c.sender==='guest').length} ${h('stat_from_guests')}</div>
       </div>
     </div>
 
     <div class="table-wrap">
       <div class="table-header">
-        <div class="table-title">Recent Check-ins</div>
-        <button class="btn btn-secondary btn-sm" onclick="showPanel('checkins', document.querySelector('[onclick*=checkins]'))">View All →</button>
+        <div class="table-title">${h('recent_checkins')}</div>
+        <button class="btn btn-secondary btn-sm" onclick="showPanel('checkins', document.querySelector('[onclick*=checkins]'))">${h('view_all')}</button>
       </div>
       <table>
-        <thead><tr><th>Guest</th><th>Type</th><th>Citizenship</th><th>Document</th><th>Docs</th><th>Submitted</th></tr></thead>
+        <thead><tr><th>${h('th_guest')}</th><th>${h('th_type')}</th><th>${h('th_citizenship')}</th><th>${h('th_document')}</th><th>${h('th_docs')}</th><th>${h('th_submitted')}</th></tr></thead>
         <tbody>
           ${allCheckins.slice(0,5).map(c => `
             <tr>
@@ -833,10 +1002,10 @@ function renderDashboard() {
               <td>${c.guest_type}</td>
               <td>${c.citizenship}</td>
               <td>${c.document_type}<br><span style="font-size:0.6rem;color:var(--ink-soft)">${c.document_number}</span></td>
-              <td><span class="status-badge ${c.docs_status==='complete'?'complete':c.docs_status==='partial'?'pending':'missing'}">${c.docs_status==='complete'?'✓ Complete':c.docs_status==='partial'?'⏳ Partial':'✗ Missing'}</span></td>
-              <td style="font-size:0.68rem;color:var(--ink-soft)">${new Date(c.submitted_at).toLocaleDateString('en-GB')}</td>
+              <td><span class="status-badge ${c.docs_status==='complete'?'complete':c.docs_status==='partial'?'pending':'missing'}">${c.docs_status==='complete'?h('doc_complete'):c.docs_status==='partial'?h('doc_partial'):h('doc_missing')}</span></td>
+              <td style="font-size:0.68rem;color:var(--ink-soft)">${new Date(c.submitted_at).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB')}</td>
             </tr>
-          `).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--ink-soft);padding:24px;">No check-ins yet. Share your guest link to get started!</td></tr>'}
+          `).join('') || `<tr><td colspan="6" style="text-align:center;color:var(--ink-soft);padding:24px;">${h('no_checkins')}</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -851,15 +1020,15 @@ function renderCheckins() {
     <tr>
       <td><strong>${c.surname} ${c.name}</strong></td>
       <td>${c.guest_type}</td>
-      <td>${c.date_of_birth ? new Date(c.date_of_birth).toLocaleDateString('en-GB') : '—'}<br><span style="font-size:0.6rem;color:var(--ink-soft)">${c.place_of_birth || ''}</span></td>
+      <td>${c.date_of_birth ? new Date(c.date_of_birth).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB') : '—'}<br><span style="font-size:0.6rem;color:var(--ink-soft)">${c.place_of_birth || ''}</span></td>
       <td>${c.citizenship}</td>
       <td>${c.document_type}<br><span style="font-size:0.6rem;color:var(--ink-soft)">${c.document_number}</span></td>
-      <td style="font-size:0.68rem">${new Date(c.submitted_at).toLocaleDateString('en-GB')}</td>
+      <td style="font-size:0.68rem">${new Date(c.submitted_at).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB')}</td>
       <td><span class="status-badge ${c.docs_status==='complete'?'complete':c.docs_status==='partial'?'pending':'missing'}">${c.docs_status==='complete'?'✓':c.docs_status==='partial'?'⏳':'✗'}</span></td>
-      <td><span class="status-badge ${c.alloggiati_status==='filed'?'complete':'missing'}">${c.alloggiati_status==='filed'?'✓ Filed':'Pending'}</span></td>
-      <td><button class="btn btn-secondary btn-sm" onclick="viewGuest('${c.id}')">View</button></td>
+      <td><span class="status-badge ${c.alloggiati_status==='filed'?'complete':'missing'}">${c.alloggiati_status==='filed'?h('alloggiati_filed'):h('alloggiati_pending')}</span></td>
+      <td><button class="btn btn-secondary btn-sm" onclick="viewGuest('${c.id}')">${h('btn_view')}</button></td>
     </tr>
-  `).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--ink-soft);padding:24px;">No check-ins yet</td></tr>';
+  `).join('') || `<tr><td colspan="9" style="text-align:center;color:var(--ink-soft);padding:24px;">${h('no_checkins')}</td></tr>`;
 
   document.getElementById('checkinCount').textContent = allCheckins.length;
 }

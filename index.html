@@ -544,7 +544,7 @@ body {
 <!-- WELCOME -->
 <div class="page active" id="page-welcome">
   <div class="top-bar">
-    <div class="top-bar-title">Casa Sole</div>
+    <div class="top-bar-title" id="topBarTitle">Casa Sole</div>
     <div class="lang-toggle">
       <button class="lang-opt active" onclick="setLang('en')">EN</button>
       <button class="lang-opt" onclick="setLang('it')">IT</button>
@@ -552,11 +552,11 @@ body {
   </div>
 
   <div class="welcome-hero">
-    <img class="welcome-hero-img" src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80" alt="Casa Sole">
+    <img class="welcome-hero-img" id="heroImg" src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80" alt="Property">
     <div class="welcome-hero-overlay"></div>
     <div class="welcome-hero-content">
-      <div class="welcome-hero-badge">☀ Bari Vecchia, Puglia</div>
-      <h1 class="welcome-hero-title" data-i18n="welcome_title">Welcome to<br><em>Casa Sole</em></h1>
+      <div class="welcome-hero-badge" id="heroBadge">☀ Bari Vecchia, Puglia</div>
+      <h1 class="welcome-hero-title" id="heroTitle" data-i18n="welcome_title">Welcome to<br><em>Casa Sole</em></h1>
       <p class="welcome-hero-sub" data-i18n="welcome_sub">Your home in the heart of the old city</p>
     </div>
   </div>
@@ -565,45 +565,45 @@ body {
     <div class="quick-card">
       <div class="quick-card-icon">📶</div>
       <div class="quick-card-label">WiFi</div>
-      <div class="quick-card-value">CasaSole_5G</div>
-      <div class="quick-card-sub" data-i18n="wifi_pass">Password: sole2025!</div>
+      <div class="quick-card-value" id="wifiName">CasaSole_5G</div>
+      <div class="quick-card-sub" id="wifiPass" data-i18n="wifi_pass">Password: sole2025!</div>
     </div>
     <div class="quick-card">
       <div class="quick-card-icon">📍</div>
       <div class="quick-card-label" data-i18n="address_label">Address</div>
-      <div class="quick-card-value" style="font-size:0.82rem">Via Venezia 14</div>
-      <div class="quick-card-sub">70122 Bari (BA)</div>
+      <div class="quick-card-value" id="propAddress" style="font-size:0.82rem">Via Venezia 14</div>
+      <div class="quick-card-sub" id="propCityZip">70122 Bari (BA)</div>
     </div>
     <div class="quick-card">
       <div class="quick-card-icon">🔑</div>
       <div class="quick-card-label">Check-in</div>
-      <div class="quick-card-value">15:00</div>
-      <div class="quick-card-sub" data-i18n="checkin_sub">Self check-in · Keybox</div>
+      <div class="quick-card-value" id="checkinTime">15:00</div>
+      <div class="quick-card-sub" id="accessMethod" data-i18n="checkin_sub">Self check-in · Keybox</div>
     </div>
     <div class="quick-card">
       <div class="quick-card-icon">🚪</div>
       <div class="quick-card-label">Check-out</div>
-      <div class="quick-card-value">10:00</div>
+      <div class="quick-card-value" id="checkoutTime">10:00</div>
       <div class="quick-card-sub" data-i18n="checkout_sub">Leave keys in the box</div>
     </div>
   </div>
 
   <div class="host-message">
     <div class="host-msg-header">
-      <div class="host-avatar">M</div>
+      <div class="host-avatar" id="hostAvatar">M</div>
       <div>
-        <div class="host-name">Marco & Lucia</div>
+        <div class="host-name" id="hostName">Marco & Lucia</div>
         <div class="host-role" data-i18n="host_role">Your hosts</div>
       </div>
     </div>
-    <div class="host-msg-text" data-i18n="host_msg">Welcome to Casa Sole! We're so happy to have you here. The apartment is in the very heart of Bari Vecchia — step outside and you're surrounded by history, bakeries, and the sea. If you need anything at all, use the chat in this app and we'll help right away. Enjoy your stay! 🌞</div>
+    <div class="host-msg-text" id="hostMsg" data-i18n="host_msg">Welcome to Casa Sole! We're so happy to have you here. The apartment is in the very heart of Bari Vecchia — step outside and you're surrounded by history, bakeries, and the sea. If you need anything at all, use the chat in this app and we'll help right away. Enjoy your stay! 🌞</div>
   </div>
 
   <div class="emergency-card">
     <div class="emergency-icon">🚨</div>
     <div>
       <div class="emergency-label" data-i18n="emergency_label">Emergency</div>
-      <div class="emergency-number">112 · Marco: +39 333 123 4567</div>
+      <div class="emergency-number" id="emergencyNum">112 · Marco: +39 333 123 4567</div>
     </div>
   </div>
 
@@ -1344,6 +1344,48 @@ async function init() {
       propertyId = data.id;
       propertyData = data;
       console.log('✅ Property loaded from Supabase:', data.name);
+
+      // Populate welcome page from DB
+      const d = data;
+      const el = (id) => document.getElementById(id);
+      if (el('topBarTitle')) el('topBarTitle').textContent = d.name || 'Property';
+      if (el('heroTitle')) el('heroTitle').innerHTML = `Welcome to<br><em>${d.name || 'Your Stay'}</em>`;
+      if (el('heroBadge')) el('heroBadge').textContent = `☀ ${d.city || 'City'}, ${d.region || 'Region'}`;
+      if (el('heroImg') && d.hero_image_url) el('heroImg').src = d.hero_image_url;
+      if (el('wifiName')) el('wifiName').textContent = d.wifi_name || '—';
+      if (el('wifiPass')) el('wifiPass').textContent = `Password: ${d.wifi_password || '—'}`;
+      if (el('propAddress')) el('propAddress').textContent = d.address || '—';
+      if (el('propCityZip')) el('propCityZip').textContent = `${d.zip || ''} ${d.city || ''} (${d.region || ''})`;
+      if (el('checkinTime')) el('checkinTime').textContent = d.checkin_time ? d.checkin_time.slice(0,5) : '15:00';
+      if (el('checkoutTime')) el('checkoutTime').textContent = d.checkout_time ? d.checkout_time.slice(0,5) : '10:00';
+      if (el('accessMethod')) el('accessMethod').textContent = d.access_method || 'Self check-in';
+      if (el('hostName')) el('hostName').textContent = d.host_names || 'Your Host';
+      if (el('hostAvatar')) el('hostAvatar').textContent = (d.host_names || 'H').charAt(0);
+      if (el('hostMsg') && d.welcome_message) el('hostMsg').textContent = d.welcome_message;
+      if (el('emergencyNum')) el('emergencyNum').textContent = `112 · ${d.host_names || 'Host'}: ${d.host_phone || ''}`;
+
+      // Update i18n translations with DB data
+      T.en.welcome_title = `Welcome to<br><em>${d.name}</em>`;
+      T.it.welcome_title = `Benvenuti a<br><em>${d.name}</em>`;
+      T.en.wifi_pass = `Password: ${d.wifi_password || '—'}`;
+      T.it.wifi_pass = `Password: ${d.wifi_password || '—'}`;
+      T.en.host_msg = d.welcome_message || T.en.host_msg;
+      T.it.host_msg = d.welcome_message || T.it.host_msg;
+      T.en.chat_h2 = `🏠 ${d.name} Concierge`;
+      T.it.chat_h2 = `🏠 Concierge ${d.name}`;
+      T.en.chat_welcome = `Ciao! 🌞 I'm the ${d.name} concierge. I know everything about the apartment, the neighbourhood, restaurants, and the area. How can I help you today?`;
+      T.it.chat_welcome = `Ciao! 🌞 Sono il concierge di ${d.name}. Conosco tutto sull'appartamento, il quartiere, i ristoranti e la zona. Come posso aiutarti oggi?`;
+
+      // Update chat knowledge base with real data
+      if (d.wifi_name && d.wifi_password) {
+        chatKB.en.wifi = `The WiFi network is **${d.wifi_name}** and the password is **${d.wifi_password}**. Great coverage throughout.`;
+        chatKB.it.wifi = `La rete WiFi è **${d.wifi_name}**, password **${d.wifi_password}**. Ottima copertura.`;
+      }
+      if (d.checkout_time) {
+        const ct = d.checkout_time.slice(0,5);
+        chatKB.en.checkout = `Check-out is at **${ct}**. Leave keys in the lockbox and scramble the code. Strip bed linen and run the dishwasher if you can!`;
+        chatKB.it.checkout = `Check-out alle **${ct}**. Chiavi nella lockbox, mescolate il codice. Togliete le lenzuola e avviate la lavastoviglie!`;
+      }
     }
   } catch (e) { console.log('Using fallback property data'); }
 

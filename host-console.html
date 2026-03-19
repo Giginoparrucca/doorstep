@@ -324,9 +324,117 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   transition: all 0.3s ease;
 }
 .toast.show { transform: translateY(0); opacity: 1; }
+
+/* ── LOGIN SCREEN ── */
+.login-overlay {
+  position: fixed; inset: 0; z-index: 10000;
+  background: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.4s ease;
+}
+.login-overlay.hidden { opacity: 0; pointer-events: none; }
+.login-card {
+  background: var(--white); border-radius: 20px;
+  padding: 40px 36px; width: 90%; max-width: 380px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  text-align: center;
+}
+.login-logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.6rem; font-weight: 500; color: var(--ink);
+  margin-bottom: 4px;
+}
+.login-logo em { font-style: italic; color: var(--warm); }
+.login-badge {
+  display: inline-block; font-size: 0.48rem; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--warm);
+  background: rgba(194,113,79,0.08); padding: 3px 10px;
+  border-radius: 4px; margin-bottom: 24px;
+}
+.login-card .form-group { text-align: left; margin-bottom: 14px; }
+.login-card .form-label { font-size: 0.65rem; font-weight: 600; color: var(--ink-2); margin-bottom: 4px; display: block; }
+.login-card .form-input {
+  width: 100%; padding: 11px 14px; border: 1px solid var(--border);
+  border-radius: var(--radius-s); font-family: 'DM Sans', sans-serif;
+  font-size: 0.82rem; color: var(--ink); background: var(--cream);
+}
+.login-card .form-input:focus { outline: none; border-color: var(--warm); box-shadow: 0 0 0 3px rgba(194,113,79,0.1); }
+.login-btn {
+  width: 100%; padding: 13px; border: none; border-radius: var(--radius-s);
+  background: var(--warm); color: #fff; font-family: 'DM Sans', sans-serif;
+  font-size: 0.85rem; font-weight: 600; cursor: pointer; margin-top: 8px;
+  transition: background 0.2s;
+}
+.login-btn:hover { background: var(--warm-d); }
+.login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.login-toggle {
+  margin-top: 16px; font-size: 0.72rem; color: var(--ink-soft);
+}
+.login-toggle a {
+  color: var(--warm); text-decoration: none; font-weight: 600; cursor: pointer;
+}
+.login-error {
+  background: var(--red-bg); color: var(--red); padding: 8px 12px;
+  border-radius: 6px; font-size: 0.72rem; margin-bottom: 12px;
+  display: none;
+}
+.login-error.show { display: block; }
+
+/* ── PHOTO UPLOAD ── */
+.photo-upload-zone {
+  position: relative; width: 100%; height: 180px;
+  border: 2px dashed var(--border); border-radius: var(--radius);
+  overflow: hidden; cursor: pointer; transition: border-color 0.2s;
+  background: var(--cream);
+}
+.photo-upload-zone:hover { border-color: var(--warm); }
+.photo-upload-zone.has-photo { border: none; }
+.photo-upload-zone img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.photo-upload-zone .photo-placeholder {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 6px; color: var(--ink-soft);
+}
+.photo-upload-zone .photo-placeholder .ph-icon { font-size: 2rem; }
+.photo-upload-zone .photo-placeholder .ph-text { font-size: 0.72rem; font-weight: 300; }
+.photo-upload-zone .photo-placeholder .ph-text strong { color: var(--warm); font-weight: 500; }
+.photo-upload-overlay {
+  position: absolute; inset: 0;
+  background: rgba(30,16,8,0.5);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.2s;
+  color: #fff; font-size: 0.78rem; font-weight: 500;
+}
+.photo-upload-zone:hover .photo-upload-overlay { opacity: 1; }
 </style>
 </head>
 <body>
+
+<!-- LOGIN SCREEN -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="login-logo">Door<em>step</em></div>
+    <div class="login-badge">Host Console</div>
+    <div class="login-error" id="loginError"></div>
+    <div id="loginForm">
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" type="email" id="loginEmail" placeholder="you@example.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" type="password" id="loginPassword" placeholder="••••••••" onkeydown="if(event.key==='Enter')handleAuth()">
+      </div>
+      <button class="login-btn" id="authBtn" onclick="handleAuth()">Sign In</button>
+      <div class="login-toggle" id="authToggle">
+        Don't have an account? <a onclick="toggleAuthMode()">Create one</a>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- SIDEBAR -->
 <aside class="sidebar" id="sidebar">
@@ -374,12 +482,15 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     </button>
   </nav>
 
-  <div class="sidebar-footer">
-    <div class="sidebar-avatar">ML</div>
-    <div>
-      <div class="sidebar-user-name">Marco & Lucia</div>
-      <div class="sidebar-user-role" data-h="sidebar_role">Property Manager</div>
+  <div class="sidebar-footer" style="flex-direction:column;gap:10px;">
+    <div style="display:flex;align-items:center;gap:10px;width:100%;">
+      <div class="sidebar-avatar">ML</div>
+      <div>
+        <div class="sidebar-user-name">Marco & Lucia</div>
+        <div class="sidebar-user-role" data-h="sidebar_role">Property Manager</div>
+      </div>
     </div>
+    <button onclick="signOut()" style="width:100%;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:none;color:rgba(244,237,224,0.4);font-size:0.6rem;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.color='#fff';this.style.borderColor='rgba(255,255,255,0.3)'" onmouseout="this.style.color='rgba(244,237,224,0.4)';this.style.borderColor='rgba(255,255,255,0.1)'">Sign Out</button>
   </div>
 </aside>
 
@@ -464,6 +575,22 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
     <!-- ════════════ PROPERTY DETAILS ════════════ -->
     <div class="panel" id="panel-property">
+      <div class="form-card">
+        <div class="form-card-title">Cover Photo</div>
+        <div class="form-card-desc">This photo appears as the hero image on the guest welcome screen.</div>
+        <div class="photo-upload-zone" id="coverPhotoZone" onclick="document.getElementById('coverPhotoInput').click()">
+          <img id="coverPhotoPreview" src="" style="display:none">
+          <div class="photo-placeholder" id="coverPhotoPlaceholder">
+            <div class="ph-icon">📸</div>
+            <div class="ph-text">Click to upload <strong>cover photo</strong></div>
+            <div class="ph-text" style="font-size:0.6rem;color:rgba(122,90,72,0.4)">JPG or PNG · Recommended 1200×600px</div>
+          </div>
+          <div class="photo-upload-overlay">📸 Change Photo</div>
+        </div>
+        <input type="file" id="coverPhotoInput" accept="image/*" style="display:none" onchange="handleCoverUpload(this)">
+        <div style="margin-top:8px;font-size:0.6rem;color:var(--ink-soft)" id="coverPhotoStatus"></div>
+      </div>
+
       <div class="form-card">
         <div class="form-card-title">Basic Information</div>
         <div class="form-card-desc">This information will appear on the guest welcome screen.</div>
@@ -769,6 +896,127 @@ let propertyData = null;
 let allCheckins = [];
 let allChats = [];
 let hostLang = 'en';
+let isSignUp = false;
+
+/* ══════════════════════════════════════
+   AUTHENTICATION
+══════════════════════════════════════ */
+async function checkAuth() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    document.getElementById('loginOverlay').classList.add('hidden');
+    return true;
+  }
+  document.getElementById('loginOverlay').classList.remove('hidden');
+  return false;
+}
+
+function toggleAuthMode() {
+  isSignUp = !isSignUp;
+  document.getElementById('authBtn').textContent = isSignUp ? 'Create Account' : 'Sign In';
+  document.getElementById('authToggle').innerHTML = isSignUp
+    ? 'Already have an account? <a onclick="toggleAuthMode()">Sign in</a>'
+    : 'Don\'t have an account? <a onclick="toggleAuthMode()">Create one</a>';
+  document.getElementById('loginError').classList.remove('show');
+}
+
+async function handleAuth() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  const btn = document.getElementById('authBtn');
+
+  if (!email || !password) { errEl.textContent = 'Please fill in both fields'; errEl.classList.add('show'); return; }
+  if (password.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; errEl.classList.add('show'); return; }
+
+  btn.disabled = true;
+  btn.textContent = isSignUp ? 'Creating account…' : 'Signing in…';
+  errEl.classList.remove('show');
+
+  try {
+    let result;
+    if (isSignUp) {
+      result = await sb.auth.signUp({ email, password });
+    } else {
+      result = await sb.auth.signInWithPassword({ email, password });
+    }
+
+    if (result.error) {
+      errEl.textContent = result.error.message;
+      errEl.classList.add('show');
+      btn.disabled = false;
+      btn.textContent = isSignUp ? 'Create Account' : 'Sign In';
+      return;
+    }
+
+    if (isSignUp && result.data?.user?.identities?.length === 0) {
+      errEl.textContent = 'An account with this email already exists. Try signing in.';
+      errEl.classList.add('show');
+      btn.disabled = false;
+      btn.textContent = 'Create Account';
+      return;
+    }
+
+    // Success
+    document.getElementById('loginOverlay').classList.add('hidden');
+    init();
+  } catch (e) {
+    errEl.textContent = 'Connection error. Please try again.';
+    errEl.classList.add('show');
+    btn.disabled = false;
+    btn.textContent = isSignUp ? 'Create Account' : 'Sign In';
+  }
+}
+
+// Sign out function
+async function signOut() {
+  await sb.auth.signOut();
+  document.getElementById('loginOverlay').classList.remove('hidden');
+}
+
+/* ══════════════════════════════════════
+   COVER PHOTO UPLOAD
+══════════════════════════════════════ */
+async function handleCoverUpload(input) {
+  if (!input.files.length) return;
+  const file = input.files[0];
+  const status = document.getElementById('coverPhotoStatus');
+
+  status.textContent = 'Uploading…';
+  status.style.color = 'var(--warm)';
+
+  try {
+    const ext = file.name.split('.').pop();
+    const path = `covers/${propertyId || 'default'}_${Date.now()}.${ext}`;
+    const { data, error } = await sb.storage.from('property-images').upload(path, file, { upsert: true });
+
+    if (error) { status.textContent = 'Upload failed: ' + error.message; status.style.color = 'var(--red)'; return; }
+
+    // Get public URL
+    const { data: urlData } = sb.storage.from('property-images').getPublicUrl(path);
+    const publicUrl = urlData.publicUrl;
+
+    // Update property record
+    if (propertyId) {
+      await sb.from('properties').update({ hero_image_url: publicUrl }).eq('id', propertyId);
+    }
+
+    // Update preview
+    const preview = document.getElementById('coverPhotoPreview');
+    preview.src = publicUrl;
+    preview.style.display = 'block';
+    document.getElementById('coverPhotoPlaceholder').style.display = 'none';
+    document.getElementById('coverPhotoZone').classList.add('has-photo');
+
+    status.textContent = '✓ Photo uploaded and saved!';
+    status.style.color = 'var(--green)';
+    toast('Cover photo updated!');
+  } catch (e) {
+    status.textContent = 'Upload error. Try again.';
+    status.style.color = 'var(--red)';
+    console.error(e);
+  }
+}
 
 /* ══════════════════════════════════════
    HOST CONSOLE i18n
@@ -1267,6 +1515,10 @@ function viewGuest(id) {
    INIT — Load everything from Supabase
 ══════════════════════════════════════ */
 async function init() {
+  // Check auth first
+  const authed = await checkAuth();
+  if (!authed) return;
+
   // 1. Load property
   try {
     const { data } = await sb.from('properties').select('*').limit(1).single();
@@ -1289,6 +1541,16 @@ async function init() {
       if (document.getElementById('propWelcome')) document.getElementById('propWelcome').value = data.welcome_message || '';
       if (document.getElementById('propPhone')) document.getElementById('propPhone').value = data.host_phone || '';
       if (document.getElementById('propHostNames')) document.getElementById('propHostNames').value = data.host_names || '';
+      // Load cover photo preview
+      if (data.hero_image_url) {
+        const preview = document.getElementById('coverPhotoPreview');
+        if (preview) {
+          preview.src = data.hero_image_url;
+          preview.style.display = 'block';
+          document.getElementById('coverPhotoPlaceholder').style.display = 'none';
+          document.getElementById('coverPhotoZone').classList.add('has-photo');
+        }
+      }
     }
   } catch (e) { console.log('No property found'); }
 

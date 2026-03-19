@@ -483,15 +483,15 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           </div>
           <div class="form-group">
             <label class="form-label">Street Address</label>
-            <input class="form-input" value="Via Venezia 14">
+            <input class="form-input" value="Via Venezia 14" id="propAddress">
           </div>
           <div class="form-group">
             <label class="form-label">City / ZIP</label>
-            <input class="form-input" value="Bari (BA) 70122">
+            <input class="form-input" value="Bari (BA) 70122" id="propCity">
           </div>
           <div class="form-group">
             <label class="form-label">Region</label>
-            <input class="form-input" value="Puglia">
+            <input class="form-input" value="Puglia" id="propRegion">
           </div>
           <div class="form-group">
             <label class="form-label">CIR Code (Regional ID)</label>
@@ -507,15 +507,15 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label">Check-in Time</label>
-            <input class="form-input" type="time" value="15:00">
+            <input class="form-input" type="time" value="15:00" id="propCheckinTime">
           </div>
           <div class="form-group">
             <label class="form-label">Check-out Time</label>
-            <input class="form-input" type="time" value="10:00">
+            <input class="form-input" type="time" value="10:00" id="propCheckoutTime">
           </div>
           <div class="form-group">
             <label class="form-label">Access Method</label>
-            <select class="form-select">
+            <select class="form-select" id="propAccess">
               <option selected>Self check-in · Keybox</option>
               <option>In person handover</option>
               <option>Smart lock</option>
@@ -523,7 +523,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           </div>
           <div class="form-group">
             <label class="form-label">Keybox Code</label>
-            <input class="form-input" type="text" value="4821">
+            <input class="form-input" type="text" value="4821" id="propKeybox">
             <div class="form-hint">Sent to guest before arrival (not shown in app)</div>
           </div>
         </div>
@@ -534,23 +534,23 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label">WiFi Network</label>
-            <input class="form-input" value="CasaSole_5G">
+            <input class="form-input" value="CasaSole_5G" id="propWifiName">
           </div>
           <div class="form-group">
             <label class="form-label">WiFi Password</label>
-            <input class="form-input" value="sole2025!">
+            <input class="form-input" value="sole2025!" id="propWifiPass">
           </div>
           <div class="form-group full">
             <label class="form-label">Host Welcome Message</label>
-            <textarea class="form-textarea">Welcome to Casa Sole! We're so happy to have you here. The apartment is in the very heart of Bari Vecchia — step outside and you're surrounded by history, bakeries, and the sea. If you need anything at all, use the chat in this app and we'll help right away. Enjoy your stay! 🌞</textarea>
+            <textarea class="form-textarea" id="propWelcome">Welcome to Casa Sole! We're so happy to have you here. The apartment is in the very heart of Bari Vecchia — step outside and you're surrounded by history, bakeries, and the sea. If you need anything at all, use the chat in this app and we'll help right away. Enjoy your stay! 🌞</textarea>
           </div>
           <div class="form-group">
             <label class="form-label">Emergency Phone</label>
-            <input class="form-input" value="+39 333 123 4567">
+            <input class="form-input" value="+39 333 123 4567" id="propPhone">
           </div>
           <div class="form-group">
             <label class="form-label">Host Name(s)</label>
-            <input class="form-input" value="Marco & Lucia">
+            <input class="form-input" value="Marco & Lucia" id="propHostNames">
           </div>
         </div>
       </div>
@@ -1039,17 +1039,25 @@ function renderCheckins() {
 async function saveProperty() {
   if (!propertyId) { toast('No property found!'); return; }
   const update = {
-    name: document.getElementById('propName')?.value,
-    wifi_name: document.querySelector('[value="CasaSole_5G"]')?.value,
-  };
-  // Collect all form inputs from property panel
-  const inputs = document.querySelectorAll('#panel-property .form-input, #panel-property .form-textarea, #panel-property .form-select');
-  // We'll do a simple save for now
-  const { error } = await sb.from('properties').update({
     name: document.getElementById('propName').value,
-  }).eq('id', propertyId);
+    address: document.getElementById('propAddress').value,
+    city: document.getElementById('propCity').value,
+    region: document.getElementById('propRegion').value,
+    cir_code: document.getElementById('cirCode').value,
+    checkin_time: document.getElementById('propCheckinTime').value,
+    checkout_time: document.getElementById('propCheckoutTime').value,
+    access_method: document.getElementById('propAccess').value,
+    keybox_code: document.getElementById('propKeybox').value,
+    wifi_name: document.getElementById('propWifiName').value,
+    wifi_password: document.getElementById('propWifiPass').value,
+    welcome_message: document.getElementById('propWelcome').value,
+    host_phone: document.getElementById('propPhone').value,
+    host_names: document.getElementById('propHostNames').value,
+  };
+  const { error } = await sb.from('properties').update(update).eq('id', propertyId);
   if (error) { console.error(error); toast('Error saving!'); return; }
-  toast('Property details saved!');
+  propertyData = { ...propertyData, ...update };
+  toast(h('toast_property_saved'));
 }
 
 /* ══════════════════════════════════════
@@ -1268,7 +1276,19 @@ async function init() {
       console.log('✅ Property loaded:', data.name);
       // Fill in property form fields
       if (document.getElementById('propName')) document.getElementById('propName').value = data.name || '';
+      if (document.getElementById('propAddress')) document.getElementById('propAddress').value = data.address || '';
+      if (document.getElementById('propCity')) document.getElementById('propCity').value = `${data.city || ''} ${data.zip || ''}`.trim();
+      if (document.getElementById('propRegion')) document.getElementById('propRegion').value = data.region || '';
       if (document.getElementById('cirCode')) document.getElementById('cirCode').value = data.cir_code || '';
+      if (document.getElementById('propCheckinTime')) document.getElementById('propCheckinTime').value = data.checkin_time || '15:00';
+      if (document.getElementById('propCheckoutTime')) document.getElementById('propCheckoutTime').value = data.checkout_time || '10:00';
+      if (document.getElementById('propAccess')) document.getElementById('propAccess').value = data.access_method || 'Self check-in · Keybox';
+      if (document.getElementById('propKeybox')) document.getElementById('propKeybox').value = data.keybox_code || '';
+      if (document.getElementById('propWifiName')) document.getElementById('propWifiName').value = data.wifi_name || '';
+      if (document.getElementById('propWifiPass')) document.getElementById('propWifiPass').value = data.wifi_password || '';
+      if (document.getElementById('propWelcome')) document.getElementById('propWelcome').value = data.welcome_message || '';
+      if (document.getElementById('propPhone')) document.getElementById('propPhone').value = data.host_phone || '';
+      if (document.getElementById('propHostNames')) document.getElementById('propHostNames').value = data.host_names || '';
     }
   } catch (e) { console.log('No property found'); }
 

@@ -484,9 +484,9 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
   <div class="sidebar-footer" style="flex-direction:column;gap:10px;">
     <div style="display:flex;align-items:center;gap:10px;width:100%;">
-      <div class="sidebar-avatar">ML</div>
+      <div class="sidebar-avatar" id="sidebarAvatar">D</div>
       <div>
-        <div class="sidebar-user-name">Marco & Lucia</div>
+        <div class="sidebar-user-name" id="sidebarUserName">Host</div>
         <div class="sidebar-user-role" data-h="sidebar_role">Property Manager</div>
       </div>
     </div>
@@ -1519,6 +1519,16 @@ async function init() {
   const authed = await checkAuth();
   if (!authed) return;
 
+  // Set sidebar user info from auth session
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session?.user) {
+      const email = session.user.email || '';
+      document.getElementById('sidebarUserName').textContent = email.split('@')[0];
+      document.getElementById('sidebarAvatar').textContent = email.charAt(0).toUpperCase();
+    }
+  } catch (e) {}
+
   // 1. Load property
   try {
     const { data } = await sb.from('properties').select('*').limit(1).single();
@@ -1550,6 +1560,11 @@ async function init() {
           document.getElementById('coverPhotoPlaceholder').style.display = 'none';
           document.getElementById('coverPhotoZone').classList.add('has-photo');
         }
+      }
+      // Update sidebar with host names
+      if (data.host_names) {
+        document.getElementById('sidebarUserName').textContent = data.host_names;
+        document.getElementById('sidebarAvatar').textContent = data.host_names.charAt(0);
       }
     }
   } catch (e) { console.log('No property found'); }

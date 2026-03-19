@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doorstep · Host Console</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --warm: #C2714F;
+  --warm-l: #D4876A;
+  --warm-d: #9E5538;
+  --cream: #FAF6F0;
+  --cream-2: #F0EAE0;
+  --cream-3: #E8DFD0;
+  --gold: #C9A96E;
+  --ink: #1E1008;
+  --ink-2: #3A2218;
+  --ink-soft: #7A5A48;
+  --white: #FFFFFF;
+  --green: #4CAF7D;
+  --green-bg: #E8F5EE;
+  --amber: #E8A840;
+  --amber-bg: #FFF8EB;
+  --red: #D94B4B;
+  --red-bg: #FDECEC;
+  --blue: #4A90D9;
+  --blue-bg: #EBF3FC;
+  --border: rgba(194,113,79,0.12);
+  --shadow-s: 0 1px 3px rgba(30,16,8,0.05);
+  --shadow-m: 0 4px 16px rgba(30,16,8,0.07);
+  --radius: 12px;
+  --radius-s: 8px;
+  --sidebar-w: 240px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); }
+body { display: flex; overflow: hidden; }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width: var(--sidebar-w); min-width: var(--sidebar-w);
+  background: var(--ink); color: var(--cream);
+  display: flex; flex-direction: column;
+  border-right: 1px solid rgba(255,255,255,0.05);
+  z-index: 100;
+}
+.sidebar-brand {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.sidebar-logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.25rem; font-weight: 500; color: #fff;
+}
+.sidebar-logo em { font-style: italic; color: var(--gold); }
+.sidebar-badge {
+  display: inline-block; margin-top: 4px;
+  font-size: 0.48rem; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--warm-l);
+  background: rgba(194,113,79,0.12); padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.sidebar-nav { flex: 1; padding: 12px 10px; overflow-y: auto; }
+.sidebar-section {
+  font-size: 0.46rem; letter-spacing: 0.2em; text-transform: uppercase;
+  color: rgba(201,169,110,0.4); padding: 12px 10px 6px;
+}
+.sidebar-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border-radius: var(--radius-s);
+  cursor: pointer; transition: all 0.15s;
+  font-size: 0.78rem; color: rgba(244,237,224,0.55);
+  font-weight: 400; border: none; background: none;
+  width: 100%; text-align: left; font-family: 'DM Sans', sans-serif;
+}
+.sidebar-item:hover { background: rgba(255,255,255,0.05); color: rgba(244,237,224,0.85); }
+.sidebar-item.active { background: rgba(194,113,79,0.18); color: #fff; font-weight: 500; }
+.sidebar-item svg { width: 18px; height: 18px; flex-shrink: 0; stroke-width: 1.6; }
+.sidebar-item .badge-count {
+  margin-left: auto; background: var(--warm);
+  color: #fff; font-size: 0.55rem; font-weight: 700;
+  padding: 1px 7px; border-radius: 10px;
+}
+
+.sidebar-footer {
+  padding: 14px 16px; border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex; align-items: center; gap: 10px;
+}
+.sidebar-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--warm), var(--gold));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.72rem; color: #fff; font-weight: 600;
+}
+.sidebar-user-name { font-size: 0.72rem; color: rgba(244,237,224,0.8); }
+.sidebar-user-role { font-size: 0.52rem; color: rgba(244,237,224,0.35); }
+
+/* ── MAIN CONTENT ── */
+.main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+
+.main-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 28px;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 50;
+}
+.main-title { font-family: 'Playfair Display', serif; font-size: 1.35rem; font-weight: 500; }
+.main-subtitle { font-size: 0.72rem; color: var(--ink-soft); font-weight: 300; margin-top: 2px; }
+
+.header-actions { display: flex; gap: 8px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: var(--radius-s);
+  font-family: 'DM Sans', sans-serif; font-size: 0.75rem;
+  font-weight: 600; cursor: pointer; transition: all 0.15s;
+  border: none; text-decoration: none;
+}
+.btn-primary { background: var(--warm); color: #fff; }
+.btn-primary:hover { background: var(--warm-d); }
+.btn-secondary { background: var(--cream-2); color: var(--ink); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--cream-3); }
+.btn-success { background: var(--green); color: #fff; }
+.btn-danger { background: var(--red); color: #fff; }
+.btn-sm { padding: 5px 10px; font-size: 0.68rem; }
+
+.content { flex: 1; padding: 24px 28px 40px; }
+
+/* ── PANELS ── */
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* ── DASHBOARD STATS ── */
+.stat-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px; margin-bottom: 24px;
+}
+.stat-card {
+  background: var(--white); border-radius: var(--radius);
+  padding: 18px 20px; border: 1px solid var(--border);
+  box-shadow: var(--shadow-s);
+}
+.stat-label {
+  font-size: 0.5rem; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--ink-soft); margin-bottom: 6px;
+}
+.stat-value {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem; font-weight: 500; color: var(--ink); line-height: 1;
+}
+.stat-change { font-size: 0.62rem; margin-top: 4px; font-weight: 500; }
+.stat-change.up { color: var(--green); }
+.stat-change.down { color: var(--red); }
+
+/* ── TABLES ── */
+.table-wrap {
+  background: var(--white); border-radius: var(--radius);
+  border: 1px solid var(--border); overflow: hidden;
+  box-shadow: var(--shadow-s);
+}
+.table-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+}
+.table-title { font-weight: 600; font-size: 0.85rem; }
+table { width: 100%; border-collapse: collapse; }
+th {
+  text-align: left; padding: 10px 16px;
+  font-size: 0.5rem; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--ink-soft);
+  border-bottom: 1px solid var(--border);
+  background: rgba(250,246,240,0.5);
+  font-weight: 600;
+}
+td {
+  padding: 12px 16px; font-size: 0.78rem;
+  border-bottom: 1px solid rgba(194,113,79,0.06);
+  color: var(--ink-2);
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(250,246,240,0.6); }
+
+.status-badge {
+  display: inline-block; padding: 2px 8px;
+  border-radius: 4px; font-size: 0.6rem;
+  font-weight: 600; letter-spacing: 0.04em;
+}
+.status-badge.complete { background: var(--green-bg); color: var(--green); }
+.status-badge.pending { background: var(--amber-bg); color: var(--amber); }
+.status-badge.missing { background: var(--red-bg); color: var(--red); }
+
+/* ── FORMS ── */
+.form-card {
+  background: var(--white); border-radius: var(--radius);
+  border: 1px solid var(--border); padding: 24px;
+  box-shadow: var(--shadow-s); margin-bottom: 20px;
+}
+.form-card-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.1rem; font-weight: 500; margin-bottom: 4px;
+}
+.form-card-desc { font-size: 0.72rem; color: var(--ink-soft); margin-bottom: 18px; font-weight: 300; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group.full { grid-column: 1 / -1; }
+.form-label { font-size: 0.65rem; font-weight: 600; color: var(--ink-2); letter-spacing: 0.04em; }
+.form-input, .form-select, .form-textarea {
+  padding: 9px 12px; border: 1px solid var(--border);
+  border-radius: var(--radius-s); font-family: 'DM Sans', sans-serif;
+  font-size: 0.8rem; color: var(--ink); background: var(--white);
+  transition: border-color 0.2s; width: 100%;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  outline: none; border-color: var(--warm);
+  box-shadow: 0 0 0 3px rgba(194,113,79,0.08);
+}
+.form-textarea { min-height: 80px; resize: vertical; }
+.form-hint { font-size: 0.58rem; color: var(--ink-soft); }
+
+/* ── EDITABLE LIST ── */
+.edit-list { display: flex; flex-direction: column; gap: 10px; }
+.edit-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius-s); padding: 14px;
+}
+.edit-item-drag { color: var(--ink-soft); cursor: grab; margin-top: 2px; font-size: 0.9rem; }
+.edit-item-body { flex: 1; }
+.edit-item-actions { display: flex; gap: 4px; margin-top: 2px; }
+.edit-item-actions button {
+  background: none; border: none; cursor: pointer;
+  font-size: 0.9rem; padding: 2px; opacity: 0.5;
+  transition: opacity 0.15s;
+}
+.edit-item-actions button:hover { opacity: 1; }
+
+/* ── ALERT ── */
+.alert {
+  padding: 12px 16px; border-radius: var(--radius-s);
+  font-size: 0.75rem; margin-bottom: 16px;
+  display: flex; align-items: flex-start; gap: 8px;
+}
+.alert-info { background: var(--blue-bg); color: var(--blue); border: 1px solid rgba(74,144,217,0.15); }
+.alert-success { background: var(--green-bg); color: #2d7a4a; border: 1px solid rgba(76,175,125,0.15); }
+.alert-warn { background: var(--amber-bg); color: #9a6b00; border: 1px solid rgba(232,168,64,0.2); }
+
+/* ── QR SECTION ── */
+.qr-preview {
+  display: flex; align-items: center; gap: 24px;
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 24px;
+  box-shadow: var(--shadow-s);
+}
+.qr-box {
+  width: 160px; height: 160px; flex-shrink: 0;
+  background: #fff; border: 1px solid #eee;
+  border-radius: 8px; display: flex;
+  align-items: center; justify-content: center;
+  font-size: 0.7rem; color: var(--ink-soft);
+}
+.qr-box canvas { width: 140px !important; height: 140px !important; }
+.qr-info h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; }
+.qr-info p { font-size: 0.72rem; color: var(--ink-soft); line-height: 1.6; font-weight: 300; }
+.qr-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--cream-2); border-radius: 6px;
+  padding: 6px 12px; margin-top: 10px;
+  font-size: 0.72rem; color: var(--warm); font-weight: 500;
+  word-break: break-all;
+}
+
+/* ── EXPORT SECTION ── */
+.export-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.export-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px;
+  box-shadow: var(--shadow-s);
+}
+.export-card h3 { font-size: 0.88rem; font-weight: 600; margin-bottom: 4px; }
+.export-card p { font-size: 0.68rem; color: var(--ink-soft); line-height: 1.5; margin-bottom: 12px; font-weight: 300; }
+
+/* ── TABS inside panels ── */
+.panel-tabs {
+  display: flex; gap: 0; border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+.panel-tab {
+  padding: 8px 18px; font-size: 0.75rem; font-weight: 500;
+  color: var(--ink-soft); cursor: pointer; border: none;
+  background: none; font-family: 'DM Sans', sans-serif;
+  border-bottom: 2px solid transparent; transition: all 0.15s;
+}
+.panel-tab.active { color: var(--warm); border-bottom-color: var(--warm); }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 860px) {
+  .sidebar { position: fixed; left: -260px; top: 0; bottom: 0; transition: left 0.3s; z-index: 200; }
+  .sidebar.open { left: 0; }
+  .mobile-toggle { display: flex !important; }
+  .form-grid { grid-template-columns: 1fr; }
+  .export-grid { grid-template-columns: 1fr; }
+  .stat-grid { grid-template-columns: 1fr 1fr; }
+}
+.mobile-toggle {
+  display: none; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 8px;
+  background: var(--cream-2); border: 1px solid var(--border);
+  cursor: pointer; font-size: 1.1rem;
+}
+
+/* ── TOAST ── */
+.toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+  background: var(--ink); color: #fff; padding: 12px 20px;
+  border-radius: var(--radius-s); font-size: 0.78rem;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+  transform: translateY(80px); opacity: 0;
+  transition: all 0.3s ease;
+}
+.toast.show { transform: translateY(0); opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="sidebar-logo">Door<em>step</em></div>
+    <div class="sidebar-badge">Host Console</div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">Overview</div>
+    <button class="sidebar-item active" onclick="showPanel('dashboard', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </button>
+
+    <div class="sidebar-section">Property</div>
+    <button class="sidebar-item" onclick="showPanel('property', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/></svg>
+      Property Details
+    </button>
+    <button class="sidebar-item" onclick="showPanel('rules', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      House Rules
+    </button>
+    <button class="sidebar-item" onclick="showPanel('recos', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88"/></svg>
+      Recommendations
+    </button>
+
+    <div class="sidebar-section">Guests</div>
+    <button class="sidebar-item" onclick="showPanel('checkins', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Check-in Data
+      <span class="badge-count" id="checkinCount">3</span>
+    </button>
+    <button class="sidebar-item" onclick="showPanel('export', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export / Alloggiati
+    </button>
+
+    <div class="sidebar-section">Share</div>
+    <button class="sidebar-item" onclick="showPanel('qrlink', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3z"/><path d="M18 18h3v3h-3z"/><path d="M14 18h3v3h-3z"/></svg>
+      QR Code & Link
+    </button>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="sidebar-avatar">ML</div>
+    <div>
+      <div class="sidebar-user-name">Marco & Lucia</div>
+      <div class="sidebar-user-role">Property Manager</div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="main-header">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="mobile-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</div>
+      <div>
+        <div class="main-title" id="panelTitle">Dashboard</div>
+        <div class="main-subtitle" id="panelSubtitle">Overview of your property and guests</div>
+      </div>
+    </div>
+    <div class="header-actions" id="headerActions"></div>
+  </div>
+
+  <div class="content">
+
+    <!-- ════════════ DASHBOARD ════════════ -->
+    <div class="panel active" id="panel-dashboard">
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Check-ins</div>
+          <div class="stat-value">3</div>
+          <div class="stat-change up">This month</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Pending Documents</div>
+          <div class="stat-value" style="color:var(--amber)">1</div>
+          <div class="stat-change down">Needs attention</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Alloggiati Filed</div>
+          <div class="stat-value" style="color:var(--green)">2</div>
+          <div class="stat-change up">Up to date</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Chat Messages</div>
+          <div class="stat-value">12</div>
+          <div class="stat-change up">0 unread</div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-header">
+          <div class="table-title">Recent Check-ins</div>
+          <button class="btn btn-secondary btn-sm" onclick="showPanel('checkins', document.querySelector('[onclick*=checkins]'))">View All →</button>
+        </div>
+        <table>
+          <thead><tr><th>Guest</th><th>Dates</th><th>Type</th><th>Documents</th><th>Alloggiati</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Sophie Martin</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">French · Passport</span></td>
+              <td>Mar 15–18</td>
+              <td>Single</td>
+              <td><span class="status-badge complete">✓ Complete</span></td>
+              <td><span class="status-badge complete">✓ Filed</span></td>
+            </tr>
+            <tr>
+              <td><strong>Hans Weber</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">German · ID Card</span></td>
+              <td>Mar 15–18</td>
+              <td>Family Head</td>
+              <td><span class="status-badge complete">✓ Complete</span></td>
+              <td><span class="status-badge complete">✓ Filed</span></td>
+            </tr>
+            <tr>
+              <td><strong>Anna Weber</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">German · ID Card</span></td>
+              <td>Mar 15–18</td>
+              <td>Family Member</td>
+              <td><span class="status-badge pending">⏳ Pending</span></td>
+              <td><span class="status-badge missing">✗ Waiting</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════════════ PROPERTY DETAILS ════════════ -->
+    <div class="panel" id="panel-property">
+      <div class="form-card">
+        <div class="form-card-title">Basic Information</div>
+        <div class="form-card-desc">This information will appear on the guest welcome screen.</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Property Name</label>
+            <input class="form-input" value="Casa Sole" id="propName">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Property Type</label>
+            <select class="form-select">
+              <option selected>Apartment</option>
+              <option>House</option>
+              <option>Villa</option>
+              <option>Room</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Street Address</label>
+            <input class="form-input" value="Via Venezia 14">
+          </div>
+          <div class="form-group">
+            <label class="form-label">City / ZIP</label>
+            <input class="form-input" value="Bari (BA) 70122">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Region</label>
+            <input class="form-input" value="Puglia">
+          </div>
+          <div class="form-group">
+            <label class="form-label">CIR Code (Regional ID)</label>
+            <input class="form-input" placeholder="e.g., 072006-APP-00123" id="cirCode">
+            <div class="form-hint">Required for Puglia DMS reporting</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <div class="form-card-title">Check-in / Check-out</div>
+        <div class="form-card-desc">Times and access instructions for your guests.</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Check-in Time</label>
+            <input class="form-input" type="time" value="15:00">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Check-out Time</label>
+            <input class="form-input" type="time" value="10:00">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Access Method</label>
+            <select class="form-select">
+              <option selected>Self check-in · Keybox</option>
+              <option>In person handover</option>
+              <option>Smart lock</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Keybox Code</label>
+            <input class="form-input" type="text" value="4821">
+            <div class="form-hint">Sent to guest before arrival (not shown in app)</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <div class="form-card-title">WiFi & Essentials</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">WiFi Network</label>
+            <input class="form-input" value="CasaSole_5G">
+          </div>
+          <div class="form-group">
+            <label class="form-label">WiFi Password</label>
+            <input class="form-input" value="sole2025!">
+          </div>
+          <div class="form-group full">
+            <label class="form-label">Host Welcome Message</label>
+            <textarea class="form-textarea">Welcome to Casa Sole! We're so happy to have you here. The apartment is in the very heart of Bari Vecchia — step outside and you're surrounded by history, bakeries, and the sea. If you need anything at all, use the chat in this app and we'll help right away. Enjoy your stay! 🌞</textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Emergency Phone</label>
+            <input class="form-input" value="+39 333 123 4567">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Host Name(s)</label>
+            <input class="form-input" value="Marco & Lucia">
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" onclick="toast('Property details saved!')">💾 Save Property Details</button>
+    </div>
+
+    <!-- ════════════ HOUSE RULES ════════════ -->
+    <div class="panel" id="panel-rules">
+      <div class="alert alert-info">
+        ℹ️ These rules appear in the guest app's "Rules" tab. Drag to reorder. Mark important rules so they're highlighted.
+      </div>
+
+      <div class="edit-list" id="rulesList"></div>
+
+      <div style="margin-top:16px; display:flex; gap:10px;">
+        <button class="btn btn-secondary" onclick="addRule()">+ Add Rule</button>
+        <button class="btn btn-primary" onclick="toast('House rules saved!')">💾 Save Rules</button>
+      </div>
+    </div>
+
+    <!-- ════════════ RECOMMENDATIONS ════════════ -->
+    <div class="panel" id="panel-recos">
+      <div class="alert alert-info">
+        ℹ️ These appear in the guest app's "Explore" tab. Add your favorite restaurants, bars, sights, beaches, and shops.
+      </div>
+
+      <div class="panel-tabs" id="recoTabs">
+        <button class="panel-tab active" onclick="setRecoCat('food',this)">🍝 Food</button>
+        <button class="panel-tab" onclick="setRecoCat('drink',this)">🍷 Drinks</button>
+        <button class="panel-tab" onclick="setRecoCat('see',this)">👁 Sights</button>
+        <button class="panel-tab" onclick="setRecoCat('beach',this)">🏖 Beach</button>
+        <button class="panel-tab" onclick="setRecoCat('shop',this)">🛍 Shop</button>
+      </div>
+
+      <div class="edit-list" id="recoList"></div>
+
+      <div style="margin-top:16px; display:flex; gap:10px;">
+        <button class="btn btn-secondary" onclick="addReco()">+ Add Recommendation</button>
+        <button class="btn btn-primary" onclick="toast('Recommendations saved!')">💾 Save</button>
+      </div>
+    </div>
+
+    <!-- ════════════ CHECK-IN DATA ════════════ -->
+    <div class="panel" id="panel-checkins">
+      <div class="alert alert-warn">
+        ⚠️ Italian law requires all guest data to be submitted to <strong>Alloggiati Web</strong> (State Police) within 24 hours of arrival. Puglia also requires <strong>Puglia DMS</strong> reporting.
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-header">
+          <div class="table-title">All Guest Check-ins</div>
+          <div style="display:flex;gap:8px;">
+            <select class="form-select" style="width:auto;padding:5px 10px;font-size:0.68rem;">
+              <option>All Bookings</option>
+              <option selected>March 2026</option>
+            </select>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Guest</th>
+              <th>Type</th>
+              <th>Birth</th>
+              <th>Citizenship</th>
+              <th>Document</th>
+              <th>Dates</th>
+              <th>Docs</th>
+              <th>Alloggiati</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="checkinTable">
+            <tr>
+              <td><strong>Sophie Martin</strong></td>
+              <td>Single</td>
+              <td>15/04/1992<br><span style="font-size:0.6rem;color:var(--ink-soft)">Lyon, France</span></td>
+              <td>🇫🇷 French</td>
+              <td>Passport<br><span style="font-size:0.6rem;color:var(--ink-soft)">19AF28491</span></td>
+              <td>15–18 Mar</td>
+              <td><span class="status-badge complete">✓</span></td>
+              <td><span class="status-badge complete">✓ Filed</span></td>
+              <td><button class="btn btn-secondary btn-sm" onclick="viewGuest('sophie')">View</button></td>
+            </tr>
+            <tr>
+              <td><strong>Hans Weber</strong></td>
+              <td>Family Head</td>
+              <td>22/08/1985<br><span style="font-size:0.6rem;color:var(--ink-soft)">Munich, Germany</span></td>
+              <td>🇩🇪 German</td>
+              <td>ID Card<br><span style="font-size:0.6rem;color:var(--ink-soft)">T220089456</span></td>
+              <td>15–18 Mar</td>
+              <td><span class="status-badge complete">✓</span></td>
+              <td><span class="status-badge complete">✓ Filed</span></td>
+              <td><button class="btn btn-secondary btn-sm" onclick="viewGuest('hans')">View</button></td>
+            </tr>
+            <tr>
+              <td><strong>Anna Weber</strong></td>
+              <td>Fam. Member</td>
+              <td>10/11/1987<br><span style="font-size:0.6rem;color:var(--ink-soft)">Berlin, Germany</span></td>
+              <td>🇩🇪 German</td>
+              <td>ID Card<br><span style="font-size:0.6rem;color:var(--ink-soft)">T220089457</span></td>
+              <td>15–18 Mar</td>
+              <td><span class="status-badge pending">⏳</span></td>
+              <td><span class="status-badge missing">Waiting</span></td>
+              <td><button class="btn btn-secondary btn-sm">Remind</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════════════ EXPORT / ALLOGGIATI ════════════ -->
+    <div class="panel" id="panel-export">
+      <div class="alert alert-info">
+        ℹ️ Generate files formatted for the Italian police portal (Alloggiati Web) and the regional tourism platform (Puglia DMS).
+      </div>
+
+      <div class="export-grid">
+        <div class="export-card">
+          <h3>🏛 Alloggiati Web Export</h3>
+          <p>Generates a <strong>.txt file</strong> in the exact format required by the Polizia di Stato's Alloggiati Web portal. Includes all guest data: name, birth details, document info, check-in date.</p>
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label">Date Range</label>
+            <div style="display:flex;gap:8px;">
+              <input class="form-input" type="date" value="2026-03-15" style="font-size:0.72rem;">
+              <input class="form-input" type="date" value="2026-03-18" style="font-size:0.72rem;">
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="exportAlloggiati()">📥 Generate Alloggiati File</button>
+        </div>
+
+        <div class="export-card">
+          <h3>🌐 Puglia DMS Export</h3>
+          <p>Generates a file for the <strong>Puglia regional tourism authority</strong>. Includes guest count, stay dates, property CIR code, and statistical data.</p>
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label">Month</label>
+            <select class="form-select" style="font-size:0.72rem;">
+              <option>March 2026</option>
+              <option>February 2026</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="exportDMS()">📥 Generate DMS File</button>
+        </div>
+
+        <div class="export-card">
+          <h3>📊 CSV Export</h3>
+          <p>Download all guest check-in data as a <strong>CSV spreadsheet</strong> for your own records, accounting, or analysis.</p>
+          <button class="btn btn-secondary" onclick="exportCSV()" style="margin-top:auto">📥 Download CSV</button>
+        </div>
+
+        <div class="export-card">
+          <h3>📋 ISTAT / C59 Report</h3>
+          <p>Monthly statistical report for <strong>ISTAT tourism statistics</strong>. Nationality breakdown, arrival counts, average stay length.</p>
+          <button class="btn btn-secondary" onclick="toast('ISTAT report generated!')" style="margin-top:auto">📥 Generate Report</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════ QR CODE & LINK ════════════ -->
+    <div class="panel" id="panel-qrlink">
+      <div class="qr-preview">
+        <div class="qr-box" id="qrCanvas">
+          <div style="text-align:center;">
+            <div style="font-size:2rem;margin-bottom:6px;">📱</div>
+            <div>QR Preview</div>
+            <div style="font-size:0.55rem;color:var(--ink-soft);margin-top:2px;">Will generate when<br>app is deployed</div>
+          </div>
+        </div>
+        <div class="qr-info">
+          <h3>Guest App Link</h3>
+          <p>Share this link with guests before arrival, or print the QR code and place it in the apartment.</p>
+          <div class="qr-link" id="guestLink">https://getdoorstep.app/p/casa-sole</div>
+          <div style="margin-top:12px;display:flex;gap:8px;">
+            <button class="btn btn-primary btn-sm" onclick="copyLink()">📋 Copy Link</button>
+            <button class="btn btn-secondary btn-sm" onclick="toast('QR downloaded!')">🖨 Print QR</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-card" style="margin-top:20px;">
+        <div class="form-card-title">Pre-Arrival Message Template</div>
+        <div class="form-card-desc">Send this to guests when they book. Customize as needed.</div>
+        <textarea class="form-textarea" style="min-height:120px;">Hi {guest_name}! 🌞
+
+Welcome to Casa Sole! Before you arrive, please complete your online check-in here:
+👉 https://getdoorstep.app/p/casa-sole
+
+It takes about 2 minutes and is required by Italian law. You'll also find WiFi details, house rules, and our personal recommendations for Bari.
+
+See you soon!
+Marco & Lucia</textarea>
+        <div style="margin-top:12px;">
+          <button class="btn btn-secondary btn-sm" onclick="copyTemplate()">📋 Copy Template</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+/* ══════════════════════════════════════
+   NAV
+══════════════════════════════════════ */
+const titles = {
+  dashboard: ['Dashboard', 'Overview of your property and guests'],
+  property: ['Property Details', 'Edit your property information'],
+  rules: ['House Rules', 'Manage rules shown to guests'],
+  recos: ['Recommendations', 'Curate local tips for your guests'],
+  checkins: ['Check-in Data', 'View and manage guest registrations'],
+  export: ['Export & Compliance', 'Generate files for Italian authorities'],
+  qrlink: ['QR Code & Link', 'Share your guest portal'],
+};
+
+function showPanel(id, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+  document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.getElementById('panelTitle').textContent = titles[id][0];
+  document.getElementById('panelSubtitle').textContent = titles[id][1];
+  document.getElementById('sidebar').classList.remove('open');
+}
+
+/* ══════════════════════════════════════
+   RULES EDITOR
+══════════════════════════════════════ */
+let rulesData = [
+  { icon: '🔇', title: 'Quiet Hours', desc: 'Please keep noise to a minimum between 22:00 and 8:00.', important: true },
+  { icon: '🚭', title: 'No Smoking Inside', desc: 'Smoking is not allowed inside. You can smoke on the balcony.', important: true },
+  { icon: '🐾', title: 'No Pets', desc: 'Unfortunately we cannot accommodate pets.', important: false },
+  { icon: '🗑', title: 'Waste Separation', desc: 'Separate bins provided — organic, plastic, paper, glass, general.', important: false },
+  { icon: '🔑', title: 'Keys & Lockbox', desc: 'Return keys to the lockbox on departure and scramble the code.', important: false },
+  { icon: '💧', title: 'Water is Precious', desc: 'Puglia is dry — short showers appreciated!', important: false },
+];
+
+function renderRules() {
+  document.getElementById('rulesList').innerHTML = rulesData.map((r, i) => `
+    <div class="edit-item">
+      <div class="edit-item-drag">⠿</div>
+      <div class="edit-item-body">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <input class="form-input" style="width:50px;text-align:center;padding:6px;" value="${r.icon}" onchange="rulesData[${i}].icon=this.value">
+          <input class="form-input" style="flex:1" value="${r.title}" onchange="rulesData[${i}].title=this.value">
+          <label style="display:flex;align-items:center;gap:4px;font-size:0.62rem;white-space:nowrap;color:var(--red);cursor:pointer;">
+            <input type="checkbox" ${r.important?'checked':''} onchange="rulesData[${i}].important=this.checked"> Important
+          </label>
+        </div>
+        <textarea class="form-textarea" style="min-height:44px;font-size:0.72rem;" onchange="rulesData[${i}].desc=this.value">${r.desc}</textarea>
+      </div>
+      <div class="edit-item-actions">
+        <button onclick="rulesData.splice(${i},1);renderRules()">🗑</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function addRule() {
+  rulesData.push({ icon: '📌', title: 'New Rule', desc: 'Describe the rule...', important: false });
+  renderRules();
+}
+
+/* ══════════════════════════════════════
+   RECOMMENDATIONS EDITOR
+══════════════════════════════════════ */
+let recoData = [
+  { cat: 'food', name: 'Terranima', desc: 'Best orecchiette in Bari. Book ahead.', tags: 'Pasta, €€, 5 min walk' },
+  { cat: 'food', name: 'Pescaria', desc: 'Gourmet fish sandwiches — fast, fresh, unforgettable.', tags: 'Seafood, €, 3 min walk' },
+  { cat: 'food', name: 'Al Pescatore', desc: 'Long seafood lunch by the harbour. Let the waiter choose.', tags: 'Seafood, €€€, 8 min walk' },
+  { cat: 'drink', name: 'Piazza Mercantile', desc: 'Any café with outdoor seating. Spritz + passeggiata.', tags: 'Wine, Sunset, 4 min walk' },
+  { cat: 'see', name: 'Basilica di San Nicola', desc: 'Great Romanesque church. Don\'t miss the crypt.', tags: 'Church, Free, 4 min walk' },
+  { cat: 'beach', name: 'Pane e Pomodoro', desc: 'Urban beach, 10 min along the lungomare. Sandy and free.', tags: 'Sandy, Free, 10 min walk' },
+];
+
+let activeRecoCat = 'food';
+
+function setRecoCat(cat, btn) {
+  activeRecoCat = cat;
+  document.querySelectorAll('#recoTabs .panel-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderRecos();
+}
+
+function renderRecos() {
+  const filtered = recoData.filter(r => r.cat === activeRecoCat);
+  document.getElementById('recoList').innerHTML = filtered.length === 0
+    ? '<div style="text-align:center;padding:30px;color:var(--ink-soft);font-size:0.78rem;">No recommendations in this category yet.</div>'
+    : filtered.map((r, i) => {
+      const globalIdx = recoData.indexOf(r);
+      return `
+      <div class="edit-item">
+        <div class="edit-item-body">
+          <div style="display:flex;gap:8px;margin-bottom:6px;">
+            <input class="form-input" style="flex:1" value="${r.name}" placeholder="Name" onchange="recoData[${globalIdx}].name=this.value">
+            <input class="form-input" style="flex:1" value="${r.tags}" placeholder="Tags (comma separated)" onchange="recoData[${globalIdx}].tags=this.value">
+          </div>
+          <textarea class="form-textarea" style="min-height:44px;font-size:0.72rem;" placeholder="Description" onchange="recoData[${globalIdx}].desc=this.value">${r.desc}</textarea>
+        </div>
+        <div class="edit-item-actions">
+          <button onclick="recoData.splice(${globalIdx},1);renderRecos()">🗑</button>
+        </div>
+      </div>`;
+    }).join('');
+}
+
+function addReco() {
+  recoData.push({ cat: activeRecoCat, name: '', desc: '', tags: '' });
+  renderRecos();
+}
+
+/* ══════════════════════════════════════
+   EXPORTS
+══════════════════════════════════════ */
+function exportAlloggiati() {
+  // Alloggiati Web format: fixed-width text file
+  const lines = [
+    '// ALLOGGIATI WEB - Export File',
+    '// Property: Casa Sole - Via Venezia 14, 70122 Bari (BA)',
+    '// Generated: ' + new Date().toLocaleDateString('it-IT'),
+    '// ─────────────────────────────────────────────',
+    '',
+    'TipoAlloggiato;Cognome;Nome;Sesso;DataNascita;ComuneNascita;ProvinciaNascita;StatoNascita;Cittadinanza;TipoDocumento;NumeroDocumento;DataArrivo',
+    '16;MARTIN;SOPHIE;2;19920415;LYON;;FRANCIA;FRANCIA;PAORDI;19AF28491;20260315',
+    '17;WEBER;HANS;1;19850822;MUNICH;;GERMANIA;GERMANIA;IDCARD;T220089456;20260315',
+    '19;WEBER;ANNA;2;19871110;BERLIN;;GERMANIA;GERMANIA;IDCARD;T220089457;20260315',
+  ];
+  downloadFile('alloggiati_export_2026-03.txt', lines.join('\n'));
+  toast('Alloggiati file generated and downloaded!');
+}
+
+function exportDMS() {
+  const lines = [
+    'Puglia DMS - Tourism Report',
+    'Property CIR: 072006-APP-00123',
+    'Property: Casa Sole',
+    'Period: March 2026',
+    '',
+    'Total Guests: 3',
+    'Total Nights: 9 (3 guests × 3 nights)',
+    '',
+    'Nationality Breakdown:',
+    'France: 1 guest / 3 nights',
+    'Germany: 2 guests / 6 nights',
+    '',
+    'Arrival Date: 15/03/2026',
+    'Departure Date: 18/03/2026',
+  ];
+  downloadFile('puglia_dms_march_2026.txt', lines.join('\n'));
+  toast('Puglia DMS file generated!');
+}
+
+function exportCSV() {
+  const csv = [
+    'Surname,Name,Sex,DateOfBirth,PlaceOfBirth,Citizenship,DocumentType,DocumentNumber,GuestType,CheckIn,CheckOut',
+    'MARTIN,SOPHIE,F,1992-04-15,Lyon,French,Passport,19AF28491,Single,2026-03-15,2026-03-18',
+    'WEBER,HANS,M,1985-08-22,Munich,German,ID Card,T220089456,Family Head,2026-03-15,2026-03-18',
+    'WEBER,ANNA,F,1987-11-10,Berlin,German,ID Card,T220089457,Family Member,2026-03-15,2026-03-18',
+  ];
+  downloadFile('checkins_march_2026.csv', csv.join('\n'));
+  toast('CSV downloaded!');
+}
+
+function downloadFile(filename, content) {
+  const blob = new Blob([content], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ══════════════════════════════════════
+   UTILS
+══════════════════════════════════════ */
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function copyLink() {
+  navigator.clipboard?.writeText(document.getElementById('guestLink').textContent);
+  toast('Link copied to clipboard!');
+}
+
+function copyTemplate() {
+  const txt = document.querySelector('#panel-qrlink textarea').value;
+  navigator.clipboard?.writeText(txt);
+  toast('Template copied!');
+}
+
+function viewGuest(name) {
+  toast('Guest detail view coming in v2!');
+}
+
+/* ══════════════════════════════════════
+   INIT
+══════════════════════════════════════ */
+renderRules();
+renderRecos();
+</script>
+</body>
+</html>

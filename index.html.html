@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Casa Sole · Doorstep</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --warm: #C2714F;
+  --warm-l: #D4876A;
+  --warm-d: #9E5538;
+  --cream: #FAF6F0;
+  --cream-2: #F0EAE0;
+  --cream-3: #E8DFD0;
+  --gold: #C9A96E;
+  --gold-l: #DEC48F;
+  --ink: #1E1008;
+  --ink-2: #3A2218;
+  --ink-soft: #7A5A48;
+  --white: #FFFFFF;
+  --green: #4CAF7D;
+  --green-bg: #E8F5EE;
+  --amber: #E8A840;
+  --amber-bg: #FFF4DE;
+  --red: #D94B4B;
+  --red-bg: #FDECEC;
+  --blue: #4A90D9;
+  --blue-bg: #E8F0FA;
+  --shadow-s: 0 1px 3px rgba(30,16,8,0.06);
+  --shadow-m: 0 4px 16px rgba(30,16,8,0.08);
+  --shadow-l: 0 8px 32px rgba(30,16,8,0.12);
+  --radius: 14px;
+  --radius-s: 8px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { height: 100%; -webkit-text-size-adjust: 100%; }
+body {
+  height: 100%; overflow: hidden;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--cream);
+  color: var(--ink);
+  display: flex; flex-direction: column;
+}
+
+/* ── NAVIGATION ── */
+.nav-bar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000;
+  background: var(--white);
+  border-top: 1px solid rgba(194,113,79,0.12);
+  display: flex; align-items: stretch;
+  height: 64px;
+  box-shadow: 0 -2px 20px rgba(30,16,8,0.06);
+}
+.nav-item {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 3px; cursor: pointer;
+  color: var(--ink-soft); font-size: 0.58rem;
+  letter-spacing: 0.04em; font-weight: 500;
+  transition: color 0.2s; border: none; background: none;
+  font-family: 'DM Sans', sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+.nav-item svg { width: 22px; height: 22px; stroke-width: 1.6; transition: all 0.2s; }
+.nav-item.active { color: var(--warm); }
+.nav-item.active svg { stroke: var(--warm); }
+.nav-item:not(.active) svg { stroke: var(--ink-soft); }
+.nav-badge {
+  position: absolute; top: 6px; right: calc(50% - 16px);
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--red); border: 2px solid var(--white);
+}
+
+/* ── PAGES ── */
+.page {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 64px;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  opacity: 0; visibility: hidden;
+  transition: opacity 0.3s ease;
+}
+.page.active { opacity: 1; visibility: visible; }
+
+/* ── TOP BAR ── */
+.top-bar {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(250,246,240,0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(194,113,79,0.08);
+}
+.top-bar-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.1rem; font-weight: 500; color: var(--ink);
+}
+.lang-toggle {
+  display: flex; align-items: center;
+  background: var(--cream-2); border-radius: 20px;
+  padding: 3px; gap: 2px; cursor: pointer;
+  border: 1px solid rgba(194,113,79,0.1);
+}
+.lang-opt {
+  padding: 4px 10px; border-radius: 16px;
+  font-size: 0.62rem; font-weight: 600;
+  letter-spacing: 0.06em; transition: all 0.2s;
+  color: var(--ink-soft); border: none; background: none;
+  cursor: pointer; font-family: 'DM Sans', sans-serif;
+}
+.lang-opt.active { background: var(--white); color: var(--warm); box-shadow: var(--shadow-s); }
+
+/* ══════════════════════════
+   WELCOME PAGE
+═══════════════════════════ */
+.welcome-hero {
+  position: relative; height: 260px; overflow: hidden;
+}
+.welcome-hero-img {
+  width: 100%; height: 100%; object-fit: cover;
+  filter: brightness(0.85);
+}
+.welcome-hero-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(to bottom, transparent 30%, rgba(30,16,8,0.7) 100%);
+}
+.welcome-hero-content {
+  position: absolute; bottom: 20px; left: 20px; right: 20px; z-index: 2;
+}
+.welcome-hero-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,0.15); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 20px; padding: 4px 12px;
+  font-size: 0.55rem; letter-spacing: 0.15em;
+  text-transform: uppercase; color: rgba(255,255,255,0.9);
+  margin-bottom: 8px;
+}
+.welcome-hero-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 2rem; color: #fff; font-weight: 400; line-height: 1.1;
+}
+.welcome-hero-title em { font-style: italic; color: var(--gold-l); }
+.welcome-hero-sub {
+  font-size: 0.78rem; color: rgba(255,255,255,0.7);
+  margin-top: 4px; font-weight: 300;
+}
+
+/* Quick info cards */
+.quick-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px; padding: 16px;
+}
+.quick-card {
+  background: var(--white); border-radius: var(--radius-s);
+  padding: 14px; border: 1px solid rgba(194,113,79,0.08);
+  box-shadow: var(--shadow-s);
+}
+.quick-card-icon { font-size: 1.2rem; margin-bottom: 6px; }
+.quick-card-label {
+  font-size: 0.5rem; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--ink-soft);
+  margin-bottom: 2px;
+}
+.quick-card-value {
+  font-family: 'Playfair Display', serif;
+  font-size: 1rem; color: var(--ink); font-weight: 500;
+}
+.quick-card-sub { font-size: 0.68rem; color: var(--ink-soft); margin-top: 2px; }
+
+/* Host message */
+.host-message {
+  margin: 0 16px 16px; padding: 16px;
+  background: var(--white); border-radius: var(--radius);
+  border: 1px solid rgba(194,113,79,0.1);
+  box-shadow: var(--shadow-s);
+}
+.host-msg-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.host-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--warm), var(--gold));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; color: #fff;
+}
+.host-name { font-weight: 600; font-size: 0.82rem; color: var(--ink); }
+.host-role { font-size: 0.6rem; color: var(--ink-soft); }
+.host-msg-text {
+  font-size: 0.78rem; color: var(--ink-2); line-height: 1.6;
+  font-weight: 300;
+}
+
+/* Emergency card */
+.emergency-card {
+  margin: 0 16px 16px; padding: 14px 16px;
+  background: var(--red-bg); border-radius: var(--radius-s);
+  border: 1px solid rgba(217,75,75,0.15);
+  display: flex; align-items: center; gap: 12px;
+}
+.emergency-icon { font-size: 1.4rem; }
+.emergency-label { font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--red); font-weight: 600; }
+.emergency-number { font-size: 0.82rem; color: var(--ink); font-weight: 600; }
+
+/* Section headers */
+.section-header {
+  padding: 20px 16px 10px;
+  font-size: 0.5rem; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--ink-soft);
+}
+
+/* ══════════════════════════
+   CHECK-IN PAGE
+═══════════════════════════ */
+.checkin-intro {
+  padding: 20px 16px;
+}
+.checkin-intro h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.4rem; font-weight: 500; color: var(--ink);
+  margin-bottom: 6px;
+}
+.checkin-intro p {
+  font-size: 0.78rem; color: var(--ink-soft); line-height: 1.5; font-weight: 300;
+}
+
+/* Steps indicator */
+.steps-bar {
+  display: flex; align-items: center; gap: 0;
+  padding: 0 16px 20px; position: relative;
+}
+.step-dot {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.65rem; font-weight: 600;
+  border: 2px solid var(--cream-3); color: var(--ink-soft);
+  background: var(--white); position: relative; z-index: 2;
+  transition: all 0.3s;
+}
+.step-dot.active { border-color: var(--warm); color: var(--white); background: var(--warm); }
+.step-dot.done { border-color: var(--green); color: var(--white); background: var(--green); }
+.step-line { flex: 1; height: 2px; background: var(--cream-3); }
+.step-line.done { background: var(--green); }
+
+/* Form */
+.form-section {
+  padding: 0 16px 20px; display: none;
+}
+.form-section.active { display: block; }
+
+.form-group { margin-bottom: 14px; }
+.form-label {
+  display: block; font-size: 0.65rem; font-weight: 600;
+  letter-spacing: 0.06em; color: var(--ink-2);
+  margin-bottom: 5px;
+}
+.form-label .req { color: var(--red); }
+.form-input, .form-select {
+  width: 100%; padding: 11px 14px;
+  border: 1px solid rgba(194,113,79,0.18);
+  border-radius: var(--radius-s);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.82rem; color: var(--ink);
+  background: var(--white);
+  transition: border-color 0.2s;
+  -webkit-appearance: none;
+}
+.form-input:focus, .form-select:focus {
+  outline: none; border-color: var(--warm);
+  box-shadow: 0 0 0 3px rgba(194,113,79,0.1);
+}
+.form-input::placeholder { color: rgba(122,90,72,0.4); }
+.form-row { display: flex; gap: 10px; }
+.form-row > .form-group { flex: 1; }
+
+/* Photo upload */
+.upload-zone {
+  border: 2px dashed rgba(194,113,79,0.25);
+  border-radius: var(--radius);
+  padding: 28px 16px; text-align: center;
+  cursor: pointer; transition: all 0.2s;
+  background: rgba(194,113,79,0.03);
+}
+.upload-zone:hover { border-color: var(--warm); background: rgba(194,113,79,0.06); }
+.upload-zone.has-file { border-color: var(--green); border-style: solid; background: var(--green-bg); }
+.upload-icon { font-size: 2rem; margin-bottom: 8px; }
+.upload-text { font-size: 0.78rem; color: var(--ink-soft); font-weight: 300; }
+.upload-text strong { color: var(--warm); font-weight: 500; }
+.upload-hint { font-size: 0.6rem; color: rgba(122,90,72,0.4); margin-top: 4px; }
+.upload-filename { font-size: 0.72rem; color: var(--green); font-weight: 500; margin-top: 6px; }
+
+/* Guest type select */
+.guest-type-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px; margin-bottom: 14px;
+}
+.guest-type-opt {
+  padding: 10px; border-radius: var(--radius-s);
+  border: 1px solid rgba(194,113,79,0.15);
+  background: var(--white); cursor: pointer;
+  text-align: center; transition: all 0.2s;
+  font-family: 'DM Sans', sans-serif;
+}
+.guest-type-opt:hover { border-color: var(--warm); }
+.guest-type-opt.active { border-color: var(--warm); background: rgba(194,113,79,0.06); }
+.guest-type-opt .gt-icon { font-size: 1.3rem; }
+.guest-type-opt .gt-label { font-size: 0.65rem; font-weight: 500; color: var(--ink); margin-top: 4px; }
+
+/* Buttons */
+.btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; padding: 13px;
+  border-radius: var(--radius-s); border: none;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.82rem; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-primary { background: var(--warm); color: var(--white); }
+.btn-primary:hover { background: var(--warm-d); }
+.btn-secondary { background: var(--cream-2); color: var(--ink); }
+.btn-secondary:hover { background: var(--cream-3); }
+.btn-success { background: var(--green); color: var(--white); }
+
+.btn-row { display: flex; gap: 10px; padding: 0 16px 24px; }
+.btn-row .btn { flex: 1; }
+
+/* Success state */
+.checkin-success {
+  display: none; text-align: center; padding: 40px 24px;
+}
+.checkin-success.show { display: block; }
+.success-icon { font-size: 3.5rem; margin-bottom: 12px; }
+.success-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.5rem; color: var(--ink); margin-bottom: 8px;
+}
+.success-text { font-size: 0.82rem; color: var(--ink-soft); line-height: 1.6; font-weight: 300; }
+
+/* ══════════════════════════
+   HOUSE RULES PAGE
+═══════════════════════════ */
+.rules-header {
+  padding: 20px 16px 10px;
+}
+.rules-header h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.4rem; font-weight: 500; color: var(--ink);
+}
+.rule-card {
+  margin: 0 16px 10px;
+  background: var(--white); border-radius: var(--radius-s);
+  padding: 14px 16px;
+  border: 1px solid rgba(194,113,79,0.08);
+  display: flex; align-items: flex-start; gap: 12px;
+  box-shadow: var(--shadow-s);
+}
+.rule-icon { font-size: 1.3rem; flex-shrink: 0; margin-top: 2px; }
+.rule-title { font-size: 0.82rem; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+.rule-desc { font-size: 0.72rem; color: var(--ink-soft); line-height: 1.5; font-weight: 300; }
+.rule-card.important { border-left: 3px solid var(--red); }
+.rule-card.tip { border-left: 3px solid var(--green); }
+
+/* ══════════════════════════
+   EXPLORE PAGE
+═══════════════════════════ */
+.explore-header { padding: 20px 16px 10px; }
+.explore-header h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.4rem; font-weight: 500; color: var(--ink);
+}
+.explore-header p { font-size: 0.78rem; color: var(--ink-soft); font-weight: 300; margin-top: 4px; }
+
+.cat-tabs {
+  display: flex; gap: 6px; padding: 10px 16px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+}
+.cat-tabs::-webkit-scrollbar { display: none; }
+.cat-tab {
+  padding: 7px 14px; border-radius: 20px;
+  font-size: 0.68rem; font-weight: 500;
+  white-space: nowrap; cursor: pointer;
+  border: 1px solid rgba(194,113,79,0.15);
+  background: var(--white); color: var(--ink-soft);
+  transition: all 0.2s; font-family: 'DM Sans', sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+.cat-tab.active { background: var(--warm); color: var(--white); border-color: var(--warm); }
+
+.reco-card {
+  margin: 0 16px 12px;
+  background: var(--white); border-radius: var(--radius);
+  overflow: hidden; border: 1px solid rgba(194,113,79,0.08);
+  box-shadow: var(--shadow-s);
+}
+.reco-img { width: 100%; height: 140px; object-fit: cover; display: block; }
+.reco-body { padding: 12px 14px 14px; }
+.reco-cat {
+  font-size: 0.48rem; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--warm);
+  margin-bottom: 4px; font-weight: 600;
+}
+.reco-name {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.05rem; color: var(--ink); font-weight: 500;
+  margin-bottom: 4px;
+}
+.reco-desc {
+  font-size: 0.72rem; color: var(--ink-soft);
+  line-height: 1.5; font-weight: 300; margin-bottom: 8px;
+}
+.reco-meta { display: flex; gap: 8px; flex-wrap: wrap; }
+.reco-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 4px;
+  font-size: 0.55rem; font-weight: 500;
+  background: var(--cream-2); color: var(--ink-soft);
+}
+
+/* ══════════════════════════
+   CHAT PAGE
+═══════════════════════════ */
+.chat-container { display: flex; flex-direction: column; height: 100%; }
+.chat-header-area { padding: 16px 16px 10px; flex-shrink: 0; }
+.chat-header-area h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.2rem; font-weight: 500;
+}
+.chat-header-area p { font-size: 0.72rem; color: var(--ink-soft); font-weight: 300; }
+
+.chat-messages {
+  flex: 1; overflow-y: auto; padding: 0 16px 16px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.chat-bubble {
+  max-width: 82%; padding: 11px 14px;
+  border-radius: 14px; font-size: 0.78rem;
+  line-height: 1.55; font-weight: 300;
+  animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.chat-bubble.bot {
+  background: var(--white); color: var(--ink);
+  border: 1px solid rgba(194,113,79,0.1);
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+}
+.chat-bubble.user {
+  background: var(--warm); color: var(--white);
+  align-self: flex-end;
+  border-bottom-right-radius: 4px;
+}
+.chat-bubble.system {
+  background: var(--amber-bg);
+  color: var(--ink-2);
+  align-self: center;
+  text-align: center;
+  font-size: 0.68rem;
+  border-radius: 10px;
+  max-width: 90%;
+}
+
+.chat-suggestions {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  padding: 0 16px 10px; flex-shrink: 0;
+}
+.chat-sug {
+  padding: 7px 12px; border-radius: 18px;
+  font-size: 0.68rem; font-weight: 500;
+  border: 1px solid rgba(194,113,79,0.2);
+  background: var(--white); color: var(--warm);
+  cursor: pointer; transition: all 0.2s;
+  font-family: 'DM Sans', sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+.chat-sug:hover { background: rgba(194,113,79,0.06); }
+
+.chat-input-bar {
+  display: flex; gap: 8px; padding: 10px 16px 14px;
+  border-top: 1px solid rgba(194,113,79,0.1);
+  background: var(--white); flex-shrink: 0;
+}
+.chat-input {
+  flex: 1; padding: 10px 14px;
+  border: 1px solid rgba(194,113,79,0.18);
+  border-radius: 22px; font-size: 0.82rem;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--cream); color: var(--ink);
+}
+.chat-input:focus { outline: none; border-color: var(--warm); }
+.chat-input::placeholder { color: rgba(122,90,72,0.35); }
+.chat-send {
+  width: 42px; height: 42px; border-radius: 50%;
+  background: var(--warm); border: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0; transition: background 0.2s;
+}
+.chat-send:hover { background: var(--warm-d); }
+.chat-send svg { stroke: #fff; width: 18px; height: 18px; }
+
+/* ── UTILITIES ── */
+.pb-safe { padding-bottom: 24px; }
+.hidden { display: none !important; }
+
+/* ── POWERED BY DOORSTEP FOOTER ── */
+.powered-by {
+  position: fixed; bottom: 64px; left: 0; right: 0; z-index: 999;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 6px 0;
+  background: linear-gradient(to bottom, rgba(250,246,240,0), rgba(250,246,240,1) 30%);
+  pointer-events: none;
+}
+.powered-by a {
+  pointer-events: all;
+  display: flex; align-items: center; gap: 5px;
+  text-decoration: none;
+  font-size: 0.56rem; letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+.powered-by a:hover { opacity: 0.8; }
+.powered-by .doorstep-mark {
+  width: 14px; height: 14px;
+  background: var(--warm);
+  border-radius: 3px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.5rem; color: #fff; font-weight: 700;
+  line-height: 1;
+}
+
+@media (min-width: 600px) {
+  .page { max-width: 480px; left: 50%; transform: translateX(-50%); }
+  .nav-bar { max-width: 480px; left: 50%; transform: translateX(-50%); }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     PAGES
+══════════════════════════════════════ -->
+
+<!-- WELCOME -->
+<div class="page active" id="page-welcome">
+  <div class="top-bar">
+    <div class="top-bar-title">Casa Sole</div>
+    <div class="lang-toggle">
+      <button class="lang-opt active" onclick="setLang('en')">EN</button>
+      <button class="lang-opt" onclick="setLang('it')">IT</button>
+    </div>
+  </div>
+
+  <div class="welcome-hero">
+    <img class="welcome-hero-img" src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80" alt="Casa Sole">
+    <div class="welcome-hero-overlay"></div>
+    <div class="welcome-hero-content">
+      <div class="welcome-hero-badge">☀ Bari Vecchia, Puglia</div>
+      <h1 class="welcome-hero-title" data-i18n="welcome_title">Welcome to<br><em>Casa Sole</em></h1>
+      <p class="welcome-hero-sub" data-i18n="welcome_sub">Your home in the heart of the old city</p>
+    </div>
+  </div>
+
+  <div class="quick-grid">
+    <div class="quick-card">
+      <div class="quick-card-icon">📶</div>
+      <div class="quick-card-label">WiFi</div>
+      <div class="quick-card-value">CasaSole_5G</div>
+      <div class="quick-card-sub" data-i18n="wifi_pass">Password: sole2025!</div>
+    </div>
+    <div class="quick-card">
+      <div class="quick-card-icon">📍</div>
+      <div class="quick-card-label" data-i18n="address_label">Address</div>
+      <div class="quick-card-value" style="font-size:0.82rem">Via Venezia 14</div>
+      <div class="quick-card-sub">70122 Bari (BA)</div>
+    </div>
+    <div class="quick-card">
+      <div class="quick-card-icon">🔑</div>
+      <div class="quick-card-label">Check-in</div>
+      <div class="quick-card-value">15:00</div>
+      <div class="quick-card-sub" data-i18n="checkin_sub">Self check-in · Keybox</div>
+    </div>
+    <div class="quick-card">
+      <div class="quick-card-icon">🚪</div>
+      <div class="quick-card-label">Check-out</div>
+      <div class="quick-card-value">10:00</div>
+      <div class="quick-card-sub" data-i18n="checkout_sub">Leave keys in the box</div>
+    </div>
+  </div>
+
+  <div class="host-message">
+    <div class="host-msg-header">
+      <div class="host-avatar">M</div>
+      <div>
+        <div class="host-name">Marco & Lucia</div>
+        <div class="host-role" data-i18n="host_role">Your hosts</div>
+      </div>
+    </div>
+    <div class="host-msg-text" data-i18n="host_msg">Welcome to Casa Sole! We're so happy to have you here. The apartment is in the very heart of Bari Vecchia — step outside and you're surrounded by history, bakeries, and the sea. If you need anything at all, use the chat in this app and we'll help right away. Enjoy your stay! 🌞</div>
+  </div>
+
+  <div class="emergency-card">
+    <div class="emergency-icon">🚨</div>
+    <div>
+      <div class="emergency-label" data-i18n="emergency_label">Emergency</div>
+      <div class="emergency-number">112 · Marco: +39 333 123 4567</div>
+    </div>
+  </div>
+
+  <div style="height:24px"></div>
+</div>
+
+<!-- CHECK-IN -->
+<div class="page" id="page-checkin">
+  <div class="top-bar">
+    <div class="top-bar-title" data-i18n="checkin_title">Online Check-in</div>
+    <div class="lang-toggle">
+      <button class="lang-opt active" onclick="setLang('en')">EN</button>
+      <button class="lang-opt" onclick="setLang('it')">IT</button>
+    </div>
+  </div>
+
+  <div class="checkin-intro">
+    <h2 data-i18n="checkin_h2">Complete Your Check-in</h2>
+    <p data-i18n="checkin_p">Italian law requires us to register all guests. This takes about 2 minutes per guest.</p>
+  </div>
+
+  <!-- Steps -->
+  <div class="steps-bar">
+    <div class="step-dot active" id="sd1">1</div>
+    <div class="step-line" id="sl1"></div>
+    <div class="step-dot" id="sd2">2</div>
+    <div class="step-line" id="sl2"></div>
+    <div class="step-dot" id="sd3">3</div>
+  </div>
+
+  <!-- Step 1: Guest Type -->
+  <div class="form-section active" id="step1">
+    <div class="section-header" data-i18n="step1_header">Step 1 · Guest Type</div>
+    <div class="guest-type-grid">
+      <div class="guest-type-opt active" onclick="selectGuestType(this,'single')" data-i18n-label="gt_single">
+        <div class="gt-icon">🧑</div>
+        <div class="gt-label">Single Traveler</div>
+      </div>
+      <div class="guest-type-opt" onclick="selectGuestType(this,'head')" data-i18n-label="gt_head">
+        <div class="gt-icon">👨‍👩‍👧</div>
+        <div class="gt-label">Family Head</div>
+      </div>
+      <div class="guest-type-opt" onclick="selectGuestType(this,'member')" data-i18n-label="gt_member">
+        <div class="gt-icon">👤</div>
+        <div class="gt-label">Family Member</div>
+      </div>
+      <div class="guest-type-opt" onclick="selectGuestType(this,'group')" data-i18n-label="gt_group">
+        <div class="gt-icon">👥</div>
+        <div class="gt-label">Group Leader</div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label" data-i18n="num_guests_label">Total number of guests <span class="req">*</span></label>
+      <input class="form-input" type="number" id="numGuests" value="2" min="1" max="20">
+    </div>
+  </div>
+
+  <!-- Step 2: Personal Details -->
+  <div class="form-section" id="step2">
+    <div class="section-header" data-i18n="step2_header">Step 2 · Personal Details</div>
+    <div class="form-group">
+      <label class="form-label" data-i18n="surname_label">Surname <span class="req">*</span></label>
+      <input class="form-input" type="text" id="surname" placeholder="">
+    </div>
+    <div class="form-group">
+      <label class="form-label" data-i18n="name_label">Name <span class="req">*</span></label>
+      <input class="form-input" type="text" id="gname" placeholder="">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" data-i18n="sex_label">Sex <span class="req">*</span></label>
+        <select class="form-select" id="sex">
+          <option value="M" data-i18n-opt="male">Male</option>
+          <option value="F" data-i18n-opt="female">Female</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" data-i18n="dob_label">Date of Birth <span class="req">*</span></label>
+        <input class="form-input" type="date" id="dob">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label" data-i18n="birthplace_label">Place of Birth <span class="req">*</span></label>
+      <input class="form-input" type="text" id="birthplace" placeholder="">
+    </div>
+    <div class="form-group">
+      <label class="form-label" data-i18n="citizenship_label">Citizenship <span class="req">*</span></label>
+      <input class="form-input" type="text" id="citizenship" placeholder="">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" data-i18n="doctype_label">Document Type <span class="req">*</span></label>
+        <select class="form-select" id="doctype">
+          <option value="passport" data-i18n-opt="passport">Passport</option>
+          <option value="id_card" data-i18n-opt="id_card">ID Card</option>
+          <option value="driving" data-i18n-opt="driving">Driving License</option>
+          <option value="other" data-i18n-opt="other">Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" data-i18n="docnum_label">Document Number <span class="req">*</span></label>
+        <input class="form-input" type="text" id="docnum" placeholder="">
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3: Document Upload -->
+  <div class="form-section" id="step3">
+    <div class="section-header" data-i18n="step3_header">Step 3 · Document Upload</div>
+    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+      <div class="upload-icon">📄</div>
+      <div class="upload-text" data-i18n="upload_text">Tap to upload <strong>ID / Passport photo</strong></div>
+      <div class="upload-hint" data-i18n="upload_hint">JPG, PNG or PDF · Max 10MB</div>
+      <div class="upload-filename" id="uploadFilename"></div>
+    </div>
+    <input type="file" id="fileInput" accept="image/*,.pdf" capture="environment" style="display:none" onchange="handleFileUpload(this)">
+    <div style="height:16px"></div>
+    <div class="upload-zone" id="uploadZone2" onclick="document.getElementById('fileInput2').click()">
+      <div class="upload-icon">🤳</div>
+      <div class="upload-text" data-i18n="upload_selfie">Tap to take a <strong>selfie with your ID</strong></div>
+      <div class="upload-hint" data-i18n="upload_selfie_hint">For identity verification</div>
+      <div class="upload-filename" id="uploadFilename2"></div>
+    </div>
+    <input type="file" id="fileInput2" accept="image/*" capture="user" style="display:none" onchange="handleFileUpload2(this)">
+  </div>
+
+  <!-- Nav buttons -->
+  <div class="btn-row" id="checkinBtns">
+    <button class="btn btn-secondary hidden" id="btnPrev" onclick="checkinPrev()" data-i18n="btn_back">Back</button>
+    <button class="btn btn-primary" id="btnNext" onclick="checkinNext()" data-i18n="btn_next">Next →</button>
+  </div>
+
+  <!-- Success -->
+  <div class="checkin-success" id="checkinSuccess">
+    <div class="success-icon">✅</div>
+    <div class="success-title" data-i18n="success_title">Check-in Complete!</div>
+    <div class="success-text" data-i18n="success_text">Your details have been submitted. We'll take care of the registration with the authorities. Enjoy your stay at Casa Sole!</div>
+  </div>
+
+  <div style="height:24px"></div>
+</div>
+
+<!-- HOUSE RULES -->
+<div class="page" id="page-rules">
+  <div class="top-bar">
+    <div class="top-bar-title" data-i18n="rules_topbar">House Rules</div>
+    <div class="lang-toggle">
+      <button class="lang-opt active" onclick="setLang('en')">EN</button>
+      <button class="lang-opt" onclick="setLang('it')">IT</button>
+    </div>
+  </div>
+
+  <div class="rules-header">
+    <h2 data-i18n="rules_h2">House Rules</h2>
+  </div>
+
+  <div id="rulesContainer"></div>
+  <div style="height:24px"></div>
+</div>
+
+<!-- EXPLORE -->
+<div class="page" id="page-explore">
+  <div class="top-bar">
+    <div class="top-bar-title" data-i18n="explore_topbar">Explore</div>
+    <div class="lang-toggle">
+      <button class="lang-opt active" onclick="setLang('en')">EN</button>
+      <button class="lang-opt" onclick="setLang('it')">IT</button>
+    </div>
+  </div>
+
+  <div class="explore-header">
+    <h2 data-i18n="explore_h2">Our Recommendations</h2>
+    <p data-i18n="explore_p">Hand-picked by your hosts — no tourist traps</p>
+  </div>
+
+  <div class="cat-tabs" id="catTabs"></div>
+  <div id="recoContainer"></div>
+  <div style="height:24px"></div>
+</div>
+
+<!-- CHAT -->
+<div class="page" id="page-chat">
+  <div class="chat-container">
+    <div class="top-bar">
+      <div class="top-bar-title" data-i18n="chat_topbar">Concierge</div>
+      <div class="lang-toggle">
+        <button class="lang-opt active" onclick="setLang('en')">EN</button>
+        <button class="lang-opt" onclick="setLang('it')">IT</button>
+      </div>
+    </div>
+
+    <div class="chat-header-area">
+      <h2 data-i18n="chat_h2">🏠 Casa Sole Concierge</h2>
+      <p data-i18n="chat_p">Ask me anything about the apartment, Bari, or your stay</p>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+      <div class="chat-bubble bot" data-i18n="chat_welcome">Ciao! 🌞 I'm the Casa Sole concierge. I know everything about the apartment, the neighbourhood, restaurants, and Bari. How can I help you today?</div>
+    </div>
+
+    <div class="chat-suggestions" id="chatSuggestions"></div>
+
+    <div class="chat-input-bar">
+      <input class="chat-input" id="chatInput" data-i18n-placeholder="chat_placeholder" placeholder="Ask anything…" onkeydown="if(event.key==='Enter')sendChat()">
+      <button class="chat-send" onclick="sendChat()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Powered by Doorstep -->
+<div class="powered-by">
+  <a href="https://getdoorstep.app" target="_blank">
+    <div class="doorstep-mark">D</div>
+    Powered by <strong style="font-weight:600;color:var(--ink-2)">Doorstep</strong>
+  </a>
+</div>
+
+<!-- ══════════════════════════════════════
+     BOTTOM NAV
+══════════════════════════════════════ -->
+<nav class="nav-bar">
+  <button class="nav-item active" onclick="goTo('welcome')">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    <span data-i18n="nav_home">Home</span>
+  </button>
+  <button class="nav-item" onclick="goTo('checkin')" style="position:relative">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    <span>Check-in</span>
+    <div class="nav-badge" id="checkinBadge"></div>
+  </button>
+  <button class="nav-item" onclick="goTo('rules')">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    <span data-i18n="nav_rules">Rules</span>
+  </button>
+  <button class="nav-item" onclick="goTo('explore')">
+    <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+    <span data-i18n="nav_explore">Explore</span>
+  </button>
+  <button class="nav-item" onclick="goTo('chat')">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+    <span data-i18n="nav_chat">Chat</span>
+  </button>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+/* ══════════════════════════════════════
+   SUPABASE CONNECTION
+══════════════════════════════════════ */
+const SUPABASE_URL = 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjandhcXFhYmd3cWhoemhmYnRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4OTM0MjMsImV4cCI6MjA4OTQ2OTQyM30.BCskfjawOLqayI7xXV8ebIBEcXf12WygH52w204NzWk';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let propertyId = null;
+let propertyData = null;
+let uploadedIdFile = null;
+let uploadedSelfieFile = null;
+
+/* ══════════════════════════════════════
+   i18n
+══════════════════════════════════════ */
+let lang = 'en';
+
+const T = {
+  en: {
+    welcome_title: 'Welcome to<br><em>Casa Sole</em>',
+    welcome_sub: 'Your home in the heart of the old city',
+    wifi_pass: 'Password: sole2025!',
+    address_label: 'Address',
+    checkin_sub: 'Self check-in · Keybox',
+    checkout_sub: 'Leave keys in the box',
+    host_role: 'Your hosts',
+    host_msg: 'Welcome to Casa Sole! We\'re so happy to have you here. The apartment is in the very heart of Bari Vecchia — step outside and you\'re surrounded by history, bakeries, and the sea. If you need anything at all, use the chat in this app and we\'ll help right away. Enjoy your stay! 🌞',
+    emergency_label: 'Emergency',
+    checkin_title: 'Online Check-in',
+    checkin_h2: 'Complete Your Check-in',
+    checkin_p: 'Italian law requires us to register all guests. This takes about 2 minutes per guest.',
+    step1_header: 'Step 1 · Guest Type',
+    gt_single: 'Single Traveler', gt_head: 'Family Head', gt_member: 'Family Member', gt_group: 'Group Leader',
+    num_guests_label: 'Total number of guests <span class="req">*</span>',
+    step2_header: 'Step 2 · Personal Details',
+    surname_label: 'Surname <span class="req">*</span>',
+    name_label: 'Name <span class="req">*</span>',
+    sex_label: 'Sex <span class="req">*</span>',
+    male: 'Male', female: 'Female',
+    dob_label: 'Date of Birth <span class="req">*</span>',
+    birthplace_label: 'Place of Birth <span class="req">*</span>',
+    citizenship_label: 'Citizenship <span class="req">*</span>',
+    doctype_label: 'Document Type <span class="req">*</span>',
+    passport: 'Passport', id_card: 'ID Card', driving: 'Driving License', other: 'Other',
+    docnum_label: 'Document Number <span class="req">*</span>',
+    step3_header: 'Step 3 · Document Upload',
+    upload_text: 'Tap to upload <strong>ID / Passport photo</strong>',
+    upload_hint: 'JPG, PNG or PDF · Max 10MB',
+    upload_selfie: 'Tap to take a <strong>selfie with your ID</strong>',
+    upload_selfie_hint: 'For identity verification',
+    btn_back: 'Back', btn_next: 'Next →', btn_submit: 'Submit Check-in ✓',
+    btn_submitting: 'Submitting…',
+    success_title: 'Check-in Complete!',
+    success_text: 'Your details have been submitted. We\'ll take care of the registration with the authorities. Enjoy your stay at Casa Sole!',
+    error_text: 'Something went wrong. Please try again or contact your host.',
+    rules_topbar: 'House Rules', rules_h2: 'House Rules',
+    explore_topbar: 'Explore', explore_h2: 'Our Recommendations',
+    explore_p: 'Hand-picked by your hosts — no tourist traps',
+    chat_topbar: 'Concierge',
+    chat_h2: '🏠 Casa Sole Concierge',
+    chat_p: 'Ask me anything about the apartment, Bari, or your stay',
+    chat_welcome: 'Ciao! 🌞 I\'m the Casa Sole concierge. I know everything about the apartment, the neighbourhood, restaurants, and Bari. How can I help you today?',
+    chat_placeholder: 'Ask anything…',
+    nav_home: 'Home', nav_rules: 'Rules', nav_explore: 'Explore', nav_chat: 'Chat',
+    sug1: 'What\'s the WiFi password?', sug2: 'Best restaurant nearby?', sug3: 'How does check-out work?', sug4: 'Talk to a human',
+    cat_all: 'All', cat_food: '🍝 Food', cat_drink: '🍷 Drinks', cat_see: '👁 See', cat_beach: '🏖 Beach', cat_shop: '🛍 Shop',
+  },
+  it: {
+    welcome_title: 'Benvenuti a<br><em>Casa Sole</em>',
+    welcome_sub: 'La vostra casa nel cuore della città vecchia',
+    wifi_pass: 'Password: sole2025!',
+    address_label: 'Indirizzo',
+    checkin_sub: 'Self check-in · Keybox',
+    checkout_sub: 'Lasciare le chiavi nella cassetta',
+    host_role: 'I vostri host',
+    host_msg: 'Benvenuti a Casa Sole! Siamo felicissimi di avervi qui. L\'appartamento è nel cuore di Bari Vecchia — uscite e siete circondati da storia, panifici e mare. Se avete bisogno di qualsiasi cosa, usate la chat in questa app e vi aiuteremo subito. Buon soggiorno! 🌞',
+    emergency_label: 'Emergenza',
+    checkin_title: 'Check-in Online',
+    checkin_h2: 'Completa il Check-in',
+    checkin_p: 'La legge italiana richiede la registrazione di tutti gli ospiti. Ci vogliono circa 2 minuti per ospite.',
+    step1_header: 'Passo 1 · Tipo di Ospite',
+    gt_single: 'Viaggiatore Singolo', gt_head: 'Capofamiglia', gt_member: 'Membro Famiglia', gt_group: 'Capogruppo',
+    num_guests_label: 'Numero totale di ospiti <span class="req">*</span>',
+    step2_header: 'Passo 2 · Dati Personali',
+    surname_label: 'Cognome <span class="req">*</span>',
+    name_label: 'Nome <span class="req">*</span>',
+    sex_label: 'Sesso <span class="req">*</span>',
+    male: 'Maschio', female: 'Femmina',
+    dob_label: 'Data di Nascita <span class="req">*</span>',
+    birthplace_label: 'Luogo di Nascita <span class="req">*</span>',
+    citizenship_label: 'Cittadinanza <span class="req">*</span>',
+    doctype_label: 'Tipo Documento <span class="req">*</span>',
+    passport: 'Passaporto', id_card: 'Carta d\'Identità', driving: 'Patente', other: 'Altro',
+    docnum_label: 'Numero Documento <span class="req">*</span>',
+    step3_header: 'Passo 3 · Caricamento Documento',
+    upload_text: 'Tocca per caricare la <strong>foto del documento</strong>',
+    upload_hint: 'JPG, PNG o PDF · Max 10MB',
+    upload_selfie: 'Tocca per fare un <strong>selfie con il documento</strong>',
+    upload_selfie_hint: 'Per la verifica dell\'identità',
+    btn_back: 'Indietro', btn_next: 'Avanti →', btn_submit: 'Invia Check-in ✓',
+    btn_submitting: 'Invio in corso…',
+    success_title: 'Check-in Completato!',
+    success_text: 'I tuoi dati sono stati inviati. Ci occuperemo noi della registrazione presso le autorità. Buon soggiorno a Casa Sole!',
+    error_text: 'Qualcosa è andato storto. Riprova o contatta il tuo host.',
+    rules_topbar: 'Regole della Casa', rules_h2: 'Regole della Casa',
+    explore_topbar: 'Esplora', explore_h2: 'I Nostri Consigli',
+    explore_p: 'Scelti dai vostri host — nessuna trappola per turisti',
+    chat_topbar: 'Concierge',
+    chat_h2: '🏠 Concierge Casa Sole',
+    chat_p: 'Chiedi qualsiasi cosa sull\'appartamento, Bari o il tuo soggiorno',
+    chat_welcome: 'Ciao! 🌞 Sono il concierge di Casa Sole. Conosco tutto sull\'appartamento, il quartiere, i ristoranti e Bari. Come posso aiutarti oggi?',
+    chat_placeholder: 'Chiedi qualsiasi cosa…',
+    nav_home: 'Home', nav_rules: 'Regole', nav_explore: 'Esplora', nav_chat: 'Chat',
+    sug1: 'Qual è la password WiFi?', sug2: 'Miglior ristorante vicino?', sug3: 'Come funziona il check-out?', sug4: 'Parla con una persona',
+    cat_all: 'Tutti', cat_food: '🍝 Cibo', cat_drink: '🍷 Bevande', cat_see: '👁 Vedere', cat_beach: '🏖 Spiaggia', cat_shop: '🛍 Shopping',
+  }
+};
+
+function setLang(l) {
+  lang = l;
+  document.querySelectorAll('.lang-opt').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent.trim() === l.toUpperCase());
+  });
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (T[lang][key] !== undefined) el.innerHTML = T[lang][key];
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (T[lang][key]) el.placeholder = T[lang][key];
+  });
+  document.querySelectorAll('[data-i18n-label]').forEach(el => {
+    const key = el.getAttribute('data-i18n-label');
+    if (T[lang][key]) el.querySelector('.gt-label').textContent = T[lang][key];
+  });
+  document.querySelectorAll('[data-i18n-opt]').forEach(el => {
+    const key = el.getAttribute('data-i18n-opt');
+    if (T[lang][key]) el.textContent = T[lang][key];
+  });
+  if (checkinStep === 3) document.getElementById('btnNext').innerHTML = T[lang].btn_submit;
+  renderRules();
+  renderRecos();
+  renderChatSuggestions();
+}
+
+/* ══════════════════════════════════════
+   NAVIGATION
+══════════════════════════════════════ */
+function goTo(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach((n, i) => {
+    const pages = ['welcome','checkin','rules','explore','chat'];
+    n.classList.toggle('active', pages[i] === page);
+  });
+}
+
+/* ══════════════════════════════════════
+   CHECK-IN FLOW — NOW SAVES TO SUPABASE
+══════════════════════════════════════ */
+let checkinStep = 1;
+let selectedGuestType = 'single';
+
+function selectGuestType(el, type) {
+  document.querySelectorAll('.guest-type-opt').forEach(o => o.classList.remove('active'));
+  el.classList.add('active');
+  selectedGuestType = type;
+}
+
+function updateSteps() {
+  for (let i = 1; i <= 3; i++) {
+    const dot = document.getElementById('sd' + i);
+    const line = i < 3 ? document.getElementById('sl' + i) : null;
+    dot.classList.remove('active', 'done');
+    if (i < checkinStep) { dot.classList.add('done'); dot.textContent = '✓'; }
+    else if (i === checkinStep) { dot.classList.add('active'); dot.textContent = i; }
+    else { dot.textContent = i; }
+    if (line) line.classList.toggle('done', i < checkinStep);
+  }
+  document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
+  document.getElementById('step' + checkinStep).classList.add('active');
+  const prev = document.getElementById('btnPrev');
+  const next = document.getElementById('btnNext');
+  prev.classList.toggle('hidden', checkinStep === 1);
+  next.innerHTML = checkinStep === 3 ? T[lang].btn_submit : T[lang].btn_next;
+  if (checkinStep === 3) next.classList.replace('btn-primary', 'btn-success') || next.classList.add('btn-success');
+  else { next.classList.remove('btn-success'); next.classList.add('btn-primary'); }
+}
+
+function checkinNext() {
+  if (checkinStep < 3) { checkinStep++; updateSteps(); }
+  else { submitCheckin(); }
+}
+function checkinPrev() {
+  if (checkinStep > 1) { checkinStep--; updateSteps(); }
+}
+
+async function uploadFile(file, folder) {
+  if (!file) return null;
+  try {
+    const ext = file.name.split('.').pop();
+    const path = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    const { data, error } = await sb.storage.from('documents').upload(path, file);
+    if (error) { console.warn('Upload skipped:', error.message); return null; }
+    return data.path;
+  } catch (e) { console.warn('Upload failed, continuing:', e); return null; }
+}
+
+async function submitCheckin() {
+  const btn = document.getElementById('btnNext');
+  btn.innerHTML = T[lang].btn_submitting;
+  btn.disabled = true;
+
+  try {
+    // Upload files to Supabase Storage (non-blocking — continues even if upload fails)
+    const idPath = await uploadFile(uploadedIdFile, 'id-photos');
+    const selfiePath = await uploadFile(uploadedSelfieFile, 'selfies');
+
+    // Build checkin record
+    const record = {
+      guest_type: selectedGuestType,
+      surname: document.getElementById('surname').value.trim(),
+      name: document.getElementById('gname').value.trim(),
+      sex: document.getElementById('sex').value,
+      date_of_birth: document.getElementById('dob').value || '2000-01-01',
+      place_of_birth: document.getElementById('birthplace').value.trim() || 'Not provided',
+      citizenship: document.getElementById('citizenship').value.trim() || 'Not provided',
+      document_type: document.getElementById('doctype').value,
+      document_number: document.getElementById('docnum').value.trim() || 'Not provided',
+      id_photo_path: idPath,
+      selfie_photo_path: selfiePath,
+      docs_status: (idPath && selfiePath) ? 'complete' : idPath ? 'partial' : 'pending',
+    };
+    if (propertyId) record.property_id = propertyId;
+
+    console.log('Submitting check-in:', record);
+    const { data, error } = await sb.from('checkins').insert(record);
+
+    if (error) { console.error('DB insert error:', JSON.stringify(error)); throw error; }
+
+    // Also save chat message noting the check-in
+    await sb.from('chat_messages').insert({
+      property_id: propertyId,
+      sender: 'system',
+      message: `Guest ${document.getElementById('gname').value} ${document.getElementById('surname').value} completed online check-in.`
+    });
+
+    // Show success
+    document.getElementById('checkinBtns').classList.add('hidden');
+    document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
+    document.querySelector('.steps-bar').classList.add('hidden');
+    document.querySelector('.checkin-intro').classList.add('hidden');
+    document.getElementById('checkinSuccess').classList.add('show');
+    document.getElementById('checkinBadge').style.display = 'none';
+    console.log('Check-in saved to Supabase!', data);
+
+  } catch (err) {
+    console.error('Check-in submission error:', err);
+    btn.innerHTML = T[lang].btn_submit;
+    btn.disabled = false;
+    alert(T[lang].error_text);
+  }
+}
+
+function handleFileUpload(input) {
+  if (input.files.length) {
+    uploadedIdFile = input.files[0];
+    document.getElementById('uploadZone').classList.add('has-file');
+    document.getElementById('uploadFilename').textContent = '✓ ' + input.files[0].name;
+  }
+}
+function handleFileUpload2(input) {
+  if (input.files.length) {
+    uploadedSelfieFile = input.files[0];
+    document.getElementById('uploadZone2').classList.add('has-file');
+    document.getElementById('uploadFilename2').textContent = '✓ ' + input.files[0].name;
+  }
+}
+
+/* ══════════════════════════════════════
+   HOUSE RULES — fallback data + DB load
+══════════════════════════════════════ */
+const fallbackRules = {
+  en: [
+    { icon: '🔇', title: 'Quiet Hours', desc: 'Please keep noise to a minimum between 22:00 and 8:00. The old city walls carry sound easily.', type: 'important' },
+    { icon: '🚭', title: 'No Smoking Inside', desc: 'Smoking is not allowed anywhere inside the apartment. You can smoke on the balcony.', type: 'important' },
+    { icon: '🐾', title: 'No Pets', desc: 'Unfortunately we cannot accommodate pets at this time.', type: '' },
+    { icon: '🗑', title: 'Waste Separation', desc: 'Bari has strict recycling rules. Separate bins are provided — organic, plastic, paper, glass, general.', type: '' },
+    { icon: '🔑', title: 'Keys & Lockbox', desc: 'The keybox code was sent to you by message. On departure, return keys to the lockbox and scramble the code.', type: '' },
+    { icon: '💧', title: 'Water is Precious', desc: 'Puglia is a dry region. Please be mindful of water usage — short showers are appreciated!', type: 'tip' },
+    { icon: '🧹', title: 'Leave it Tidy', desc: 'Please leave the apartment in a reasonable condition. Run the dishwasher, take out rubbish, strip the beds.', type: '' },
+    { icon: '👕', title: 'Laundry', desc: 'The washing machine is in the bathroom. You can hang clothes on the balcony line. Detergent is under the sink.', type: 'tip' },
+  ],
+  it: [
+    { icon: '🔇', title: 'Ore di Silenzio', desc: 'Si prega di mantenere il rumore al minimo tra le 22:00 e le 8:00.', type: 'important' },
+    { icon: '🚭', title: 'Vietato Fumare', desc: 'È vietato fumare all\'interno dell\'appartamento. Si può fumare sul balcone.', type: 'important' },
+    { icon: '🐾', title: 'No Animali', desc: 'Purtroppo non possiamo ospitare animali domestici.', type: '' },
+    { icon: '🗑', title: 'Raccolta Differenziata', desc: 'Bidoni separati: organico, plastica, carta, vetro, indifferenziato.', type: '' },
+    { icon: '🔑', title: 'Chiavi & Lockbox', desc: 'Alla partenza, rimettete le chiavi nella lockbox e mescolate il codice.', type: '' },
+    { icon: '💧', title: 'L\'Acqua è Preziosa', desc: 'Docce brevi sono apprezzate!', type: 'tip' },
+    { icon: '🧹', title: 'Lasciate in Ordine', desc: 'Avviate la lavastoviglie, buttate la spazzatura, togliete le lenzuola.', type: '' },
+    { icon: '👕', title: 'Bucato', desc: 'La lavatrice è in bagno. Detersivo sotto il lavandino.', type: 'tip' },
+  ]
+};
+
+let rulesFromDB = null;
+
+function renderRules() {
+  const c = document.getElementById('rulesContainer');
+  let data;
+  if (rulesFromDB && rulesFromDB.length > 0) {
+    data = rulesFromDB.map(r => ({
+      icon: r.icon,
+      title: lang === 'it' && r.title_it ? r.title_it : r.title_en,
+      desc: lang === 'it' && r.desc_it ? r.desc_it : r.desc_en,
+      type: r.is_important ? 'important' : ''
+    }));
+  } else {
+    data = fallbackRules[lang];
+  }
+  c.innerHTML = data.map(r => `
+    <div class="rule-card ${r.type}">
+      <div class="rule-icon">${r.icon}</div>
+      <div>
+        <div class="rule-title">${r.title}</div>
+        <div class="rule-desc">${r.desc}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ══════════════════════════════════════
+   RECOMMENDATIONS — fallback data + DB load
+══════════════════════════════════════ */
+const fallbackRecos = {
+  en: [
+    { cat: 'food', name: 'Terranima', desc: 'Homemade Puglian pasta — best orecchiette in Bari. Book ahead.', tags: ['🍝 Pasta','💰 €€','📍 5 min walk'], img: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600&q=75' },
+    { cat: 'food', name: 'Pescaria', desc: 'Gourmet fish sandwiches. Fast, fresh, unforgettable.', tags: ['🐟 Seafood','💰 €','📍 3 min walk'], img: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=600&q=75' },
+    { cat: 'food', name: 'Al Pescatore', desc: 'Long seafood lunch by the harbour. Let the waiter choose.', tags: ['🐟 Seafood','💰 €€€','📍 8 min walk'], img: 'https://images.unsplash.com/photo-1534482421-64566f976cfa?w=600&q=75' },
+    { cat: 'drink', name: 'Piazza Mercantile', desc: 'Any café with outdoor seating. Spritz + passeggiata at golden hour.', tags: ['🍷 Wine','☀ Sunset','📍 4 min walk'], img: 'https://images.unsplash.com/photo-1504753793761-46dba1ef0bae?w=600&q=75' },
+    { cat: 'drink', name: 'Reverse Cocktail Bar', desc: 'Best cocktails in Bari. Try the Puglia Sour.', tags: ['🍸 Cocktails','💰 €€','📍 6 min walk'], img: 'https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=600&q=75' },
+    { cat: 'see', name: 'Basilica di San Nicola', desc: 'Great Romanesque church. Don\'t miss the crypt.', tags: ['⛪ Church','🎟 Free','📍 4 min walk'], img: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=75' },
+    { cat: 'see', name: 'Bari Vecchia Streets', desc: 'Just wander. Get lost — that\'s the entire point.', tags: ['🚶 Walk','🎟 Free','📍 Outside your door'], img: 'https://images.unsplash.com/photo-1541451049-18b3dab1ba05?w=600&q=75' },
+    { cat: 'beach', name: 'Pane e Pomodoro', desc: 'Urban beach, 10 min along the lungomare. Sandy and free.', tags: ['🏖 Sandy','🎟 Free','📍 10 min walk'], img: 'https://images.unsplash.com/photo-1520637836993-5c20c01ac776?w=600&q=75' },
+    { cat: 'shop', name: 'Via Sparano Shopping', desc: 'Elegant pedestrianised shopping street.', tags: ['🛍 Fashion','📍 12 min walk'], img: 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=600&q=75' },
+  ],
+  it: [
+    { cat: 'food', name: 'Terranima', desc: 'Le migliori orecchiette di Bari. Prenotate.', tags: ['🍝 Pasta','💰 €€','📍 5 min'], img: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600&q=75' },
+    { cat: 'food', name: 'Pescaria', desc: 'Panini di pesce gourmet. Veloce e fresco.', tags: ['🐟 Pesce','💰 €','📍 3 min'], img: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=600&q=75' },
+    { cat: 'food', name: 'Al Pescatore', desc: 'Pranzo di pesce al porto. Lasciate scegliere al cameriere.', tags: ['🐟 Pesce','💰 €€€','📍 8 min'], img: 'https://images.unsplash.com/photo-1534482421-64566f976cfa?w=600&q=75' },
+    { cat: 'drink', name: 'Piazza Mercantile', desc: 'Spritz e passeggiata nell\'ora dorata.', tags: ['🍷 Vino','☀ Tramonto','📍 4 min'], img: 'https://images.unsplash.com/photo-1504753793761-46dba1ef0bae?w=600&q=75' },
+    { cat: 'drink', name: 'Reverse Cocktail Bar', desc: 'I migliori cocktail di Bari.', tags: ['🍸 Cocktail','💰 €€','📍 6 min'], img: 'https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=600&q=75' },
+    { cat: 'see', name: 'Basilica di San Nicola', desc: 'Non perdetevi la cripta.', tags: ['⛪ Chiesa','🎟 Gratis','📍 4 min'], img: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=75' },
+    { cat: 'see', name: 'Strade di Bari Vecchia', desc: 'Perdetevi — è il punto.', tags: ['🚶 Passeggiata','🎟 Gratis'], img: 'https://images.unsplash.com/photo-1541451049-18b3dab1ba05?w=600&q=75' },
+    { cat: 'beach', name: 'Pane e Pomodoro', desc: 'Spiaggia urbana, gratuita.', tags: ['🏖 Sabbia','🎟 Gratis','📍 10 min'], img: 'https://images.unsplash.com/photo-1520637836993-5c20c01ac776?w=600&q=75' },
+    { cat: 'shop', name: 'Via Sparano Shopping', desc: 'Via dello shopping elegante e pedonale.', tags: ['🛍 Moda','📍 12 min'], img: 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=600&q=75' },
+  ]
+};
+
+let recosFromDB = null;
+let activeCat = 'all';
+
+function renderCatTabs() {
+  const cats = ['all','food','drink','see','beach','shop'];
+  const keys = ['cat_all','cat_food','cat_drink','cat_see','cat_beach','cat_shop'];
+  document.getElementById('catTabs').innerHTML = cats.map((c,i) =>
+    `<button class="cat-tab ${c===activeCat?'active':''}" onclick="filterCat('${c}')">${T[lang][keys[i]]}</button>`
+  ).join('');
+}
+function filterCat(c) { activeCat = c; renderRecos(); }
+
+function renderRecos() {
+  renderCatTabs();
+  let data;
+  if (recosFromDB && recosFromDB.length > 0) {
+    data = recosFromDB.map(r => ({
+      cat: r.category,
+      name: r.name,
+      desc: lang === 'it' && r.desc_it ? r.desc_it : r.desc_en,
+      tags: r.tags ? r.tags.split(',').map(t => t.trim()) : [],
+      img: r.image_url || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600&q=75'
+    }));
+  } else {
+    data = fallbackRecos[lang];
+  }
+  const filtered = activeCat === 'all' ? data : data.filter(r => r.cat === activeCat);
+  document.getElementById('recoContainer').innerHTML = filtered.map(r => `
+    <div class="reco-card">
+      <img class="reco-img" src="${r.img}" alt="${r.name}">
+      <div class="reco-body">
+        <div class="reco-cat">${r.cat.toUpperCase()}</div>
+        <div class="reco-name">${r.name}</div>
+        <div class="reco-desc">${r.desc}</div>
+        <div class="reco-meta">${r.tags.map(t=>`<span class="reco-tag">${t}</span>`).join('')}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/* ══════════════════════════════════════
+   CHAT — saves messages to DB
+══════════════════════════════════════ */
+const chatKB = {
+  en: {
+    wifi: 'The WiFi network is **CasaSole_5G** and the password is **sole2025!** Great coverage throughout.',
+    checkout: 'Check-out is at **10:00 AM**. Leave keys in the lockbox and scramble the code. Strip bed linen and run the dishwasher if you can!',
+    restaurant: 'Top pick: **Terranima** (5 min) — best orecchiette. For seafood: **Al Pescatore**. Quick bite: **Pescaria**. Check the Explore tab!',
+    checkin: 'Complete your check-in in the **Check-in** tab. You\'ll need your passport or ID — takes about 2 minutes.',
+    human: '📞 I\'m connecting you with Marco now. He usually responds within minutes. Anything else I can help with?',
+    default: 'Great question! Check the **Explore** tab for local tips, or say "talk to a human" to reach Marco (your host) anytime.'
+  },
+  it: {
+    wifi: 'La rete WiFi è **CasaSole_5G**, password **sole2025!** Ottima copertura in tutto l\'appartamento.',
+    checkout: 'Check-out alle **10:00**. Chiavi nella lockbox, mescolate il codice. Togliete le lenzuola e avviate la lavastoviglie!',
+    restaurant: 'Consiglio: **Terranima** (5 min) — migliori orecchiette. Pesce: **Al Pescatore**. Veloce: **Pescaria**. Guardate Esplora!',
+    checkin: 'Completate il check-in nella scheda **Check-in**. Servono passaporto o carta d\'identità — circa 2 minuti.',
+    human: '📞 Vi metto in contatto con Marco. Di solito risponde entro pochi minuti. Posso aiutarvi con altro?',
+    default: 'Ottima domanda! Guardate la sezione **Esplora** per consigli, o dite "parla con una persona" per contattare Marco.'
+  }
+};
+
+function matchResponse(msg) {
+  const m = msg.toLowerCase();
+  const kb = chatKB[lang];
+  if (m.includes('wifi') || m.includes('password') || m.includes('internet')) return kb.wifi;
+  if (m.includes('check-out') || m.includes('checkout') || m.includes('leave') || m.includes('partenza')) return kb.checkout;
+  if (m.includes('restaurant') || m.includes('eat') || m.includes('food') || m.includes('ristorante') || m.includes('mangiare')) return kb.restaurant;
+  if (m.includes('check-in') || m.includes('checkin') || m.includes('document') || m.includes('passport') || m.includes('documento')) return kb.checkin;
+  if (m.includes('human') || m.includes('person') || m.includes('marco') || m.includes('host') || m.includes('persona') || m.includes('umano')) return kb.human;
+  return kb.default;
+}
+
+function renderChatSuggestions() {
+  const keys = ['sug1','sug2','sug3','sug4'];
+  document.getElementById('chatSuggestions').innerHTML = keys.map(k =>
+    `<button class="chat-sug" onclick="sendSuggestion('${T[lang][k]}')">${T[lang][k]}</button>`
+  ).join('');
+}
+
+function addBubble(text, type) {
+  const div = document.createElement('div');
+  div.className = 'chat-bubble ' + type;
+  div.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  document.getElementById('chatMessages').appendChild(div);
+  document.getElementById('chatMessages').scrollTop = 99999;
+}
+
+async function saveChatMsg(sender, message) {
+  if (!propertyId) return;
+  await sb.from('chat_messages').insert({ property_id: propertyId, sender, message }).catch(() => {});
+}
+
+function sendChat() {
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+  addBubble(msg, 'user');
+  saveChatMsg('guest', msg);
+  input.value = '';
+  setTimeout(() => {
+    const reply = matchResponse(msg);
+    addBubble(reply, 'bot');
+    saveChatMsg('bot', reply);
+    // If escalated to human, mark it
+    if (msg.toLowerCase().match(/human|person|marco|host|persona|umano/)) {
+      saveChatMsg('system', 'Guest requested human assistance — escalating to host.');
+    }
+  }, 600);
+}
+
+function sendSuggestion(text) {
+  addBubble(text, 'user');
+  saveChatMsg('guest', text);
+  document.getElementById('chatSuggestions').innerHTML = '';
+  setTimeout(() => {
+    const reply = matchResponse(text);
+    addBubble(reply, 'bot');
+    saveChatMsg('bot', reply);
+  }, 600);
+}
+
+/* ══════════════════════════════════════
+   INIT — Load from Supabase, fallback to local data
+══════════════════════════════════════ */
+async function init() {
+  // 1. Load property
+  try {
+    const { data } = await sb.from('properties').select('*').limit(1).single();
+    if (data) {
+      propertyId = data.id;
+      propertyData = data;
+      console.log('✅ Property loaded from Supabase:', data.name);
+    }
+  } catch (e) { console.log('Using fallback property data'); }
+
+  // 2. Load rules from DB
+  if (propertyId) {
+    try {
+      const { data } = await sb.from('rules').select('*').eq('property_id', propertyId).order('sort_order');
+      if (data && data.length > 0) { rulesFromDB = data; console.log('✅ Rules loaded from DB'); }
+    } catch (e) {}
+  }
+
+  // 3. Load recommendations from DB
+  if (propertyId) {
+    try {
+      const { data } = await sb.from('recommendations').select('*').eq('property_id', propertyId).order('sort_order');
+      if (data && data.length > 0) { recosFromDB = data; console.log('✅ Recommendations loaded from DB'); }
+    } catch (e) {}
+  }
+
+  // 4. Render everything
+  renderRules();
+  renderRecos();
+  renderChatSuggestions();
+}
+
+init();
+</script>
+</body>
+</html>

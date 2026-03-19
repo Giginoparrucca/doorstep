@@ -550,7 +550,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
       </div>
 
-      <button class="btn btn-primary" onclick="toast('Property details saved!')">💾 Save Property Details</button>
+      <button class="btn btn-primary" onclick="saveProperty()">💾 Save Property Details</button>
     </div>
 
     <!-- ════════════ HOUSE RULES ════════════ -->
@@ -563,7 +563,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
       <div style="margin-top:16px; display:flex; gap:10px;">
         <button class="btn btn-secondary" onclick="addRule()">+ Add Rule</button>
-        <button class="btn btn-primary" onclick="toast('House rules saved!')">💾 Save Rules</button>
+        <button class="btn btn-primary" onclick="saveRules()">💾 Save Rules</button>
       </div>
     </div>
 
@@ -585,7 +585,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
       <div style="margin-top:16px; display:flex; gap:10px;">
         <button class="btn btn-secondary" onclick="addReco()">+ Add Recommendation</button>
-        <button class="btn btn-primary" onclick="toast('Recommendations saved!')">💾 Save</button>
+        <button class="btn btn-primary" onclick="saveRecos()">💾 Save</button>
       </div>
     </div>
 
@@ -718,7 +718,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="qr-info">
           <h3>Guest App Link</h3>
           <p>Share this link with guests before arrival, or print the QR code and place it in the apartment.</p>
-          <div class="qr-link" id="guestLink">https://getdoorstep.app/p/casa-sole</div>
+          <div class="qr-link" id="guestLink">https://doorstep-rust.vercel.app</div>
           <div style="margin-top:12px;display:flex;gap:8px;">
             <button class="btn btn-primary btn-sm" onclick="copyLink()">📋 Copy Link</button>
             <button class="btn btn-secondary btn-sm" onclick="toast('QR downloaded!')">🖨 Print QR</button>
@@ -732,7 +732,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <textarea class="form-textarea" style="min-height:120px;">Hi {guest_name}! 🌞
 
 Welcome to Casa Sole! Before you arrive, please complete your online check-in here:
-👉 https://getdoorstep.app/p/casa-sole
+👉 https://doorstep-rust.vercel.app
 
 It takes about 2 minutes and is required by Italian law. You'll also find WiFi details, house rules, and our personal recommendations for Bari.
 
@@ -750,7 +750,20 @@ Marco & Lucia</textarea>
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
+/* ══════════════════════════════════════
+   SUPABASE CONNECTION
+══════════════════════════════════════ */
+const SUPABASE_URL = 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjandhcXFhYmd3cWhoemhmYnRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4OTM0MjMsImV4cCI6MjA4OTQ2OTQyM30.BCskfjawOLqayI7xXV8ebIBEcXf12WygH52w204NzWk';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let propertyId = null;
+let propertyData = null;
+let allCheckins = [];
+let allChats = [];
+
 /* ══════════════════════════════════════
    NAV
 ══════════════════════════════════════ */
@@ -775,16 +788,105 @@ function showPanel(id, btn) {
 }
 
 /* ══════════════════════════════════════
-   RULES EDITOR
+   DASHBOARD — live stats
 ══════════════════════════════════════ */
-let rulesData = [
-  { icon: '🔇', title: 'Quiet Hours', desc: 'Please keep noise to a minimum between 22:00 and 8:00.', important: true },
-  { icon: '🚭', title: 'No Smoking Inside', desc: 'Smoking is not allowed inside. You can smoke on the balcony.', important: true },
-  { icon: '🐾', title: 'No Pets', desc: 'Unfortunately we cannot accommodate pets.', important: false },
-  { icon: '🗑', title: 'Waste Separation', desc: 'Separate bins provided — organic, plastic, paper, glass, general.', important: false },
-  { icon: '🔑', title: 'Keys & Lockbox', desc: 'Return keys to the lockbox on departure and scramble the code.', important: false },
-  { icon: '💧', title: 'Water is Precious', desc: 'Puglia is dry — short showers appreciated!', important: false },
-];
+function renderDashboard() {
+  const total = allCheckins.length;
+  const pending = allCheckins.filter(c => c.docs_status === 'pending').length;
+  const filed = allCheckins.filter(c => c.alloggiati_status === 'filed').length;
+
+  document.getElementById('panel-dashboard').innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Check-ins</div>
+        <div class="stat-value">${total}</div>
+        <div class="stat-change up">All time</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Pending Documents</div>
+        <div class="stat-value" style="color:${pending>0?'var(--amber)':'var(--green)'}">${pending}</div>
+        <div class="stat-change ${pending>0?'down':'up'}">${pending>0?'Needs attention':'All complete'}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Alloggiati Filed</div>
+        <div class="stat-value" style="color:var(--green)">${filed}</div>
+        <div class="stat-change up">${total>0?Math.round(filed/total*100)+'% done':'No guests yet'}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Chat Messages</div>
+        <div class="stat-value">${allChats.length}</div>
+        <div class="stat-change up">${allChats.filter(c=>c.sender==='guest').length} from guests</div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-header">
+        <div class="table-title">Recent Check-ins</div>
+        <button class="btn btn-secondary btn-sm" onclick="showPanel('checkins', document.querySelector('[onclick*=checkins]'))">View All →</button>
+      </div>
+      <table>
+        <thead><tr><th>Guest</th><th>Type</th><th>Citizenship</th><th>Document</th><th>Docs</th><th>Submitted</th></tr></thead>
+        <tbody>
+          ${allCheckins.slice(0,5).map(c => `
+            <tr>
+              <td><strong>${c.surname} ${c.name}</strong></td>
+              <td>${c.guest_type}</td>
+              <td>${c.citizenship}</td>
+              <td>${c.document_type}<br><span style="font-size:0.6rem;color:var(--ink-soft)">${c.document_number}</span></td>
+              <td><span class="status-badge ${c.docs_status==='complete'?'complete':c.docs_status==='partial'?'pending':'missing'}">${c.docs_status==='complete'?'✓ Complete':c.docs_status==='partial'?'⏳ Partial':'✗ Missing'}</span></td>
+              <td style="font-size:0.68rem;color:var(--ink-soft)">${new Date(c.submitted_at).toLocaleDateString('en-GB')}</td>
+            </tr>
+          `).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--ink-soft);padding:24px;">No check-ins yet. Share your guest link to get started!</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+/* ══════════════════════════════════════
+   CHECK-IN DATA TABLE — live from DB
+══════════════════════════════════════ */
+function renderCheckins() {
+  document.getElementById('checkinTable').innerHTML = allCheckins.map(c => `
+    <tr>
+      <td><strong>${c.surname} ${c.name}</strong></td>
+      <td>${c.guest_type}</td>
+      <td>${c.date_of_birth ? new Date(c.date_of_birth).toLocaleDateString('en-GB') : '—'}<br><span style="font-size:0.6rem;color:var(--ink-soft)">${c.place_of_birth || ''}</span></td>
+      <td>${c.citizenship}</td>
+      <td>${c.document_type}<br><span style="font-size:0.6rem;color:var(--ink-soft)">${c.document_number}</span></td>
+      <td style="font-size:0.68rem">${new Date(c.submitted_at).toLocaleDateString('en-GB')}</td>
+      <td><span class="status-badge ${c.docs_status==='complete'?'complete':c.docs_status==='partial'?'pending':'missing'}">${c.docs_status==='complete'?'✓':c.docs_status==='partial'?'⏳':'✗'}</span></td>
+      <td><span class="status-badge ${c.alloggiati_status==='filed'?'complete':'missing'}">${c.alloggiati_status==='filed'?'✓ Filed':'Pending'}</span></td>
+      <td><button class="btn btn-secondary btn-sm" onclick="viewGuest('${c.id}')">View</button></td>
+    </tr>
+  `).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--ink-soft);padding:24px;">No check-ins yet</td></tr>';
+
+  document.getElementById('checkinCount').textContent = allCheckins.length;
+}
+
+/* ══════════════════════════════════════
+   PROPERTY EDITOR — save to DB
+══════════════════════════════════════ */
+async function saveProperty() {
+  if (!propertyId) { toast('No property found!'); return; }
+  const update = {
+    name: document.getElementById('propName')?.value,
+    wifi_name: document.querySelector('[value="CasaSole_5G"]')?.value,
+  };
+  // Collect all form inputs from property panel
+  const inputs = document.querySelectorAll('#panel-property .form-input, #panel-property .form-textarea, #panel-property .form-select');
+  // We'll do a simple save for now
+  const { error } = await sb.from('properties').update({
+    name: document.getElementById('propName').value,
+  }).eq('id', propertyId);
+  if (error) { console.error(error); toast('Error saving!'); return; }
+  toast('Property details saved!');
+}
+
+/* ══════════════════════════════════════
+   RULES EDITOR — connected to DB
+══════════════════════════════════════ */
+let rulesData = [];
 
 function renderRules() {
   document.getElementById('rulesList').innerHTML = rulesData.map((r, i) => `
@@ -793,37 +895,48 @@ function renderRules() {
       <div class="edit-item-body">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
           <input class="form-input" style="width:50px;text-align:center;padding:6px;" value="${r.icon}" onchange="rulesData[${i}].icon=this.value">
-          <input class="form-input" style="flex:1" value="${r.title}" onchange="rulesData[${i}].title=this.value">
+          <input class="form-input" style="flex:1" value="${r.title_en||r.title||''}" onchange="rulesData[${i}].title_en=this.value">
           <label style="display:flex;align-items:center;gap:4px;font-size:0.62rem;white-space:nowrap;color:var(--red);cursor:pointer;">
-            <input type="checkbox" ${r.important?'checked':''} onchange="rulesData[${i}].important=this.checked"> Important
+            <input type="checkbox" ${r.is_important?'checked':''} onchange="rulesData[${i}].is_important=this.checked"> Important
           </label>
         </div>
-        <textarea class="form-textarea" style="min-height:44px;font-size:0.72rem;" onchange="rulesData[${i}].desc=this.value">${r.desc}</textarea>
+        <textarea class="form-textarea" style="min-height:44px;font-size:0.72rem;" onchange="rulesData[${i}].desc_en=this.value">${r.desc_en||r.desc||''}</textarea>
       </div>
       <div class="edit-item-actions">
         <button onclick="rulesData.splice(${i},1);renderRules()">🗑</button>
       </div>
     </div>
-  `).join('');
+  `).join('') || '<div style="text-align:center;padding:20px;color:var(--ink-soft)">No rules yet. Click "Add Rule" to create one.</div>';
 }
 
 function addRule() {
-  rulesData.push({ icon: '📌', title: 'New Rule', desc: 'Describe the rule...', important: false });
+  rulesData.push({ icon: '📌', title_en: 'New Rule', desc_en: 'Describe the rule...', is_important: false });
   renderRules();
 }
 
-/* ══════════════════════════════════════
-   RECOMMENDATIONS EDITOR
-══════════════════════════════════════ */
-let recoData = [
-  { cat: 'food', name: 'Terranima', desc: 'Best orecchiette in Bari. Book ahead.', tags: 'Pasta, €€, 5 min walk' },
-  { cat: 'food', name: 'Pescaria', desc: 'Gourmet fish sandwiches — fast, fresh, unforgettable.', tags: 'Seafood, €, 3 min walk' },
-  { cat: 'food', name: 'Al Pescatore', desc: 'Long seafood lunch by the harbour. Let the waiter choose.', tags: 'Seafood, €€€, 8 min walk' },
-  { cat: 'drink', name: 'Piazza Mercantile', desc: 'Any café with outdoor seating. Spritz + passeggiata.', tags: 'Wine, Sunset, 4 min walk' },
-  { cat: 'see', name: 'Basilica di San Nicola', desc: 'Great Romanesque church. Don\'t miss the crypt.', tags: 'Church, Free, 4 min walk' },
-  { cat: 'beach', name: 'Pane e Pomodoro', desc: 'Urban beach, 10 min along the lungomare. Sandy and free.', tags: 'Sandy, Free, 10 min walk' },
-];
+async function saveRules() {
+  if (!propertyId) return;
+  // Delete existing rules and re-insert
+  await sb.from('rules').delete().eq('property_id', propertyId);
+  const rows = rulesData.map((r, i) => ({
+    property_id: propertyId,
+    icon: r.icon,
+    title_en: r.title_en || r.title || '',
+    desc_en: r.desc_en || r.desc || '',
+    is_important: r.is_important || false,
+    sort_order: i,
+  }));
+  if (rows.length > 0) {
+    const { error } = await sb.from('rules').insert(rows);
+    if (error) { console.error(error); toast('Error saving rules!'); return; }
+  }
+  toast('House rules saved to database!');
+}
 
+/* ══════════════════════════════════════
+   RECOMMENDATIONS EDITOR — connected to DB
+══════════════════════════════════════ */
+let recoData = [];
 let activeRecoCat = 'food';
 
 function setRecoCat(cat, btn) {
@@ -834,7 +947,7 @@ function setRecoCat(cat, btn) {
 }
 
 function renderRecos() {
-  const filtered = recoData.filter(r => r.cat === activeRecoCat);
+  const filtered = recoData.filter(r => r.category === activeRecoCat || r.cat === activeRecoCat);
   document.getElementById('recoList').innerHTML = filtered.length === 0
     ? '<div style="text-align:center;padding:30px;color:var(--ink-soft);font-size:0.78rem;">No recommendations in this category yet.</div>'
     : filtered.map((r, i) => {
@@ -844,9 +957,9 @@ function renderRecos() {
         <div class="edit-item-body">
           <div style="display:flex;gap:8px;margin-bottom:6px;">
             <input class="form-input" style="flex:1" value="${r.name}" placeholder="Name" onchange="recoData[${globalIdx}].name=this.value">
-            <input class="form-input" style="flex:1" value="${r.tags}" placeholder="Tags (comma separated)" onchange="recoData[${globalIdx}].tags=this.value">
+            <input class="form-input" style="flex:1" value="${r.tags||''}" placeholder="Tags (comma separated)" onchange="recoData[${globalIdx}].tags=this.value">
           </div>
-          <textarea class="form-textarea" style="min-height:44px;font-size:0.72rem;" placeholder="Description" onchange="recoData[${globalIdx}].desc=this.value">${r.desc}</textarea>
+          <textarea class="form-textarea" style="min-height:44px;font-size:0.72rem;" placeholder="Description" onchange="recoData[${globalIdx}].desc_en=this.value">${r.desc_en||r.desc||''}</textarea>
         </div>
         <div class="edit-item-actions">
           <button onclick="recoData.splice(${globalIdx},1);renderRecos()">🗑</button>
@@ -856,60 +969,86 @@ function renderRecos() {
 }
 
 function addReco() {
-  recoData.push({ cat: activeRecoCat, name: '', desc: '', tags: '' });
+  recoData.push({ category: activeRecoCat, name: '', desc_en: '', tags: '' });
   renderRecos();
 }
 
+async function saveRecos() {
+  if (!propertyId) return;
+  await sb.from('recommendations').delete().eq('property_id', propertyId);
+  const rows = recoData.map((r, i) => ({
+    property_id: propertyId,
+    category: r.category || r.cat || 'food',
+    name: r.name,
+    desc_en: r.desc_en || r.desc || '',
+    tags: r.tags || '',
+    sort_order: i,
+  }));
+  if (rows.length > 0) {
+    const { error } = await sb.from('recommendations').insert(rows);
+    if (error) { console.error(error); toast('Error saving!'); return; }
+  }
+  toast('Recommendations saved to database!');
+}
+
 /* ══════════════════════════════════════
-   EXPORTS
+   EXPORTS — from real DB data
 ══════════════════════════════════════ */
+function guestTypeCode(t) {
+  const map = { single:'16', head:'17', group:'18', member:'19', group_member:'20' };
+  return map[t] || '16';
+}
+function sexCode(s) { return s === 'F' ? '2' : '1'; }
+function fmtDateAlloggiati(d) { if(!d) return ''; return d.replace(/-/g,''); }
+
 function exportAlloggiati() {
-  // Alloggiati Web format: fixed-width text file
+  const propName = propertyData?.name || 'Property';
+  const propAddr = propertyData?.address || '';
   const lines = [
     '// ALLOGGIATI WEB - Export File',
-    '// Property: Casa Sole - Via Venezia 14, 70122 Bari (BA)',
+    `// Property: ${propName} - ${propAddr}`,
     '// Generated: ' + new Date().toLocaleDateString('it-IT'),
     '// ─────────────────────────────────────────────',
     '',
     'TipoAlloggiato;Cognome;Nome;Sesso;DataNascita;ComuneNascita;ProvinciaNascita;StatoNascita;Cittadinanza;TipoDocumento;NumeroDocumento;DataArrivo',
-    '16;MARTIN;SOPHIE;2;19920415;LYON;;FRANCIA;FRANCIA;PAORDI;19AF28491;20260315',
-    '17;WEBER;HANS;1;19850822;MUNICH;;GERMANIA;GERMANIA;IDCARD;T220089456;20260315',
-    '19;WEBER;ANNA;2;19871110;BERLIN;;GERMANIA;GERMANIA;IDCARD;T220089457;20260315',
+    ...allCheckins.map(c =>
+      `${guestTypeCode(c.guest_type)};${(c.surname||'').toUpperCase()};${(c.name||'').toUpperCase()};${sexCode(c.sex)};${fmtDateAlloggiati(c.date_of_birth)};${(c.place_of_birth||'').toUpperCase()};;${(c.citizenship||'').toUpperCase()};${(c.citizenship||'').toUpperCase()};${(c.document_type||'').toUpperCase()};${c.document_number||''};${fmtDateAlloggiati(c.submitted_at?.split('T')[0])}`
+    )
   ];
-  downloadFile('alloggiati_export_2026-03.txt', lines.join('\n'));
-  toast('Alloggiati file generated and downloaded!');
+  downloadFile('alloggiati_export_' + new Date().toISOString().slice(0,7) + '.txt', lines.join('\n'));
+  toast('Alloggiati file generated from ' + allCheckins.length + ' guests!');
 }
 
 function exportDMS() {
+  const propName = propertyData?.name || 'Property';
+  const cir = propertyData?.cir_code || 'NOT SET';
+  const nationalities = {};
+  allCheckins.forEach(c => {
+    const n = c.citizenship || 'Unknown';
+    nationalities[n] = (nationalities[n] || 0) + 1;
+  });
   const lines = [
     'Puglia DMS - Tourism Report',
-    'Property CIR: 072006-APP-00123',
-    'Property: Casa Sole',
-    'Period: March 2026',
+    `Property CIR: ${cir}`,
+    `Property: ${propName}`,
+    `Period: ${new Date().toLocaleDateString('en-GB', {month:'long', year:'numeric'})}`,
     '',
-    'Total Guests: 3',
-    'Total Nights: 9 (3 guests × 3 nights)',
+    `Total Guests: ${allCheckins.length}`,
     '',
     'Nationality Breakdown:',
-    'France: 1 guest / 3 nights',
-    'Germany: 2 guests / 6 nights',
-    '',
-    'Arrival Date: 15/03/2026',
-    'Departure Date: 18/03/2026',
+    ...Object.entries(nationalities).map(([n,c]) => `${n}: ${c} guest${c>1?'s':''}`),
   ];
-  downloadFile('puglia_dms_march_2026.txt', lines.join('\n'));
+  downloadFile('puglia_dms_' + new Date().toISOString().slice(0,7) + '.txt', lines.join('\n'));
   toast('Puglia DMS file generated!');
 }
 
 function exportCSV() {
-  const csv = [
-    'Surname,Name,Sex,DateOfBirth,PlaceOfBirth,Citizenship,DocumentType,DocumentNumber,GuestType,CheckIn,CheckOut',
-    'MARTIN,SOPHIE,F,1992-04-15,Lyon,French,Passport,19AF28491,Single,2026-03-15,2026-03-18',
-    'WEBER,HANS,M,1985-08-22,Munich,German,ID Card,T220089456,Family Head,2026-03-15,2026-03-18',
-    'WEBER,ANNA,F,1987-11-10,Berlin,German,ID Card,T220089457,Family Member,2026-03-15,2026-03-18',
-  ];
-  downloadFile('checkins_march_2026.csv', csv.join('\n'));
-  toast('CSV downloaded!');
+  const header = 'Surname,Name,Sex,DateOfBirth,PlaceOfBirth,Citizenship,DocumentType,DocumentNumber,GuestType,SubmittedAt';
+  const rows = allCheckins.map(c =>
+    `${c.surname},${c.name},${c.sex},${c.date_of_birth},${c.place_of_birth},${c.citizenship},${c.document_type},${c.document_number},${c.guest_type},${c.submitted_at}`
+  );
+  downloadFile('checkins_' + new Date().toISOString().slice(0,7) + '.csv', [header, ...rows].join('\n'));
+  toast('CSV downloaded with ' + allCheckins.length + ' guests!');
 }
 
 function downloadFile(filename, content) {
@@ -942,15 +1081,85 @@ function copyTemplate() {
   toast('Template copied!');
 }
 
-function viewGuest(name) {
-  toast('Guest detail view coming in v2!');
+function viewGuest(id) {
+  const c = allCheckins.find(g => g.id === id);
+  if (c) toast(`${c.name} ${c.surname} — ${c.citizenship} — ${c.document_type} ${c.document_number}`);
 }
 
 /* ══════════════════════════════════════
-   INIT
+   INIT — Load everything from Supabase
 ══════════════════════════════════════ */
-renderRules();
-renderRecos();
+async function init() {
+  // 1. Load property
+  try {
+    const { data } = await sb.from('properties').select('*').limit(1).single();
+    if (data) {
+      propertyId = data.id;
+      propertyData = data;
+      console.log('✅ Property loaded:', data.name);
+      // Fill in property form fields
+      if (document.getElementById('propName')) document.getElementById('propName').value = data.name || '';
+      if (document.getElementById('cirCode')) document.getElementById('cirCode').value = data.cir_code || '';
+    }
+  } catch (e) { console.log('No property found'); }
+
+  // 2. Load check-ins
+  try {
+    const { data } = await sb.from('checkins').select('*').order('submitted_at', { ascending: false });
+    if (data) { allCheckins = data; console.log('✅ Loaded', data.length, 'check-ins'); }
+  } catch (e) {}
+
+  // 3. Load chat messages
+  try {
+    const { data } = await sb.from('chat_messages').select('*').order('created_at', { ascending: false });
+    if (data) { allChats = data; console.log('✅ Loaded', data.length, 'chat messages'); }
+  } catch (e) {}
+
+  // 4. Load rules
+  if (propertyId) {
+    try {
+      const { data } = await sb.from('rules').select('*').eq('property_id', propertyId).order('sort_order');
+      if (data && data.length > 0) { rulesData = data; console.log('✅ Loaded', data.length, 'rules'); }
+      else {
+        // Load defaults if DB is empty
+        rulesData = [
+          { icon: '🔇', title_en: 'Quiet Hours', desc_en: 'Keep noise to a minimum between 22:00 and 8:00.', is_important: true },
+          { icon: '🚭', title_en: 'No Smoking Inside', desc_en: 'Smoking not allowed inside. Use the balcony.', is_important: true },
+          { icon: '🐾', title_en: 'No Pets', desc_en: 'Unfortunately we cannot accommodate pets.', is_important: false },
+          { icon: '🗑', title_en: 'Waste Separation', desc_en: 'Separate bins: organic, plastic, paper, glass, general.', is_important: false },
+          { icon: '🔑', title_en: 'Keys & Lockbox', desc_en: 'Return keys to lockbox on departure, scramble the code.', is_important: false },
+          { icon: '💧', title_en: 'Water is Precious', desc_en: 'Puglia is dry — short showers appreciated!', is_important: false },
+        ];
+      }
+    } catch (e) {}
+  }
+
+  // 5. Load recommendations
+  if (propertyId) {
+    try {
+      const { data } = await sb.from('recommendations').select('*').eq('property_id', propertyId).order('sort_order');
+      if (data && data.length > 0) { recoData = data; console.log('✅ Loaded', data.length, 'recommendations'); }
+      else {
+        recoData = [
+          { category: 'food', name: 'Terranima', desc_en: 'Best orecchiette in Bari. Book ahead.', tags: '🍝 Pasta, 💰 €€, 📍 5 min walk' },
+          { category: 'food', name: 'Pescaria', desc_en: 'Gourmet fish sandwiches — fast, fresh.', tags: '🐟 Seafood, 💰 €, 📍 3 min walk' },
+          { category: 'food', name: 'Al Pescatore', desc_en: 'Seafood lunch by the harbour.', tags: '🐟 Seafood, 💰 €€€, 📍 8 min walk' },
+          { category: 'drink', name: 'Piazza Mercantile', desc_en: 'Spritz + passeggiata at golden hour.', tags: '🍷 Wine, ☀ Sunset, 📍 4 min walk' },
+          { category: 'see', name: 'Basilica di San Nicola', desc_en: 'Great Romanesque church. See the crypt.', tags: '⛪ Church, 🎟 Free, 📍 4 min walk' },
+          { category: 'beach', name: 'Pane e Pomodoro', desc_en: 'Urban beach, sandy and free.', tags: '🏖 Sandy, 🎟 Free, 📍 10 min walk' },
+        ];
+      }
+    } catch (e) {}
+  }
+
+  // 6. Render everything
+  renderDashboard();
+  renderCheckins();
+  renderRules();
+  renderRecos();
+}
+
+init();
 </script>
 </body>
 </html>

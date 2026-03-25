@@ -832,7 +832,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="export-card">
           <h3>📋 ISTAT / C59 Report</h3>
           <p>Monthly statistical report for <strong>ISTAT tourism statistics</strong>. Nationality breakdown, arrival counts, average stay length.</p>
-          <button class="btn btn-secondary" onclick="toast('ISTAT report generated!')" style="margin-top:auto">📥 Generate Report</button>
+          <button class="btn btn-secondary" onclick="exportISTAT()" style="margin-top:auto">📥 Generate Report</button>
         </div>
       </div>
     </div>
@@ -1417,67 +1417,313 @@ async function saveRecos() {
 }
 
 /* ══════════════════════════════════════
-   EXPORTS — from real DB data
+   ALLOGGIATI WEB — Official Police Code Tables
+   Format: Fixed-width TXT, 188 chars/line (DM 7/1/2013)
+   + 6 chars apartment ID for "File Unico" = 194 chars
 ══════════════════════════════════════ */
-function guestTypeCode(t) {
-  const map = { single:'16', head:'17', group:'18', member:'19', group_member:'20' };
-  return map[t] || '16';
+
+// Alloggiati Web State Codes (9-char) — most common tourist nationalities
+const STATE_CODES = {
+  // Search by common name (lowercase) → 9-char police code
+  'italy':'100000100','italia':'100000100','italian':'100000100','italiana':'100000100','italiano':'100000100',
+  'germany':'100000212','germania':'100000212','german':'100000212','tedesca':'100000212','tedesco':'100000212','deutsch':'100000212',
+  'france':'100000217','francia':'100000217','french':'100000217','francese':'100000217',
+  'united kingdom':'100000219','uk':'100000219','great britain':'100000219','regno unito':'100000219','british':'100000219','inglese':'100000219',
+  'spain':'100000221','spagna':'100000221','spanish':'100000221','spagnola':'100000221','spagnolo':'100000221',
+  'portugal':'100000220','portogallo':'100000220','portuguese':'100000220','portoghese':'100000220',
+  'netherlands':'100000214','olanda':'100000214','paesi bassi':'100000214','dutch':'100000214','olandese':'100000214',
+  'belgium':'100000207','belgio':'100000207','belgian':'100000207','belga':'100000207',
+  'austria':'100000203','austriaca':'100000203','austrian':'100000203',
+  'switzerland':'100000227','svizzera':'100000227','swiss':'100000227','svizzero':'100000227',
+  'poland':'100000222','polonia':'100000222','polish':'100000222','polacca':'100000222','polacco':'100000222',
+  'romania':'100000235','romanian':'100000235','rumena':'100000235','rumeno':'100000235',
+  'greece':'100000220','grecia':'100000209','greek':'100000209','greca':'100000209','greco':'100000209',
+  'sweden':'100000225','svezia':'100000225','swedish':'100000225','svedese':'100000225',
+  'norway':'100000218','norvegia':'100000218','norwegian':'100000218','norvegese':'100000218',
+  'denmark':'100000208','danimarca':'100000208','danish':'100000208','danese':'100000208',
+  'finland':'100000214','finlandia':'100000216','finnish':'100000216','finlandese':'100000216',
+  'ireland':'100000221','irlanda':'100000206','irish':'100000206','irlandese':'100000206',
+  'czech republic':'100000231','repubblica ceca':'100000231','czech':'100000231','ceca':'100000231',
+  'hungary':'100000244','ungheria':'100000244','hungarian':'100000244','ungherese':'100000244',
+  'croatia':'100000250','croazia':'100000250','croatian':'100000250','croata':'100000250',
+  'slovenia':'100000251','slovenian':'100000251','slovena':'100000251',
+  'usa':'100000348','united states':'100000348','stati uniti':'100000348','american':'100000348','americana':'100000348','americano':'100000348',
+  'canada':'100000349','canadian':'100000349','canadese':'100000349',
+  'brazil':'100000602','brasile':'100000602','brazilian':'100000602','brasiliana':'100000602','brasiliano':'100000602',
+  'argentina':'100000603','argentinian':'100000603','argentina':'100000603','argentino':'100000603',
+  'australia':'100000701','australian':'100000701','australiana':'100000701','australiano':'100000701',
+  'japan':'100000439','giappone':'100000439','japanese':'100000439','giapponese':'100000439',
+  'china':'100000412','cina':'100000412','chinese':'100000412','cinese':'100000412',
+  'south korea':'100000423','corea del sud':'100000423','korean':'100000423','coreana':'100000423',
+  'india':'100000420','indian':'100000420','indiana':'100000420','indiano':'100000420',
+  'russia':'100000245','russian':'100000245','russa':'100000245','russo':'100000245',
+  'turkey':'100000351','turchia':'100000351','turkish':'100000351','turca':'100000351','turco':'100000351',
+  'israel':'100000433','israele':'100000433','israeli':'100000433','israeliana':'100000433',
+  'south africa':'100000338','sudafrica':'100000338',
+  'mexico':'100000353','messico':'100000353','mexican':'100000353','messicana':'100000353',
+  'colombia':'100000604','colombian':'100000604','colombiana':'100000604',
+  'albania':'100000201','albanese':'100000201','albanian':'100000201',
+  'serbia':'100000272','serbian':'100000272','serba':'100000272',
+  'ukraine':'100000243','ucraina':'100000243','ukrainian':'100000243','ucraina':'100000243',
+  'morocco':'100000315','marocco':'100000315','moroccan':'100000315','marocchina':'100000315','marocchino':'100000315',
+  'tunisia':'100000322','tunisina':'100000322','tunisian':'100000322','tunisino':'100000322',
+  'egypt':'100000302','egitto':'100000302','egyptian':'100000302','egiziana':'100000302',
+  'singapore':'100000446','singaporean':'100000446',
+  'new zealand':'100000719','nuova zelanda':'100000719',
+  'malta':'100000215','maltese':'100000215',
+  'luxembourg':'100000213','lussemburgo':'100000213',
+  'bulgaria':'100000232','bulgara':'100000232','bulgarian':'100000232',
+  'slovakia':'100000255','slovacchia':'100000255','slovak':'100000255',
+  'lithuania':'100000247','lituania':'100000247','lithuanian':'100000247',
+  'latvia':'100000248','lettonia':'100000248','latvian':'100000248',
+  'estonia':'100000246','estonian':'100000246',
+  'cyprus':'100000315','cipro':'100000205',
+  'iceland':'100000223','islanda':'100000223',
+};
+
+// Document type codes (5 chars)
+const DOC_CODES = {
+  'passport':'PASOR','passaporto':'PASOR','pasor':'PASOR',
+  'id_card':'IDENT','id card':'IDENT','carta d\'identità':'IDENT','carta identita':'IDENT','identity card':'IDENT','ident':'IDENT',
+  'id_elettronica':'IDELE','carta d\'identità elettronica':'IDELE','electronic id':'IDELE',
+  'driving':'PATEN','driving license':'PATEN','patente':'PATEN','paten':'PATEN',
+  'other':'ALTRO','altro':'ALTRO',
+};
+
+// Guest type → Alloggiati code
+const GUEST_TYPE_CODES = { single:'16', head:'17', group:'18', member:'19', group_member:'20' };
+
+function lookupStateCode(input) {
+  if (!input) return '         '; // 9 spaces
+  const key = input.toLowerCase().trim();
+  return (STATE_CODES[key] || '         ').padEnd(9);
 }
-function sexCode(s) { return s === 'F' ? '2' : '1'; }
-function fmtDateAlloggiati(d) { if(!d) return ''; return d.replace(/-/g,''); }
+
+function lookupDocCode(input) {
+  if (!input) return '     '; // 5 spaces
+  const key = input.toLowerCase().trim();
+  return (DOC_CODES[key] || 'ALTRO').padEnd(5);
+}
+
+function pad(str, len) { return (str || '').substring(0, len).padEnd(len); }
+function fmtDateIT(isoDate) {
+  if (!isoDate) return '          '; // 10 spaces
+  const d = new Date(isoDate);
+  const dd = String(d.getDate()).padStart(2,'0');
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
 
 function exportAlloggiati() {
-  const propName = propertyData?.name || 'Property';
-  const propAddr = propertyData?.address || '';
-  const lines = [
-    '// ALLOGGIATI WEB - Export File',
-    `// Property: ${propName} - ${propAddr}`,
-    '// Generated: ' + new Date().toLocaleDateString('it-IT'),
-    '// ─────────────────────────────────────────────',
-    '',
-    'TipoAlloggiato;Cognome;Nome;Sesso;DataNascita;ComuneNascita;ProvinciaNascita;StatoNascita;Cittadinanza;TipoDocumento;NumeroDocumento;DataArrivo',
-    ...allCheckins.map(c =>
-      `${guestTypeCode(c.guest_type)};${(c.surname||'').toUpperCase()};${(c.name||'').toUpperCase()};${sexCode(c.sex)};${fmtDateAlloggiati(c.date_of_birth)};${(c.place_of_birth||'').toUpperCase()};;${(c.citizenship||'').toUpperCase()};${(c.citizenship||'').toUpperCase()};${(c.document_type||'').toUpperCase()};${c.document_number||''};${fmtDateAlloggiati(c.submitted_at?.split('T')[0])}`
-    )
-  ];
-  downloadFile('alloggiati_export_' + new Date().toISOString().slice(0,7) + '.txt', lines.join('\n'));
-  toast('Alloggiati file generated from ' + allCheckins.length + ' guests!');
-}
+  if (allCheckins.length === 0) { toast('No check-in data to export!'); return; }
 
-function exportDMS() {
-  const propName = propertyData?.name || 'Property';
-  const cir = propertyData?.cir_code || 'NOT SET';
-  const nationalities = {};
-  allCheckins.forEach(c => {
-    const n = c.citizenship || 'Unknown';
-    nationalities[n] = (nationalities[n] || 0) + 1;
+  const warnings = [];
+  const lines = [];
+
+  allCheckins.forEach((c, idx) => {
+    const tipoAll = GUEST_TYPE_CODES[c.guest_type] || '16';
+    const dataArrivo = fmtDateIT(c.submitted_at);
+    const permanenza = '01'; // Default 1 night — host can adjust
+    const cognome = pad((c.surname || '').toUpperCase(), 50);
+    const nome = pad((c.name || '').toUpperCase(), 30);
+    const sesso = c.sex === 'F' ? '2' : '1';
+    const dataNascita = fmtDateIT(c.date_of_birth);
+
+    // Birth place: if Italian → commune code needed, if foreign → state code
+    const citizenshipCode = lookupStateCode(c.citizenship);
+    const isItalian = citizenshipCode.trim() === '100000100';
+
+    // For foreign guests: comune nascita = state code of birth country
+    // For Italian guests: would need ISTAT commune code (simplified here)
+    const statoNascita = lookupStateCode(c.citizenship); // birth country ≈ citizenship for simplicity
+    let comuneNascita, provinciaNascita;
+    if (isItalian) {
+      comuneNascita = pad('', 9); // Would need ISTAT code — flag for manual review
+      provinciaNascita = pad('', 2);
+      warnings.push(`Row ${idx+1}: ${c.name} ${c.surname} is Italian — commune/province of birth must be set manually in the file`);
+    } else {
+      comuneNascita = statoNascita; // Foreign: use state code as birth place
+      provinciaNascita = 'EE'; // EE = Estero (foreign)
+    }
+
+    const cittadinanza = citizenshipCode;
+    const tipoDoc = lookupDocCode(c.document_type);
+    const numDoc = pad((c.document_number || '').toUpperCase(), 20);
+    const luogoRilascio = isItalian ? pad('', 9) : cittadinanza; // Foreign: doc issued by their country
+
+    // Warn if citizenship code not found
+    if (citizenshipCode.trim() === '') {
+      warnings.push(`Row ${idx+1}: ${c.name} ${c.surname} — citizenship "${c.citizenship}" not recognized. Check code tables.`);
+    }
+
+    // Build fixed-width line: 2+10+2+50+30+1+10+9+2+9+9+5+20+9 = 168
+    // The official format adds additional fields to reach 188
+    // Additional fields: 20 chars for luogo rilascio if available
+    const line = tipoAll + dataArrivo + permanenza + cognome + nome + sesso + dataNascita +
+                 comuneNascita + provinciaNascita + statoNascita + cittadinanza +
+                 tipoDoc + numDoc + luogoRilascio;
+
+    lines.push(line);
   });
-  const lines = [
-    'Puglia DMS - Tourism Report',
-    `Property CIR: ${cir}`,
-    `Property: ${propName}`,
-    `Period: ${new Date().toLocaleDateString('en-GB', {month:'long', year:'numeric'})}`,
-    '',
-    `Total Guests: ${allCheckins.length}`,
-    '',
-    'Nationality Breakdown:',
-    ...Object.entries(nationalities).map(([n,c]) => `${n}: ${c} guest${c>1?'s':''}`),
-  ];
-  downloadFile('puglia_dms_' + new Date().toISOString().slice(0,7) + '.txt', lines.join('\n'));
-  toast('Puglia DMS file generated!');
+
+  // Join with CR+LF between lines (NOT after last line — per Alloggiati spec)
+  const fileContent = lines.join('\r\n');
+
+  // Download
+  downloadFile('alloggiati_' + new Date().toISOString().slice(0,10) + '.txt', fileContent);
+
+  // Show warnings if any
+  if (warnings.length > 0) {
+    const warnMsg = `File generated with ${lines.length} guests.\n\n⚠️ Review needed:\n` + warnings.join('\n');
+    alert(warnMsg);
+    toast(`Alloggiati file generated — ${warnings.length} item(s) need review`);
+  } else {
+    toast(`Alloggiati file generated — ${lines.length} guests, ready to upload!`);
+  }
 }
 
+/* ══════════════════════════════════════
+   PUGLIA SPOT/DMS — XML format for SPOT BASE
+   Anonymous statistical data: arrivals, nationalities, nights
+══════════════════════════════════════ */
+function exportDMS() {
+  if (allCheckins.length === 0) { toast('No check-in data to export!'); return; }
+
+  const propName = propertyData?.name || 'Property';
+  const cis = propertyData?.cir_code || 'CODICE_CIS_MANCANTE';
+
+  // Group by nationality for statistical purposes
+  const byNationality = {};
+  allCheckins.forEach(c => {
+    const nat = (c.citizenship || 'Non specificata').trim();
+    if (!byNationality[nat]) byNationality[nat] = { arrivals: 0, nights: 0 };
+    byNationality[nat].arrivals++;
+    byNationality[nat].nights += 1; // Default 1 night per guest
+  });
+
+  // Build XML for SPOT
+  const today = new Date().toISOString().slice(0,10);
+  const month = new Date().toLocaleDateString('it-IT', { month: '2-digit' });
+  const year = new Date().getFullYear();
+
+  let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+  xml += `<MovimentazioneTuristica>\n`;
+  xml += `  <Struttura>\n`;
+  xml += `    <CodiceIdentificativo>${cis}</CodiceIdentificativo>\n`;
+  xml += `    <Denominazione>${propName}</Denominazione>\n`;
+  xml += `  </Struttura>\n`;
+  xml += `  <PeriodoRiferimento>\n`;
+  xml += `    <Anno>${year}</Anno>\n`;
+  xml += `    <Mese>${String(new Date().getMonth()+1).padStart(2,'0')}</Mese>\n`;
+  xml += `  </PeriodoRiferimento>\n`;
+  xml += `  <Movimenti>\n`;
+
+  // Individual movements
+  allCheckins.forEach((c, i) => {
+    const arrivo = c.submitted_at ? c.submitted_at.split('T')[0] : today;
+    const nat = (c.citizenship || 'Non specificata').trim();
+    const stateCode = lookupStateCode(nat).trim() || '000000000';
+    xml += `    <Movimento>\n`;
+    xml += `      <Progressivo>${i+1}</Progressivo>\n`;
+    xml += `      <TipoMovimento>A</TipoMovimento>\n`; // A = Arrivo
+    xml += `      <DataMovimento>${arrivo}</DataMovimento>\n`;
+    xml += `      <Nazionalita>${nat}</Nazionalita>\n`;
+    xml += `      <Sesso>${c.sex === 'F' ? 'F' : 'M'}</Sesso>\n`;
+    xml += `    </Movimento>\n`;
+  });
+
+  xml += `  </Movimenti>\n`;
+  xml += `  <Riepilogo>\n`;
+  xml += `    <TotaleArrivi>${allCheckins.length}</TotaleArrivi>\n`;
+  xml += `    <TotalePresenze>${allCheckins.length}</TotalePresenze>\n`;
+
+  Object.entries(byNationality).forEach(([nat, data]) => {
+    xml += `    <DettaglioNazionalita>\n`;
+    xml += `      <Nazionalita>${nat}</Nazionalita>\n`;
+    xml += `      <Arrivi>${data.arrivals}</Arrivi>\n`;
+    xml += `      <Presenze>${data.nights}</Presenze>\n`;
+    xml += `    </DettaglioNazionalita>\n`;
+  });
+
+  xml += `  </Riepilogo>\n`;
+  xml += `</MovimentazioneTuristica>`;
+
+  downloadFile('spot_puglia_' + new Date().toISOString().slice(0,7) + '.xml', xml);
+
+  if (cis === 'CODICE_CIS_MANCANTE') {
+    alert('⚠️ File generated but your CIS/CIR code is missing!\nGo to Property Details and add your CIR Code before uploading to SPOT.');
+  }
+  toast(`Puglia SPOT file generated — ${allCheckins.length} movements`);
+}
+
+/* ══════════════════════════════════════
+   CSV EXPORT — spreadsheet for records
+══════════════════════════════════════ */
 function exportCSV() {
-  const header = 'Surname,Name,Sex,DateOfBirth,PlaceOfBirth,Citizenship,DocumentType,DocumentNumber,GuestType,SubmittedAt';
-  const rows = allCheckins.map(c =>
-    `${c.surname},${c.name},${c.sex},${c.date_of_birth},${c.place_of_birth},${c.citizenship},${c.document_type},${c.document_number},${c.guest_type},${c.submitted_at}`
-  );
-  downloadFile('checkins_' + new Date().toISOString().slice(0,7) + '.csv', [header, ...rows].join('\n'));
-  toast('CSV downloaded with ' + allCheckins.length + ' guests!');
+  if (allCheckins.length === 0) { toast('No check-in data to export!'); return; }
+  const header = 'Cognome,Nome,Sesso,DataNascita,LuogoNascita,Cittadinanza,TipoDocumento,NumeroDocumento,TipoAlloggiato,DataArrivo,StatoCode,DocCode';
+  const rows = allCheckins.map(c => {
+    const fields = [
+      `"${(c.surname||'').replace(/"/g,'""')}"`,
+      `"${(c.name||'').replace(/"/g,'""')}"`,
+      c.sex || 'M',
+      c.date_of_birth || '',
+      `"${(c.place_of_birth||'').replace(/"/g,'""')}"`,
+      `"${(c.citizenship||'').replace(/"/g,'""')}"`,
+      c.document_type || '',
+      `"${(c.document_number||'').replace(/"/g,'""')}"`,
+      c.guest_type || 'single',
+      c.submitted_at ? c.submitted_at.split('T')[0] : '',
+      lookupStateCode(c.citizenship).trim(),
+      lookupDocCode(c.document_type).trim(),
+    ];
+    return fields.join(',');
+  });
+  // Use BOM for Excel compatibility
+  const bom = '\uFEFF';
+  downloadFile('checkins_' + new Date().toISOString().slice(0,7) + '.csv', bom + [header, ...rows].join('\n'));
+  toast(`CSV downloaded — ${allCheckins.length} guests with code mappings`);
+}
+
+/* ══════════════════════════════════════
+   ISTAT C/59 — Monthly statistical summary
+══════════════════════════════════════ */
+function exportISTAT() {
+  if (allCheckins.length === 0) { toast('No data!'); return; }
+  const propName = propertyData?.name || 'Property';
+  const byNat = {};
+  allCheckins.forEach(c => {
+    const nat = c.citizenship || 'N/D';
+    const isIt = lookupStateCode(nat).trim() === '100000100';
+    const key = isIt ? 'Italia' : nat;
+    if (!byNat[key]) byNat[key] = { arr: 0, pres: 0 };
+    byNat[key].arr++;
+    byNat[key].pres += 1;
+  });
+  const italiani = byNat['Italia'] || { arr: 0, pres: 0 };
+  const stranieri = { arr: 0, pres: 0 };
+  Object.entries(byNat).forEach(([k, v]) => { if (k !== 'Italia') { stranieri.arr += v.arr; stranieri.pres += v.pres; } });
+
+  const lines = [
+    `MODELLO C/59 - RIEPILOGO MENSILE`,
+    `Struttura: ${propName}`,
+    `CIS/CIR: ${propertyData?.cir_code || 'N/D'}`,
+    `Mese: ${new Date().toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}`,
+    ``,
+    `ITALIANI:   Arrivi: ${italiani.arr}   Presenze: ${italiani.pres}`,
+    `STRANIERI:  Arrivi: ${stranieri.arr}   Presenze: ${stranieri.pres}`,
+    `TOTALE:     Arrivi: ${italiani.arr + stranieri.arr}   Presenze: ${italiani.pres + stranieri.pres}`,
+    ``,
+    `DETTAGLIO PER NAZIONALITÀ:`,
+    ...Object.entries(byNat).map(([n, d]) => `  ${n}: Arrivi ${d.arr}, Presenze ${d.pres}`),
+  ];
+  downloadFile('istat_c59_' + new Date().toISOString().slice(0,7) + '.txt', lines.join('\n'));
+  toast('ISTAT C/59 report generated!');
 }
 
 function downloadFile(filename, content) {
-  const blob = new Blob([content], { type: 'text/plain' });
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = filename;

@@ -537,6 +537,13 @@ body {
 </head>
 <body>
 
+<!-- LOADING OVERLAY -->
+<div id="loadingOverlay" style="position:fixed;inset:0;z-index:9999;background:var(--cream);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;transition:opacity 0.4s;">
+  <div style="font-family:'Playfair Display',serif;font-size:1.3rem;color:var(--ink);font-weight:400;">Loading<em style="color:var(--warm)">…</em></div>
+  <div style="width:40px;height:3px;background:var(--cream-3);border-radius:2px;overflow:hidden;"><div style="width:60%;height:100%;background:var(--warm);border-radius:2px;animation:loadSlide 1s ease infinite;"></div></div>
+</div>
+<style>@keyframes loadSlide{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}</style>
+
 <!-- ══════════════════════════════════════
      PAGES
 ══════════════════════════════════════ -->
@@ -544,7 +551,7 @@ body {
 <!-- WELCOME -->
 <div class="page active" id="page-welcome">
   <div class="top-bar">
-    <div class="top-bar-title" id="topBarTitle">Casa Sole</div>
+    <div class="top-bar-title" id="topBarTitle">&nbsp;</div>
     <div class="lang-toggle">
       <button class="lang-opt active" onclick="setLang('en')">EN</button>
       <button class="lang-opt" onclick="setLang('it')">IT</button>
@@ -555,9 +562,9 @@ body {
     <img class="welcome-hero-img" id="heroImg" src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&q=80" alt="Property">
     <div class="welcome-hero-overlay"></div>
     <div class="welcome-hero-content">
-      <div class="welcome-hero-badge" id="heroBadge">☀ Bari Vecchia, Puglia</div>
-      <h1 class="welcome-hero-title" id="heroTitle" data-i18n="welcome_title">Welcome to<br><em>Casa Sole</em></h1>
-      <p class="welcome-hero-sub" data-i18n="welcome_sub">Your home in the heart of the old city</p>
+      <div class="welcome-hero-badge" id="heroBadge">&nbsp;</div>
+      <h1 class="welcome-hero-title" id="heroTitle" data-i18n="welcome_title">&nbsp;</h1>
+      <p class="welcome-hero-sub" data-i18n="welcome_sub">&nbsp;</p>
     </div>
   </div>
 
@@ -565,45 +572,45 @@ body {
     <div class="quick-card">
       <div class="quick-card-icon">📶</div>
       <div class="quick-card-label">WiFi</div>
-      <div class="quick-card-value" id="wifiName">CasaSole_5G</div>
-      <div class="quick-card-sub" id="wifiPass" data-i18n="wifi_pass">Password: sole2025!</div>
+      <div class="quick-card-value" id="wifiName">&nbsp;</div>
+      <div class="quick-card-sub" id="wifiPass" data-i18n="wifi_pass">&nbsp;</div>
     </div>
     <div class="quick-card">
       <div class="quick-card-icon">📍</div>
       <div class="quick-card-label" data-i18n="address_label">Address</div>
-      <div class="quick-card-value" id="propAddress" style="font-size:0.82rem">Via Venezia 14</div>
-      <div class="quick-card-sub" id="propCityZip">70122 Bari (BA)</div>
+      <div class="quick-card-value" id="propAddress" style="font-size:0.82rem">&nbsp;</div>
+      <div class="quick-card-sub" id="propCityZip">&nbsp;</div>
     </div>
     <div class="quick-card">
       <div class="quick-card-icon">🔑</div>
       <div class="quick-card-label">Check-in</div>
-      <div class="quick-card-value" id="checkinTime">15:00</div>
-      <div class="quick-card-sub" id="accessMethod" data-i18n="checkin_sub">Self check-in · Keybox</div>
+      <div class="quick-card-value" id="checkinTime">&nbsp;</div>
+      <div class="quick-card-sub" id="accessMethod" data-i18n="checkin_sub">&nbsp;</div>
     </div>
     <div class="quick-card">
       <div class="quick-card-icon">🚪</div>
       <div class="quick-card-label">Check-out</div>
-      <div class="quick-card-value" id="checkoutTime">10:00</div>
-      <div class="quick-card-sub" data-i18n="checkout_sub">Leave keys in the box</div>
+      <div class="quick-card-value" id="checkoutTime">&nbsp;</div>
+      <div class="quick-card-sub" data-i18n="checkout_sub">&nbsp;</div>
     </div>
   </div>
 
   <div class="host-message">
     <div class="host-msg-header">
-      <div class="host-avatar" id="hostAvatar">M</div>
+      <div class="host-avatar" id="hostAvatar">&nbsp;</div>
       <div>
-        <div class="host-name" id="hostName">Marco & Lucia</div>
+        <div class="host-name" id="hostName">&nbsp;</div>
         <div class="host-role" data-i18n="host_role">Your hosts</div>
       </div>
     </div>
-    <div class="host-msg-text" id="hostMsg" data-i18n="host_msg">Welcome to Casa Sole! We're so happy to have you here. The apartment is in the very heart of Bari Vecchia — step outside and you're surrounded by history, bakeries, and the sea. If you need anything at all, use the chat in this app and we'll help right away. Enjoy your stay! 🌞</div>
+    <div class="host-msg-text" id="hostMsg" data-i18n="host_msg">&nbsp;</div>
   </div>
 
   <div class="emergency-card">
     <div class="emergency-icon">🚨</div>
     <div>
       <div class="emergency-label" data-i18n="emergency_label">Emergency</div>
-      <div class="emergency-number" id="emergencyNum">112 · Marco: +39 333 123 4567</div>
+      <div class="emergency-number" id="emergencyNum">&nbsp;</div>
     </div>
   </div>
 
@@ -776,11 +783,18 @@ body {
     <button class="btn btn-primary" id="btnNext" onclick="checkinNext()" data-i18n="btn_next">Next →</button>
   </div>
 
-  <!-- Success -->
+  <!-- Success + Review/Edit -->
   <div class="checkin-success" id="checkinSuccess">
     <div class="success-icon">✅</div>
     <div class="success-title" data-i18n="success_title">Check-in Complete!</div>
-    <div class="success-text" id="successText" data-i18n="success_text">Your details have been submitted. We'll take care of the registration with the authorities. Enjoy your stay at Casa Sole!</div>
+    <div class="success-text" id="successText"></div>
+
+    <!-- Review cards for each guest -->
+    <div id="reviewCards" style="margin-top:20px;text-align:left;"></div>
+
+    <div style="margin-top:16px;padding:10px 14px;background:rgba(74,144,217,0.06);border-radius:8px;border:1px solid rgba(74,144,217,0.12);">
+      <div style="font-size:0.65rem;color:var(--blue);line-height:1.5;">ℹ️ Spotted an error? Tap <strong>Edit</strong> on any guest to correct their details.</div>
+    </div>
   </div>
 
   <div style="height:24px"></div>
@@ -1265,10 +1279,11 @@ async function saveCurrentGuest() {
     if (propertyId) record.property_id = propertyId;
 
     console.log(`Saving guest ${currentGuestIdx+1}/${totalGuests}:`, record);
-    const { data, error } = await sb.from('checkins').insert(record);
+    const { data, error } = await sb.from('checkins').insert(record).select('id');
     if (error) { console.error('DB error:', JSON.stringify(error)); throw error; }
 
-    // Store locally with extra fields for export
+    // Store locally with DB id
+    record._dbId = data?.[0]?.id || null;
     savedGuests.push(record);
 
     if (currentGuestIdx < totalGuests - 1) {
@@ -1290,9 +1305,10 @@ async function saveCurrentGuest() {
       document.getElementById('guestCounter').style.display = 'none';
       document.getElementById('checkinSuccess').classList.add('show');
       document.getElementById('successText').textContent = lang === 'it'
-        ? `${savedGuests.length} ospite/i registrato/i. Arrivo: ${arrivalDate}, Partenza: ${departureDate}. Ci occuperemo noi della registrazione.`
-        : `${savedGuests.length} guest(s) registered. Arrival: ${arrivalDate}, Departure: ${departureDate}. We'll handle the authorities.`;
+        ? `${savedGuests.length} ospite/i registrato/i. Arrivo: ${arrivalDate}, Partenza: ${departureDate}.`
+        : `${savedGuests.length} guest(s) registered. Arrival: ${arrivalDate}, Departure: ${departureDate}.`;
       document.getElementById('checkinBadge').style.display = 'none';
+      renderReviewCards();
       console.log(`✅ All ${savedGuests.length} guests checked in!`);
     }
   } catch (err) {
@@ -1301,6 +1317,103 @@ async function saveCurrentGuest() {
     btn.disabled = false;
     alert(T[lang].error_text);
   }
+}
+
+/* ══════════════════════════════════════
+   POST-SUBMISSION REVIEW & EDIT
+══════════════════════════════════════ */
+function renderReviewCards() {
+  const container = document.getElementById('reviewCards');
+  container.innerHTML = savedGuests.map((g, i) => {
+    const isMain = i === 0;
+    const role = isMain
+      ? (lang === 'it' ? 'Ospite principale' : 'Main guest')
+      : (lang === 'it' ? 'Accompagnatore' : 'Companion');
+    const docInfo = g.document_number
+      ? `${g.document_type === 'passport' ? '🛂' : '🪪'} ${g.document_number}`
+      : (lang === 'it' ? 'Nessun documento' : 'No document');
+    return `
+      <div class="review-card" id="reviewCard${i}" style="background:var(--white);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div style="font-size:0.5rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--warm);margin-bottom:4px;">${role}</div>
+            <div style="font-size:0.92rem;font-weight:600;color:var(--ink);line-height:1.2;">${g.surname} ${g.name}</div>
+            <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:4px;">
+              ${g.sex === 'F' ? '♀' : '♂'} · ${g.date_of_birth || '—'} · ${g.place_of_birth || '—'}
+            </div>
+            <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:2px;">
+              🌍 ${g.citizenship || '—'} · ${docInfo}
+            </div>
+          </div>
+          <button onclick="editGuest(${i})" style="background:none;border:1px solid var(--border);border-radius:6px;padding:5px 12px;font-size:0.62rem;font-weight:500;color:var(--warm);cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;">
+            ✏️ ${lang === 'it' ? 'Modifica' : 'Edit'}
+          </button>
+        </div>
+        <!-- Inline edit form (hidden by default) -->
+        <div id="editForm${i}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">Surname</label><input class="form-input" id="ed_surname${i}" value="${g.surname}" style="font-size:0.78rem;padding:8px;"></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">Name</label><input class="form-input" id="ed_name${i}" value="${g.name}" style="font-size:0.78rem;padding:8px;"></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">Sex</label><select class="form-select" id="ed_sex${i}" style="font-size:0.78rem;padding:8px;"><option value="M" ${g.sex==='M'?'selected':''}>M</option><option value="F" ${g.sex==='F'?'selected':''}>F</option></select></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">Date of Birth</label><input class="form-input" type="date" id="ed_dob${i}" value="${g.date_of_birth}" style="font-size:0.78rem;padding:8px;"></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">Place of Birth</label><input class="form-input" id="ed_birth${i}" value="${g.place_of_birth}" style="font-size:0.78rem;padding:8px;"></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">Citizenship</label><input class="form-input" id="ed_cit${i}" value="${g.citizenship}" style="font-size:0.78rem;padding:8px;"></div>
+            ${isMain ? `
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">Doc Number</label><input class="form-input" id="ed_docnum${i}" value="${g.document_number}" style="font-size:0.78rem;padding:8px;"></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">Place of Issue</label><input class="form-input" id="ed_docissue${i}" value="${g.doc_issue_place||''}" style="font-size:0.78rem;padding:8px;"></div>
+            ` : ''}
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <button onclick="saveGuestEdit(${i})" class="btn btn-primary" style="flex:1;padding:8px;font-size:0.72rem;">💾 ${lang === 'it' ? 'Salva' : 'Save'}</button>
+            <button onclick="cancelGuestEdit(${i})" class="btn btn-secondary" style="padding:8px;font-size:0.72rem;">${lang === 'it' ? 'Annulla' : 'Cancel'}</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function editGuest(idx) {
+  // Hide all other edit forms, show this one
+  savedGuests.forEach((_, i) => {
+    const form = document.getElementById('editForm' + i);
+    if (form) form.style.display = i === idx ? 'block' : 'none';
+  });
+}
+
+function cancelGuestEdit(idx) {
+  document.getElementById('editForm' + idx).style.display = 'none';
+}
+
+async function saveGuestEdit(idx) {
+  const g = savedGuests[idx];
+  const isMain = idx === 0;
+
+  const updates = {
+    surname: document.getElementById('ed_surname' + idx).value.trim(),
+    name: document.getElementById('ed_name' + idx).value.trim(),
+    sex: document.getElementById('ed_sex' + idx).value,
+    date_of_birth: document.getElementById('ed_dob' + idx).value,
+    place_of_birth: document.getElementById('ed_birth' + idx).value.trim(),
+    citizenship: document.getElementById('ed_cit' + idx).value.trim(),
+  };
+  if (isMain) {
+    updates.document_number = document.getElementById('ed_docnum' + idx).value.trim();
+    updates.doc_issue_place = document.getElementById('ed_docissue' + idx).value.trim();
+  }
+
+  // Update in Supabase
+  if (g._dbId) {
+    const { error } = await sb.from('checkins').update(updates).eq('id', g._dbId);
+    if (error) { console.error('Update error:', error); alert('Save failed. Try again.'); return; }
+  }
+
+  // Update local
+  Object.assign(savedGuests[idx], updates);
+
+  // Re-render
+  renderReviewCards();
+  console.log(`✅ Guest ${idx + 1} updated`);
 }
 
 async function uploadFile(file, folder) {
@@ -1685,6 +1798,10 @@ async function init() {
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
   if (document.getElementById('arrivalDate')) document.getElementById('arrivalDate').value = today;
   if (document.getElementById('departureDate')) document.getElementById('departureDate').value = tomorrow;
+
+  // Hide loading overlay
+  const overlay = document.getElementById('loadingOverlay');
+  if (overlay) { overlay.style.opacity = '0'; setTimeout(() => overlay.remove(), 400); }
 }
 
 init();

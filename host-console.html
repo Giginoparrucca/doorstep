@@ -516,60 +516,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
     <!-- ════════════ DASHBOARD ════════════ -->
     <div class="panel active" id="panel-dashboard">
-      <div class="stat-grid">
-        <div class="stat-card">
-          <div class="stat-label">Total Check-ins</div>
-          <div class="stat-value">3</div>
-          <div class="stat-change up">This month</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Pending Documents</div>
-          <div class="stat-value" style="color:var(--amber)">1</div>
-          <div class="stat-change down">Needs attention</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Alloggiati Filed</div>
-          <div class="stat-value" style="color:var(--green)">2</div>
-          <div class="stat-change up">Up to date</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Chat Messages</div>
-          <div class="stat-value">12</div>
-          <div class="stat-change up">0 unread</div>
-        </div>
-      </div>
-
-      <div class="table-wrap">
-        <div class="table-header">
-          <div class="table-title">Recent Check-ins</div>
-          <button class="btn btn-secondary btn-sm" onclick="showPanel('checkins', document.querySelector('[onclick*=checkins]'))">View All →</button>
-        </div>
-        <table>
-          <thead><tr><th>Guest</th><th>Dates</th><th>Type</th><th>Documents</th><th>Alloggiati</th></tr></thead>
-          <tbody>
-            <tr>
-              <td><strong>Sophie Martin</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">French · Passport</span></td>
-              <td>Mar 15–18</td>
-              <td>Single</td>
-              <td><span class="status-badge complete">✓ Complete</span></td>
-              <td><span class="status-badge complete">✓ Filed</span></td>
-            </tr>
-            <tr>
-              <td><strong>Hans Weber</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">German · ID Card</span></td>
-              <td>Mar 15–18</td>
-              <td>Family Head</td>
-              <td><span class="status-badge complete">✓ Complete</span></td>
-              <td><span class="status-badge complete">✓ Filed</span></td>
-            </tr>
-            <tr>
-              <td><strong>Anna Weber</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">German · ID Card</span></td>
-              <td>Mar 15–18</td>
-              <td>Family Member</td>
-              <td><span class="status-badge pending">⏳ Pending</span></td>
-              <td><span class="status-badge missing">✗ Waiting</span></td>
-            </tr>
-          </tbody>
-        </table>
+      <div style="display:flex;align-items:center;justify-content:center;padding:60px 20px;color:var(--ink-soft);font-size:0.78rem;">
+        Loading dashboard…
       </div>
     </div>
 
@@ -597,7 +545,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label">Property Name</label>
-            <input class="form-input" value="Casa Sole" id="propName">
+            <input class="form-input" value="" id="propName">
           </div>
           <div class="form-group">
             <label class="form-label">Property Type</label>
@@ -610,15 +558,15 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           </div>
           <div class="form-group">
             <label class="form-label">Street Address</label>
-            <input class="form-input" value="Via Venezia 14" id="propAddress">
+            <input class="form-input" value="" id="propAddress">
           </div>
           <div class="form-group">
             <label class="form-label">City / ZIP</label>
-            <input class="form-input" value="Bari (BA) 70122" id="propCity">
+            <input class="form-input" value="" id="propCity">
           </div>
           <div class="form-group">
             <label class="form-label">Region</label>
-            <input class="form-input" value="Puglia" id="propRegion">
+            <input class="form-input" value="" id="propRegion">
           </div>
           <div class="form-group">
             <label class="form-label">CIR Code (Regional ID)</label>
@@ -650,7 +598,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           </div>
           <div class="form-group">
             <label class="form-label">Keybox Code</label>
-            <input class="form-input" type="text" value="4821" id="propKeybox">
+            <input class="form-input" type="text" value="" id="propKeybox">
             <div class="form-hint">Sent to guest before arrival (not shown in app)</div>
           </div>
         </div>
@@ -661,23 +609,23 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label">WiFi Network</label>
-            <input class="form-input" value="CasaSole_5G" id="propWifiName">
+            <input class="form-input" value="" id="propWifiName">
           </div>
           <div class="form-group">
             <label class="form-label">WiFi Password</label>
-            <input class="form-input" value="sole2025!" id="propWifiPass">
+            <input class="form-input" value="" id="propWifiPass">
           </div>
           <div class="form-group full">
             <label class="form-label">Host Welcome Message</label>
-            <textarea class="form-textarea" id="propWelcome">Welcome to Casa Sole! We're so happy to have you here. The apartment is in the very heart of Bari Vecchia — step outside and you're surrounded by history, bakeries, and the sea. If you need anything at all, use the chat in this app and we'll help right away. Enjoy your stay! 🌞</textarea>
+            <textarea class="form-textarea" id="propWelcome"></textarea>
           </div>
           <div class="form-group">
             <label class="form-label">Emergency Phone</label>
-            <input class="form-input" value="+39 333 123 4567" id="propPhone">
+            <input class="form-input" value="" id="propPhone">
           </div>
           <div class="form-group">
             <label class="form-label">Host Name(s)</label>
-            <input class="form-input" value="Marco & Lucia" id="propHostNames">
+            <input class="form-input" value="" id="propHostNames">
           </div>
         </div>
       </div>

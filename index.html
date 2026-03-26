@@ -661,9 +661,29 @@ body {
     </div>
   </div>
 
-  <!-- Step 2: Personal Details -->
+  <!-- Step 2: Scan & Personal Details -->
   <div class="form-section" id="step2">
     <div class="section-header" data-i18n="step2_header">Step 2 · Personal Details</div>
+    
+    <!-- DOCUMENT SCANNER -->
+    <div id="scannerZone" style="margin-bottom:18px;">
+      <div class="upload-zone" id="scanZone" onclick="document.getElementById('scanInput').click()" style="border-color:var(--warm);background:rgba(194,113,79,0.04);">
+        <div class="upload-icon">📷</div>
+        <div class="upload-text" id="scanText"><strong style="color:var(--warm)">Scan your ID or Passport</strong><br><span style="font-size:0.68rem;color:var(--ink-soft)">Take a photo — we'll fill the form automatically</span></div>
+        <div class="upload-hint" id="scanHint">Faster than typing · Works with passports, ID cards & driving licenses</div>
+        <div id="scanStatus" style="display:none;margin-top:8px;"></div>
+      </div>
+      <input type="file" id="scanInput" accept="image/*" capture="environment" style="display:none" onchange="scanDocument(this)">
+      <div id="scanResult" style="display:none;margin-top:10px;padding:10px 14px;background:var(--green-bg);border-radius:8px;border:1px solid rgba(76,175,125,0.2);">
+        <div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;color:var(--green);font-weight:600;">✅ <span id="scanResultText">Document scanned successfully!</span></div>
+        <div style="font-size:0.62rem;color:var(--ink-soft);margin-top:4px;" id="scanConfidence">Please review the details below and correct if needed.</div>
+      </div>
+      <div id="scanError" style="display:none;margin-top:10px;padding:10px 14px;background:var(--red-bg);border-radius:8px;border:1px solid rgba(217,75,75,0.2);">
+        <div style="font-size:0.72rem;color:var(--red);font-weight:500;" id="scanErrorText">Could not read document. Please fill in manually.</div>
+      </div>
+      <div style="text-align:center;margin-top:8px;font-size:0.58rem;color:var(--ink-soft);">or fill in manually below ↓</div>
+    </div>
+
     <div class="form-group">
       <label class="form-label" data-i18n="surname_label">Surname <span class="req">*</span></label>
       <input class="form-input" type="text" id="surname" placeholder="">
@@ -710,17 +730,9 @@ body {
     </div>
   </div>
 
-  <!-- Step 3: Document Upload -->
+  <!-- Step 3: Selfie Verification -->
   <div class="form-section" id="step3">
-    <div class="section-header" data-i18n="step3_header">Step 3 · Document Upload</div>
-    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
-      <div class="upload-icon">📄</div>
-      <div class="upload-text" data-i18n="upload_text">Tap to upload <strong>ID / Passport photo</strong></div>
-      <div class="upload-hint" data-i18n="upload_hint">JPG, PNG or PDF · Max 10MB</div>
-      <div class="upload-filename" id="uploadFilename"></div>
-    </div>
-    <input type="file" id="fileInput" accept="image/*,.pdf" capture="environment" style="display:none" onchange="handleFileUpload(this)">
-    <div style="height:16px"></div>
+    <div class="section-header" data-i18n="step3_header">Step 3 · Verification</div>
     <div class="upload-zone" id="uploadZone2" onclick="document.getElementById('fileInput2').click()">
       <div class="upload-icon">🤳</div>
       <div class="upload-text" data-i18n="upload_selfie">Tap to take a <strong>selfie with your ID</strong></div>
@@ -1060,17 +1072,106 @@ async function uploadFile(file, folder) {
   } catch (e) { console.warn('Upload failed, continuing:', e); return null; }
 }
 
+/* ══════════════════════════════════════
+   DOCUMENT SCANNER — Claude Vision via Supabase Edge Function
+══════════════════════════════════════ */
+async function scanDocument(input) {
+  if (!input.files.length) return;
+  const file = input.files[0];
+  uploadedIdFile = file; // Store for later upload
+
+  const scanZone = document.getElementById('scanZone');
+  const scanStatus = document.getElementById('scanStatus');
+  const scanResult = document.getElementById('scanResult');
+  const scanError = document.getElementById('scanError');
+  scanStatus.style.display = 'block';
+  scanStatus.innerHTML = '<span style="color:var(--warm);font-size:0.72rem;font-weight:500;">🔍 Reading your document…</span>';
+  scanResult.style.display = 'none';
+  scanError.style.display = 'none';
+  scanZone.classList.add('has-file');
+
+  try {
+    const base64 = await fileToBase64(file);
+    const mediaType = file.type || 'image/jpeg';
+    const response = await fetch('/api/scan-document', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_base64: base64, media_type: mediaType }),
+    });
+    const result = await response.json();
+    if (result.success && result.data) {
+      const d = result.data;
+      if (d.surname) document.getElementById('surname').value = d.surname;
+      if (d.name) document.getElementById('gname').value = d.name;
+      if (d.sex) document.getElementById('sex').value = d.sex;
+      if (d.date_of_birth) document.getElementById('dob').value = d.date_of_birth;
+      if (d.place_of_birth) document.getElementById('birthplace').value = d.place_of_birth;
+      if (d.citizenship) document.getElementById('citizenship').value = d.citizenship;
+      if (d.document_number) document.getElementById('docnum').value = d.document_number;
+      if (d.document_type) {
+        const sel = document.getElementById('doctype');
+        for (let i = 0; i < sel.options.length; i++) {
+          if (sel.options[i].value === d.document_type) { sel.selectedIndex = i; break; }
+        }
+      }
+      scanStatus.style.display = 'none';
+      scanResult.style.display = 'block';
+      document.getElementById('scanResultText').textContent = `${d.name} ${d.surname} — ${d.citizenship || ''}`;
+      document.getElementById('scanConfidence').textContent = d.confidence === 'high'
+        ? 'All fields extracted. Review below.'
+        : 'Please check and correct if needed.';
+      ['surname','gname','dob','birthplace','citizenship','docnum'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.value) {
+          el.style.borderColor = 'var(--green)';
+          el.style.background = 'rgba(76,175,125,0.04)';
+          setTimeout(() => { el.style.borderColor = ''; el.style.background = ''; }, 3000);
+        }
+      });
+    } else { throw new Error(result.error || 'Could not read document'); }
+  } catch (e) {
+    console.error('Scan error:', e);
+    scanStatus.style.display = 'none';
+    scanError.style.display = 'block';
+    document.getElementById('scanErrorText').textContent = 'Could not read document. Please fill in manually below.';
+  }
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const maxW = 1200;
+      let w = img.width, h = img.height;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', 0.85).split(',')[1]);
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function handleFileUpload(input) {
+  if (input.files.length) { uploadedIdFile = input.files[0]; }
+}
+function handleFileUpload2(input) {
+  if (input.files.length) {
+    uploadedSelfieFile = input.files[0];
+    document.getElementById('uploadZone2').classList.add('has-file');
+    document.getElementById('uploadFilename2').textContent = '✓ ' + input.files[0].name;
+  }
+}
+
 async function submitCheckin() {
   const btn = document.getElementById('btnNext');
   btn.innerHTML = T[lang].btn_submitting;
   btn.disabled = true;
-
   try {
-    // Upload files to Supabase Storage (non-blocking — continues even if upload fails)
     const idPath = await uploadFile(uploadedIdFile, 'id-photos');
     const selfiePath = await uploadFile(uploadedSelfieFile, 'selfies');
-
-    // Build checkin record
     const record = {
       guest_type: selectedGuestType,
       surname: document.getElementById('surname').value.trim(),
@@ -1086,48 +1187,25 @@ async function submitCheckin() {
       docs_status: (idPath && selfiePath) ? 'complete' : idPath ? 'partial' : 'pending',
     };
     if (propertyId) record.property_id = propertyId;
-
     console.log('Submitting check-in:', record);
     const { data, error } = await sb.from('checkins').insert(record);
-
     if (error) { console.error('DB insert error:', JSON.stringify(error)); throw error; }
-
-    // Also save chat message noting the check-in
     await sb.from('chat_messages').insert({
-      property_id: propertyId,
-      sender: 'system',
+      property_id: propertyId, sender: 'system',
       message: `Guest ${document.getElementById('gname').value} ${document.getElementById('surname').value} completed online check-in.`
     });
-
-    // Show success
     document.getElementById('checkinBtns').classList.add('hidden');
     document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
     document.querySelector('.steps-bar').classList.add('hidden');
     document.querySelector('.checkin-intro').classList.add('hidden');
     document.getElementById('checkinSuccess').classList.add('show');
     document.getElementById('checkinBadge').style.display = 'none';
-    console.log('Check-in saved to Supabase!', data);
-
+    console.log('Check-in saved!', data);
   } catch (err) {
     console.error('Check-in submission error:', err);
     btn.innerHTML = T[lang].btn_submit;
     btn.disabled = false;
     alert(T[lang].error_text);
-  }
-}
-
-function handleFileUpload(input) {
-  if (input.files.length) {
-    uploadedIdFile = input.files[0];
-    document.getElementById('uploadZone').classList.add('has-file');
-    document.getElementById('uploadFilename').textContent = '✓ ' + input.files[0].name;
-  }
-}
-function handleFileUpload2(input) {
-  if (input.files.length) {
-    uploadedSelfieFile = input.files[0];
-    document.getElementById('uploadZone2').classList.add('has-file');
-    document.getElementById('uploadFilename2').textContent = '✓ ' + input.files[0].name;
   }
 }
 

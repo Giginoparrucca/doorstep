@@ -633,7 +633,7 @@ body {
   </div>
 
   <!-- Guest counter (shows for multi-guest) -->
-  <div id="guestCounter" style="display:none; margin:0 16px 12px; padding:10px 14px; background:var(--blue-bg); border-radius:8px; border:1px solid rgba(74,144,217,0.15); display:none;">
+  <div id="guestCounter" style="display:none; margin:0 16px 12px; padding:10px 14px; background:var(--blue-bg); border-radius:8px; border:1px solid rgba(74,144,217,0.15);">
     <div style="display:flex;align-items:center;justify-content:space-between;">
       <span style="font-size:0.72rem;color:var(--blue);font-weight:600;" id="guestCounterText">Guest 1 of 2</span>
       <span style="font-size:0.6rem;color:var(--ink-soft);" id="guestCounterHint">Fill details for each guest</span>
@@ -643,37 +643,57 @@ body {
     </div>
   </div>
 
-  <!-- Step 1: Guest Type -->
+  <!-- Step 1: Booking Info -->
   <div class="form-section active" id="step1">
-    <div class="section-header" data-i18n="step1_header">Step 1 · Guest Type</div>
-    <div class="guest-type-grid">
-      <div class="guest-type-opt active" onclick="selectGuestType(this,'single')" data-i18n-label="gt_single">
-        <div class="gt-icon">🧑</div>
-        <div class="gt-label">Single Traveler</div>
-      </div>
-      <div class="guest-type-opt" onclick="selectGuestType(this,'head')" data-i18n-label="gt_head">
-        <div class="gt-icon">👨‍👩‍👧</div>
-        <div class="gt-label">Family Head</div>
-      </div>
-      <div class="guest-type-opt" onclick="selectGuestType(this,'member')" data-i18n-label="gt_member">
-        <div class="gt-icon">👤</div>
-        <div class="gt-label">Family Member</div>
-      </div>
-      <div class="guest-type-opt" onclick="selectGuestType(this,'group')" data-i18n-label="gt_group">
-        <div class="gt-icon">👥</div>
-        <div class="gt-label">Group Leader</div>
+    <div class="section-header">Step 1 · Booking Details</div>
+
+    <!-- Simplified guest type -->
+    <div class="form-group">
+      <label class="form-label">Who is checking in? <span class="req">*</span></label>
+      <div class="guest-type-grid" id="guestTypeGrid">
+        <div class="guest-type-opt active" onclick="selectGuestType(this,'single')">
+          <div class="gt-icon">🧑</div>
+          <div class="gt-label" id="gtl_single">Just me</div>
+        </div>
+        <div class="guest-type-opt" onclick="selectGuestType(this,'head')">
+          <div class="gt-icon">👨‍👩‍👧</div>
+          <div class="gt-label" id="gtl_family">Family / Couple</div>
+        </div>
+        <div class="guest-type-opt" onclick="selectGuestType(this,'group')">
+          <div class="gt-icon">👥</div>
+          <div class="gt-label" id="gtl_group">Group</div>
+        </div>
       </div>
     </div>
-    <div class="form-group">
-      <label class="form-label" data-i18n="num_guests_label">Total number of guests <span class="req">*</span></label>
-      <input class="form-input" type="number" id="numGuests" value="2" min="1" max="20">
+
+    <!-- Number of guests — hidden for "Just me" -->
+    <div class="form-group" id="numGuestsGroup" style="display:none;">
+      <label class="form-label">Total number of guests (including you) <span class="req">*</span></label>
+      <input class="form-input" type="number" id="numGuests" value="2" min="2" max="20">
+    </div>
+
+    <!-- Arrival & Departure dates — needed for both Alloggiati and SPOT -->
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Arrival Date <span class="req">*</span></label>
+        <input class="form-input" type="date" id="arrivalDate">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Departure Date <span class="req">*</span></label>
+        <input class="form-input" type="date" id="departureDate">
+      </div>
     </div>
   </div>
 
   <!-- Step 2: Scan & Personal Details -->
   <div class="form-section" id="step2">
-    <div class="section-header" data-i18n="step2_header">Step 2 · Personal Details</div>
-    
+    <div class="section-header" id="step2Header">Step 2 · Guest Details</div>
+
+    <!-- Label for who we're registering -->
+    <div id="guestRoleLabel" style="display:none;margin-bottom:14px;padding:8px 12px;background:var(--amber-bg);border-radius:6px;border:1px solid rgba(232,168,64,0.15);">
+      <span style="font-size:0.68rem;color:var(--ink-2);font-weight:500;" id="guestRoleLabelText">Main guest — document required</span>
+    </div>
+
     <!-- DOCUMENT SCANNER -->
     <div id="scannerZone" style="margin-bottom:18px;">
       <div class="upload-zone" id="scanZone" onclick="document.getElementById('scanInput').click()" style="border-color:var(--warm);background:rgba(194,113,79,0.04);">
@@ -693,48 +713,59 @@ body {
       <div style="text-align:center;margin-top:8px;font-size:0.58rem;color:var(--ink-soft);">or fill in manually below ↓</div>
     </div>
 
+    <!-- Personal details — required for ALL guests (Alloggiati) -->
     <div class="form-group">
-      <label class="form-label" data-i18n="surname_label">Surname <span class="req">*</span></label>
+      <label class="form-label">Surname <span class="req">*</span></label>
       <input class="form-input" type="text" id="surname" placeholder="">
     </div>
     <div class="form-group">
-      <label class="form-label" data-i18n="name_label">Name <span class="req">*</span></label>
+      <label class="form-label">Name <span class="req">*</span></label>
       <input class="form-input" type="text" id="gname" placeholder="">
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label" data-i18n="sex_label">Sex <span class="req">*</span></label>
+        <label class="form-label">Sex <span class="req">*</span></label>
         <select class="form-select" id="sex">
-          <option value="M" data-i18n-opt="male">Male</option>
-          <option value="F" data-i18n-opt="female">Female</option>
+          <option value="M">Male</option>
+          <option value="F">Female</option>
         </select>
       </div>
       <div class="form-group">
-        <label class="form-label" data-i18n="dob_label">Date of Birth <span class="req">*</span></label>
+        <label class="form-label">Date of Birth <span class="req">*</span></label>
         <input class="form-input" type="date" id="dob">
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label" data-i18n="birthplace_label">Place of Birth <span class="req">*</span></label>
-      <input class="form-input" type="text" id="birthplace" placeholder="">
+      <label class="form-label">Place of Birth <span class="req">*</span></label>
+      <input class="form-input" type="text" id="birthplace" placeholder="City or country if born abroad">
     </div>
     <div class="form-group">
-      <label class="form-label" data-i18n="citizenship_label">Citizenship <span class="req">*</span></label>
-      <input class="form-input" type="text" id="citizenship" placeholder="">
+      <label class="form-label">Citizenship <span class="req">*</span></label>
+      <input class="form-input" type="text" id="citizenship" placeholder="e.g., Italian, French, German">
     </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label" data-i18n="doctype_label">Document Type <span class="req">*</span></label>
-        <select class="form-select" id="doctype">
-          <option value="passport" data-i18n-opt="passport">Passport</option>
-          <option value="id_card" data-i18n-opt="id_card">ID Card</option>
-          <option value="driving" data-i18n-opt="driving">Driving License</option>
-          <option value="other" data-i18n-opt="other">Other</option>
-        </select>
+
+    <!-- Document section — ONLY for main guest (single/head/group leader) -->
+    <div id="documentSection">
+      <div style="margin:16px 0 8px;padding-top:12px;border-top:1px solid rgba(194,113,79,0.1);">
+        <div style="font-size:0.5rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink-soft);">Identity Document</div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Document Type <span class="req">*</span></label>
+          <select class="form-select" id="doctype">
+            <option value="passport">Passport</option>
+            <option value="id_card">ID Card / Carta d'Identità</option>
+            <option value="driving">Driving License / Patente</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Document Number <span class="req">*</span></label>
+          <input class="form-input" type="text" id="docnum" placeholder="">
+        </div>
       </div>
       <div class="form-group">
-        <label class="form-label" data-i18n="docnum_label">Document Number <span class="req">*</span></label>
-        <input class="form-input" type="text" id="docnum" placeholder="">
+        <label class="form-label">Place of Issue <span class="req">*</span></label>
+        <input class="form-input" type="text" id="docissue" placeholder="City or country that issued the document">
       </div>
     </div>
   </div>
@@ -1018,22 +1049,39 @@ function goTo(page) {
 }
 
 /* ══════════════════════════════════════
-   CHECK-IN FLOW — Multi-guest support
+   CHECK-IN FLOW — Aligned to Alloggiati Web + Puglia SPOT
 ══════════════════════════════════════ */
 let checkinStep = 1;
 let selectedGuestType = 'single';
 let totalGuests = 1;
-let currentGuestIdx = 0; // 0-based
-let savedGuests = []; // Array of submitted guest records
+let currentGuestIdx = 0;
+let savedGuests = [];
+let arrivalDate = '';
+let departureDate = '';
 
 function selectGuestType(el, type) {
   document.querySelectorAll('.guest-type-opt').forEach(o => o.classList.remove('active'));
   el.classList.add('active');
   selectedGuestType = type;
+  // Show/hide guest count
+  const numGroup = document.getElementById('numGuestsGroup');
+  if (type === 'single') {
+    numGroup.style.display = 'none';
+    document.getElementById('numGuests').value = '1';
+  } else {
+    numGroup.style.display = 'block';
+    if (parseInt(document.getElementById('numGuests').value) < 2) {
+      document.getElementById('numGuests').value = '2';
+    }
+  }
+}
+
+function isMainGuest() {
+  // First guest is always the main guest (needs document)
+  return currentGuestIdx === 0;
 }
 
 function updateSteps() {
-  // Only 2 steps now
   for (let i = 1; i <= 2; i++) {
     const dot = document.getElementById('sd' + i);
     const line = i < 2 ? document.getElementById('sl' + i) : null;
@@ -1050,10 +1098,41 @@ function updateSteps() {
   const next = document.getElementById('btnNext');
   prev.classList.toggle('hidden', checkinStep === 1);
 
-  // Button label logic
   if (checkinStep === 2) {
-    const isLastGuest = currentGuestIdx >= totalGuests - 1;
-    if (isLastGuest) {
+    const isLast = currentGuestIdx >= totalGuests - 1;
+    const isMain = isMainGuest();
+
+    // Show/hide document section (only for main guest per Alloggiati rules)
+    document.getElementById('documentSection').style.display = isMain ? 'block' : 'none';
+
+    // Show role label for multi-guest
+    const roleLabel = document.getElementById('guestRoleLabel');
+    if (totalGuests > 1) {
+      roleLabel.style.display = 'block';
+      if (isMain) {
+        document.getElementById('guestRoleLabelText').textContent = lang === 'it'
+          ? '👤 Ospite principale — documento richiesto'
+          : '👤 Main guest — document required';
+      } else {
+        document.getElementById('guestRoleLabelText').textContent = lang === 'it'
+          ? '👥 Accompagnatore — solo dati personali necessari'
+          : '👥 Companion — only personal details needed';
+      }
+    } else {
+      roleLabel.style.display = 'none';
+    }
+
+    // Scanner hint
+    if (!isMain) {
+      document.getElementById('scanHint').textContent = lang === 'it'
+        ? 'Puoi anche scansionare un documento, oppure compila manualmente'
+        : 'You can scan a document, or just fill in manually — no document required';
+    } else {
+      document.getElementById('scanHint').textContent = 'Faster than typing · Works with passports, ID cards & driving licenses';
+    }
+
+    // Button label
+    if (isLast) {
       next.innerHTML = lang === 'it' ? 'Invia Check-in ✓' : 'Submit Check-in ✓';
       next.classList.remove('btn-primary'); next.classList.add('btn-success');
     } else {
@@ -1072,9 +1151,9 @@ function updateSteps() {
     document.getElementById('guestCounterText').textContent =
       lang === 'it' ? `Ospite ${currentGuestIdx+1} di ${totalGuests}` : `Guest ${currentGuestIdx+1} of ${totalGuests}`;
     document.getElementById('guestCounterHint').textContent =
-      currentGuestIdx === 0
-        ? (lang === 'it' ? 'Compila i dati per ogni ospite' : 'Fill details for each guest')
-        : (lang === 'it' ? `${savedGuests.length} ospite/i già registrati` : `${savedGuests.length} guest(s) already registered`);
+      savedGuests.length > 0
+        ? (lang === 'it' ? `${savedGuests.length} già registrati` : `${savedGuests.length} already registered`)
+        : (lang === 'it' ? 'Compila i dati per ogni ospite' : 'Fill details for each guest');
     document.getElementById('guestProgressBar').style.width = `${((currentGuestIdx+1)/totalGuests)*100}%`;
   } else {
     counter.style.display = 'none';
@@ -1082,11 +1161,13 @@ function updateSteps() {
 }
 
 function clearForm() {
-  ['surname','gname','birthplace','citizenship','docnum'].forEach(id => document.getElementById(id).value = '');
+  ['surname','gname','birthplace','citizenship','docnum','docissue'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
   document.getElementById('dob').value = '';
   document.getElementById('sex').value = 'M';
   document.getElementById('doctype').selectedIndex = 0;
-  // Reset scanner state
   document.getElementById('scanResult').style.display = 'none';
   document.getElementById('scanError').style.display = 'none';
   document.getElementById('scanStatus').style.display = 'none';
@@ -1097,25 +1178,33 @@ function clearForm() {
 
 function checkinNext() {
   if (checkinStep === 1) {
-    totalGuests = parseInt(document.getElementById('numGuests').value) || 1;
+    // Validate dates
+    arrivalDate = document.getElementById('arrivalDate').value;
+    departureDate = document.getElementById('departureDate').value;
+    if (!arrivalDate) { alert(lang === 'it' ? 'Inserisci la data di arrivo' : 'Please enter arrival date'); return; }
+    if (!departureDate) { alert(lang === 'it' ? 'Inserisci la data di partenza' : 'Please enter departure date'); return; }
+
+    totalGuests = selectedGuestType === 'single' ? 1 : (parseInt(document.getElementById('numGuests').value) || 2);
     currentGuestIdx = 0;
     savedGuests = [];
-    // If multiple guests but "single" selected, auto-switch to "head"
-    if (totalGuests > 1 && selectedGuestType === 'single') {
-      selectedGuestType = 'head';
-    }
     checkinStep = 2;
     updateSteps();
   } else if (checkinStep === 2) {
+    // Validate required fields
+    const surname = document.getElementById('surname').value.trim();
+    const name = document.getElementById('gname').value.trim();
+    if (!surname || !name) { alert(lang === 'it' ? 'Cognome e nome sono obbligatori' : 'Surname and name are required'); return; }
+    if (isMainGuest()) {
+      const docnum = document.getElementById('docnum').value.trim();
+      if (!docnum) { alert(lang === 'it' ? 'Il numero del documento è obbligatorio per l\'ospite principale' : 'Document number is required for the main guest'); return; }
+    }
     saveCurrentGuest();
   }
 }
 
 function checkinPrev() {
   if (checkinStep === 2 && currentGuestIdx > 0) {
-    // Go back to previous guest
     currentGuestIdx--;
-    // Restore previous guest data
     const prev = savedGuests[currentGuestIdx];
     if (prev) {
       document.getElementById('surname').value = prev.surname || '';
@@ -1126,8 +1215,9 @@ function checkinPrev() {
       document.getElementById('citizenship').value = prev.citizenship || '';
       document.getElementById('doctype').value = prev.document_type || 'passport';
       document.getElementById('docnum').value = prev.document_number || '';
+      if (document.getElementById('docissue')) document.getElementById('docissue').value = prev.doc_issue_place || '';
     }
-    savedGuests.splice(currentGuestIdx, 1); // Remove so it gets re-saved on next
+    savedGuests.splice(currentGuestIdx, 1);
     updateSteps();
   } else if (checkinStep === 2 && currentGuestIdx === 0) {
     checkinStep = 1;
@@ -1144,12 +1234,16 @@ async function saveCurrentGuest() {
   try {
     const idPath = await uploadFile(uploadedIdFile, 'id-photos');
 
-    // Determine guest type for Alloggiati
-    let guestType = selectedGuestType;
-    if (totalGuests > 1 && currentGuestIdx > 0) {
-      // Subsequent guests are family members or group members
-      guestType = (selectedGuestType === 'head' || selectedGuestType === 'single') ? 'member' : 'group_member';
+    // Determine Alloggiati guest type code
+    let guestType;
+    if (currentGuestIdx === 0) {
+      guestType = selectedGuestType === 'single' ? 'single' : selectedGuestType === 'group' ? 'group' : 'head';
+    } else {
+      guestType = selectedGuestType === 'group' ? 'group_member' : 'member';
     }
+
+    // Calculate nights for SPOT
+    const nights = Math.max(1, Math.round((new Date(departureDate) - new Date(arrivalDate)) / 86400000));
 
     const record = {
       guest_type: guestType,
@@ -1157,12 +1251,16 @@ async function saveCurrentGuest() {
       name: document.getElementById('gname').value.trim(),
       sex: document.getElementById('sex').value,
       date_of_birth: document.getElementById('dob').value || '2000-01-01',
-      place_of_birth: document.getElementById('birthplace').value.trim() || 'Not provided',
-      citizenship: document.getElementById('citizenship').value.trim() || 'Not provided',
-      document_type: document.getElementById('doctype').value,
-      document_number: document.getElementById('docnum').value.trim() || 'Not provided',
+      place_of_birth: document.getElementById('birthplace').value.trim() || '',
+      citizenship: document.getElementById('citizenship').value.trim() || '',
+      document_type: isMainGuest() ? document.getElementById('doctype').value : '',
+      document_number: isMainGuest() ? document.getElementById('docnum').value.trim() : '',
+      doc_issue_place: isMainGuest() ? (document.getElementById('docissue')?.value?.trim() || '') : '',
+      arrival_date: arrivalDate,
+      departure_date: departureDate,
+      nights: nights,
       id_photo_path: idPath,
-      docs_status: idPath ? 'complete' : 'pending',
+      docs_status: isMainGuest() ? (idPath ? 'complete' : 'pending') : 'not_required',
     };
     if (propertyId) record.property_id = propertyId;
 
@@ -1170,22 +1268,20 @@ async function saveCurrentGuest() {
     const { data, error } = await sb.from('checkins').insert(record);
     if (error) { console.error('DB error:', JSON.stringify(error)); throw error; }
 
+    // Store locally with extra fields for export
     savedGuests.push(record);
 
-    // Check if more guests to register
     if (currentGuestIdx < totalGuests - 1) {
-      // Move to next guest
       currentGuestIdx++;
       clearForm();
       btn.disabled = false;
       updateSteps();
-      // Scroll to top of form
       document.getElementById('page-checkin').scrollTop = 0;
     } else {
-      // All guests done — log and show success
+      // All done
       await sb.from('chat_messages').insert({
         property_id: propertyId, sender: 'system',
-        message: `Check-in complete: ${savedGuests.length} guest(s) registered.`
+        message: `Check-in complete: ${savedGuests.length} guest(s) registered. Arrival: ${arrivalDate}, Departure: ${departureDate}.`
       });
       document.getElementById('checkinBtns').classList.add('hidden');
       document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
@@ -1194,8 +1290,8 @@ async function saveCurrentGuest() {
       document.getElementById('guestCounter').style.display = 'none';
       document.getElementById('checkinSuccess').classList.add('show');
       document.getElementById('successText').textContent = lang === 'it'
-        ? `${savedGuests.length} ospite/i registrato/i con successo. Ci occuperemo noi della registrazione presso le autorità. Buon soggiorno!`
-        : `${savedGuests.length} guest(s) registered successfully. We'll take care of the registration with the authorities. Enjoy your stay!`;
+        ? `${savedGuests.length} ospite/i registrato/i. Arrivo: ${arrivalDate}, Partenza: ${departureDate}. Ci occuperemo noi della registrazione.`
+        : `${savedGuests.length} guest(s) registered. Arrival: ${arrivalDate}, Departure: ${departureDate}. We'll handle the authorities.`;
       document.getElementById('checkinBadge').style.display = 'none';
       console.log(`✅ All ${savedGuests.length} guests checked in!`);
     }
@@ -1254,6 +1350,7 @@ async function scanDocument(input) {
       if (d.place_of_birth) document.getElementById('birthplace').value = d.place_of_birth;
       if (d.citizenship) document.getElementById('citizenship').value = d.citizenship;
       if (d.document_number) document.getElementById('docnum').value = d.document_number;
+      if (d.issuing_country && document.getElementById('docissue')) document.getElementById('docissue').value = d.issuing_country;
       if (d.document_type) {
         const sel = document.getElementById('doctype');
         for (let i = 0; i < sel.options.length; i++) {
@@ -1582,6 +1679,12 @@ async function init() {
   renderRules();
   renderRecos();
   renderChatSuggestions();
+
+  // Set default check-in dates
+  const today = new Date().toISOString().split('T')[0];
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  if (document.getElementById('arrivalDate')) document.getElementById('arrivalDate').value = today;
+  if (document.getElementById('departureDate')) document.getElementById('departureDate').value = tomorrow;
 }
 
 init();

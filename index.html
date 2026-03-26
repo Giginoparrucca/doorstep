@@ -539,7 +539,7 @@ body {
 
 <!-- LOADING OVERLAY -->
 <div id="loadingOverlay" style="position:fixed;inset:0;z-index:9999;background:var(--cream);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;transition:opacity 0.4s;">
-  <div style="font-family:'Playfair Display',serif;font-size:1.3rem;color:var(--ink);font-weight:400;">Loading<em style="color:var(--warm)">…</em></div>
+  <div style="font-family:'Playfair Display',serif;font-size:1.3rem;color:var(--ink);font-weight:400;">Door<em style="color:var(--warm)">step</em></div>
   <div style="width:40px;height:3px;background:var(--cream-3);border-radius:2px;overflow:hidden;"><div style="width:60%;height:100%;background:var(--warm);border-radius:2px;animation:loadSlide 1s ease infinite;"></div></div>
 </div>
 <style>@keyframes loadSlide{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}</style>
@@ -652,41 +652,38 @@ body {
 
   <!-- Step 1: Booking Info -->
   <div class="form-section active" id="step1">
-    <div class="section-header">Step 1 · Booking Details</div>
+    <div class="section-header" data-i18n="step1_header">Step 1 · Booking Details</div>
 
-    <!-- Simplified guest type -->
     <div class="form-group">
-      <label class="form-label">Who is checking in? <span class="req">*</span></label>
+      <label class="form-label" data-i18n="who_checkin">Who is checking in? <span class="req">*</span></label>
       <div class="guest-type-grid" id="guestTypeGrid">
         <div class="guest-type-opt active" onclick="selectGuestType(this,'single')">
           <div class="gt-icon">🧑</div>
-          <div class="gt-label" id="gtl_single">Just me</div>
+          <div class="gt-label" data-i18n="gt_single">Just me</div>
         </div>
         <div class="guest-type-opt" onclick="selectGuestType(this,'head')">
           <div class="gt-icon">👨‍👩‍👧</div>
-          <div class="gt-label" id="gtl_family">Family / Couple</div>
+          <div class="gt-label" data-i18n="gt_family">Family / Couple</div>
         </div>
         <div class="guest-type-opt" onclick="selectGuestType(this,'group')">
           <div class="gt-icon">👥</div>
-          <div class="gt-label" id="gtl_group">Group</div>
+          <div class="gt-label" data-i18n="gt_group">Group</div>
         </div>
       </div>
     </div>
 
-    <!-- Number of guests — hidden for "Just me" -->
     <div class="form-group" id="numGuestsGroup" style="display:none;">
-      <label class="form-label">Total number of guests (including you) <span class="req">*</span></label>
+      <label class="form-label" data-i18n="num_guests_label">Total number of guests (including you) <span class="req">*</span></label>
       <input class="form-input" type="number" id="numGuests" value="2" min="2" max="20">
     </div>
 
-    <!-- Arrival & Departure dates — needed for both Alloggiati and SPOT -->
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Arrival Date <span class="req">*</span></label>
+        <label class="form-label" data-i18n="arrival_label">Arrival Date <span class="req">*</span></label>
         <input class="form-input" type="date" id="arrivalDate">
       </div>
       <div class="form-group">
-        <label class="form-label">Departure Date <span class="req">*</span></label>
+        <label class="form-label" data-i18n="departure_label">Departure Date <span class="req">*</span></label>
         <input class="form-input" type="date" id="departureDate">
       </div>
     </div>
@@ -694,85 +691,81 @@ body {
 
   <!-- Step 2: Scan & Personal Details -->
   <div class="form-section" id="step2">
-    <div class="section-header" id="step2Header">Step 2 · Guest Details</div>
+    <div class="section-header" data-i18n="step2_header">Step 2 · Guest Details</div>
 
-    <!-- Label for who we're registering -->
     <div id="guestRoleLabel" style="display:none;margin-bottom:14px;padding:8px 12px;background:var(--amber-bg);border-radius:6px;border:1px solid rgba(232,168,64,0.15);">
-      <span style="font-size:0.68rem;color:var(--ink-2);font-weight:500;" id="guestRoleLabelText">Main guest — document required</span>
+      <span style="font-size:0.68rem;color:var(--ink-2);font-weight:500;" id="guestRoleLabelText"></span>
     </div>
 
-    <!-- DOCUMENT SCANNER -->
     <div id="scannerZone" style="margin-bottom:18px;">
       <div class="upload-zone" id="scanZone" onclick="document.getElementById('scanInput').click()" style="border-color:var(--warm);background:rgba(194,113,79,0.04);">
         <div class="upload-icon">📷</div>
-        <div class="upload-text" id="scanText"><strong style="color:var(--warm)">Scan your ID or Passport</strong><br><span style="font-size:0.68rem;color:var(--ink-soft)">Take a photo — we'll fill the form automatically</span></div>
-        <div class="upload-hint" id="scanHint">Faster than typing · Works with passports, ID cards & driving licenses</div>
+        <div class="upload-text" id="scanText"><strong style="color:var(--warm)" data-i18n="scan_title">Scan your ID or Passport</strong><br><span style="font-size:0.68rem;color:var(--ink-soft)" data-i18n="scan_sub">Take a photo — we'll fill the form automatically</span></div>
+        <div class="upload-hint" id="scanHint" data-i18n="scan_hint">Faster than typing · Works with passports, ID cards & driving licenses</div>
         <div id="scanStatus" style="display:none;margin-top:8px;"></div>
       </div>
       <input type="file" id="scanInput" accept="image/*" capture="environment" style="display:none" onchange="scanDocument(this)">
       <div id="scanResult" style="display:none;margin-top:10px;padding:10px 14px;background:var(--green-bg);border-radius:8px;border:1px solid rgba(76,175,125,0.2);">
-        <div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;color:var(--green);font-weight:600;">✅ <span id="scanResultText">Document scanned successfully!</span></div>
-        <div style="font-size:0.62rem;color:var(--ink-soft);margin-top:4px;" id="scanConfidence">Please review the details below and correct if needed.</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;color:var(--green);font-weight:600;">✅ <span id="scanResultText"></span></div>
+        <div style="font-size:0.62rem;color:var(--ink-soft);margin-top:4px;" id="scanConfidence"></div>
       </div>
       <div id="scanError" style="display:none;margin-top:10px;padding:10px 14px;background:var(--red-bg);border-radius:8px;border:1px solid rgba(217,75,75,0.2);">
-        <div style="font-size:0.72rem;color:var(--red);font-weight:500;" id="scanErrorText">Could not read document. Please fill in manually.</div>
+        <div style="font-size:0.72rem;color:var(--red);font-weight:500;" id="scanErrorText"></div>
       </div>
-      <div style="text-align:center;margin-top:8px;font-size:0.58rem;color:var(--ink-soft);">or fill in manually below ↓</div>
+      <div style="text-align:center;margin-top:8px;font-size:0.58rem;color:var(--ink-soft);" data-i18n="scan_or_manual">or fill in manually below ↓</div>
     </div>
 
-    <!-- Personal details — required for ALL guests (Alloggiati) -->
     <div class="form-group">
-      <label class="form-label">Surname <span class="req">*</span></label>
+      <label class="form-label" data-i18n="surname_label">Surname <span class="req">*</span></label>
       <input class="form-input" type="text" id="surname" placeholder="">
     </div>
     <div class="form-group">
-      <label class="form-label">Name <span class="req">*</span></label>
+      <label class="form-label" data-i18n="name_label">Name <span class="req">*</span></label>
       <input class="form-input" type="text" id="gname" placeholder="">
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Sex <span class="req">*</span></label>
+        <label class="form-label" data-i18n="sex_label">Sex <span class="req">*</span></label>
         <select class="form-select" id="sex">
-          <option value="M">Male</option>
-          <option value="F">Female</option>
+          <option value="M" data-i18n-opt="male">Male</option>
+          <option value="F" data-i18n-opt="female">Female</option>
         </select>
       </div>
       <div class="form-group">
-        <label class="form-label">Date of Birth <span class="req">*</span></label>
+        <label class="form-label" data-i18n="dob_label">Date of Birth <span class="req">*</span></label>
         <input class="form-input" type="date" id="dob">
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Place of Birth <span class="req">*</span></label>
-      <input class="form-input" type="text" id="birthplace" placeholder="City or country if born abroad">
+      <label class="form-label" data-i18n="birthplace_label">Place of Birth <span class="req">*</span></label>
+      <input class="form-input" type="text" id="birthplace" data-i18n-placeholder="birthplace_hint">
     </div>
     <div class="form-group">
-      <label class="form-label">Citizenship <span class="req">*</span></label>
-      <input class="form-input" type="text" id="citizenship" placeholder="e.g., Italian, French, German">
+      <label class="form-label" data-i18n="citizenship_label">Citizenship <span class="req">*</span></label>
+      <input class="form-input" type="text" id="citizenship" data-i18n-placeholder="citizenship_hint">
     </div>
 
-    <!-- Document section — ONLY for main guest (single/head/group leader) -->
     <div id="documentSection">
       <div style="margin:16px 0 8px;padding-top:12px;border-top:1px solid rgba(194,113,79,0.1);">
-        <div style="font-size:0.5rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink-soft);">Identity Document</div>
+        <div style="font-size:0.5rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink-soft);" data-i18n="doc_section">Identity Document</div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Document Type <span class="req">*</span></label>
+          <label class="form-label" data-i18n="doctype_label">Document Type <span class="req">*</span></label>
           <select class="form-select" id="doctype">
-            <option value="passport">Passport</option>
-            <option value="id_card">ID Card / Carta d'Identità</option>
-            <option value="driving">Driving License / Patente</option>
+            <option value="passport" data-i18n-opt="passport">Passport</option>
+            <option value="id_card" data-i18n-opt="id_card">ID Card / Carta d'Identità</option>
+            <option value="driving" data-i18n-opt="driving">Driving License / Patente</option>
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Document Number <span class="req">*</span></label>
+          <label class="form-label" data-i18n="docnum_label">Document Number <span class="req">*</span></label>
           <input class="form-input" type="text" id="docnum" placeholder="">
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">Place of Issue <span class="req">*</span></label>
-        <input class="form-input" type="text" id="docissue" placeholder="City or country that issued the document">
+        <label class="form-label" data-i18n="docissue_label">Place of Issue <span class="req">*</span></label>
+        <input class="form-input" type="text" id="docissue" data-i18n-placeholder="docissue_hint">
       </div>
     </div>
   </div>
@@ -793,7 +786,7 @@ body {
     <div id="reviewCards" style="margin-top:20px;text-align:left;"></div>
 
     <div style="margin-top:16px;padding:10px 14px;background:rgba(74,144,217,0.06);border-radius:8px;border:1px solid rgba(74,144,217,0.12);">
-      <div style="font-size:0.65rem;color:var(--blue);line-height:1.5;">ℹ️ Spotted an error? Tap <strong>Edit</strong> on any guest to correct their details.</div>
+      <div style="font-size:0.65rem;color:var(--blue);line-height:1.5;" id="reviewHintText"></div>
     </div>
   </div>
 
@@ -924,6 +917,7 @@ let lang = 'en';
 
 const T = {
   en: {
+    // Welcome
     welcome_title: 'Welcome to<br><em>Casa Sole</em>',
     welcome_sub: 'Your home in the heart of the old city',
     wifi_pass: 'Password: sole2025!',
@@ -931,35 +925,61 @@ const T = {
     checkin_sub: 'Self check-in · Keybox',
     checkout_sub: 'Leave keys in the box',
     host_role: 'Your hosts',
-    host_msg: 'Welcome to Casa Sole! We\'re so happy to have you here. The apartment is in the very heart of Bari Vecchia — step outside and you\'re surrounded by history, bakeries, and the sea. If you need anything at all, use the chat in this app and we\'ll help right away. Enjoy your stay! 🌞',
+    host_msg: '',
     emergency_label: 'Emergency',
+    // Check-in
     checkin_title: 'Online Check-in',
     checkin_h2: 'Complete Your Check-in',
     checkin_p: 'Italian law requires us to register all guests. This takes about 2 minutes per guest.',
-    step1_header: 'Step 1 · Guest Type',
-    gt_single: 'Single Traveler', gt_head: 'Family Head', gt_member: 'Family Member', gt_group: 'Group Leader',
-    num_guests_label: 'Total number of guests <span class="req">*</span>',
-    step2_header: 'Step 2 · Personal Details',
-    surname_label: 'Surname <span class="req">*</span>',
-    name_label: 'Name <span class="req">*</span>',
-    sex_label: 'Sex <span class="req">*</span>',
-    male: 'Male', female: 'Female',
-    dob_label: 'Date of Birth <span class="req">*</span>',
-    birthplace_label: 'Place of Birth <span class="req">*</span>',
-    citizenship_label: 'Citizenship <span class="req">*</span>',
-    doctype_label: 'Document Type <span class="req">*</span>',
-    passport: 'Passport', id_card: 'ID Card', driving: 'Driving License', other: 'Other',
-    docnum_label: 'Document Number <span class="req">*</span>',
-    step3_header: 'Step 3 · Document Upload',
-    upload_text: 'Tap to upload <strong>ID / Passport photo</strong>',
-    upload_hint: 'JPG, PNG or PDF · Max 10MB',
-    upload_selfie: 'Tap to take a <strong>selfie with your ID</strong>',
-    upload_selfie_hint: 'For identity verification',
+    // Step 1
+    step1_header: 'Step 1 · Booking Details',
+    who_checkin: 'Who is checking in?',
+    gt_single: 'Just me', gt_family: 'Family / Couple', gt_group: 'Group',
+    num_guests_label: 'Total number of guests (including you)',
+    arrival_label: 'Arrival Date',
+    departure_label: 'Departure Date',
+    // Step 2
+    step2_header: 'Step 2 · Guest Details',
+    role_main: '👤 Main guest — document required',
+    role_companion: '👥 Companion — only personal details needed',
+    scan_title: 'Scan your ID or Passport',
+    scan_sub: 'Take a photo — we\'ll fill the form automatically',
+    scan_hint: 'Faster than typing · Works with passports, ID cards & driving licenses',
+    scan_hint_companion: 'You can scan a document, or just fill in manually — no document required',
+    scan_or_manual: 'or fill in manually below ↓',
+    scan_reading: '🔍 Reading your document…',
+    scan_fail: 'Could not read document. Please fill in manually below.',
+    surname_label: 'Surname', name_label: 'Name',
+    sex_label: 'Sex', male: 'Male', female: 'Female',
+    dob_label: 'Date of Birth',
+    birthplace_label: 'Place of Birth', birthplace_hint: 'City or country if born abroad',
+    citizenship_label: 'Citizenship', citizenship_hint: 'e.g., Italian, French, German',
+    doc_section: 'Identity Document',
+    doctype_label: 'Document Type',
+    passport: 'Passport', id_card: 'ID Card / Carta d\'Identità', driving: 'Driving License / Patente',
+    docnum_label: 'Document Number',
+    docissue_label: 'Place of Issue', docissue_hint: 'City or country that issued the document',
+    // Buttons & flow
     btn_back: 'Back', btn_next: 'Next →', btn_submit: 'Submit Check-in ✓',
-    btn_submitting: 'Submitting…',
-    success_title: 'Check-in Complete!',
-    success_text: 'Your details have been submitted. We\'ll take care of the registration with the authorities. Enjoy your stay at Casa Sole!',
+    btn_saving: 'Saving…',
+    btn_next_guest: 'Next guest',
+    // Validation
+    val_arrival: 'Please enter arrival date',
+    val_departure: 'Please enter departure date',
+    val_name: 'Surname and name are required',
+    val_doc: 'Document number is required for the main guest',
     error_text: 'Something went wrong. Please try again or contact your host.',
+    // Success & review
+    success_title: 'Check-in Complete!',
+    review_hint: 'ℹ️ Spotted an error? Tap <strong>Edit</strong> on any guest to correct their details.',
+    review_main: 'Main guest', review_companion: 'Companion',
+    review_no_doc: 'No document needed',
+    review_edit: 'Edit', review_save: 'Save', review_cancel: 'Cancel',
+    review_saved: 'already registered',
+    review_fill: 'Fill details for each guest',
+    guest_x_of_y: 'Guest',
+    of_word: 'of',
+    // Other pages
     rules_topbar: 'House Rules', rules_h2: 'House Rules',
     explore_topbar: 'Explore', explore_h2: 'Our Recommendations',
     explore_p: 'Hand-picked by your hosts — no tourist traps',
@@ -971,6 +991,8 @@ const T = {
     nav_home: 'Home', nav_rules: 'Rules', nav_explore: 'Explore', nav_chat: 'Chat',
     sug1: 'What\'s the WiFi password?', sug2: 'Best restaurant nearby?', sug3: 'How does check-out work?', sug4: 'Talk to a human',
     cat_all: 'All', cat_food: '🍝 Food', cat_drink: '🍷 Drinks', cat_see: '👁 See', cat_beach: '🏖 Beach', cat_shop: '🛍 Shop',
+    loading: 'Loading…',
+    req: '*',
   },
   it: {
     welcome_title: 'Benvenuti a<br><em>Casa Sole</em>',
@@ -980,35 +1002,54 @@ const T = {
     checkin_sub: 'Self check-in · Keybox',
     checkout_sub: 'Lasciare le chiavi nella cassetta',
     host_role: 'I vostri host',
-    host_msg: 'Benvenuti a Casa Sole! Siamo felicissimi di avervi qui. L\'appartamento è nel cuore di Bari Vecchia — uscite e siete circondati da storia, panifici e mare. Se avete bisogno di qualsiasi cosa, usate la chat in questa app e vi aiuteremo subito. Buon soggiorno! 🌞',
+    host_msg: '',
     emergency_label: 'Emergenza',
     checkin_title: 'Check-in Online',
     checkin_h2: 'Completa il Check-in',
     checkin_p: 'La legge italiana richiede la registrazione di tutti gli ospiti. Ci vogliono circa 2 minuti per ospite.',
-    step1_header: 'Passo 1 · Tipo di Ospite',
-    gt_single: 'Viaggiatore Singolo', gt_head: 'Capofamiglia', gt_member: 'Membro Famiglia', gt_group: 'Capogruppo',
-    num_guests_label: 'Numero totale di ospiti <span class="req">*</span>',
-    step2_header: 'Passo 2 · Dati Personali',
-    surname_label: 'Cognome <span class="req">*</span>',
-    name_label: 'Nome <span class="req">*</span>',
-    sex_label: 'Sesso <span class="req">*</span>',
-    male: 'Maschio', female: 'Femmina',
-    dob_label: 'Data di Nascita <span class="req">*</span>',
-    birthplace_label: 'Luogo di Nascita <span class="req">*</span>',
-    citizenship_label: 'Cittadinanza <span class="req">*</span>',
-    doctype_label: 'Tipo Documento <span class="req">*</span>',
-    passport: 'Passaporto', id_card: 'Carta d\'Identità', driving: 'Patente', other: 'Altro',
-    docnum_label: 'Numero Documento <span class="req">*</span>',
-    step3_header: 'Passo 3 · Caricamento Documento',
-    upload_text: 'Tocca per caricare la <strong>foto del documento</strong>',
-    upload_hint: 'JPG, PNG o PDF · Max 10MB',
-    upload_selfie: 'Tocca per fare un <strong>selfie con il documento</strong>',
-    upload_selfie_hint: 'Per la verifica dell\'identità',
+    step1_header: 'Passo 1 · Dettagli Prenotazione',
+    who_checkin: 'Chi fa il check-in?',
+    gt_single: 'Solo io', gt_family: 'Famiglia / Coppia', gt_group: 'Gruppo',
+    num_guests_label: 'Numero totale di ospiti (te compreso/a)',
+    arrival_label: 'Data di Arrivo',
+    departure_label: 'Data di Partenza',
+    step2_header: 'Passo 2 · Dati Ospite',
+    role_main: '👤 Ospite principale — documento richiesto',
+    role_companion: '👥 Accompagnatore — solo dati personali necessari',
+    scan_title: 'Scansiona il tuo documento',
+    scan_sub: 'Fai una foto — compileremo il modulo automaticamente',
+    scan_hint: 'Più veloce della digitazione · Funziona con passaporti, carte d\'identità e patenti',
+    scan_hint_companion: 'Puoi scansionare un documento oppure compilare manualmente — nessun documento richiesto',
+    scan_or_manual: 'oppure compila manualmente ↓',
+    scan_reading: '🔍 Lettura del documento…',
+    scan_fail: 'Impossibile leggere il documento. Compila manualmente qui sotto.',
+    surname_label: 'Cognome', name_label: 'Nome',
+    sex_label: 'Sesso', male: 'Maschio', female: 'Femmina',
+    dob_label: 'Data di Nascita',
+    birthplace_label: 'Luogo di Nascita', birthplace_hint: 'Città o paese se nato/a all\'estero',
+    citizenship_label: 'Cittadinanza', citizenship_hint: 'es. Italiana, Francese, Tedesca',
+    doc_section: 'Documento d\'Identità',
+    doctype_label: 'Tipo Documento',
+    passport: 'Passaporto', id_card: 'Carta d\'Identità', driving: 'Patente',
+    docnum_label: 'Numero Documento',
+    docissue_label: 'Luogo di Rilascio', docissue_hint: 'Città o paese che ha rilasciato il documento',
     btn_back: 'Indietro', btn_next: 'Avanti →', btn_submit: 'Invia Check-in ✓',
-    btn_submitting: 'Invio in corso…',
-    success_title: 'Check-in Completato!',
-    success_text: 'I tuoi dati sono stati inviati. Ci occuperemo noi della registrazione presso le autorità. Buon soggiorno a Casa Sole!',
+    btn_saving: 'Salvataggio…',
+    btn_next_guest: 'Prossimo ospite',
+    val_arrival: 'Inserisci la data di arrivo',
+    val_departure: 'Inserisci la data di partenza',
+    val_name: 'Cognome e nome sono obbligatori',
+    val_doc: 'Il numero del documento è obbligatorio per l\'ospite principale',
     error_text: 'Qualcosa è andato storto. Riprova o contatta il tuo host.',
+    success_title: 'Check-in Completato!',
+    review_hint: 'ℹ️ Hai notato un errore? Tocca <strong>Modifica</strong> su un ospite per correggere i dati.',
+    review_main: 'Ospite principale', review_companion: 'Accompagnatore',
+    review_no_doc: 'Nessun documento necessario',
+    review_edit: 'Modifica', review_save: 'Salva', review_cancel: 'Annulla',
+    review_saved: 'già registrati',
+    review_fill: 'Compila i dati per ogni ospite',
+    guest_x_of_y: 'Ospite',
+    of_word: 'di',
     rules_topbar: 'Regole della Casa', rules_h2: 'Regole della Casa',
     explore_topbar: 'Esplora', explore_h2: 'I Nostri Consigli',
     explore_p: 'Scelti dai vostri host — nessuna trappola per turisti',
@@ -1020,6 +1061,8 @@ const T = {
     nav_home: 'Home', nav_rules: 'Regole', nav_explore: 'Esplora', nav_chat: 'Chat',
     sug1: 'Qual è la password WiFi?', sug2: 'Miglior ristorante vicino?', sug3: 'Come funziona il check-out?', sug4: 'Parla con una persona',
     cat_all: 'Tutti', cat_food: '🍝 Cibo', cat_drink: '🍷 Bevande', cat_see: '👁 Vedere', cat_beach: '🏖 Spiaggia', cat_shop: '🛍 Shopping',
+    loading: 'Caricamento…',
+    req: '*',
   }
 };
 
@@ -1044,10 +1087,13 @@ function setLang(l) {
     const key = el.getAttribute('data-i18n-opt');
     if (T[lang][key]) el.textContent = T[lang][key];
   });
-  if (checkinStep === 3) document.getElementById('btnNext').innerHTML = T[lang].btn_submit;
+  // Re-render dynamic elements
+  updateSteps();
   renderRules();
   renderRecos();
   renderChatSuggestions();
+  // Re-render review cards if visible
+  if (document.getElementById('checkinSuccess')?.classList.contains('show')) renderReviewCards();
 }
 
 /* ══════════════════════════════════════
@@ -1123,34 +1169,20 @@ function updateSteps() {
     const roleLabel = document.getElementById('guestRoleLabel');
     if (totalGuests > 1) {
       roleLabel.style.display = 'block';
-      if (isMain) {
-        document.getElementById('guestRoleLabelText').textContent = lang === 'it'
-          ? '👤 Ospite principale — documento richiesto'
-          : '👤 Main guest — document required';
-      } else {
-        document.getElementById('guestRoleLabelText').textContent = lang === 'it'
-          ? '👥 Accompagnatore — solo dati personali necessari'
-          : '👥 Companion — only personal details needed';
-      }
+      document.getElementById('guestRoleLabelText').textContent = isMain ? T[lang].role_main : T[lang].role_companion;
     } else {
       roleLabel.style.display = 'none';
     }
 
     // Scanner hint
-    if (!isMain) {
-      document.getElementById('scanHint').textContent = lang === 'it'
-        ? 'Puoi anche scansionare un documento, oppure compila manualmente'
-        : 'You can scan a document, or just fill in manually — no document required';
-    } else {
-      document.getElementById('scanHint').textContent = 'Faster than typing · Works with passports, ID cards & driving licenses';
-    }
+    document.getElementById('scanHint').textContent = isMain ? T[lang].scan_hint : T[lang].scan_hint_companion;
 
     // Button label
     if (isLast) {
-      next.innerHTML = lang === 'it' ? 'Invia Check-in ✓' : 'Submit Check-in ✓';
+      next.innerHTML = T[lang].btn_submit;
       next.classList.remove('btn-primary'); next.classList.add('btn-success');
     } else {
-      next.innerHTML = lang === 'it' ? `Prossimo ospite (${currentGuestIdx+2}/${totalGuests}) →` : `Next guest (${currentGuestIdx+2}/${totalGuests}) →`;
+      next.innerHTML = `${T[lang].btn_next_guest} (${currentGuestIdx+2}/${totalGuests}) →`;
       next.classList.remove('btn-success'); next.classList.add('btn-primary');
     }
   } else {
@@ -1163,11 +1195,11 @@ function updateSteps() {
   if (checkinStep === 2 && totalGuests > 1) {
     counter.style.display = 'block';
     document.getElementById('guestCounterText').textContent =
-      lang === 'it' ? `Ospite ${currentGuestIdx+1} di ${totalGuests}` : `Guest ${currentGuestIdx+1} of ${totalGuests}`;
+      `${T[lang].guest_x_of_y} ${currentGuestIdx+1} ${T[lang].of_word} ${totalGuests}`;
     document.getElementById('guestCounterHint').textContent =
       savedGuests.length > 0
-        ? (lang === 'it' ? `${savedGuests.length} già registrati` : `${savedGuests.length} already registered`)
-        : (lang === 'it' ? 'Compila i dati per ogni ospite' : 'Fill details for each guest');
+        ? `${savedGuests.length} ${T[lang].review_saved}`
+        : T[lang].review_fill;
     document.getElementById('guestProgressBar').style.width = `${((currentGuestIdx+1)/totalGuests)*100}%`;
   } else {
     counter.style.display = 'none';
@@ -1195,8 +1227,8 @@ function checkinNext() {
     // Validate dates
     arrivalDate = document.getElementById('arrivalDate').value;
     departureDate = document.getElementById('departureDate').value;
-    if (!arrivalDate) { alert(lang === 'it' ? 'Inserisci la data di arrivo' : 'Please enter arrival date'); return; }
-    if (!departureDate) { alert(lang === 'it' ? 'Inserisci la data di partenza' : 'Please enter departure date'); return; }
+    if (!arrivalDate) { alert(T[lang].val_arrival); return; }
+    if (!departureDate) { alert(T[lang].val_departure); return; }
 
     totalGuests = selectedGuestType === 'single' ? 1 : (parseInt(document.getElementById('numGuests').value) || 2);
     currentGuestIdx = 0;
@@ -1207,10 +1239,10 @@ function checkinNext() {
     // Validate required fields
     const surname = document.getElementById('surname').value.trim();
     const name = document.getElementById('gname').value.trim();
-    if (!surname || !name) { alert(lang === 'it' ? 'Cognome e nome sono obbligatori' : 'Surname and name are required'); return; }
+    if (!surname || !name) { alert(T[lang].val_name); return; }
     if (isMainGuest()) {
       const docnum = document.getElementById('docnum').value.trim();
-      if (!docnum) { alert(lang === 'it' ? 'Il numero del documento è obbligatorio per l\'ospite principale' : 'Document number is required for the main guest'); return; }
+      if (!docnum) { alert(T[lang].val_doc); return; }
     }
     saveCurrentGuest();
   }
@@ -1242,7 +1274,7 @@ function checkinPrev() {
 async function saveCurrentGuest() {
   const btn = document.getElementById('btnNext');
   const originalText = btn.innerHTML;
-  btn.innerHTML = lang === 'it' ? 'Salvataggio…' : 'Saving…';
+  btn.innerHTML = T[lang].btn_saving;
   btn.disabled = true;
 
   try {
@@ -1307,6 +1339,7 @@ async function saveCurrentGuest() {
       document.getElementById('successText').textContent = lang === 'it'
         ? `${savedGuests.length} ospite/i registrato/i. Arrivo: ${arrivalDate}, Partenza: ${departureDate}.`
         : `${savedGuests.length} guest(s) registered. Arrival: ${arrivalDate}, Departure: ${departureDate}.`;
+      document.getElementById('reviewHintText').innerHTML = T[lang].review_hint;
       document.getElementById('checkinBadge').style.display = 'none';
       renderReviewCards();
       console.log(`✅ All ${savedGuests.length} guests checked in!`);
@@ -1326,12 +1359,10 @@ function renderReviewCards() {
   const container = document.getElementById('reviewCards');
   container.innerHTML = savedGuests.map((g, i) => {
     const isMain = i === 0;
-    const role = isMain
-      ? (lang === 'it' ? 'Ospite principale' : 'Main guest')
-      : (lang === 'it' ? 'Accompagnatore' : 'Companion');
+    const role = isMain ? T[lang].review_main : T[lang].review_companion;
     const docInfo = g.document_number
       ? `${g.document_type === 'passport' ? '🛂' : '🪪'} ${g.document_number}`
-      : (lang === 'it' ? 'Nessun documento' : 'No document');
+      : T[lang].review_no_doc;
     return `
       <div class="review-card" id="reviewCard${i}" style="background:var(--white);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;">
@@ -1346,26 +1377,25 @@ function renderReviewCards() {
             </div>
           </div>
           <button onclick="editGuest(${i})" style="background:none;border:1px solid var(--border);border-radius:6px;padding:5px 12px;font-size:0.62rem;font-weight:500;color:var(--warm);cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;">
-            ✏️ ${lang === 'it' ? 'Modifica' : 'Edit'}
+            ✏️ ${T[lang].review_edit}
           </button>
         </div>
-        <!-- Inline edit form (hidden by default) -->
         <div id="editForm${i}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">Surname</label><input class="form-input" id="ed_surname${i}" value="${g.surname}" style="font-size:0.78rem;padding:8px;"></div>
-            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">Name</label><input class="form-input" id="ed_name${i}" value="${g.name}" style="font-size:0.78rem;padding:8px;"></div>
-            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">Sex</label><select class="form-select" id="ed_sex${i}" style="font-size:0.78rem;padding:8px;"><option value="M" ${g.sex==='M'?'selected':''}>M</option><option value="F" ${g.sex==='F'?'selected':''}>F</option></select></div>
-            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">Date of Birth</label><input class="form-input" type="date" id="ed_dob${i}" value="${g.date_of_birth}" style="font-size:0.78rem;padding:8px;"></div>
-            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">Place of Birth</label><input class="form-input" id="ed_birth${i}" value="${g.place_of_birth}" style="font-size:0.78rem;padding:8px;"></div>
-            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">Citizenship</label><input class="form-input" id="ed_cit${i}" value="${g.citizenship}" style="font-size:0.78rem;padding:8px;"></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].surname_label}</label><input class="form-input" id="ed_surname${i}" value="${g.surname}" style="font-size:0.78rem;padding:8px;"></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].name_label}</label><input class="form-input" id="ed_name${i}" value="${g.name}" style="font-size:0.78rem;padding:8px;"></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].sex_label}</label><select class="form-select" id="ed_sex${i}" style="font-size:0.78rem;padding:8px;"><option value="M" ${g.sex==='M'?'selected':''}>${T[lang].male}</option><option value="F" ${g.sex==='F'?'selected':''}>${T[lang].female}</option></select></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].dob_label}</label><input class="form-input" type="date" id="ed_dob${i}" value="${g.date_of_birth}" style="font-size:0.78rem;padding:8px;"></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].birthplace_label}</label><input class="form-input" id="ed_birth${i}" value="${g.place_of_birth}" style="font-size:0.78rem;padding:8px;"></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].citizenship_label}</label><input class="form-input" id="ed_cit${i}" value="${g.citizenship}" style="font-size:0.78rem;padding:8px;"></div>
             ${isMain ? `
-            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">Doc Number</label><input class="form-input" id="ed_docnum${i}" value="${g.document_number}" style="font-size:0.78rem;padding:8px;"></div>
-            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">Place of Issue</label><input class="form-input" id="ed_docissue${i}" value="${g.doc_issue_place||''}" style="font-size:0.78rem;padding:8px;"></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].docnum_label}</label><input class="form-input" id="ed_docnum${i}" value="${g.document_number}" style="font-size:0.78rem;padding:8px;"></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].docissue_label}</label><input class="form-input" id="ed_docissue${i}" value="${g.doc_issue_place||''}" style="font-size:0.78rem;padding:8px;"></div>
             ` : ''}
           </div>
           <div style="display:flex;gap:8px;margin-top:10px;">
-            <button onclick="saveGuestEdit(${i})" class="btn btn-primary" style="flex:1;padding:8px;font-size:0.72rem;">💾 ${lang === 'it' ? 'Salva' : 'Save'}</button>
-            <button onclick="cancelGuestEdit(${i})" class="btn btn-secondary" style="padding:8px;font-size:0.72rem;">${lang === 'it' ? 'Annulla' : 'Cancel'}</button>
+            <button onclick="saveGuestEdit(${i})" class="btn btn-primary" style="flex:1;padding:8px;font-size:0.72rem;">💾 ${T[lang].review_save}</button>
+            <button onclick="cancelGuestEdit(${i})" class="btn btn-secondary" style="padding:8px;font-size:0.72rem;">${T[lang].review_cancel}</button>
           </div>
         </div>
       </div>
@@ -1440,7 +1470,7 @@ async function scanDocument(input) {
   const scanResult = document.getElementById('scanResult');
   const scanError = document.getElementById('scanError');
   scanStatus.style.display = 'block';
-  scanStatus.innerHTML = '<span style="color:var(--warm);font-size:0.72rem;font-weight:500;">🔍 Reading your document…</span>';
+  scanStatus.innerHTML = `<span style="color:var(--warm);font-size:0.72rem;font-weight:500;">${T[lang].scan_reading}</span>`;
   scanResult.style.display = 'none';
   scanError.style.display = 'none';
   scanZone.classList.add('has-file');
@@ -1489,7 +1519,7 @@ async function scanDocument(input) {
     console.error('Scan error:', e);
     scanStatus.style.display = 'none';
     scanError.style.display = 'block';
-    document.getElementById('scanErrorText').textContent = 'Could not read document. Please fill in manually below.';
+    document.getElementById('scanErrorText').textContent = T[lang].scan_fail;
   }
 }
 

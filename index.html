@@ -630,8 +630,17 @@ body {
     <div class="step-dot active" id="sd1">1</div>
     <div class="step-line" id="sl1"></div>
     <div class="step-dot" id="sd2">2</div>
-    <div class="step-line" id="sl2"></div>
-    <div class="step-dot" id="sd3">3</div>
+  </div>
+
+  <!-- Guest counter (shows for multi-guest) -->
+  <div id="guestCounter" style="display:none; margin:0 16px 12px; padding:10px 14px; background:var(--blue-bg); border-radius:8px; border:1px solid rgba(74,144,217,0.15); display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-size:0.72rem;color:var(--blue);font-weight:600;" id="guestCounterText">Guest 1 of 2</span>
+      <span style="font-size:0.6rem;color:var(--ink-soft);" id="guestCounterHint">Fill details for each guest</span>
+    </div>
+    <div style="margin-top:6px;height:4px;background:rgba(74,144,217,0.12);border-radius:2px;overflow:hidden;">
+      <div id="guestProgressBar" style="height:100%;background:var(--blue);border-radius:2px;transition:width 0.3s;width:50%"></div>
+    </div>
   </div>
 
   <!-- Step 1: Guest Type -->
@@ -730,18 +739,6 @@ body {
     </div>
   </div>
 
-  <!-- Step 3: Selfie Verification -->
-  <div class="form-section" id="step3">
-    <div class="section-header" data-i18n="step3_header">Step 3 · Verification</div>
-    <div class="upload-zone" id="uploadZone2" onclick="document.getElementById('fileInput2').click()">
-      <div class="upload-icon">🤳</div>
-      <div class="upload-text" data-i18n="upload_selfie">Tap to take a <strong>selfie with your ID</strong></div>
-      <div class="upload-hint" data-i18n="upload_selfie_hint">For identity verification</div>
-      <div class="upload-filename" id="uploadFilename2"></div>
-    </div>
-    <input type="file" id="fileInput2" accept="image/*" capture="user" style="display:none" onchange="handleFileUpload2(this)">
-  </div>
-
   <!-- Nav buttons -->
   <div class="btn-row" id="checkinBtns">
     <button class="btn btn-secondary hidden" id="btnPrev" onclick="checkinPrev()" data-i18n="btn_back">Back</button>
@@ -752,7 +749,7 @@ body {
   <div class="checkin-success" id="checkinSuccess">
     <div class="success-icon">✅</div>
     <div class="success-title" data-i18n="success_title">Check-in Complete!</div>
-    <div class="success-text" data-i18n="success_text">Your details have been submitted. We'll take care of the registration with the authorities. Enjoy your stay at Casa Sole!</div>
+    <div class="success-text" id="successText" data-i18n="success_text">Your details have been submitted. We'll take care of the registration with the authorities. Enjoy your stay at Casa Sole!</div>
   </div>
 
   <div style="height:24px"></div>
@@ -874,7 +871,6 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let propertyId = null;
 let propertyData = null;
 let uploadedIdFile = null;
-let uploadedSelfieFile = null;
 
 /* ══════════════════════════════════════
    i18n
@@ -1022,10 +1018,13 @@ function goTo(page) {
 }
 
 /* ══════════════════════════════════════
-   CHECK-IN FLOW — NOW SAVES TO SUPABASE
+   CHECK-IN FLOW — Multi-guest support
 ══════════════════════════════════════ */
 let checkinStep = 1;
 let selectedGuestType = 'single';
+let totalGuests = 1;
+let currentGuestIdx = 0; // 0-based
+let savedGuests = []; // Array of submitted guest records
 
 function selectGuestType(el, type) {
   document.querySelectorAll('.guest-type-opt').forEach(o => o.classList.remove('active'));
@@ -1034,9 +1033,10 @@ function selectGuestType(el, type) {
 }
 
 function updateSteps() {
-  for (let i = 1; i <= 3; i++) {
+  // Only 2 steps now
+  for (let i = 1; i <= 2; i++) {
     const dot = document.getElementById('sd' + i);
-    const line = i < 3 ? document.getElementById('sl' + i) : null;
+    const line = i < 2 ? document.getElementById('sl' + i) : null;
     dot.classList.remove('active', 'done');
     if (i < checkinStep) { dot.classList.add('done'); dot.textContent = '✓'; }
     else if (i === checkinStep) { dot.classList.add('active'); dot.textContent = i; }
@@ -1045,20 +1045,166 @@ function updateSteps() {
   }
   document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
   document.getElementById('step' + checkinStep).classList.add('active');
+
   const prev = document.getElementById('btnPrev');
   const next = document.getElementById('btnNext');
   prev.classList.toggle('hidden', checkinStep === 1);
-  next.innerHTML = checkinStep === 3 ? T[lang].btn_submit : T[lang].btn_next;
-  if (checkinStep === 3) next.classList.replace('btn-primary', 'btn-success') || next.classList.add('btn-success');
-  else { next.classList.remove('btn-success'); next.classList.add('btn-primary'); }
+
+  // Button label logic
+  if (checkinStep === 2) {
+    const isLastGuest = currentGuestIdx >= totalGuests - 1;
+    if (isLastGuest) {
+      next.innerHTML = lang === 'it' ? 'Invia Check-in ✓' : 'Submit Check-in ✓';
+      next.classList.remove('btn-primary'); next.classList.add('btn-success');
+    } else {
+      next.innerHTML = lang === 'it' ? `Prossimo ospite (${currentGuestIdx+2}/${totalGuests}) →` : `Next guest (${currentGuestIdx+2}/${totalGuests}) →`;
+      next.classList.remove('btn-success'); next.classList.add('btn-primary');
+    }
+  } else {
+    next.innerHTML = T[lang].btn_next;
+    next.classList.remove('btn-success'); next.classList.add('btn-primary');
+  }
+
+  // Guest counter
+  const counter = document.getElementById('guestCounter');
+  if (checkinStep === 2 && totalGuests > 1) {
+    counter.style.display = 'block';
+    document.getElementById('guestCounterText').textContent =
+      lang === 'it' ? `Ospite ${currentGuestIdx+1} di ${totalGuests}` : `Guest ${currentGuestIdx+1} of ${totalGuests}`;
+    document.getElementById('guestCounterHint').textContent =
+      currentGuestIdx === 0
+        ? (lang === 'it' ? 'Compila i dati per ogni ospite' : 'Fill details for each guest')
+        : (lang === 'it' ? `${savedGuests.length} ospite/i già registrati` : `${savedGuests.length} guest(s) already registered`);
+    document.getElementById('guestProgressBar').style.width = `${((currentGuestIdx+1)/totalGuests)*100}%`;
+  } else {
+    counter.style.display = 'none';
+  }
+}
+
+function clearForm() {
+  ['surname','gname','birthplace','citizenship','docnum'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('dob').value = '';
+  document.getElementById('sex').value = 'M';
+  document.getElementById('doctype').selectedIndex = 0;
+  // Reset scanner state
+  document.getElementById('scanResult').style.display = 'none';
+  document.getElementById('scanError').style.display = 'none';
+  document.getElementById('scanStatus').style.display = 'none';
+  document.getElementById('scanZone').classList.remove('has-file');
+  document.getElementById('scanInput').value = '';
+  uploadedIdFile = null;
 }
 
 function checkinNext() {
-  if (checkinStep < 3) { checkinStep++; updateSteps(); }
-  else { submitCheckin(); }
+  if (checkinStep === 1) {
+    totalGuests = parseInt(document.getElementById('numGuests').value) || 1;
+    currentGuestIdx = 0;
+    savedGuests = [];
+    // If multiple guests but "single" selected, auto-switch to "head"
+    if (totalGuests > 1 && selectedGuestType === 'single') {
+      selectedGuestType = 'head';
+    }
+    checkinStep = 2;
+    updateSteps();
+  } else if (checkinStep === 2) {
+    saveCurrentGuest();
+  }
 }
+
 function checkinPrev() {
-  if (checkinStep > 1) { checkinStep--; updateSteps(); }
+  if (checkinStep === 2 && currentGuestIdx > 0) {
+    // Go back to previous guest
+    currentGuestIdx--;
+    // Restore previous guest data
+    const prev = savedGuests[currentGuestIdx];
+    if (prev) {
+      document.getElementById('surname').value = prev.surname || '';
+      document.getElementById('gname').value = prev.name || '';
+      document.getElementById('sex').value = prev.sex || 'M';
+      document.getElementById('dob').value = prev.date_of_birth || '';
+      document.getElementById('birthplace').value = prev.place_of_birth || '';
+      document.getElementById('citizenship').value = prev.citizenship || '';
+      document.getElementById('doctype').value = prev.document_type || 'passport';
+      document.getElementById('docnum').value = prev.document_number || '';
+    }
+    savedGuests.splice(currentGuestIdx, 1); // Remove so it gets re-saved on next
+    updateSteps();
+  } else if (checkinStep === 2 && currentGuestIdx === 0) {
+    checkinStep = 1;
+    updateSteps();
+  }
+}
+
+async function saveCurrentGuest() {
+  const btn = document.getElementById('btnNext');
+  const originalText = btn.innerHTML;
+  btn.innerHTML = lang === 'it' ? 'Salvataggio…' : 'Saving…';
+  btn.disabled = true;
+
+  try {
+    const idPath = await uploadFile(uploadedIdFile, 'id-photos');
+
+    // Determine guest type for Alloggiati
+    let guestType = selectedGuestType;
+    if (totalGuests > 1 && currentGuestIdx > 0) {
+      // Subsequent guests are family members or group members
+      guestType = (selectedGuestType === 'head' || selectedGuestType === 'single') ? 'member' : 'group_member';
+    }
+
+    const record = {
+      guest_type: guestType,
+      surname: document.getElementById('surname').value.trim(),
+      name: document.getElementById('gname').value.trim(),
+      sex: document.getElementById('sex').value,
+      date_of_birth: document.getElementById('dob').value || '2000-01-01',
+      place_of_birth: document.getElementById('birthplace').value.trim() || 'Not provided',
+      citizenship: document.getElementById('citizenship').value.trim() || 'Not provided',
+      document_type: document.getElementById('doctype').value,
+      document_number: document.getElementById('docnum').value.trim() || 'Not provided',
+      id_photo_path: idPath,
+      docs_status: idPath ? 'complete' : 'pending',
+    };
+    if (propertyId) record.property_id = propertyId;
+
+    console.log(`Saving guest ${currentGuestIdx+1}/${totalGuests}:`, record);
+    const { data, error } = await sb.from('checkins').insert(record);
+    if (error) { console.error('DB error:', JSON.stringify(error)); throw error; }
+
+    savedGuests.push(record);
+
+    // Check if more guests to register
+    if (currentGuestIdx < totalGuests - 1) {
+      // Move to next guest
+      currentGuestIdx++;
+      clearForm();
+      btn.disabled = false;
+      updateSteps();
+      // Scroll to top of form
+      document.getElementById('page-checkin').scrollTop = 0;
+    } else {
+      // All guests done — log and show success
+      await sb.from('chat_messages').insert({
+        property_id: propertyId, sender: 'system',
+        message: `Check-in complete: ${savedGuests.length} guest(s) registered.`
+      });
+      document.getElementById('checkinBtns').classList.add('hidden');
+      document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
+      document.querySelector('.steps-bar').classList.add('hidden');
+      document.querySelector('.checkin-intro').classList.add('hidden');
+      document.getElementById('guestCounter').style.display = 'none';
+      document.getElementById('checkinSuccess').classList.add('show');
+      document.getElementById('successText').textContent = lang === 'it'
+        ? `${savedGuests.length} ospite/i registrato/i con successo. Ci occuperemo noi della registrazione presso le autorità. Buon soggiorno!`
+        : `${savedGuests.length} guest(s) registered successfully. We'll take care of the registration with the authorities. Enjoy your stay!`;
+      document.getElementById('checkinBadge').style.display = 'none';
+      console.log(`✅ All ${savedGuests.length} guests checked in!`);
+    }
+  } catch (err) {
+    console.error('Save error:', err);
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+    alert(T[lang].error_text);
+  }
 }
 
 async function uploadFile(file, folder) {
@@ -1156,57 +1302,6 @@ function fileToBase64(file) {
 
 function handleFileUpload(input) {
   if (input.files.length) { uploadedIdFile = input.files[0]; }
-}
-function handleFileUpload2(input) {
-  if (input.files.length) {
-    uploadedSelfieFile = input.files[0];
-    document.getElementById('uploadZone2').classList.add('has-file');
-    document.getElementById('uploadFilename2').textContent = '✓ ' + input.files[0].name;
-  }
-}
-
-async function submitCheckin() {
-  const btn = document.getElementById('btnNext');
-  btn.innerHTML = T[lang].btn_submitting;
-  btn.disabled = true;
-  try {
-    const idPath = await uploadFile(uploadedIdFile, 'id-photos');
-    const selfiePath = await uploadFile(uploadedSelfieFile, 'selfies');
-    const record = {
-      guest_type: selectedGuestType,
-      surname: document.getElementById('surname').value.trim(),
-      name: document.getElementById('gname').value.trim(),
-      sex: document.getElementById('sex').value,
-      date_of_birth: document.getElementById('dob').value || '2000-01-01',
-      place_of_birth: document.getElementById('birthplace').value.trim() || 'Not provided',
-      citizenship: document.getElementById('citizenship').value.trim() || 'Not provided',
-      document_type: document.getElementById('doctype').value,
-      document_number: document.getElementById('docnum').value.trim() || 'Not provided',
-      id_photo_path: idPath,
-      selfie_photo_path: selfiePath,
-      docs_status: (idPath && selfiePath) ? 'complete' : idPath ? 'partial' : 'pending',
-    };
-    if (propertyId) record.property_id = propertyId;
-    console.log('Submitting check-in:', record);
-    const { data, error } = await sb.from('checkins').insert(record);
-    if (error) { console.error('DB insert error:', JSON.stringify(error)); throw error; }
-    await sb.from('chat_messages').insert({
-      property_id: propertyId, sender: 'system',
-      message: `Guest ${document.getElementById('gname').value} ${document.getElementById('surname').value} completed online check-in.`
-    });
-    document.getElementById('checkinBtns').classList.add('hidden');
-    document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
-    document.querySelector('.steps-bar').classList.add('hidden');
-    document.querySelector('.checkin-intro').classList.add('hidden');
-    document.getElementById('checkinSuccess').classList.add('show');
-    document.getElementById('checkinBadge').style.display = 'none';
-    console.log('Check-in saved!', data);
-  } catch (err) {
-    console.error('Check-in submission error:', err);
-    btn.innerHTML = T[lang].btn_submit;
-    btn.disabled = false;
-    alert(T[lang].error_text);
-  }
 }
 
 /* ══════════════════════════════════════

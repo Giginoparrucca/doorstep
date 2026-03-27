@@ -704,7 +704,7 @@ body {
         <div class="upload-hint" id="scanHint" data-i18n="scan_hint">Faster than typing · Works with passports, ID cards & driving licenses</div>
         <div id="scanStatus" style="display:none;margin-top:8px;"></div>
       </div>
-      <input type="file" id="scanInput" accept="image/*" capture="environment" style="display:none" onchange="scanDocument(this)">
+      <input type="file" id="scanInput" accept="image/*" style="display:none" onchange="scanDocument(this)">
       <div id="scanResult" style="display:none;margin-top:10px;padding:10px 14px;background:var(--green-bg);border-radius:8px;border:1px solid rgba(76,175,125,0.2);">
         <div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;color:var(--green);font-weight:600;">✅ <span id="scanResultText"></span></div>
         <div style="font-size:0.62rem;color:var(--ink-soft);margin-top:4px;" id="scanConfidence"></div>
@@ -1013,6 +1013,7 @@ const T = {
     val_departure: 'Please enter departure date',
     val_name: 'Surname and name are required',
     val_doc: 'Document number is required for the main guest',
+    val_province: 'Province of birth is required for Italian guests (Alloggiati / DMS)',
     error_text: 'Something went wrong. Please try again or contact your host.',
     // Success & review
     success_title: 'Check-in Complete!',
@@ -1086,6 +1087,7 @@ const T = {
     val_departure: 'Inserisci la data di partenza',
     val_name: 'Cognome e nome sono obbligatori',
     val_doc: 'Il numero del documento è obbligatorio per l\'ospite principale',
+    val_province: 'La provincia di nascita è obbligatoria per gli ospiti italiani (Alloggiati / DMS)',
     error_text: 'Qualcosa è andato storto. Riprova o contatta il tuo host.',
     success_title: 'Check-in Completato!',
     review_hint: 'ℹ️ Hai notato un errore? Tocca <strong>Modifica</strong> su un ospite per correggere i dati.',
@@ -1309,6 +1311,12 @@ function checkinNext() {
     if (isMainGuest()) {
       const docnum = document.getElementById('docnum').value.trim();
       if (!docnum) { alert(T[lang].val_doc); return; }
+    }
+    // Province required for Italian citizens (mandatory for Alloggiati & DMS)
+    const provinceGroup = document.getElementById('provinceGroup');
+    if (provinceGroup && provinceGroup.style.display !== 'none') {
+      const province = document.getElementById('birthProvince').value;
+      if (!province) { alert(T[lang].val_province); return; }
     }
     saveCurrentGuest();
   }

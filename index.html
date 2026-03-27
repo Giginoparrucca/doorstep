@@ -742,7 +742,51 @@ body {
     </div>
     <div class="form-group">
       <label class="form-label" data-i18n="citizenship_label">Citizenship <span class="req">*</span></label>
-      <input class="form-input" type="text" id="citizenship" data-i18n-placeholder="citizenship_hint">
+      <input class="form-input" type="text" id="citizenship" data-i18n-placeholder="citizenship_hint" oninput="onCitizenshipChange()">
+    </div>
+
+    <!-- Province — shows for Italian guests (required by Alloggiati) -->
+    <div class="form-group" id="provinceGroup" style="display:none;">
+      <label class="form-label" data-i18n="province_label">Province of Birth <span class="req">*</span></label>
+      <select class="form-select" id="birthProvince">
+        <option value="">—</option>
+        <option value="AG">Agrigento (AG)</option><option value="AL">Alessandria (AL)</option><option value="AN">Ancona (AN)</option>
+        <option value="AO">Aosta (AO)</option><option value="AR">Arezzo (AR)</option><option value="AP">Ascoli Piceno (AP)</option>
+        <option value="AT">Asti (AT)</option><option value="AV">Avellino (AV)</option><option value="BA">Bari (BA)</option>
+        <option value="BT">Barletta-Andria-Trani (BT)</option><option value="BL">Belluno (BL)</option><option value="BN">Benevento (BN)</option>
+        <option value="BG">Bergamo (BG)</option><option value="BI">Biella (BI)</option><option value="BO">Bologna (BO)</option>
+        <option value="BZ">Bolzano (BZ)</option><option value="BS">Brescia (BS)</option><option value="BR">Brindisi (BR)</option>
+        <option value="CA">Cagliari (CA)</option><option value="CL">Caltanissetta (CL)</option><option value="CB">Campobasso (CB)</option>
+        <option value="CE">Caserta (CE)</option><option value="CT">Catania (CT)</option><option value="CZ">Catanzaro (CZ)</option>
+        <option value="CH">Chieti (CH)</option><option value="CO">Como (CO)</option><option value="CS">Cosenza (CS)</option>
+        <option value="CR">Cremona (CR)</option><option value="KR">Crotone (KR)</option><option value="CN">Cuneo (CN)</option>
+        <option value="EN">Enna (EN)</option><option value="FM">Fermo (FM)</option><option value="FE">Ferrara (FE)</option>
+        <option value="FI">Firenze (FI)</option><option value="FG">Foggia (FG)</option><option value="FC">Forlì-Cesena (FC)</option>
+        <option value="FR">Frosinone (FR)</option><option value="GE">Genova (GE)</option><option value="GO">Gorizia (GO)</option>
+        <option value="GR">Grosseto (GR)</option><option value="IM">Imperia (IM)</option><option value="IS">Isernia (IS)</option>
+        <option value="SP">La Spezia (SP)</option><option value="AQ">L'Aquila (AQ)</option><option value="LT">Latina (LT)</option>
+        <option value="LE">Lecce (LE)</option><option value="LC">Lecco (LC)</option><option value="LI">Livorno (LI)</option>
+        <option value="LO">Lodi (LO)</option><option value="LU">Lucca (LU)</option><option value="MC">Macerata (MC)</option>
+        <option value="MN">Mantova (MN)</option><option value="MS">Massa-Carrara (MS)</option><option value="MT">Matera (MT)</option>
+        <option value="ME">Messina (ME)</option><option value="MI">Milano (MI)</option><option value="MO">Modena (MO)</option>
+        <option value="MB">Monza e Brianza (MB)</option><option value="NA">Napoli (NA)</option><option value="NO">Novara (NO)</option>
+        <option value="NU">Nuoro (NU)</option><option value="OR">Oristano (OR)</option><option value="PD">Padova (PD)</option>
+        <option value="PA">Palermo (PA)</option><option value="PR">Parma (PR)</option><option value="PV">Pavia (PV)</option>
+        <option value="PG">Perugia (PG)</option><option value="PU">Pesaro e Urbino (PU)</option><option value="PE">Pescara (PE)</option>
+        <option value="PC">Piacenza (PC)</option><option value="PI">Pisa (PI)</option><option value="PT">Pistoia (PT)</option>
+        <option value="PN">Pordenone (PN)</option><option value="PZ">Potenza (PZ)</option><option value="PO">Prato (PO)</option>
+        <option value="RG">Ragusa (RG)</option><option value="RA">Ravenna (RA)</option><option value="RC">Reggio Calabria (RC)</option>
+        <option value="RE">Reggio Emilia (RE)</option><option value="RI">Rieti (RI)</option><option value="RN">Rimini (RN)</option>
+        <option value="RM">Roma (RM)</option><option value="RO">Rovigo (RO)</option><option value="SA">Salerno (SA)</option>
+        <option value="SS">Sassari (SS)</option><option value="SV">Savona (SV)</option><option value="SI">Siena (SI)</option>
+        <option value="SR">Siracusa (SR)</option><option value="SO">Sondrio (SO)</option><option value="SU">Sud Sardegna (SU)</option>
+        <option value="TA">Taranto (TA)</option><option value="TE">Teramo (TE)</option><option value="TR">Terni (TR)</option>
+        <option value="TO">Torino (TO)</option><option value="TP">Trapani (TP)</option><option value="TN">Trento (TN)</option>
+        <option value="TV">Treviso (TV)</option><option value="TS">Trieste (TS)</option><option value="UD">Udine (UD)</option>
+        <option value="VA">Varese (VA)</option><option value="VE">Venezia (VE)</option><option value="VB">Verbano-Cusio-Ossola (VB)</option>
+        <option value="VC">Vercelli (VC)</option><option value="VR">Verona (VR)</option><option value="VV">Vibo Valentia (VV)</option>
+        <option value="VI">Vicenza (VI)</option><option value="VT">Viterbo (VT)</option>
+      </select>
     </div>
 
     <div id="documentSection">
@@ -959,6 +1003,7 @@ const T = {
     passport: 'Passport', id_card: 'ID Card / Carta d\'Identità', driving: 'Driving License / Patente',
     docnum_label: 'Document Number',
     docissue_label: 'Place of Issue', docissue_hint: 'City or country that issued the document',
+    province_label: 'Province of Birth',
     // Buttons & flow
     btn_back: 'Back', btn_next: 'Next →', btn_submit: 'Submit Check-in ✓',
     btn_saving: 'Saving…',
@@ -1033,6 +1078,7 @@ const T = {
     passport: 'Passaporto', id_card: 'Carta d\'Identità', driving: 'Patente',
     docnum_label: 'Numero Documento',
     docissue_label: 'Luogo di Rilascio', docissue_hint: 'Città o paese che ha rilasciato il documento',
+    province_label: 'Provincia di Nascita',
     btn_back: 'Indietro', btn_next: 'Avanti →', btn_submit: 'Invia Check-in ✓',
     btn_saving: 'Salvataggio…',
     btn_next_guest: 'Prossimo ospite',
@@ -1136,6 +1182,24 @@ function selectGuestType(el, type) {
   }
 }
 
+function isItalianCitizenship(val) {
+  if (!val) return false;
+  const v = val.toLowerCase().trim();
+  return ['italian','italiana','italiano','italy','italia','it'].includes(v);
+}
+
+function onCitizenshipChange() {
+  const val = document.getElementById('citizenship').value;
+  const show = isItalianCitizenship(val);
+  document.getElementById('provinceGroup').style.display = show ? 'block' : 'none';
+  // Auto-fill doc issue place from birthplace if empty
+  const docIssue = document.getElementById('docissue');
+  const birthplace = document.getElementById('birthplace').value;
+  if (docIssue && !docIssue.value && birthplace) {
+    docIssue.value = birthplace;
+  }
+}
+
 function isMainGuest() {
   // First guest is always the main guest (needs document)
   return currentGuestIdx === 0;
@@ -1214,6 +1278,8 @@ function clearForm() {
   document.getElementById('dob').value = '';
   document.getElementById('sex').value = 'M';
   document.getElementById('doctype').selectedIndex = 0;
+  document.getElementById('birthProvince').value = '';
+  document.getElementById('provinceGroup').style.display = 'none';
   document.getElementById('scanResult').style.display = 'none';
   document.getElementById('scanError').style.display = 'none';
   document.getElementById('scanStatus').style.display = 'none';
@@ -1262,6 +1328,8 @@ function checkinPrev() {
       document.getElementById('doctype').value = prev.document_type || 'passport';
       document.getElementById('docnum').value = prev.document_number || '';
       if (document.getElementById('docissue')) document.getElementById('docissue').value = prev.doc_issue_place || '';
+      document.getElementById('birthProvince').value = prev.birth_province || '';
+      onCitizenshipChange(); // Show/hide province field
     }
     savedGuests.splice(currentGuestIdx, 1);
     updateSteps();
@@ -1291,17 +1359,27 @@ async function saveCurrentGuest() {
     // Calculate nights for SPOT
     const nights = Math.max(1, Math.round((new Date(departureDate) - new Date(arrivalDate)) / 86400000));
 
+    const birthplace = document.getElementById('birthplace').value.trim();
+    const citizenship = document.getElementById('citizenship').value.trim();
+    const province = document.getElementById('birthProvince').value || '';
+    const docIssuePlaceEl = document.getElementById('docissue');
+    // Auto-default doc issue place to birthplace if empty
+    if (isMainGuest() && docIssuePlaceEl && !docIssuePlaceEl.value.trim() && birthplace) {
+      docIssuePlaceEl.value = birthplace;
+    }
+
     const record = {
       guest_type: guestType,
       surname: document.getElementById('surname').value.trim(),
       name: document.getElementById('gname').value.trim(),
       sex: document.getElementById('sex').value,
       date_of_birth: document.getElementById('dob').value || '2000-01-01',
-      place_of_birth: document.getElementById('birthplace').value.trim() || '',
-      citizenship: document.getElementById('citizenship').value.trim() || '',
+      place_of_birth: birthplace || '',
+      birth_province: province,
+      citizenship: citizenship || '',
       document_type: isMainGuest() ? document.getElementById('doctype').value : '',
       document_number: isMainGuest() ? document.getElementById('docnum').value.trim() : '',
-      doc_issue_place: isMainGuest() ? (document.getElementById('docissue')?.value?.trim() || '') : '',
+      doc_issue_place: isMainGuest() ? (docIssuePlaceEl?.value?.trim() || birthplace || '') : '',
       arrival_date: arrivalDate,
       departure_date: departureDate,
       nights: nights,
@@ -1363,6 +1441,7 @@ function renderReviewCards() {
     const docInfo = g.document_number
       ? `${g.document_type === 'passport' ? '🛂' : '🪪'} ${g.document_number}`
       : T[lang].review_no_doc;
+    const provInfo = g.birth_province ? ` (${g.birth_province})` : '';
     return `
       <div class="review-card" id="reviewCard${i}" style="background:var(--white);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;">
@@ -1370,7 +1449,7 @@ function renderReviewCards() {
             <div style="font-size:0.5rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--warm);margin-bottom:4px;">${role}</div>
             <div style="font-size:0.92rem;font-weight:600;color:var(--ink);line-height:1.2;">${g.surname} ${g.name}</div>
             <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:4px;">
-              ${g.sex === 'F' ? '♀' : '♂'} · ${g.date_of_birth || '—'} · ${g.place_of_birth || '—'}
+              ${g.sex === 'F' ? '♀' : '♂'} · ${g.date_of_birth || '—'} · ${g.place_of_birth || '—'}${provInfo}
             </div>
             <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:2px;">
               🌍 ${g.citizenship || '—'} · ${docInfo}
@@ -1388,6 +1467,7 @@ function renderReviewCards() {
             <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].dob_label}</label><input class="form-input" type="date" id="ed_dob${i}" value="${g.date_of_birth}" style="font-size:0.78rem;padding:8px;"></div>
             <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].birthplace_label}</label><input class="form-input" id="ed_birth${i}" value="${g.place_of_birth}" style="font-size:0.78rem;padding:8px;"></div>
             <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].citizenship_label}</label><input class="form-input" id="ed_cit${i}" value="${g.citizenship}" style="font-size:0.78rem;padding:8px;"></div>
+            ${isItalianCitizenship(g.citizenship) ? `<div style="grid-column:1/-1"><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].province_label}</label><input class="form-input" id="ed_prov${i}" value="${g.birth_province||''}" style="font-size:0.78rem;padding:8px;" placeholder="e.g. BA, MI, RM"></div>` : ''}
             ${isMain ? `
             <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].docnum_label}</label><input class="form-input" id="ed_docnum${i}" value="${g.document_number}" style="font-size:0.78rem;padding:8px;"></div>
             <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].docissue_label}</label><input class="form-input" id="ed_docissue${i}" value="${g.doc_issue_place||''}" style="font-size:0.78rem;padding:8px;"></div>
@@ -1426,6 +1506,7 @@ async function saveGuestEdit(idx) {
     date_of_birth: document.getElementById('ed_dob' + idx).value,
     place_of_birth: document.getElementById('ed_birth' + idx).value.trim(),
     citizenship: document.getElementById('ed_cit' + idx).value.trim(),
+    birth_province: document.getElementById('ed_prov' + idx)?.value?.trim() || g.birth_province || '',
   };
   if (isMain) {
     updates.document_number = document.getElementById('ed_docnum' + idx).value.trim();
@@ -1494,6 +1575,12 @@ async function scanDocument(input) {
       if (d.citizenship) document.getElementById('citizenship').value = d.citizenship;
       if (d.document_number) document.getElementById('docnum').value = d.document_number;
       if (d.issuing_country && document.getElementById('docissue')) document.getElementById('docissue').value = d.issuing_country;
+      // Trigger province check for Italian guests
+      onCitizenshipChange();
+      // Default doc issue from birthplace if not set by scan
+      if (!d.issuing_country && d.place_of_birth && document.getElementById('docissue')) {
+        document.getElementById('docissue').value = d.place_of_birth;
+      }
       if (d.document_type) {
         const sel = document.getElementById('doctype');
         for (let i = 0; i < sel.options.length; i++) {

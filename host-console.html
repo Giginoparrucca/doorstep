@@ -1478,18 +1478,19 @@ function exportAlloggiati() {
     const sesso = c.sex === 'F' ? '2' : '1';
     const dataNascita = fmtDateIT(c.date_of_birth);
 
-    // Birth place: if Italian → commune code needed, if foreign → state code
+    // Birth place: if Italian → commune name + province, if foreign → state code
     const citizenshipCode = lookupStateCode(c.citizenship);
     const isItalian = citizenshipCode.trim() === '100000100';
 
-    // For foreign guests: comune nascita = state code of birth country
-    // For Italian guests: would need ISTAT commune code (simplified here)
-    const statoNascita = lookupStateCode(c.citizenship); // birth country ≈ citizenship for simplicity
+    const statoNascita = lookupStateCode(c.citizenship);
     let comuneNascita, provinciaNascita;
     if (isItalian) {
-      comuneNascita = pad('', 9); // Would need ISTAT code — flag for manual review
-      provinciaNascita = pad('', 2);
-      warnings.push(`Row ${idx+1}: ${c.name} ${c.surname} is Italian — commune/province of birth must be set manually in the file`);
+      // Italian guests: use place of birth as commune, province from DB
+      comuneNascita = pad((c.place_of_birth || '').toUpperCase(), 9);
+      provinciaNascita = (c.birth_province || '').toUpperCase().padEnd(2).substring(0,2);
+      if (!c.birth_province) {
+        warnings.push(`Row ${idx+1}: ${c.name} ${c.surname} is Italian — province of birth is missing.`);
+      }
     } else {
       comuneNascita = statoNascita; // Foreign: use state code as birth place
       provinciaNascita = 'EE'; // EE = Estero (foreign)
@@ -1498,7 +1499,9 @@ function exportAlloggiati() {
     const cittadinanza = citizenshipCode;
     const tipoDoc = lookupDocCode(c.document_type);
     const numDoc = pad((c.document_number || '').toUpperCase(), 20);
-    const luogoRilascio = isItalian ? pad('', 9) : cittadinanza; // Foreign: doc issued by their country
+    const luogoRilascio = c.doc_issue_place
+      ? (isItalian ? pad((c.doc_issue_place || '').toUpperCase(), 9) : lookupStateCode(c.doc_issue_place || c.citizenship))
+      : (isItalian ? pad('', 9) : cittadinanza);
 
     // Warn if citizenship code not found
     if (citizenshipCode.trim() === '') {

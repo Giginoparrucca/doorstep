@@ -749,7 +749,7 @@ body {
     </div>
     <div class="form-group">
       <label class="form-label" data-i18n="birthplace_label">Place of Birth <span class="req">*</span></label>
-      <input class="form-input" type="text" id="birthplace" data-i18n-placeholder="birthplace_hint">
+      <input class="form-input" type="text" id="birthplace" data-i18n-placeholder="birthplace_hint" oninput="autoDetectProvince()">
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -1245,6 +1245,100 @@ function onBirthCountryChange() {
   if (docIssue && !docIssue.value && birthplace) {
     docIssue.value = birthplace;
   }
+  // Try to auto-detect province if born in Italy
+  if (bornInItaly) autoDetectProvince();
+}
+
+/* ══════════════════════════════════════
+   ITALIAN CITY → PROVINCE AUTO-DETECTION
+══════════════════════════════════════ */
+const CITY_PROVINCE = {
+  // All 107 provincial capitals + major cities (lowercase → province code)
+  'agrigento':'AG','alessandria':'AL','ancona':'AN','aosta':'AO','arezzo':'AR',
+  'ascoli piceno':'AP','asti':'AT','avellino':'AV','bari':'BA','barletta':'BT',
+  'andria':'BT','trani':'BT','belluno':'BL','benevento':'BN','bergamo':'BG',
+  'biella':'BI','bologna':'BO','bolzano':'BZ','bozen':'BZ','brescia':'BS',
+  'brindisi':'BR','cagliari':'CA','caltanissetta':'CL','campobasso':'CB',
+  'caserta':'CE','catania':'CT','catanzaro':'CZ','chieti':'CH','como':'CO',
+  'cosenza':'CS','cremona':'CR','crotone':'KR','cuneo':'CN','enna':'EN',
+  'fermo':'FM','ferrara':'FE','firenze':'FI','florence':'FI','foggia':'FG',
+  'forli':'FC','forlì':'FC','cesena':'FC','frosinone':'FR','genova':'GE',
+  'genoa':'GE','gorizia':'GO','grosseto':'GR','imperia':'IM','isernia':'IS',
+  'la spezia':'SP','l\'aquila':'AQ','aquila':'AQ','latina':'LT','lecce':'LE',
+  'lecco':'LC','livorno':'LI','lodi':'LO','lucca':'LU','macerata':'MC',
+  'mantova':'MN','massa':'MS','carrara':'MS','matera':'MT','messina':'ME',
+  'milano':'MI','milan':'MI','modena':'MO','monza':'MB','napoli':'NA',
+  'naples':'NA','novara':'NO','nuoro':'NU','oristano':'OR','padova':'PD',
+  'padua':'PD','palermo':'PA','parma':'PR','pavia':'PV','perugia':'PG',
+  'pesaro':'PU','urbino':'PU','pescara':'PE','piacenza':'PC','pisa':'PI',
+  'pistoia':'PT','pordenone':'PN','potenza':'PZ','prato':'PO','ragusa':'RG',
+  'ravenna':'RA','reggio calabria':'RC','reggio emilia':'RE','rieti':'RI',
+  'rimini':'RN','roma':'RM','rome':'RM','rovigo':'RO','salerno':'SA',
+  'sassari':'SS','savona':'SV','siena':'SI','siracusa':'SR','syracuse':'SR',
+  'sondrio':'SO','taranto':'TA','teramo':'TE','terni':'TR','torino':'TO',
+  'turin':'TO','trapani':'TP','trento':'TN','treviso':'TV','trieste':'TS',
+  'udine':'UD','varese':'VA','venezia':'VE','venice':'VE','verbania':'VB',
+  'vercelli':'VC','verona':'VR','vibo valentia':'VV','vicenza':'VI','viterbo':'VT',
+  // Additional major cities/towns (non-capitals)
+  'civitavecchia':'RM','tivoli':'RM','guidonia':'RM','fiumicino':'RM','velletri':'RM','frascati':'RM',
+  'ostia':'RM','ladispoli':'RM','anzio':'RM','nettuno':'RM','pomezia':'RM',
+  'sesto san giovanni':'MI','cinisello balsamo':'MI','rho':'MI','legnano':'MI',
+  'monfalcone':'GO','portogruaro':'VE','mestre':'VE','marghera':'VE','chioggia':'VE',
+  'giugliano':'NA','pozzuoli':'NA','torre del greco':'NA','castellammare di stabia':'NA','ercolano':'NA',
+  'torre annunziata':'NA','portici':'NA','san giorgio a cremano':'NA',
+  'altamura':'BA','molfetta':'BA','bitonto':'BA','corato':'BA','ruvo di puglia':'BA',
+  'monopoli':'BA','conversano':'BA','putignano':'BA','gioia del colle':'BA',
+  'martina franca':'TA','manduria':'TA','massafra':'TA','grottaglie':'TA',
+  'san severo':'FG','manfredonia':'FG','cerignola':'FG','lucera':'FG',
+  'gallipoli':'LE','nardo':'LE','galatina':'LE','maglie':'LE','otranto':'LE',
+  'ostuni':'BR','fasano':'BR','francavilla fontana':'BR','mesagne':'BR','ceglie messapica':'BR',
+  'polignano a mare':'BA','alberobello':'BA','locorotondo':'BA','castellana grotte':'BA',
+  'sanremo':'IM','ventimiglia':'IM','bordighera':'IM',
+  'cortona':'AR','montepulciano':'SI','san gimignano':'SI',
+  'assisi':'PG','spoleto':'PG','orvieto':'TR','gubbio':'PG',
+  'amalfi':'SA','positano':'SA','ravello':'SA','vietri sul mare':'SA','cava de\' tirreni':'SA',
+  'sorrento':'NA','capri':'NA','ischia':'NA','procida':'NA',
+  'matera':'MT','policoro':'MT',
+  'tropea':'VV','pizzo':'VV',
+  'cefalu':'PA','cefalù':'PA','monreale':'PA',
+  'taormina':'ME','milazzo':'ME',
+  'noto':'SR','modica':'RG','ragusa':'RG','scicli':'RG',
+  'olbia':'SS','alghero':'SS','porto cervo':'SS','arzachena':'SS',
+  'capo d\'orlando':'ME','lipari':'ME',
+  'como':'CO','bellagio':'CO','cernobbio':'CO',
+  'stresa':'VB','baveno':'VB','verbania':'VB',
+  'desenzano del garda':'BS','sirmione':'BS','salo':'BS','salò':'BS',
+  'lazise':'VR','bardolino':'VR','malcesine':'VR','peschiera del garda':'VR',
+  'riva del garda':'TN','arco':'TN',
+  'merano':'BZ','meran':'BZ','bressanone':'BZ','brixen':'BZ','brunico':'BZ','bruneck':'BZ',
+  'cortina d\'ampezzo':'BL','cortina':'BL',
+  'bassano del grappa':'VI','asiago':'VI',
+};
+
+function autoDetectProvince() {
+  const birthplace = document.getElementById('birthplace').value.trim();
+  if (!birthplace) return;
+
+  const sel = document.getElementById('birthProvince');
+  if (sel.value) return; // Don't override if already set
+
+  // 1. Check if brackets contain province code: "CIVITAVECCHIA (RM)"
+  const bracketMatch = birthplace.match(/\(([A-Z]{2})\)/);
+  if (bracketMatch) {
+    const code = bracketMatch[1];
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === code) { sel.selectedIndex = i; return; }
+    }
+  }
+
+  // 2. Lookup city name in table
+  const cityClean = birthplace.replace(/\s*\([^)]*\)\s*/g, '').toLowerCase().trim();
+  const province = CITY_PROVINCE[cityClean];
+  if (province) {
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === province) { sel.selectedIndex = i; return; }
+    }
+  }
 }
 
 function isMainGuest() {
@@ -1674,6 +1768,15 @@ async function scanDocument(input) {
       if (d.issuing_country && document.getElementById('docissue')) document.getElementById('docissue').value = d.issuing_country;
       // Trigger province check based on birth country (not citizenship!)
       onBirthCountryChange();
+      // Set province from scan if available (e.g. "(RM)" parsed from ID card)
+      if (d.birth_province && document.getElementById('birthProvince')) {
+        const sel = document.getElementById('birthProvince');
+        for (let i = 0; i < sel.options.length; i++) {
+          if (sel.options[i].value === d.birth_province.toUpperCase()) { sel.selectedIndex = i; break; }
+        }
+      }
+      // If province still empty, try auto-detect from city name
+      if (!document.getElementById('birthProvince').value) autoDetectProvince();
       // Default doc issue from issuing_country or birthplace
       if (!d.issuing_country && d.place_of_birth && document.getElementById('docissue')) {
         document.getElementById('docissue').value = d.place_of_birth;

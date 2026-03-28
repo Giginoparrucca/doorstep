@@ -698,13 +698,24 @@ body {
     </div>
 
     <div id="scannerZone" style="margin-bottom:18px;">
-      <div class="upload-zone" id="scanZone" onclick="document.getElementById('scanInput').click()" style="border-color:var(--warm);background:rgba(194,113,79,0.04);">
-        <div class="upload-icon">📷</div>
-        <div class="upload-text" id="scanText"><strong style="color:var(--warm)" data-i18n="scan_title">Scan your ID or Passport</strong><br><span style="font-size:0.68rem;color:var(--ink-soft)" data-i18n="scan_sub">Take a photo — we'll fill the form automatically</span></div>
-        <div class="upload-hint" id="scanHint" data-i18n="scan_hint">Faster than typing · Works with passports, ID cards & driving licenses</div>
-        <div id="scanStatus" style="display:none;margin-top:8px;"></div>
+      <div style="text-align:center;margin-bottom:8px;">
+        <strong style="color:var(--warm);font-size:0.82rem;" data-i18n="scan_title">Scan your ID or Passport</strong><br>
+        <span style="font-size:0.68rem;color:var(--ink-soft)" data-i18n="scan_sub">Take a photo — we'll fill the form automatically</span>
       </div>
-      <input type="file" id="scanInput" accept="image/*" style="display:none" onchange="scanDocument(this)">
+      <div style="display:flex;gap:8px;margin-bottom:6px;">
+        <button type="button" onclick="document.getElementById('scanInputCamera').click()" class="upload-zone" style="flex:1;border-color:var(--warm);background:rgba(194,113,79,0.04);padding:14px 10px;cursor:pointer;">
+          <div class="upload-icon" style="font-size:1.5rem;">📷</div>
+          <div style="font-size:0.68rem;font-weight:500;color:var(--warm);" data-i18n="scan_take_photo">Take Photo</div>
+        </button>
+        <button type="button" onclick="document.getElementById('scanInputGallery').click()" class="upload-zone" style="flex:1;border-color:var(--border);padding:14px 10px;cursor:pointer;">
+          <div class="upload-icon" style="font-size:1.5rem;">🖼</div>
+          <div style="font-size:0.68rem;font-weight:500;color:var(--ink-soft);" data-i18n="scan_from_gallery">From Gallery</div>
+        </button>
+      </div>
+      <input type="file" id="scanInputCamera" accept="image/*" capture="environment" style="display:none" onchange="scanDocument(this)">
+      <input type="file" id="scanInputGallery" accept="image/*" style="display:none" onchange="scanDocument(this)">
+      <div class="upload-hint" id="scanHint" data-i18n="scan_hint" style="text-align:center;font-size:0.58rem;color:var(--ink-soft);margin-top:4px;">Faster than typing · Works with passports, ID cards & driving licenses</div>
+      <div id="scanStatus" style="display:none;margin-top:8px;text-align:center;"></div>
       <div id="scanResult" style="display:none;margin-top:10px;padding:10px 14px;background:var(--green-bg);border-radius:8px;border:1px solid rgba(76,175,125,0.2);">
         <div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;color:var(--green);font-weight:600;">✅ <span id="scanResultText"></span></div>
         <div style="font-size:0.62rem;color:var(--ink-soft);margin-top:4px;" id="scanConfidence"></div>
@@ -989,6 +1000,8 @@ const T = {
     scan_title: 'Scan your ID or Passport',
     scan_sub: 'Take a photo — we\'ll fill the form automatically',
     scan_hint: 'Faster than typing · Works with passports, ID cards & driving licenses',
+    scan_take_photo: 'Take Photo',
+    scan_from_gallery: 'From Gallery',
     scan_hint_companion: 'You can scan a document, or just fill in manually — no document required',
     scan_or_manual: 'or fill in manually below ↓',
     scan_reading: '🔍 Reading your document…',
@@ -1072,6 +1085,8 @@ const T = {
     scan_title: 'Scansiona il tuo documento',
     scan_sub: 'Fai una foto — compileremo il modulo automaticamente',
     scan_hint: 'Più veloce della digitazione · Funziona con passaporti, carte d\'identità e patenti',
+    scan_take_photo: 'Scatta Foto',
+    scan_from_gallery: 'Da Galleria',
     scan_hint_companion: 'Puoi scansionare un documento oppure compilare manualmente — nessun documento richiesto',
     scan_or_manual: 'oppure compila manualmente ↓',
     scan_reading: '🔍 Lettura del documento…',
@@ -1299,8 +1314,8 @@ function clearForm() {
   document.getElementById('scanResult').style.display = 'none';
   document.getElementById('scanError').style.display = 'none';
   document.getElementById('scanStatus').style.display = 'none';
-  document.getElementById('scanZone').classList.remove('has-file');
-  document.getElementById('scanInput').value = '';
+  document.getElementById('scanInputCamera').value = '';
+  document.getElementById('scanInputGallery').value = '';
   uploadedIdFile = null;
 }
 
@@ -1600,7 +1615,6 @@ async function scanDocument(input) {
   const file = input.files[0];
   uploadedIdFile = file; // Store for later upload
 
-  const scanZone = document.getElementById('scanZone');
   const scanStatus = document.getElementById('scanStatus');
   const scanResult = document.getElementById('scanResult');
   const scanError = document.getElementById('scanError');
@@ -1608,7 +1622,6 @@ async function scanDocument(input) {
   scanStatus.innerHTML = `<span style="color:var(--warm);font-size:0.72rem;font-weight:500;">${T[lang].scan_reading}</span>`;
   scanResult.style.display = 'none';
   scanError.style.display = 'none';
-  scanZone.classList.add('has-file');
 
   try {
     const base64 = await fileToBase64(file);

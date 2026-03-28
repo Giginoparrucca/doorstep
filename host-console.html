@@ -678,11 +678,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       <div class="table-wrap">
         <div class="table-header">
           <div class="table-title">All Guest Check-ins</div>
-          <div style="display:flex;gap:8px;">
-            <select class="form-select" style="width:auto;padding:5px 10px;font-size:0.68rem;">
-              <option>All Bookings</option>
-              <option selected>March 2026</option>
-            </select>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button class="btn btn-secondary btn-sm" onclick="deleteAllCheckins()" style="color:var(--red);border-color:rgba(217,75,75,0.3);">🗑 Delete All</button>
           </div>
         </div>
         <table>
@@ -693,46 +690,12 @@ tr:hover td { background: rgba(250,246,240,0.6); }
               <th>Birth</th>
               <th>Citizenship</th>
               <th>Document</th>
-              <th>Dates</th>
+              <th>Submitted</th>
               <th>Docs</th>
-              <th>Alloggiati</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody id="checkinTable">
-            <tr>
-              <td><strong>Sophie Martin</strong></td>
-              <td>Single</td>
-              <td>15/04/1992<br><span style="font-size:0.6rem;color:var(--ink-soft)">Lyon, France</span></td>
-              <td>🇫🇷 French</td>
-              <td>Passport<br><span style="font-size:0.6rem;color:var(--ink-soft)">19AF28491</span></td>
-              <td>15–18 Mar</td>
-              <td><span class="status-badge complete">✓</span></td>
-              <td><span class="status-badge complete">✓ Filed</span></td>
-              <td><button class="btn btn-secondary btn-sm" onclick="viewGuest('sophie')">View</button></td>
-            </tr>
-            <tr>
-              <td><strong>Hans Weber</strong></td>
-              <td>Family Head</td>
-              <td>22/08/1985<br><span style="font-size:0.6rem;color:var(--ink-soft)">Munich, Germany</span></td>
-              <td>🇩🇪 German</td>
-              <td>ID Card<br><span style="font-size:0.6rem;color:var(--ink-soft)">T220089456</span></td>
-              <td>15–18 Mar</td>
-              <td><span class="status-badge complete">✓</span></td>
-              <td><span class="status-badge complete">✓ Filed</span></td>
-              <td><button class="btn btn-secondary btn-sm" onclick="viewGuest('hans')">View</button></td>
-            </tr>
-            <tr>
-              <td><strong>Anna Weber</strong></td>
-              <td>Fam. Member</td>
-              <td>10/11/1987<br><span style="font-size:0.6rem;color:var(--ink-soft)">Berlin, Germany</span></td>
-              <td>🇩🇪 German</td>
-              <td>ID Card<br><span style="font-size:0.6rem;color:var(--ink-soft)">T220089457</span></td>
-              <td>15–18 Mar</td>
-              <td><span class="status-badge pending">⏳</span></td>
-              <td><span class="status-badge missing">Waiting</span></td>
-              <td><button class="btn btn-secondary btn-sm">Remind</button></td>
-            </tr>
           </tbody>
         </table>
       </div>
@@ -1216,17 +1179,58 @@ function renderCheckins() {
     <tr>
       <td><strong>${c.surname} ${c.name}</strong></td>
       <td>${c.guest_type}</td>
-      <td>${c.date_of_birth ? new Date(c.date_of_birth).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB') : '—'}<br><span style="font-size:0.6rem;color:var(--ink-soft)">${c.place_of_birth || ''}</span></td>
+      <td>${c.date_of_birth ? new Date(c.date_of_birth).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB') : '—'}<br><span style="font-size:0.6rem;color:var(--ink-soft)">${c.place_of_birth || ''}${c.birth_province ? ' ('+c.birth_province+')' : ''}</span></td>
       <td>${c.citizenship}</td>
-      <td>${c.document_type}<br><span style="font-size:0.6rem;color:var(--ink-soft)">${c.document_number}</span></td>
+      <td>${c.document_type || '—'}<br><span style="font-size:0.6rem;color:var(--ink-soft)">${c.document_number || ''}</span></td>
       <td style="font-size:0.68rem">${new Date(c.submitted_at).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB')}</td>
-      <td><span class="status-badge ${c.docs_status==='complete'?'complete':c.docs_status==='partial'?'pending':'missing'}">${c.docs_status==='complete'?'✓':c.docs_status==='partial'?'⏳':'✗'}</span></td>
-      <td><span class="status-badge ${c.alloggiati_status==='filed'?'complete':'missing'}">${c.alloggiati_status==='filed'?h('alloggiati_filed'):h('alloggiati_pending')}</span></td>
-      <td><button class="btn btn-secondary btn-sm" onclick="viewGuest('${c.id}')">${h('btn_view')}</button></td>
+      <td><span class="status-badge ${c.docs_status==='complete'?'complete':c.docs_status==='not_required'?'complete':c.docs_status==='partial'?'pending':'missing'}">${c.docs_status==='complete'?'✓':c.docs_status==='not_required'?'—':c.docs_status==='partial'?'⏳':'✗'}</span></td>
+      <td>
+        <div style="display:flex;gap:4px;">
+          <button class="btn btn-secondary btn-sm" onclick="viewGuest('${c.id}')">${h('btn_view')}</button>
+          <button class="btn btn-secondary btn-sm" onclick="deleteCheckin('${c.id}','${(c.surname||'').replace(/'/g,'\\\'')}')" style="color:var(--red);border-color:rgba(217,75,75,0.2);padding:4px 8px;">🗑</button>
+        </div>
+      </td>
     </tr>
-  `).join('') || `<tr><td colspan="9" style="text-align:center;color:var(--ink-soft);padding:24px;">${h('no_checkins')}</td></tr>`;
+  `).join('') || `<tr><td colspan="8" style="text-align:center;color:var(--ink-soft);padding:24px;">${h('no_checkins')}</td></tr>`;
 
   document.getElementById('checkinCount').textContent = allCheckins.length;
+}
+
+async function deleteCheckin(id, name) {
+  const msg = hostLang === 'it'
+    ? `Eliminare il record di ${name}? Questa azione è irreversibile.`
+    : `Delete record for ${name}? This cannot be undone.`;
+  if (!confirm(msg)) return;
+
+  const { error } = await sb.from('checkins').delete().eq('id', id);
+  if (error) { console.error(error); toast('Error deleting record'); return; }
+
+  allCheckins = allCheckins.filter(c => c.id !== id);
+  renderCheckins();
+  renderDashboard();
+  toast(hostLang === 'it' ? `Record di ${name} eliminato` : `${name}'s record deleted`);
+}
+
+async function deleteAllCheckins() {
+  const msg = hostLang === 'it'
+    ? `Eliminare TUTTI i ${allCheckins.length} record di check-in? Questa azione è irreversibile.`
+    : `Delete ALL ${allCheckins.length} check-in records? This cannot be undone.`;
+  if (!confirm(msg)) return;
+
+  // Double confirm for safety
+  const msg2 = hostLang === 'it'
+    ? 'Sei sicuro? Digita "ELIMINA" per confermare.'
+    : 'Are you sure? Type "DELETE" to confirm.';
+  const typed = prompt(msg2);
+  if (typed !== 'DELETE' && typed !== 'ELIMINA') { toast(hostLang === 'it' ? 'Eliminazione annullata' : 'Deletion cancelled'); return; }
+
+  const { error } = await sb.from('checkins').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  if (error) { console.error(error); toast('Error deleting records'); return; }
+
+  allCheckins = [];
+  renderCheckins();
+  renderDashboard();
+  toast(hostLang === 'it' ? 'Tutti i record eliminati' : 'All records deleted');
 }
 
 /* ══════════════════════════════════════

@@ -1558,7 +1558,10 @@ const ISTAT_COMUNI = {
 function lookupComuneCode(cityName) {
   if (!cityName) return null;
   const key = cityName.toLowerCase().trim().replace(/\s*\([^)]*\)\s*/g, '');
-  return ISTAT_COMUNI[key] || null;
+  const code = ISTAT_COMUNI[key];
+  if (!code) return null;
+  // Pad to 9 chars with leading zeros (same format as state codes)
+  return code.padStart(9, '0');
 }
 
 function exportAlloggiati() {
@@ -1595,7 +1598,7 @@ function exportAlloggiati() {
     if (bornInItaly) {
       const istat = lookupComuneCode(c.place_of_birth);
       if (istat) {
-        comuneNascita = istat.padEnd(9);
+        comuneNascita = istat;
       } else {
         comuneNascita = pad('', 9);
         warnings.push(`⚠ Row ${idx+1}: ${c.name} ${c.surname} — "${c.place_of_birth}" not in ISTAT table. Look up code at alloggiatiweb.poliziadistato.it → Supporto → Tabella Comuni.`);
@@ -1621,7 +1624,7 @@ function exportAlloggiati() {
       const docIstat = lookupComuneCode(docPlace);
       const docState = lookupStateCode(docPlace);
       if (docIstat) {
-        luogoRilascio = docIstat.padEnd(9); // Italian city → ISTAT code
+        luogoRilascio = docIstat; // Already 9 chars from lookup
       } else if (docState.trim()) {
         luogoRilascio = docState; // Country name → state code
       } else {

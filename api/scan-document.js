@@ -42,6 +42,7 @@ Analyze this identity document and extract data. Return ONLY valid JSON, no mark
   "sex": "M" or "F",
   "date_of_birth": "YYYY-MM-DD",
   "place_of_birth": "",
+  "birth_country": "",
   "citizenship": "",
   "document_type": "passport" or "id_card" or "driving",
   "document_number": "",
@@ -51,8 +52,10 @@ Analyze this identity document and extract data. Return ONLY valid JSON, no mark
 }
 
 Rules:
-- Use ENGLISH country names for citizenship (e.g. "France" not "FRANÇAISE")
-- For Italian docs, place_of_birth = Italian city name
+- Use ENGLISH country names for citizenship and birth_country (e.g. "France" not "FRANÇAISE", "Switzerland" not "SUISSE")
+- place_of_birth = city name as printed on the document (e.g. "ZURICH", "BARI", "LYON")
+- birth_country = the COUNTRY where the person was born. This is DIFFERENT from citizenship. An Italian citizen can be born in Switzerland. Determine birth_country from the place_of_birth city. If the city is clearly in Italy (e.g. Roma, Milano, Bari, Napoli), set birth_country to "Italy". If the city is foreign (e.g. Zurich, London, Paris), set birth_country to that country.
+- citizenship = nationality as printed on the document
 - Dates in YYYY-MM-DD format
 - Prefer MRZ data if visible (more accurate)
 - Empty string for unreadable fields

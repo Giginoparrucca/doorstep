@@ -1179,7 +1179,7 @@ function renderCheckins() {
     <tr>
       <td><strong>${c.surname} ${c.name}</strong></td>
       <td>${c.guest_type}</td>
-      <td>${c.date_of_birth ? new Date(c.date_of_birth).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB') : '—'}<br><span style="font-size:0.6rem;color:var(--ink-soft)">${c.place_of_birth || ''}${c.birth_province ? ' ('+c.birth_province+')' : ''}</span></td>
+      <td>${c.date_of_birth ? new Date(c.date_of_birth).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB') : '—'}<br><span style="font-size:0.6rem;color:var(--ink-soft)">${c.place_of_birth || ''}${c.birth_province && c.birth_province!=='EE' ? ' ('+c.birth_province+')' : ''}${c.birth_country && c.birth_country !== c.place_of_birth ? ', '+c.birth_country : ''}</span></td>
       <td>${c.citizenship}</td>
       <td>${c.document_type || '—'}<br><span style="font-size:0.6rem;color:var(--ink-soft)">${c.document_number || ''}</span></td>
       <td style="font-size:0.68rem">${new Date(c.submitted_at).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB')}</td>
@@ -1458,83 +1458,184 @@ function lookupDocCode(input) {
 }
 
 function pad(str, len) { return (str || '').substring(0, len).padEnd(len); }
+function padNum(n, len) { return String(n || 0).padStart(len, '0').substring(0, len); }
+function isItalianCitizenshipCode(code) { return code && code.trim() === '100000100'; }
 function fmtDateIT(isoDate) {
-  if (!isoDate) return '          '; // 10 spaces
+  if (!isoDate) return '          ';
   const d = new Date(isoDate);
-  const dd = String(d.getDate()).padStart(2,'0');
-  const mm = String(d.getMonth()+1).padStart(2,'0');
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
+  if (isNaN(d)) return '          ';
+  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+}
+
+/* ── ISTAT Municipal Codes: city name → 6-digit ISTAT code ── */
+const ISTAT_COMUNI = {
+  'agrigento':'084001','alessandria':'006003','ancona':'042002','aosta':'007003','arezzo':'051002',
+  'ascoli piceno':'044007','asti':'005005','avellino':'064004','bari':'072006','barletta':'110001',
+  'andria':'110002','trani':'110009','belluno':'025007','benevento':'062008','bergamo':'016024',
+  'biella':'096004','bologna':'037006','bolzano':'021008','brescia':'017029','brindisi':'074001',
+  'cagliari':'092009','caltanissetta':'085005','campobasso':'070006','caserta':'061022',
+  'catania':'087015','catanzaro':'079023','chieti':'069022','como':'013075','cosenza':'078045',
+  'cremona':'019036','crotone':'101005','cuneo':'004078','enna':'086009','fermo':'109006',
+  'ferrara':'038008','firenze':'048017','florence':'048017','foggia':'071024','forli':'040012',
+  'forlì':'040012','frosinone':'060038','genova':'010025','genoa':'010025','gorizia':'031007',
+  'grosseto':'053011','imperia':'008031','isernia':'094023','la spezia':'011015',
+  'l\'aquila':'066049','aquila':'066049','latina':'059011','lecce':'075035','lecco':'097042',
+  'livorno':'049009','lodi':'098031','lucca':'046017','macerata':'043022','mantova':'020030',
+  'massa':'045010','matera':'077014','messina':'083048','milano':'015146','milan':'015146',
+  'modena':'036023','monza':'108033','napoli':'063049','naples':'063049','novara':'003106',
+  'nuoro':'091051','oristano':'095032','padova':'028060','palermo':'082053','parma':'034027',
+  'pavia':'018110','perugia':'054039','pesaro':'041044','pescara':'068028','piacenza':'033032',
+  'pisa':'050026','pistoia':'047014','pordenone':'093033','potenza':'076063','prato':'100005',
+  'ragusa':'088009','ravenna':'039014','reggio calabria':'080063','reggio emilia':'035033',
+  'rieti':'057059','rimini':'099014','roma':'058091','rome':'058091','rovigo':'029040',
+  'salerno':'065116','sassari':'090064','savona':'009056','siena':'052032','siracusa':'089017',
+  'sondrio':'014061','taranto':'073027','teramo':'067041','terni':'055032',
+  'torino':'001272','turin':'001272','trapani':'081021','trento':'022205','treviso':'026086',
+  'trieste':'032006','udine':'030129','varese':'012133','venezia':'027042','venice':'027042',
+  'verbania':'103072','vercelli':'002158','verona':'023091','vibo valentia':'102046',
+  'vicenza':'024116','viterbo':'056059',
+  // Puglia
+  'altamura':'072003','bitonto':'072010','corato':'072015','gioia del colle':'072021',
+  'molfetta':'072027','monopoli':'072029','putignano':'072035','ruvo di puglia':'072037',
+  'polignano a mare':'072032','alberobello':'072001','locorotondo':'072025',
+  'castellana grotte':'072012','conversano':'072014',
+  'martina franca':'073010','manduria':'073009','massafra':'073011','grottaglie':'073006',
+  'san severo':'071051','manfredonia':'071029','cerignola':'071020','lucera':'071028',
+  'gallipoli':'075029','nardo':'075052','galatina':'075028','otranto':'075057',
+  'ostuni':'074012','fasano':'074007','francavilla fontana':'074006','mesagne':'074010',
+  'ceglie messapica':'074004',
+  // Lazio
+  'civitavecchia':'058032','tivoli':'058104','guidonia montecelio':'058045','guidonia':'058045',
+  'fiumicino':'058120','velletri':'058109','frascati':'058038','anzio':'058006',
+  'nettuno':'058071','pomezia':'058079','ladispoli':'058122',
+  // Campania
+  'pozzuoli':'063060','torre del greco':'063082','castellammare di stabia':'063024',
+  'giugliano in campania':'063033','giugliano':'063033','portici':'063059',
+  'ercolano':'063029','torre annunziata':'063083','san giorgio a cremano':'063067',
+  'sorrento':'063079','capri':'063014','ischia':'063036',
+  'amalfi':'065005','positano':'065097','cava de\' tirreni':'065028',
+  // Lombardia
+  'sesto san giovanni':'015209','cinisello balsamo':'015055','rho':'015182','legnano':'015118',
+  // Veneto/FVG
+  'monfalcone':'031012','chioggia':'027008','mestre':'027042',
+  // Liguria
+  'sanremo':'008055','ventimiglia':'008065',
+  // Emilia
+  'cesena':'040007',
+  // Toscana
+  'cortona':'051015','montepulciano':'052019','san gimignano':'052029',
+  // Umbria
+  'assisi':'054001','spoleto':'054051','orvieto':'055022','gubbio':'054023',
+  // Sicilia
+  'taormina':'083096','milazzo':'083049','cefalu':'082023','cefalù':'082023','monreale':'082048',
+  'noto':'089013','modica':'088006','scicli':'088011',
+  // Sardegna
+  'olbia':'090044','alghero':'090003','arzachena':'090005',
+  // Alto Adige
+  'merano':'021051','bressanone':'021011','brunico':'021013',
+  // Belluno
+  'cortina d\'ampezzo':'025016','cortina':'025016',
+  // Lago di Garda
+  'desenzano del garda':'017067','sirmione':'017178',
+  'lazise':'023041','bardolino':'023006','peschiera del garda':'023059',
+  'riva del garda':'022155',
+  // Piemonte
+  'stresa':'103063',
+  // Calabria
+  'tropea':'102041',
+  // Basilicata
+  'policoro':'077023',
+};
+
+function lookupComuneCode(cityName) {
+  if (!cityName) return null;
+  const key = cityName.toLowerCase().trim().replace(/\s*\([^)]*\)\s*/g, '');
+  return ISTAT_COMUNI[key] || null;
 }
 
 function exportAlloggiati() {
   if (allCheckins.length === 0) { toast('No check-in data to export!'); return; }
-
   const warnings = [];
   const lines = [];
 
   allCheckins.forEach((c, idx) => {
     const tipoAll = GUEST_TYPE_CODES[c.guest_type] || '16';
-    const dataArrivo = fmtDateIT(c.submitted_at);
-    const permanenza = '01'; // Default 1 night — host can adjust
+    const dataArrivo = fmtDateIT(c.arrival_date || c.submitted_at);
+    const permanenza = padNum(Math.min(c.nights || 1, 99), 2);
     const cognome = pad((c.surname || '').toUpperCase(), 50);
     const nome = pad((c.name || '').toUpperCase(), 30);
     const sesso = c.sex === 'F' ? '2' : '1';
     const dataNascita = fmtDateIT(c.date_of_birth);
 
-    // Birth place: if Italian → commune name + province, if foreign → state code
+    // === BIRTH LOCATION ===
     const citizenshipCode = lookupStateCode(c.citizenship);
-    const isItalian = citizenshipCode.trim() === '100000100';
+    const birthCountry = c.birth_country || c.citizenship || '';
+    const birthCountryCode = lookupStateCode(birthCountry);
+    const bornInItaly = (c.birth_province && c.birth_province !== 'EE' && c.birth_province !== '') ||
+                        isItalianCitizenshipCode(birthCountryCode);
 
-    const statoNascita = lookupStateCode(c.citizenship);
-    let comuneNascita, provinciaNascita;
-    if (isItalian) {
-      // Italian guests: use place of birth as commune, province from DB
-      comuneNascita = pad((c.place_of_birth || '').toUpperCase(), 9);
-      provinciaNascita = (c.birth_province || '').toUpperCase().padEnd(2).substring(0,2);
-      if (!c.birth_province) {
-        warnings.push(`Row ${idx+1}: ${c.name} ${c.surname} is Italian — province of birth is missing.`);
+    let comuneNascita, provinciaNascita, statoNascita;
+    if (bornInItaly) {
+      const istat = lookupComuneCode(c.place_of_birth);
+      if (istat) {
+        comuneNascita = istat.padEnd(9);
+      } else {
+        comuneNascita = pad('', 9);
+        warnings.push(`⚠ Row ${idx+1}: ${c.name} ${c.surname} — "${c.place_of_birth}" not in ISTAT table. Look up code at alloggiatiweb.poliziadistato.it → Supporto → Tabella Comuni.`);
       }
+      provinciaNascita = (c.birth_province || '  ').toUpperCase().substring(0,2);
+      statoNascita = '100000100'; // Born in Italy → stato = Italy
     } else {
-      comuneNascita = statoNascita; // Foreign: use state code as birth place
-      provinciaNascita = 'EE'; // EE = Estero (foreign)
+      comuneNascita = birthCountryCode; // Born abroad → use country code
+      provinciaNascita = 'EE';
+      statoNascita = birthCountryCode;  // Born abroad → stato = birth country
     }
 
     const cittadinanza = citizenshipCode;
-    const tipoDoc = lookupDocCode(c.document_type);
-    const numDoc = pad((c.document_number || '').toUpperCase(), 20);
-    const luogoRilascio = c.doc_issue_place
-      ? (isItalian ? pad((c.doc_issue_place || '').toUpperCase(), 9) : lookupStateCode(c.doc_issue_place || c.citizenship))
-      : (isItalian ? pad('', 9) : cittadinanza);
 
-    // Warn if citizenship code not found
-    if (citizenshipCode.trim() === '') {
-      warnings.push(`Row ${idx+1}: ${c.name} ${c.surname} — citizenship "${c.citizenship}" not recognized. Check code tables.`);
+    // === DOCUMENT (required for types 16/17/18, blank for 19/20) ===
+    const needsDoc = ['16','17','18'].includes(tipoAll);
+    let tipoDoc, numDoc, luogoRilascio;
+    if (needsDoc && c.document_number) {
+      tipoDoc = lookupDocCode(c.document_type);
+      numDoc = pad((c.document_number || '').toUpperCase(), 20);
+      // Luogo rilascio
+      const docPlace = (c.doc_issue_place || '').trim();
+      const docIstat = lookupComuneCode(docPlace);
+      const docState = lookupStateCode(docPlace);
+      if (docIstat) {
+        luogoRilascio = docIstat.padEnd(9); // Italian city → ISTAT code
+      } else if (docState.trim()) {
+        luogoRilascio = docState; // Country name → state code
+      } else {
+        luogoRilascio = cittadinanza; // Fallback to citizenship country
+      }
+    } else {
+      tipoDoc = pad('', 5);
+      numDoc = pad('', 20);
+      luogoRilascio = pad('', 9);
     }
 
-    // Build fixed-width line: 2+10+2+50+30+1+10+9+2+9+9+5+20+9 = 168
-    // The official format adds additional fields to reach 188
-    // Additional fields: 20 chars for luogo rilascio if available
+    // === BUILD 188-char LINE ===
+    // 2+10+2+50+30+1+10+9+2+9+9+5+20+9 = 168 + 20 padding = 188
     const line = tipoAll + dataArrivo + permanenza + cognome + nome + sesso + dataNascita +
                  comuneNascita + provinciaNascita + statoNascita + cittadinanza +
-                 tipoDoc + numDoc + luogoRilascio;
+                 tipoDoc + numDoc + luogoRilascio + pad('', 20);
 
+    if (line.length !== 188) {
+      warnings.push(`⚠ Row ${idx+1}: Line is ${line.length} chars (expected 188).`);
+    }
     lines.push(line);
   });
 
-  // Join with CR+LF between lines (NOT after last line — per Alloggiati spec)
   const fileContent = lines.join('\r\n');
-
-  // Download
   downloadFile('alloggiati_' + new Date().toISOString().slice(0,10) + '.txt', fileContent);
 
-  // Show warnings if any
   if (warnings.length > 0) {
-    const warnMsg = `File generated with ${lines.length} guests.\n\n⚠️ Review needed:\n` + warnings.join('\n');
-    alert(warnMsg);
-    toast(`Alloggiati file generated — ${warnings.length} item(s) need review`);
+    alert(`File generated: ${lines.length} guests.\n\n⚠️ Review:\n` + warnings.join('\n'));
+    toast(`Alloggiati — ${warnings.length} item(s) need review`);
   } else {
-    toast(`Alloggiati file generated — ${lines.length} guests, ready to upload!`);
+    toast(`✅ Alloggiati file ready — ${lines.length} guests, 188 chars/line`);
   }
 }
 

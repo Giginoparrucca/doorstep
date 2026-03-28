@@ -1462,6 +1462,14 @@ function padNum(n, len) { return String(n || 0).padStart(len, '0').substring(0, 
 function isItalianCitizenshipCode(code) { return code && code.trim() === '100000100'; }
 function fmtDateIT(isoDate) {
   if (!isoDate) return '          ';
+  // Handle ISO date string (YYYY-MM-DD) directly to avoid timezone shifts
+  const str = String(isoDate).split('T')[0]; // Strip time portion if present
+  const parts = str.split('-');
+  if (parts.length === 3 && parts[0].length === 4) {
+    // YYYY-MM-DD → DD/MM/YYYY
+    return `${parts[2].padStart(2,'0')}/${parts[1].padStart(2,'0')}/${parts[0]}`;
+  }
+  // Fallback for other formats
   const d = new Date(isoDate);
   if (isNaN(d)) return '          ';
   return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
@@ -1558,7 +1566,16 @@ function exportAlloggiati() {
   const warnings = [];
   const lines = [];
 
-  allCheckins.forEach((c, idx) => {
+  // Sort: main guests (16/17/18) first, then members (19/20) — per Alloggiati rules
+  const sorted = [...allCheckins].sort((a, b) => {
+    const mainTypes = ['single','head','group'];
+    const aMain = mainTypes.includes(a.guest_type) ? 0 : 1;
+    const bMain = mainTypes.includes(b.guest_type) ? 0 : 1;
+    if (aMain !== bMain) return aMain - bMain;
+    return new Date(a.submitted_at) - new Date(b.submitted_at);
+  });
+
+  sorted.forEach((c, idx) => {
     const tipoAll = GUEST_TYPE_CODES[c.guest_type] || '16';
     const dataArrivo = fmtDateIT(c.arrival_date || c.submitted_at);
     const permanenza = padNum(Math.min(c.nights || 1, 99), 2);

@@ -1555,13 +1555,58 @@ const ISTAT_COMUNI = {
   'policoro':'077023',
 };
 
-function lookupComuneCode(cityName) {
+/* ── Province → Police Regional Prefix (from official Tabella Comuni) ── */
+const PROVINCE_PREFIX = {
+  'AG':'419','AL':'401','AN':'411','AO':'402','AP':'411','AQ':'413','AR':'409',
+  'AT':'401','AV':'415','BA':'416','BG':'403','BI':'401','BL':'405','BN':'415',
+  'BO':'408','BR':'416','BS':'403','BT':'416','BZ':'404','CA':'420','CB':'414',
+  'CE':'415','CH':'413','CL':'419','CN':'401','CO':'403','CR':'403','CS':'418',
+  'CT':'419','CZ':'418','EN':'419','FC':'408','FE':'408','FG':'416','FI':'409',
+  'FM':'411','FR':'412','GE':'407','GO':'406','GR':'409','IM':'407','IS':'414',
+  'KR':'418','LC':'403','LE':'416','LI':'409','LO':'403','LT':'412','LU':'409',
+  'MB':'403','MC':'411','ME':'419','MI':'403','MN':'403','MO':'408','MS':'409',
+  'MT':'417','NA':'415','NO':'401','NU':'420','OR':'420','PA':'419','PC':'408',
+  'PD':'405','PE':'413','PG':'410','PI':'409','PN':'406','PO':'409','PR':'408',
+  'PT':'409','PU':'411','PV':'403','PZ':'417','RA':'408','RC':'418','RE':'408',
+  'RG':'419','RI':'412','RM':'412','RN':'408','RO':'405','SA':'415','SI':'409',
+  'SO':'403','SP':'407','SR':'419','SS':'420','SU':'420','SV':'407','TA':'416',
+  'TE':'413','TN':'404','TO':'401','TP':'419','TR':'410','TS':'406','TV':'405',
+  'UD':'406','VA':'403','VB':'401','VC':'401','VE':'405','VI':'405','VR':'405',
+  'VT':'412','VV':'418',
+};
+
+/* ── ISTAT Province Number → Province Abbreviation ── */
+const ISTAT_NUM_PROV = {
+  '001':'TO','002':'VC','003':'NO','004':'CN','005':'AT','006':'AL','007':'AO',
+  '008':'IM','009':'SV','010':'GE','011':'SP','012':'VA','013':'CO','014':'SO',
+  '015':'MI','016':'BG','017':'BS','018':'PV','019':'CR','020':'MN','021':'BZ',
+  '022':'TN','023':'VR','024':'VI','025':'BL','026':'TV','027':'VE','028':'PD',
+  '029':'RO','030':'UD','031':'GO','032':'TS','033':'PC','034':'PR','035':'RE',
+  '036':'MO','037':'BO','038':'FE','039':'RA','042':'AN','043':'MC','044':'AP',
+  '045':'MS','046':'LU','047':'PT','048':'FI','049':'LI','050':'PI','051':'AR',
+  '052':'SI','053':'GR','054':'PG','055':'TR','056':'VT','057':'RI','058':'RM',
+  '059':'LT','060':'FR','061':'CE','062':'BN','063':'NA','064':'AV','065':'SA',
+  '066':'AQ','067':'TE','068':'PE','069':'CH','070':'CB','071':'FG','072':'BA',
+  '073':'TA','074':'BR','075':'LE','076':'PZ','077':'MT','078':'CS','079':'CZ',
+  '080':'RC','081':'TP','082':'PA','083':'ME','084':'AG','085':'CL','086':'EN',
+  '087':'CT','088':'RG','089':'SR','090':'SS','091':'NU','092':'CA','093':'PN',
+  '094':'IS','095':'OR','096':'BI','097':'LC','098':'LO','099':'RN','100':'PO',
+  '101':'KR','102':'VV','103':'VB','108':'MB','109':'FM','110':'BT','140':'FC','141':'PU',
+};
+
+function lookupPoliceCode(cityName) {
   if (!cityName) return null;
   const key = cityName.toLowerCase().trim().replace(/\s*\([^)]*\)\s*/g, '');
-  const code = ISTAT_COMUNI[key];
-  if (!code) return null;
-  // Pad to 9 chars with leading zeros (same format as state codes)
-  return code.padStart(9, '0');
+  const istat = ISTAT_COMUNI[key];
+  if (!istat) return null;
+  // Derive province from ISTAT code's first 3 digits
+  const istatProvNum = istat.substring(0, 3);
+  const provAbbr = ISTAT_NUM_PROV[istatProvNum];
+  if (!provAbbr) return null;
+  const prefix = PROVINCE_PREFIX[provAbbr];
+  if (!prefix) return null;
+  // Police code = 3-digit prefix + 6-digit ISTAT = 9 chars
+  return prefix + istat;
 }
 
 function exportAlloggiati() {
@@ -1596,19 +1641,21 @@ function exportAlloggiati() {
 
     let comuneNascita, provinciaNascita, statoNascita;
     if (bornInItaly) {
-      const istat = lookupComuneCode(c.place_of_birth);
-      if (istat) {
-        comuneNascita = istat;
+      const prov = (c.birth_province || '').toUpperCase().substring(0,2);
+      const policeCode = lookupPoliceCode(c.place_of_birth);
+      if (policeCode) {
+        comuneNascita = policeCode;
       } else {
         comuneNascita = pad('', 9);
-        warnings.push(`⚠ Row ${idx+1}: ${c.name} ${c.surname} — "${c.place_of_birth}" not in ISTAT table. Look up code at alloggiatiweb.poliziadistato.it → Supporto → Tabella Comuni.`);
+        warnings.push(`⚠ Row ${idx+1}: ${c.name} ${c.surname} — "${c.place_of_birth}" (${prov}) not found. Look up code at Supporto → Scarica Tabelle → Luoghi.`);
       }
-      provinciaNascita = (c.birth_province || '  ').toUpperCase().substring(0,2);
+      provinciaNascita = prov || '  ';
       statoNascita = '100000100'; // Born in Italy → stato = Italy
     } else {
-      comuneNascita = birthCountryCode; // Born abroad → use country code
-      provinciaNascita = 'EE';
-      statoNascita = birthCountryCode;  // Born abroad → stato = birth country
+      // Born abroad: Comune = 9 blanks, Provincia = 2 blanks (per official manual)
+      comuneNascita = '         '; // 9 spaces
+      provinciaNascita = '  ';     // 2 spaces
+      statoNascita = birthCountryCode; // e.g. 100000227 for Switzerland
     }
 
     const cittadinanza = citizenshipCode;
@@ -1621,14 +1668,16 @@ function exportAlloggiati() {
       numDoc = pad((c.document_number || '').toUpperCase(), 20);
       // Luogo rilascio
       const docPlace = (c.doc_issue_place || '').trim();
-      const docIstat = lookupComuneCode(docPlace);
-      const docState = lookupStateCode(docPlace);
+      // Try as Italian city first
+      const docCityKey = docPlace.toLowerCase().trim().replace(/\s*\([^)]*\)\s*/g, '');
+      const docIstat = ISTAT_COMUNI[docCityKey];
       if (docIstat) {
-        luogoRilascio = docIstat; // Already 9 chars from lookup
-      } else if (docState.trim()) {
-        luogoRilascio = docState; // Country name → state code
+        const policeDocCode = lookupPoliceCode(docPlace);
+        luogoRilascio = policeDocCode || pad(docPlace.toUpperCase(), 9);
       } else {
-        luogoRilascio = cittadinanza; // Fallback to citizenship country
+        // Try as country name → state code
+        const docState = lookupStateCode(docPlace);
+        luogoRilascio = docState.trim() ? docState : cittadinanza;
       }
     } else {
       tipoDoc = pad('', 5);

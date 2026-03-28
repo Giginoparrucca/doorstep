@@ -1616,14 +1616,14 @@ function exportAlloggiati() {
       luogoRilascio = pad('', 9);
     }
 
-    // === BUILD 188-char LINE ===
-    // 2+10+2+50+30+1+10+9+2+9+9+5+20+9 = 168 + 20 padding = 188
+    // === BUILD 168-char LINE (DM 7/1/2013 tracciato record) ===
+    // Fields: 2+10+2+50+30+1+10+9+2+9+9+5+20+9 = 168
     const line = tipoAll + dataArrivo + permanenza + cognome + nome + sesso + dataNascita +
                  comuneNascita + provinciaNascita + statoNascita + cittadinanza +
-                 tipoDoc + numDoc + luogoRilascio + pad('', 20);
+                 tipoDoc + numDoc + luogoRilascio;
 
-    if (line.length !== 188) {
-      warnings.push(`⚠ Row ${idx+1}: Line is ${line.length} chars (expected 188).`);
+    if (line.length !== 168) {
+      warnings.push(`⚠ Row ${idx+1}: Line is ${line.length} chars (expected 168). Check data for ${c.name} ${c.surname}.`);
     }
     lines.push(line);
   });
@@ -1635,7 +1635,7 @@ function exportAlloggiati() {
     alert(`File generated: ${lines.length} guests.\n\n⚠️ Review:\n` + warnings.join('\n'));
     toast(`Alloggiati — ${warnings.length} item(s) need review`);
   } else {
-    toast(`✅ Alloggiati file ready — ${lines.length} guests, 188 chars/line`);
+    toast(`✅ Alloggiati file ready — ${lines.length} guests, 168 chars/line`);
   }
 }
 

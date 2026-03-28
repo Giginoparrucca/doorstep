@@ -1012,8 +1012,15 @@ const T = {
     val_arrival: 'Please enter arrival date',
     val_departure: 'Please enter departure date',
     val_name: 'Surname and name are required',
+    val_surname: 'Surname is required',
+    val_firstname: 'Name is required',
+    val_dob: 'Date of birth is required',
+    val_birthplace: 'Place of birth is required',
+    val_citizenship: 'Citizenship is required',
+    val_province: 'Province of birth is required for Italian citizens',
     val_doc: 'Document number is required for the main guest',
-    val_province: 'Province of birth is required for Italian guests (Alloggiati / DMS)',
+    val_docnum: 'Document number is required',
+    val_docissue: 'Place of document issue is required',
     error_text: 'Something went wrong. Please try again or contact your host.',
     // Success & review
     success_title: 'Check-in Complete!',
@@ -1086,8 +1093,15 @@ const T = {
     val_arrival: 'Inserisci la data di arrivo',
     val_departure: 'Inserisci la data di partenza',
     val_name: 'Cognome e nome sono obbligatori',
+    val_surname: 'Il cognome è obbligatorio',
+    val_firstname: 'Il nome è obbligatorio',
+    val_dob: 'La data di nascita è obbligatoria',
+    val_birthplace: 'Il luogo di nascita è obbligatorio',
+    val_citizenship: 'La cittadinanza è obbligatoria',
+    val_province: 'La provincia di nascita è obbligatoria per i cittadini italiani',
     val_doc: 'Il numero del documento è obbligatorio per l\'ospite principale',
-    val_province: 'La provincia di nascita è obbligatoria per gli ospiti italiani (Alloggiati / DMS)',
+    val_docnum: 'Il numero del documento è obbligatorio',
+    val_docissue: 'Il luogo di rilascio del documento è obbligatorio',
     error_text: 'Qualcosa è andato storto. Riprova o contatta il tuo host.',
     success_title: 'Check-in Completato!',
     review_hint: 'ℹ️ Hai notato un errore? Tocca <strong>Modifica</strong> su un ospite per correggere i dati.',
@@ -1292,7 +1306,6 @@ function clearForm() {
 
 function checkinNext() {
   if (checkinStep === 1) {
-    // Validate dates
     arrivalDate = document.getElementById('arrivalDate').value;
     departureDate = document.getElementById('departureDate').value;
     if (!arrivalDate) { alert(T[lang].val_arrival); return; }
@@ -1304,19 +1317,52 @@ function checkinNext() {
     checkinStep = 2;
     updateSteps();
   } else if (checkinStep === 2) {
-    // Validate required fields
+    // Validate all Alloggiati-required fields
+    const errors = [];
     const surname = document.getElementById('surname').value.trim();
     const name = document.getElementById('gname').value.trim();
-    if (!surname || !name) { alert(T[lang].val_name); return; }
+    const dob = document.getElementById('dob').value;
+    const birthplace = document.getElementById('birthplace').value.trim();
+    const citizenship = document.getElementById('citizenship').value.trim();
+
+    if (!surname) errors.push(T[lang].val_surname);
+    if (!name) errors.push(T[lang].val_firstname);
+    if (!dob) errors.push(T[lang].val_dob);
+    if (!birthplace) errors.push(T[lang].val_birthplace);
+    if (!citizenship) errors.push(T[lang].val_citizenship);
+
+    // Province required for Italian guests
+    if (isItalianCitizenship(citizenship)) {
+      const province = document.getElementById('birthProvince').value;
+      if (!province) errors.push(T[lang].val_province);
+    }
+
+    // Document fields required for main guest only
     if (isMainGuest()) {
       const docnum = document.getElementById('docnum').value.trim();
-      if (!docnum) { alert(T[lang].val_doc); return; }
+      const docissue = document.getElementById('docissue').value.trim();
+      if (!docnum) errors.push(T[lang].val_docnum);
+      if (!docissue) errors.push(T[lang].val_docissue);
     }
-    // Province required for Italian citizens (mandatory for Alloggiati & DMS)
-    const provinceGroup = document.getElementById('provinceGroup');
-    if (provinceGroup && provinceGroup.style.display !== 'none') {
-      const province = document.getElementById('birthProvince').value;
-      if (!province) { alert(T[lang].val_province); return; }
+
+    if (errors.length > 0) {
+      alert(errors.join('\n'));
+      // Highlight first empty required field
+      const fieldMap = [
+        ['surname', surname], ['gname', name], ['dob', dob],
+        ['birthplace', birthplace], ['citizenship', citizenship],
+        ['birthProvince', isItalianCitizenship(citizenship) ? document.getElementById('birthProvince').value : 'ok'],
+        ['docnum', isMainGuest() ? document.getElementById('docnum').value.trim() : 'ok'],
+        ['docissue', isMainGuest() ? document.getElementById('docissue').value.trim() : 'ok'],
+      ];
+      for (const [id, val] of fieldMap) {
+        if (!val) {
+          const el = document.getElementById(id);
+          if (el) { el.focus(); el.style.borderColor = 'var(--red)'; setTimeout(() => el.style.borderColor = '', 3000); }
+          break;
+        }
+      }
+      return;
     }
     saveCurrentGuest();
   }

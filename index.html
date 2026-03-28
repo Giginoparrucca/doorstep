@@ -751,12 +751,18 @@ body {
       <label class="form-label" data-i18n="birthplace_label">Place of Birth <span class="req">*</span></label>
       <input class="form-input" type="text" id="birthplace" data-i18n-placeholder="birthplace_hint">
     </div>
-    <div class="form-group">
-      <label class="form-label" data-i18n="citizenship_label">Citizenship <span class="req">*</span></label>
-      <input class="form-input" type="text" id="citizenship" data-i18n-placeholder="citizenship_hint" oninput="onCitizenshipChange()">
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" data-i18n="birth_country_label">Country of Birth <span class="req">*</span></label>
+        <input class="form-input" type="text" id="birthCountry" data-i18n-placeholder="birth_country_hint" oninput="onBirthCountryChange()">
+      </div>
+      <div class="form-group">
+        <label class="form-label" data-i18n="citizenship_label">Citizenship <span class="req">*</span></label>
+        <input class="form-input" type="text" id="citizenship" data-i18n-placeholder="citizenship_hint">
+      </div>
     </div>
 
-    <!-- Province — shows for Italian guests (required by Alloggiati) -->
+    <!-- Province — shows ONLY when born in Italy (not based on citizenship) -->
     <div class="form-group" id="provinceGroup" style="display:none;">
       <label class="form-label" data-i18n="province_label">Province of Birth <span class="req">*</span></label>
       <select class="form-select" id="birthProvince">
@@ -1009,7 +1015,8 @@ const T = {
     surname_label: 'Surname', name_label: 'Name',
     sex_label: 'Sex', male: 'Male', female: 'Female',
     dob_label: 'Date of Birth',
-    birthplace_label: 'Place of Birth', birthplace_hint: 'City or country if born abroad',
+    birthplace_label: 'Place of Birth', birthplace_hint: 'City or town',
+    birth_country_label: 'Country of Birth', birth_country_hint: 'e.g., Italy, Switzerland, France',
     citizenship_label: 'Citizenship', citizenship_hint: 'e.g., Italian, French, German',
     doc_section: 'Identity Document',
     doctype_label: 'Document Type',
@@ -1029,6 +1036,7 @@ const T = {
     val_firstname: 'Name is required',
     val_dob: 'Date of birth is required',
     val_birthplace: 'Place of birth is required',
+    val_birth_country: 'Country of birth is required',
     val_citizenship: 'Citizenship is required',
     val_province: 'Province of birth is required for Italian citizens',
     val_doc: 'Document number is required for the main guest',
@@ -1094,7 +1102,8 @@ const T = {
     surname_label: 'Cognome', name_label: 'Nome',
     sex_label: 'Sesso', male: 'Maschio', female: 'Femmina',
     dob_label: 'Data di Nascita',
-    birthplace_label: 'Luogo di Nascita', birthplace_hint: 'Città o paese se nato/a all\'estero',
+    birthplace_label: 'Luogo di Nascita', birthplace_hint: 'Città o comune',
+    birth_country_label: 'Stato di Nascita', birth_country_hint: 'es. Italia, Svizzera, Francia',
     citizenship_label: 'Cittadinanza', citizenship_hint: 'es. Italiana, Francese, Tedesca',
     doc_section: 'Documento d\'Identità',
     doctype_label: 'Tipo Documento',
@@ -1112,6 +1121,7 @@ const T = {
     val_firstname: 'Il nome è obbligatorio',
     val_dob: 'La data di nascita è obbligatoria',
     val_birthplace: 'Il luogo di nascita è obbligatorio',
+    val_birth_country: 'Lo stato di nascita è obbligatorio',
     val_citizenship: 'La cittadinanza è obbligatoria',
     val_province: 'La provincia di nascita è obbligatoria per i cittadini italiani',
     val_doc: 'Il numero del documento è obbligatorio per l\'ospite principale',
@@ -1219,10 +1229,16 @@ function isItalianCitizenship(val) {
   return ['italian','italiana','italiano','italy','italia','it'].includes(v);
 }
 
-function onCitizenshipChange() {
-  const val = document.getElementById('citizenship').value;
-  const show = isItalianCitizenship(val);
-  document.getElementById('provinceGroup').style.display = show ? 'block' : 'none';
+function isItalianCountry(val) {
+  if (!val) return false;
+  const v = val.toLowerCase().trim();
+  return ['italian','italiana','italiano','italy','italia','it'].includes(v);
+}
+
+function onBirthCountryChange() {
+  const val = document.getElementById('birthCountry').value;
+  const bornInItaly = isItalianCountry(val);
+  document.getElementById('provinceGroup').style.display = bornInItaly ? 'block' : 'none';
   // Auto-fill doc issue place from birthplace if empty
   const docIssue = document.getElementById('docissue');
   const birthplace = document.getElementById('birthplace').value;
@@ -1302,7 +1318,7 @@ function updateSteps() {
 }
 
 function clearForm() {
-  ['surname','gname','birthplace','citizenship','docnum','docissue'].forEach(id => {
+  ['surname','gname','birthplace','birthCountry','citizenship','docnum','docissue'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -1338,16 +1354,18 @@ function checkinNext() {
     const name = document.getElementById('gname').value.trim();
     const dob = document.getElementById('dob').value;
     const birthplace = document.getElementById('birthplace').value.trim();
+    const birthCountry = document.getElementById('birthCountry').value.trim();
     const citizenship = document.getElementById('citizenship').value.trim();
 
     if (!surname) errors.push(T[lang].val_surname);
     if (!name) errors.push(T[lang].val_firstname);
     if (!dob) errors.push(T[lang].val_dob);
     if (!birthplace) errors.push(T[lang].val_birthplace);
+    if (!birthCountry) errors.push(T[lang].val_birth_country);
     if (!citizenship) errors.push(T[lang].val_citizenship);
 
-    // Province required for Italian guests
-    if (isItalianCitizenship(citizenship)) {
+    // Province required only when BORN in Italy (not just Italian citizen)
+    if (isItalianCountry(birthCountry)) {
       const province = document.getElementById('birthProvince').value;
       if (!province) errors.push(T[lang].val_province);
     }
@@ -1365,8 +1383,8 @@ function checkinNext() {
       // Highlight first empty required field
       const fieldMap = [
         ['surname', surname], ['gname', name], ['dob', dob],
-        ['birthplace', birthplace], ['citizenship', citizenship],
-        ['birthProvince', isItalianCitizenship(citizenship) ? document.getElementById('birthProvince').value : 'ok'],
+        ['birthplace', birthplace], ['birthCountry', birthCountry], ['citizenship', citizenship],
+        ['birthProvince', isItalianCountry(birthCountry) ? document.getElementById('birthProvince').value : 'ok'],
         ['docnum', isMainGuest() ? document.getElementById('docnum').value.trim() : 'ok'],
         ['docissue', isMainGuest() ? document.getElementById('docissue').value.trim() : 'ok'],
       ];
@@ -1393,12 +1411,13 @@ function checkinPrev() {
       document.getElementById('sex').value = prev.sex || 'M';
       document.getElementById('dob').value = prev.date_of_birth || '';
       document.getElementById('birthplace').value = prev.place_of_birth || '';
+      document.getElementById('birthCountry').value = prev.birth_country || '';
       document.getElementById('citizenship').value = prev.citizenship || '';
       document.getElementById('doctype').value = prev.document_type || 'passport';
       document.getElementById('docnum').value = prev.document_number || '';
       if (document.getElementById('docissue')) document.getElementById('docissue').value = prev.doc_issue_place || '';
       document.getElementById('birthProvince').value = prev.birth_province || '';
-      onCitizenshipChange(); // Show/hide province field
+      onBirthCountryChange(); // Show/hide province field
     }
     savedGuests.splice(currentGuestIdx, 1);
     updateSteps();
@@ -1429,8 +1448,10 @@ async function saveCurrentGuest() {
     const nights = Math.max(1, Math.round((new Date(departureDate) - new Date(arrivalDate)) / 86400000));
 
     const birthplace = document.getElementById('birthplace').value.trim();
+    const birthCountry = document.getElementById('birthCountry').value.trim();
     const citizenship = document.getElementById('citizenship').value.trim();
     const province = document.getElementById('birthProvince').value || '';
+    const bornInItaly = isItalianCountry(birthCountry);
     const docIssuePlaceEl = document.getElementById('docissue');
     // Auto-default doc issue place to birthplace if empty
     if (isMainGuest() && docIssuePlaceEl && !docIssuePlaceEl.value.trim() && birthplace) {
@@ -1444,7 +1465,8 @@ async function saveCurrentGuest() {
       sex: document.getElementById('sex').value,
       date_of_birth: document.getElementById('dob').value || '2000-01-01',
       place_of_birth: birthplace || '',
-      birth_province: province,
+      birth_country: birthCountry || '',
+      birth_province: bornInItaly ? province : 'EE',
       citizenship: citizenship || '',
       document_type: isMainGuest() ? document.getElementById('doctype').value : '',
       document_number: isMainGuest() ? document.getElementById('docnum').value.trim() : '',
@@ -1518,7 +1540,7 @@ function renderReviewCards() {
             <div style="font-size:0.5rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--warm);margin-bottom:4px;">${role}</div>
             <div style="font-size:0.92rem;font-weight:600;color:var(--ink);line-height:1.2;">${g.surname} ${g.name}</div>
             <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:4px;">
-              ${g.sex === 'F' ? '♀' : '♂'} · ${g.date_of_birth || '—'} · ${g.place_of_birth || '—'}${provInfo}
+              ${g.sex === 'F' ? '♀' : '♂'} · ${g.date_of_birth || '—'} · ${g.place_of_birth || '—'}${provInfo}, ${g.birth_country || '—'}
             </div>
             <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:2px;">
               🌍 ${g.citizenship || '—'} · ${docInfo}
@@ -1535,8 +1557,9 @@ function renderReviewCards() {
             <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].sex_label}</label><select class="form-select" id="ed_sex${i}" style="font-size:0.78rem;padding:8px;"><option value="M" ${g.sex==='M'?'selected':''}>${T[lang].male}</option><option value="F" ${g.sex==='F'?'selected':''}>${T[lang].female}</option></select></div>
             <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].dob_label}</label><input class="form-input" type="date" id="ed_dob${i}" value="${g.date_of_birth}" style="font-size:0.78rem;padding:8px;"></div>
             <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].birthplace_label}</label><input class="form-input" id="ed_birth${i}" value="${g.place_of_birth}" style="font-size:0.78rem;padding:8px;"></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].birth_country_label}</label><input class="form-input" id="ed_bcountry${i}" value="${g.birth_country||''}" style="font-size:0.78rem;padding:8px;"></div>
             <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].citizenship_label}</label><input class="form-input" id="ed_cit${i}" value="${g.citizenship}" style="font-size:0.78rem;padding:8px;"></div>
-            ${isItalianCitizenship(g.citizenship) ? `<div style="grid-column:1/-1"><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].province_label}</label><input class="form-input" id="ed_prov${i}" value="${g.birth_province||''}" style="font-size:0.78rem;padding:8px;" placeholder="e.g. BA, MI, RM"></div>` : ''}
+            ${isItalianCountry(g.birth_country) ? `<div style="grid-column:1/-1"><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].province_label}</label><input class="form-input" id="ed_prov${i}" value="${g.birth_province||''}" style="font-size:0.78rem;padding:8px;" placeholder="e.g. BA, MI, RM"></div>` : ''}
             ${isMain ? `
             <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].docnum_label}</label><input class="form-input" id="ed_docnum${i}" value="${g.document_number}" style="font-size:0.78rem;padding:8px;"></div>
             <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].docissue_label}</label><input class="form-input" id="ed_docissue${i}" value="${g.doc_issue_place||''}" style="font-size:0.78rem;padding:8px;"></div>
@@ -1574,6 +1597,7 @@ async function saveGuestEdit(idx) {
     sex: document.getElementById('ed_sex' + idx).value,
     date_of_birth: document.getElementById('ed_dob' + idx).value,
     place_of_birth: document.getElementById('ed_birth' + idx).value.trim(),
+    birth_country: document.getElementById('ed_bcountry' + idx)?.value?.trim() || g.birth_country || '',
     citizenship: document.getElementById('ed_cit' + idx).value.trim(),
     birth_province: document.getElementById('ed_prov' + idx)?.value?.trim() || g.birth_province || '',
   };
@@ -1640,11 +1664,17 @@ async function scanDocument(input) {
       if (d.date_of_birth) document.getElementById('dob').value = d.date_of_birth;
       if (d.place_of_birth) document.getElementById('birthplace').value = d.place_of_birth;
       if (d.citizenship) document.getElementById('citizenship').value = d.citizenship;
+      // Birth country: use scan result if available, otherwise default to citizenship
+      if (d.birth_country) {
+        document.getElementById('birthCountry').value = d.birth_country;
+      } else if (d.citizenship && !document.getElementById('birthCountry').value) {
+        document.getElementById('birthCountry').value = d.citizenship;
+      }
       if (d.document_number) document.getElementById('docnum').value = d.document_number;
       if (d.issuing_country && document.getElementById('docissue')) document.getElementById('docissue').value = d.issuing_country;
-      // Trigger province check for Italian guests
-      onCitizenshipChange();
-      // Default doc issue from birthplace if not set by scan
+      // Trigger province check based on birth country (not citizenship!)
+      onBirthCountryChange();
+      // Default doc issue from issuing_country or birthplace
       if (!d.issuing_country && d.place_of_birth && document.getElementById('docissue')) {
         document.getElementById('docissue').value = d.place_of_birth;
       }
@@ -1656,7 +1686,8 @@ async function scanDocument(input) {
       }
       scanStatus.style.display = 'none';
       scanResult.style.display = 'block';
-      document.getElementById('scanResultText').textContent = `${d.name} ${d.surname} — ${d.citizenship || ''}`;
+      document.getElementById('scanResultText').textContent =
+        `${d.name} ${d.surname} — ${d.citizenship || ''}${d.birth_country && d.birth_country !== d.citizenship ? ' (born: ' + d.birth_country + ')' : ''}`;
       document.getElementById('scanConfidence').textContent = d.confidence === 'high'
         ? 'All fields extracted. Review below.'
         : 'Please check and correct if needed.';

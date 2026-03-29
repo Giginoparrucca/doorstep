@@ -632,6 +632,29 @@ body {
     <p data-i18n="checkin_p">Italian law requires us to register all guests. This takes about 2 minutes per guest.</p>
   </div>
 
+  <!-- "Already checked in?" lookup -->
+  <div id="alreadyCheckedInBar" style="margin:0 16px 14px;">
+    <div id="lookupToggle" onclick="toggleLookup()" style="display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;background:rgba(194,113,79,0.05);border:1px solid rgba(194,113,79,0.15);border-radius:10px;cursor:pointer;transition:all 0.2s;">
+      <span style="font-size:0.78rem;">🔑</span>
+      <span style="font-size:0.72rem;color:var(--warm);font-weight:500;" data-i18n="already_checkedin">Already checked in?</span>
+      <span style="font-size:0.6rem;color:var(--ink-soft);" data-i18n="already_checkedin_tap">Tap to find your booking</span>
+    </div>
+    <div id="lookupForm" style="display:none;margin-top:10px;padding:14px;background:var(--white);border:1px solid var(--cream-3);border-radius:10px;">
+      <div style="font-size:0.68rem;color:var(--ink);font-weight:500;margin-bottom:10px;" data-i18n="lookup_title">Find your check-in</div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label class="form-label" style="font-size:0.65rem;" data-i18n="lookup_surname">Surname (as entered during check-in)</label>
+        <input class="form-input" type="text" id="lookupSurname" data-i18n-placeholder="lookup_surname_hint" placeholder="e.g., Rossi" autocomplete="family-name">
+      </div>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label class="form-label" style="font-size:0.65rem;" data-i18n="lookup_date">Arrival date</label>
+        <input class="form-input" type="date" id="lookupDate">
+      </div>
+      <button class="btn-checkin" onclick="lookupCheckin()" id="lookupBtn" style="width:100%;padding:10px;font-size:0.75rem;" data-i18n="lookup_btn">Find My Check-in</button>
+      <div id="lookupError" style="display:none;margin-top:8px;padding:8px 12px;background:var(--red-bg);border-radius:8px;border:1px solid rgba(217,75,75,0.15);font-size:0.68rem;color:var(--red);"></div>
+      <div id="lookupLoading" style="display:none;margin-top:8px;text-align:center;font-size:0.68rem;color:var(--ink-soft);" data-i18n="lookup_searching">Searching...</div>
+    </div>
+  </div>
+
   <!-- Welcome Back panel (shown when returning guest has existing check-ins) -->
   <div id="welcomeBackPanel" style="display:none;">
     <div style="text-align:center;padding:24px 16px 16px;">
@@ -641,7 +664,7 @@ body {
     </div>
     <div id="welcomeBackCards" style="padding:0 16px;"></div>
     <div style="margin:16px;padding:10px 14px;background:rgba(74,144,217,0.06);border-radius:8px;border:1px solid rgba(74,144,217,0.12);">
-      <div style="font-size:0.65rem;color:var(--blue);line-height:1.5;" id="welcomeBackHint">Need to update your details? Contact your host.</div>
+      <div style="font-size:0.65rem;color:var(--blue);line-height:1.5;" id="welcomeBackHint"></div>
     </div>
   </div>
 
@@ -1095,6 +1118,25 @@ const T = {
     cat_all: 'All', cat_food: '🍝 Food', cat_drink: '🍷 Drinks', cat_see: '👁 See', cat_beach: '🏖 Beach', cat_shop: '🛍 Shop',
     loading: 'Loading…',
     req: '*',
+    // Already checked in lookup
+    already_checkedin: 'Already checked in?',
+    already_checkedin_tap: 'Tap to find your booking',
+    lookup_title: 'Find your check-in',
+    lookup_surname: 'Surname (as entered during check-in)',
+    lookup_surname_hint: 'e.g., Rossi',
+    lookup_date: 'Arrival date',
+    lookup_btn: 'Find My Check-in',
+    lookup_searching: 'Searching...',
+    lookup_not_found: 'No check-in found with this surname and date. Please check your details and try again.',
+    lookup_err_surname: 'Please enter your surname.',
+    lookup_err_date: 'Please enter your arrival date.',
+    lookup_error: 'Something went wrong. Please try again.',
+    // Welcome back
+    wb_title: 'Welcome back,',
+    wb_sub: 'Your check-in is complete. Here\'s your booking summary.',
+    wb_hint: 'Need to update your details? Contact your host.',
+    wb_main_guest: 'Main guest',
+    wb_companion: 'Companion',
   },
   it: {
     welcome_title: 'Benvenuti a<br><em>Casa Sole</em>',
@@ -1178,6 +1220,25 @@ const T = {
     cat_all: 'Tutti', cat_food: '🍝 Cibo', cat_drink: '🍷 Bevande', cat_see: '👁 Vedere', cat_beach: '🏖 Spiaggia', cat_shop: '🛍 Shopping',
     loading: 'Caricamento…',
     req: '*',
+    // Already checked in lookup
+    already_checkedin: 'Hai già fatto il check-in?',
+    already_checkedin_tap: 'Tocca per trovare la prenotazione',
+    lookup_title: 'Trova il tuo check-in',
+    lookup_surname: 'Cognome (come inserito durante il check-in)',
+    lookup_surname_hint: 'es. Rossi',
+    lookup_date: 'Data di arrivo',
+    lookup_btn: 'Trova il Mio Check-in',
+    lookup_searching: 'Ricerca in corso...',
+    lookup_not_found: 'Nessun check-in trovato con questo cognome e data. Controlla i dati e riprova.',
+    lookup_err_surname: 'Inserisci il tuo cognome.',
+    lookup_err_date: 'Inserisci la data di arrivo.',
+    lookup_error: 'Qualcosa è andato storto. Riprova.',
+    // Welcome back
+    wb_title: 'Bentornato/a,',
+    wb_sub: 'Il tuo check-in è completo. Ecco il riepilogo della prenotazione.',
+    wb_hint: 'Hai bisogno di aggiornare i tuoi dati? Contatta il tuo host.',
+    wb_main_guest: 'Ospite principale',
+    wb_companion: 'Accompagnatore',
   }
 };
 
@@ -1209,6 +1270,10 @@ function setLang(l) {
   renderChatSuggestions();
   // Re-render review cards if visible
   if (document.getElementById('checkinSuccess')?.classList.contains('show')) renderReviewCards();
+  // Re-render welcome back state if visible
+  if (existingCheckins.length > 0 && document.getElementById('welcomeBackPanel').style.display !== 'none') {
+    showWelcomeBackState(existingCheckins);
+  }
 }
 
 /* ══════════════════════════════════════
@@ -1254,6 +1319,7 @@ function showWelcomeBackState(checkins) {
 
   // 3. Hide check-in form, show welcome back panel
   document.getElementById('checkinIntro').style.display = 'none';
+  document.getElementById('alreadyCheckedInBar').style.display = 'none';
   document.querySelector('.steps-bar').style.display = 'none';
   document.getElementById('guestCounter').style.display = 'none';
   document.querySelectorAll('#page-checkin .form-section').forEach(s => s.style.display = 'none');
@@ -1265,16 +1331,16 @@ function showWelcomeBackState(checkins) {
   // Set welcome back text
   const wbTitle = document.getElementById('welcomeBackTitle');
   const wbSub = document.getElementById('welcomeBackSub');
-  wbTitle.textContent = lang === 'it' ? `Bentornato/a, ${guestName}!` : `Welcome back, ${guestName}!`;
-  wbSub.textContent = lang === 'it'
-    ? `Il tuo check-in è completo. Ecco il riepilogo della prenotazione.`
-    : `Your check-in is complete. Here's your booking summary.`;
+  const wbHint = document.getElementById('welcomeBackHint');
+  wbTitle.textContent = `${T[lang].wb_title} ${guestName}!`;
+  wbSub.textContent = T[lang].wb_sub;
+  wbHint.textContent = T[lang].wb_hint;
 
   // 4. Render guest summary cards
   const cardsEl = document.getElementById('welcomeBackCards');
   cardsEl.innerHTML = checkins.map((g, i) => {
     const isMain = ['single','head','group'].includes(g.guest_type);
-    const roleLabel = isMain ? (lang === 'it' ? 'Ospite principale' : 'Main guest') : (lang === 'it' ? 'Accompagnatore' : 'Companion');
+    const roleLabel = isMain ? T[lang].wb_main_guest : T[lang].wb_companion;
     const provInfo = g.birth_province && g.birth_province !== 'EE' ? ` (${g.birth_province})` : '';
     return `
       <div style="background:var(--white);border:1px solid var(--cream-3);border-radius:10px;padding:12px 14px;margin-bottom:8px;${isMain ? 'border-left:3px solid var(--warm);' : ''}">
@@ -1307,6 +1373,98 @@ function showWelcomeBackState(checkins) {
 
   // 6. Default to welcome tab (not check-in)
   goTo('welcome');
+}
+
+/* ══════════════════════════════════════
+   "ALREADY CHECKED IN?" LOOKUP
+══════════════════════════════════════ */
+function toggleLookup() {
+  const form = document.getElementById('lookupForm');
+  const toggle = document.getElementById('lookupToggle');
+  if (form.style.display === 'none') {
+    form.style.display = 'block';
+    toggle.style.borderColor = 'var(--warm)';
+    toggle.style.background = 'rgba(194,113,79,0.08)';
+    // Pre-fill date with today
+    document.getElementById('lookupDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('lookupSurname').focus();
+  } else {
+    form.style.display = 'none';
+    toggle.style.borderColor = 'rgba(194,113,79,0.15)';
+    toggle.style.background = 'rgba(194,113,79,0.05)';
+  }
+}
+
+async function lookupCheckin() {
+  const surname = document.getElementById('lookupSurname').value.trim();
+  const date = document.getElementById('lookupDate').value;
+  const errEl = document.getElementById('lookupError');
+  const loadEl = document.getElementById('lookupLoading');
+  errEl.style.display = 'none';
+
+  if (!surname) {
+    errEl.textContent = T[lang].lookup_err_surname;
+    errEl.style.display = 'block';
+    return;
+  }
+  if (!date) {
+    errEl.textContent = T[lang].lookup_err_date;
+    errEl.style.display = 'block';
+    return;
+  }
+
+  // Show loading
+  loadEl.style.display = 'block';
+  document.getElementById('lookupBtn').disabled = true;
+
+  try {
+    // Search by surname (case-insensitive) + arrival_date + property_id
+    const { data, error } = await sb.from('checkins')
+      .select('*')
+      .eq('property_id', propertyId)
+      .eq('arrival_date', date)
+      .ilike('surname', surname.toUpperCase());
+
+    loadEl.style.display = 'none';
+    document.getElementById('lookupBtn').disabled = false;
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      errEl.textContent = T[lang].lookup_not_found;
+      errEl.style.display = 'block';
+      return;
+    }
+
+    // Found! Get the booking_code from the first match (all guests in same booking share it)
+    const foundCode = data[0].booking_code;
+
+    // If they have a booking code, find ALL guests in that booking
+    let allGuests = data;
+    if (foundCode) {
+      const { data: fullGroup } = await sb.from('checkins')
+        .select('*')
+        .eq('booking_code', foundCode)
+        .eq('property_id', propertyId)
+        .order('submitted_at');
+      if (fullGroup && fullGroup.length > 0) allGuests = fullGroup;
+      // Store booking code for future visits
+      localStorage.setItem('doorstep_booking', foundCode);
+    } else {
+      // No booking code — store a lookup key instead
+      localStorage.setItem('doorstep_lookup', JSON.stringify({ surname: surname.toUpperCase(), date }));
+    }
+
+    existingCheckins = allGuests;
+    showWelcomeBackState(allGuests);
+
+  } catch (e) {
+    console.error('Lookup error:', e);
+    loadEl.style.display = 'none';
+    document.getElementById('lookupBtn').disabled = false;
+    errEl.textContent = T[lang].lookup_error;
+    errEl.style.display = 'block';
+  }
 }
 
 /* ══════════════════════════════════════
@@ -2234,6 +2392,8 @@ async function init() {
 
   // 5. Check booking code & load existing check-ins
   bookingCode = getBookingCode();
+  let foundExisting = false;
+
   if (bookingCode && propertyId) {
     try {
       const { data } = await sb.from('checkins')
@@ -2243,10 +2403,31 @@ async function init() {
         .order('submitted_at');
       if (data && data.length > 0) {
         existingCheckins = data;
+        foundExisting = true;
         console.log(`✅ Found ${data.length} existing check-ins for booking ${bookingCode}`);
         showWelcomeBackState(data);
       }
     } catch (e) { console.log('No existing check-ins found'); }
+  }
+
+  // Fallback: check surname lookup from previous session
+  if (!foundExisting && propertyId) {
+    const lookupStr = localStorage.getItem('doorstep_lookup');
+    if (lookupStr) {
+      try {
+        const { surname, date } = JSON.parse(lookupStr);
+        const { data } = await sb.from('checkins')
+          .select('*')
+          .eq('property_id', propertyId)
+          .eq('arrival_date', date)
+          .ilike('surname', surname);
+        if (data && data.length > 0) {
+          existingCheckins = data;
+          foundExisting = true;
+          showWelcomeBackState(data);
+        }
+      } catch (e) {}
+    }
   }
 
   // Hide loading overlay

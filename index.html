@@ -564,7 +564,7 @@ body {
     <div class="welcome-hero-content">
       <div class="welcome-hero-badge" id="heroBadge">&nbsp;</div>
       <h1 class="welcome-hero-title" id="heroTitle" data-i18n="welcome_title">&nbsp;</h1>
-      <p class="welcome-hero-sub" data-i18n="welcome_sub">&nbsp;</p>
+      <p class="welcome-hero-sub" id="heroSub" data-i18n="welcome_sub">&nbsp;</p>
     </div>
   </div>
 
@@ -627,9 +627,22 @@ body {
     </div>
   </div>
 
-  <div class="checkin-intro">
+  <div class="checkin-intro" id="checkinIntro">
     <h2 data-i18n="checkin_h2">Complete Your Check-in</h2>
     <p data-i18n="checkin_p">Italian law requires us to register all guests. This takes about 2 minutes per guest.</p>
+  </div>
+
+  <!-- Welcome Back panel (shown when returning guest has existing check-ins) -->
+  <div id="welcomeBackPanel" style="display:none;">
+    <div style="text-align:center;padding:24px 16px 16px;">
+      <div style="font-size:3rem;margin-bottom:8px;">✅</div>
+      <h2 style="font-family:'Playfair Display',serif;font-size:1.5rem;color:var(--ink);font-weight:400;margin-bottom:4px;" id="welcomeBackTitle">Welcome back!</h2>
+      <p style="font-size:0.78rem;color:var(--ink-soft);font-weight:300;line-height:1.5;" id="welcomeBackSub">Your check-in is complete. Here's your booking summary.</p>
+    </div>
+    <div id="welcomeBackCards" style="padding:0 16px;"></div>
+    <div style="margin:16px;padding:10px 14px;background:rgba(74,144,217,0.06);border-radius:8px;border:1px solid rgba(74,144,217,0.12);">
+      <div style="font-size:0.65rem;color:var(--blue);line-height:1.5;" id="welcomeBackHint">Need to update your details? Contact your host.</div>
+    </div>
   </div>
 
   <!-- Steps -->
@@ -969,6 +982,21 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let propertyId = null;
 let propertyData = null;
+let bookingCode = null;
+let existingCheckins = [];
+
+// Extract booking code from URL (?b=CODE) or localStorage
+function getBookingCode() {
+  const params = new URLSearchParams(window.location.search);
+  const urlCode = params.get('b');
+  if (urlCode) {
+    localStorage.setItem('doorstep_booking', urlCode);
+    // Clean URL without reload
+    window.history.replaceState({}, '', window.location.pathname);
+    return urlCode;
+  }
+  return localStorage.getItem('doorstep_booking') || null;
+}
 let uploadedIdFile = null;
 
 /* ══════════════════════════════════════
@@ -1193,6 +1221,92 @@ function goTo(page) {
     const pages = ['welcome','checkin','rules','explore','chat'];
     n.classList.toggle('active', pages[i] === page);
   });
+}
+
+/* ══════════════════════════════════════
+   RETURNING GUEST — Welcome Back State
+══════════════════════════════════════ */
+function showWelcomeBackState(checkins) {
+  const mainGuest = checkins.find(c => ['single','head','group'].includes(c.guest_type)) || checkins[0];
+  const guestName = mainGuest ? `${mainGuest.name}` : '';
+
+  // 1. Update welcome page with "Welcome back" greeting
+  const heroTitle = document.getElementById('heroTitle');
+  if (heroTitle && guestName) {
+    const propName = propertyData?.name || 'your stay';
+    T.en.welcome_title = `Welcome back,<br><em>${guestName}!</em>`;
+    T.it.welcome_title = `Bentornato/a,<br><em>${guestName}!</em>`;
+    heroTitle.innerHTML = T[lang].welcome_title;
+  }
+
+  // 2. Update welcome sub with stay dates
+  const heroSub = document.getElementById('heroSub');
+  if (heroSub && mainGuest) {
+    const arr = mainGuest.arrival_date || '';
+    const dep = mainGuest.departure_date || '';
+    if (arr && dep) {
+      const fmtD = (iso) => { const p = iso.split('-'); return `${p[2]}/${p[1]}`; };
+      T.en.welcome_sub = `${fmtD(arr)} — ${fmtD(dep)} · ${checkins.length} guest${checkins.length > 1 ? 's' : ''} · Check-in complete ✓`;
+      T.it.welcome_sub = `${fmtD(arr)} — ${fmtD(dep)} · ${checkins.length} ospite/i · Check-in completato ✓`;
+      heroSub.textContent = T[lang].welcome_sub;
+    }
+  }
+
+  // 3. Hide check-in form, show welcome back panel
+  document.getElementById('checkinIntro').style.display = 'none';
+  document.querySelector('.steps-bar').style.display = 'none';
+  document.getElementById('guestCounter').style.display = 'none';
+  document.querySelectorAll('#page-checkin .form-section').forEach(s => s.style.display = 'none');
+  document.getElementById('checkinBtns').classList.add('hidden');
+
+  const panel = document.getElementById('welcomeBackPanel');
+  panel.style.display = 'block';
+
+  // Set welcome back text
+  const wbTitle = document.getElementById('welcomeBackTitle');
+  const wbSub = document.getElementById('welcomeBackSub');
+  wbTitle.textContent = lang === 'it' ? `Bentornato/a, ${guestName}!` : `Welcome back, ${guestName}!`;
+  wbSub.textContent = lang === 'it'
+    ? `Il tuo check-in è completo. Ecco il riepilogo della prenotazione.`
+    : `Your check-in is complete. Here's your booking summary.`;
+
+  // 4. Render guest summary cards
+  const cardsEl = document.getElementById('welcomeBackCards');
+  cardsEl.innerHTML = checkins.map((g, i) => {
+    const isMain = ['single','head','group'].includes(g.guest_type);
+    const roleLabel = isMain ? (lang === 'it' ? 'Ospite principale' : 'Main guest') : (lang === 'it' ? 'Accompagnatore' : 'Companion');
+    const provInfo = g.birth_province && g.birth_province !== 'EE' ? ` (${g.birth_province})` : '';
+    return `
+      <div style="background:var(--white);border:1px solid var(--cream-3);border-radius:10px;padding:12px 14px;margin-bottom:8px;${isMain ? 'border-left:3px solid var(--warm);' : ''}">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+          <div style="font-weight:600;font-size:0.82rem;color:var(--ink);">${g.surname} ${g.name}</div>
+          <div style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--warm);font-weight:500;">${roleLabel}</div>
+        </div>
+        <div style="font-size:0.68rem;color:var(--ink-soft);line-height:1.6;">
+          ${g.sex === 'F' ? '♀' : '♂'} · ${g.date_of_birth || '—'} · ${g.place_of_birth || '—'}${provInfo}
+          ${g.citizenship ? ` · ${g.citizenship}` : ''}
+          ${isMain && g.document_type ? `<br>📄 ${g.document_type} · ${g.document_number || ''}` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  // 5. Update check-in badge to show "done"
+  const badge = document.getElementById('checkinBadge');
+  if (badge) {
+    badge.style.display = 'flex';
+    badge.textContent = '✓';
+    badge.style.background = 'var(--green)';
+    badge.style.width = '14px';
+    badge.style.height = '14px';
+    badge.style.fontSize = '0.5rem';
+    badge.style.alignItems = 'center';
+    badge.style.justifyContent = 'center';
+    badge.style.borderRadius = '50%';
+    badge.style.color = '#fff';
+  }
+
+  // 6. Default to welcome tab (not check-in)
+  goTo('welcome');
 }
 
 /* ══════════════════════════════════════
@@ -1572,6 +1686,7 @@ async function saveCurrentGuest() {
       docs_status: isMainGuest() ? (idPath ? 'complete' : 'pending') : 'not_required',
     };
     if (propertyId) record.property_id = propertyId;
+    if (bookingCode) record.booking_code = bookingCode;
 
     console.log(`Saving guest ${currentGuestIdx+1}/${totalGuests}:`, record);
     const { data, error } = await sb.from('checkins').insert(record).select('id');
@@ -2116,6 +2231,23 @@ async function init() {
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
   if (document.getElementById('arrivalDate')) document.getElementById('arrivalDate').value = today;
   if (document.getElementById('departureDate')) document.getElementById('departureDate').value = tomorrow;
+
+  // 5. Check booking code & load existing check-ins
+  bookingCode = getBookingCode();
+  if (bookingCode && propertyId) {
+    try {
+      const { data } = await sb.from('checkins')
+        .select('*')
+        .eq('booking_code', bookingCode)
+        .eq('property_id', propertyId)
+        .order('submitted_at');
+      if (data && data.length > 0) {
+        existingCheckins = data;
+        console.log(`✅ Found ${data.length} existing check-ins for booking ${bookingCode}`);
+        showWelcomeBackState(data);
+      }
+    } catch (e) { console.log('No existing check-ins found'); }
+  }
 
   // Hide loading overlay
   const overlay = document.getElementById('loadingOverlay');

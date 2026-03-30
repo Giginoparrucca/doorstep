@@ -416,6 +416,18 @@ body {
   font-size: 0.55rem; font-weight: 500;
   background: var(--cream-2); color: var(--ink-soft);
 }
+.reco-maps-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-top: 10px; padding: 7px 14px;
+  background: var(--cream-2); color: var(--warm);
+  border-radius: 6px; font-size: 0.65rem; font-weight: 500;
+  text-decoration: none; transition: all 0.2s;
+  border: 1px solid rgba(194,113,79,0.12);
+}
+.reco-maps-btn:hover, .reco-maps-btn:active {
+  background: rgba(194,113,79,0.08);
+  border-color: var(--warm);
+}
 
 /* ══════════════════════════
    CHAT PAGE
@@ -1116,6 +1128,7 @@ const T = {
     nav_home: 'Home', nav_rules: 'Rules', nav_explore: 'Explore', nav_chat: 'Chat',
     sug1: 'What\'s the WiFi password?', sug2: 'Best restaurant nearby?', sug3: 'How does check-out work?', sug4: 'Talk to a human',
     cat_all: 'All', cat_food: '🍝 Food', cat_drink: '🍷 Drinks', cat_see: '👁 See', cat_beach: '🏖 Beach', cat_shop: '🛍 Shop',
+    open_maps: 'Open in Maps',
     loading: 'Loading…',
     req: '*',
     // Already checked in lookup
@@ -1218,6 +1231,7 @@ const T = {
     nav_home: 'Home', nav_rules: 'Regole', nav_explore: 'Esplora', nav_chat: 'Chat',
     sug1: 'Qual è la password WiFi?', sug2: 'Miglior ristorante vicino?', sug3: 'Come funziona il check-out?', sug4: 'Parla con una persona',
     cat_all: 'Tutti', cat_food: '🍝 Cibo', cat_drink: '🍷 Bevande', cat_see: '👁 Vedere', cat_beach: '🏖 Spiaggia', cat_shop: '🛍 Shopping',
+    open_maps: 'Apri in Mappe',
     loading: 'Caricamento…',
     req: '*',
     // Already checked in lookup
@@ -2199,27 +2213,44 @@ function filterCat(c) { activeCat = c; renderRecos(); }
 
 function renderRecos() {
   renderCatTabs();
+  const CAT_FALLBACK_IMG = {
+    food: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600&q=75',
+    drink: 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=600&q=75',
+    see: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=75',
+    beach: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=75',
+    shop: 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=600&q=75',
+  };
   let data;
   if (recosFromDB && recosFromDB.length > 0) {
     data = recosFromDB.map(r => ({
       cat: r.category,
       name: r.name,
       desc: lang === 'it' && r.desc_it ? r.desc_it : r.desc_en,
-      tags: r.tags ? r.tags.split(',').map(t => t.trim()) : [],
-      img: r.image_url || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600&q=75'
+      tags: r.tags ? r.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+      img: r.image_url || CAT_FALLBACK_IMG[r.category] || CAT_FALLBACK_IMG.food,
+      address: r.address || '',
     }));
   } else {
     data = fallbackRecos[lang];
   }
   const filtered = activeCat === 'all' ? data : data.filter(r => r.cat === activeCat);
+  const mapsUrl = (name, addr) => {
+    const q = encodeURIComponent(addr ? `${name}, ${addr}` : name);
+    return `https://www.google.com/maps/search/?api=1&query=${q}`;
+  };
   document.getElementById('recoContainer').innerHTML = filtered.map(r => `
     <div class="reco-card">
-      <img class="reco-img" src="${r.img}" alt="${r.name}">
+      <img class="reco-img" src="${r.img}" alt="${r.name}" onerror="this.src='${CAT_FALLBACK_IMG[r.cat] || CAT_FALLBACK_IMG.food}'">
       <div class="reco-body">
         <div class="reco-cat">${r.cat.toUpperCase()}</div>
         <div class="reco-name">${r.name}</div>
+        ${r.address ? `<div style="font-size:0.6rem;color:var(--ink-soft);margin-bottom:4px;display:flex;align-items:center;gap:3px;">📍 ${r.address}</div>` : ''}
         <div class="reco-desc">${r.desc}</div>
         <div class="reco-meta">${r.tags.map(t=>`<span class="reco-tag">${t}</span>`).join('')}</div>
+        <a href="${mapsUrl(r.name, r.address)}" target="_blank" rel="noopener" class="reco-maps-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          <span data-i18n="open_maps">${T[lang].open_maps || 'Open in Maps'}</span>
+        </a>
       </div>
     </div>
   `).join('');

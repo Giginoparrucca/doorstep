@@ -677,9 +677,9 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
       <div class="table-wrap">
         <div class="table-header">
-          <div class="table-title">All Guest Check-ins</div>
+          <div class="table-title" id="allCheckinsTitle">All Guest Check-ins</div>
           <div style="display:flex;gap:8px;align-items:center;">
-            <button class="btn btn-secondary btn-sm" onclick="deleteAllCheckins()" style="color:var(--red);border-color:rgba(217,75,75,0.3);">🗑 Delete All</button>
+            <button class="btn btn-secondary btn-sm" onclick="deleteAllCheckins()" style="color:var(--red);border-color:rgba(217,75,75,0.3);" id="btnDeleteAll">🗑 Delete All</button>
           </div>
         </div>
         <table>
@@ -759,33 +759,33 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           </div>
         </div>
         <div class="qr-info">
-          <h3>Guest App Link</h3>
-          <p>Each booking gets a unique link. Generate a new code for each guest/group, then share before arrival.</p>
+          <h3 id="qrGenTitle">Guest App Link</h3>
+          <p id="qrGenDesc">Each booking gets a unique link. Generate a new code for each guest/group, then share before arrival.</p>
           <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
             <button class="btn btn-primary btn-sm" onclick="generateBookingCode()" id="genBookingBtn">🔑 Generate New Booking Link</button>
           </div>
           <div id="bookingLinkSection" style="display:none;">
-            <div style="font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px;">Booking Code</div>
+            <div style="font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px;" id="bookingCodeLabel">Booking Code</div>
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
               <code style="background:var(--bg);padding:6px 12px;border-radius:6px;font-size:0.9rem;font-weight:600;color:var(--warm);letter-spacing:0.1em;" id="bookingCodeDisplay">—</code>
               <button class="btn btn-secondary btn-sm" onclick="copyLink()" style="white-space:nowrap;">📋 Copy Link</button>
             </div>
             <div class="qr-link" id="guestLink" style="font-size:0.65rem;word-break:break-all;">https://doorstep-rust.vercel.app</div>
           </div>
-          <div style="margin-top:8px;font-size:0.6rem;color:var(--ink-soft);line-height:1.5;">
+          <div style="margin-top:8px;font-size:0.6rem;color:var(--ink-soft);line-height:1.5;" id="qrReturningHint">
             💡 Returning guests who use the same link will see their check-in status and details automatically.
           </div>
         </div>
       </div>
 
       <div id="pastBookingCodes" style="margin-top:16px;display:none;">
-        <div style="font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;">Recent Booking Codes</div>
+        <div style="font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;" id="recentCodesTitle">Recent Booking Codes</div>
         <div id="pastCodesTable"></div>
       </div>
 
       <div class="form-card" style="margin-top:20px;">
-        <div class="form-card-title">Pre-Arrival Message Template</div>
-        <div class="form-card-desc">Generate a booking link above, then copy this message to send to your guests.</div>
+        <div class="form-card-title" id="templateTitle">Pre-Arrival Message Template</div>
+        <div class="form-card-desc" id="templateDesc">Generate a booking link above, then copy this message to send to your guests.</div>
         <textarea class="form-textarea" style="min-height:120px;" id="preArrivalTemplate">Hi {guest_name}! 🌞
 
 Welcome! Before you arrive, please complete your online check-in here:
@@ -1013,6 +1013,36 @@ const HT = {
     toast_property_saved: 'Property details saved!', toast_rules_saved: 'House rules saved to database!',
     toast_recos_saved: 'Recommendations saved to database!', toast_link_copied: 'Link copied to clipboard!',
     toast_template_copied: 'Template copied!', toast_istat: 'ISTAT report generated!',
+    // Checkin table
+    all_checkins_title: 'All Guest Check-ins',
+    btn_delete_all: '🗑 Delete All',
+    delete_confirm: 'Delete record for {name}? This cannot be undone.',
+    delete_all_confirm: 'Delete ALL {count} check-in records? This cannot be undone.',
+    delete_all_confirm2: 'Are you sure? Type "DELETE" to confirm.',
+    deleted_record: '{name}\'s record deleted',
+    deleted_all: 'All records deleted',
+    deletion_cancelled: 'Deletion cancelled',
+    // QR / Booking
+    qr_gen_title: 'Guest App Link',
+    qr_gen_desc: 'Each booking gets a unique link. Generate a new code for each guest/group, then share before arrival.',
+    btn_gen_booking: '🔑 Generate New Booking Link',
+    booking_code_label: 'Booking Code',
+    qr_returning_hint: '💡 Returning guests who use the same link will see their check-in status and details automatically.',
+    recent_codes_title: 'Recent Booking Codes',
+    template_title: 'Pre-Arrival Message Template',
+    template_desc: 'Generate a booking link above, then copy this message to send to your guests.',
+    // Reco editor
+    reco_empty: 'No recommendations in this category yet. Click "+ Add" below.',
+    reco_name: 'Name',
+    reco_name_hint: 'e.g., Terranima',
+    reco_address: 'Address / Location',
+    reco_address_hint: 'e.g., Via Putignani 213, Bari',
+    reco_desc_en: 'Description (EN)',
+    reco_desc_en_hint: 'Why you love it — 1-2 sentences',
+    reco_desc_it: 'Descrizione (IT)',
+    reco_desc_it_hint: 'Perché lo consigli — 1-2 frasi',
+    reco_tags: 'Tags',
+    recos_info: 'These appear in the guest app\'s "Explore" tab. Add your favorite restaurants, bars, sights, beaches, and shops. Include an address for the Google Maps link.',
   },
   it: {
     sidebar_overview: 'Panoramica', sidebar_property_sec: 'Proprietà', sidebar_guests_sec: 'Ospiti', sidebar_share_sec: 'Condividi',
@@ -1071,6 +1101,29 @@ const HT = {
     toast_property_saved: 'Dettagli proprietà salvati!', toast_rules_saved: 'Regole salvate nel database!',
     toast_recos_saved: 'Consigli salvati nel database!', toast_link_copied: 'Link copiato!',
     toast_template_copied: 'Modello copiato!', toast_istat: 'Report ISTAT generato!',
+    all_checkins_title: 'Tutti i Check-in Ospiti',
+    btn_delete_all: '🗑 Elimina Tutto',
+    delete_confirm: 'Eliminare il record di {name}? Questa azione è irreversibile.',
+    delete_all_confirm: 'Eliminare TUTTI i {count} record di check-in? Questa azione è irreversibile.',
+    delete_all_confirm2: 'Sei sicuro? Digita "ELIMINA" per confermare.',
+    deleted_record: 'Record di {name} eliminato',
+    deleted_all: 'Tutti i record eliminati',
+    deletion_cancelled: 'Eliminazione annullata',
+    qr_gen_title: 'Link App Ospiti',
+    qr_gen_desc: 'Ogni prenotazione ha un link unico. Genera un nuovo codice per ogni ospite/gruppo, poi condividilo prima dell\'arrivo.',
+    btn_gen_booking: '🔑 Genera Nuovo Link Prenotazione',
+    booking_code_label: 'Codice Prenotazione',
+    qr_returning_hint: '💡 Gli ospiti che tornano con lo stesso link vedranno automaticamente il loro stato di check-in e i dettagli.',
+    recent_codes_title: 'Codici Prenotazione Recenti',
+    template_title: 'Modello Messaggio Pre-Arrivo',
+    template_desc: 'Genera un link prenotazione qui sopra, poi copia questo messaggio da inviare ai tuoi ospiti.',
+    reco_empty: 'Nessun consiglio in questa categoria. Clicca "+ Aggiungi" qui sotto.',
+    reco_name: 'Nome', reco_name_hint: 'es. Terranima',
+    reco_address: 'Indirizzo / Posizione', reco_address_hint: 'es. Via Putignani 213, Bari',
+    reco_desc_en: 'Description (EN)', reco_desc_en_hint: 'Why you love it — 1-2 sentences',
+    reco_desc_it: 'Descrizione (IT)', reco_desc_it_hint: 'Perché lo consigli — 1-2 frasi',
+    reco_tags: 'Tags',
+    recos_info: 'Questi appaiono nella scheda "Esplora" dell\'app ospiti. Aggiungi i tuoi ristoranti, bar, luoghi preferiti. Includi un indirizzo per il link a Google Maps.',
   }
 };
 
@@ -1087,6 +1140,17 @@ function setHostLang(l) {
   });
   // Update sidebar
   document.querySelectorAll('[data-h]').forEach(el => { el.textContent = h(el.getAttribute('data-h')); });
+  // Update dynamic elements with IDs
+  const idMap = {
+    'allCheckinsTitle': 'all_checkins_title', 'btnDeleteAll': 'btn_delete_all',
+    'qrGenTitle': 'qr_gen_title', 'qrGenDesc': 'qr_gen_desc', 'genBookingBtn': 'btn_gen_booking',
+    'bookingCodeLabel': 'booking_code_label', 'qrReturningHint': 'qr_returning_hint',
+    'recentCodesTitle': 'recent_codes_title', 'templateTitle': 'template_title', 'templateDesc': 'template_desc',
+  };
+  Object.entries(idMap).forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = h(key);
+  });
   // Re-render dynamic content
   renderDashboard();
   renderCheckins();
@@ -1211,10 +1275,7 @@ function renderCheckins() {
 }
 
 async function deleteCheckin(id, name) {
-  const msg = hostLang === 'it'
-    ? `Eliminare il record di ${name}? Questa azione è irreversibile.`
-    : `Delete record for ${name}? This cannot be undone.`;
-  if (!confirm(msg)) return;
+  if (!confirm(h('delete_confirm').replace('{name}', name))) return;
 
   const { error } = await sb.from('checkins').delete().eq('id', id);
   if (error) { console.error(error); toast('Error deleting record'); return; }
@@ -1222,21 +1283,14 @@ async function deleteCheckin(id, name) {
   allCheckins = allCheckins.filter(c => c.id !== id);
   renderCheckins();
   renderDashboard();
-  toast(hostLang === 'it' ? `Record di ${name} eliminato` : `${name}'s record deleted`);
+  toast(h('deleted_record').replace('{name}', name));
 }
 
 async function deleteAllCheckins() {
-  const msg = hostLang === 'it'
-    ? `Eliminare TUTTI i ${allCheckins.length} record di check-in? Questa azione è irreversibile.`
-    : `Delete ALL ${allCheckins.length} check-in records? This cannot be undone.`;
-  if (!confirm(msg)) return;
+  if (!confirm(h('delete_all_confirm').replace('{count}', allCheckins.length))) return;
 
-  // Double confirm for safety
-  const msg2 = hostLang === 'it'
-    ? 'Sei sicuro? Digita "ELIMINA" per confermare.'
-    : 'Are you sure? Type "DELETE" to confirm.';
-  const typed = prompt(msg2);
-  if (typed !== 'DELETE' && typed !== 'ELIMINA') { toast(hostLang === 'it' ? 'Eliminazione annullata' : 'Deletion cancelled'); return; }
+  const typed = prompt(h('delete_all_confirm2'));
+  if (typed !== 'DELETE' && typed !== 'ELIMINA') { toast(h('deletion_cancelled')); return; }
 
   const { error } = await sb.from('checkins').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   if (error) { console.error(error); toast('Error deleting records'); return; }
@@ -1244,7 +1298,7 @@ async function deleteAllCheckins() {
   allCheckins = [];
   renderCheckins();
   renderDashboard();
-  toast(hostLang === 'it' ? 'Tutti i record eliminati' : 'All records deleted');
+  toast(h('deleted_all'));
 }
 
 /* ══════════════════════════════════════
@@ -1370,7 +1424,7 @@ function renderRecos() {
   const tags = PRESET_TAGS[activeRecoCat] || PRESET_TAGS.food;
 
   document.getElementById('recoList').innerHTML = filtered.length === 0
-    ? '<div style="text-align:center;padding:30px;color:var(--ink-soft);font-size:0.78rem;">No recommendations in this category yet. Click "+ Add" below.</div>'
+    ? `<div style="text-align:center;padding:30px;color:var(--ink-soft);font-size:0.78rem;">${h('reco_empty')}</div>`
     : filtered.map((r, i) => {
       const globalIdx = recoData.indexOf(r);
       const activeTags = (r.tags || '').split(',').map(t => t.trim()).filter(Boolean);
@@ -1379,24 +1433,24 @@ function renderRecos() {
         <div class="edit-item-body" style="flex:1;">
           <div style="display:flex;gap:8px;margin-bottom:8px;">
             <div style="flex:1;">
-              <label style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);display:block;margin-bottom:3px;">Name</label>
-              <input class="form-input" value="${r.name}" placeholder="e.g., Terranima" onchange="recoData[${globalIdx}].name=this.value">
+              <label style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);display:block;margin-bottom:3px;">${h('reco_name')}</label>
+              <input class="form-input" value="${r.name}" placeholder="${h('reco_name_hint')}" onchange="recoData[${globalIdx}].name=this.value">
             </div>
             <div style="flex:1;">
-              <label style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);display:block;margin-bottom:3px;">Address / Location</label>
-              <input class="form-input" value="${r.address||''}" placeholder="e.g., Via Putignani 213, Bari" onchange="recoData[${globalIdx}].address=this.value">
+              <label style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);display:block;margin-bottom:3px;">${h('reco_address')}</label>
+              <input class="form-input" value="${r.address||''}" placeholder="${h('reco_address_hint')}" onchange="recoData[${globalIdx}].address=this.value">
             </div>
           </div>
           <div style="margin-bottom:8px;">
-            <label style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);display:block;margin-bottom:3px;">Description (EN)</label>
-            <textarea class="form-textarea" style="min-height:40px;font-size:0.72rem;" placeholder="Why you love it — 1-2 sentences" onchange="recoData[${globalIdx}].desc_en=this.value">${r.desc_en||r.desc||''}</textarea>
+            <label style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);display:block;margin-bottom:3px;">${h('reco_desc_en')}</label>
+            <textarea class="form-textarea" style="min-height:40px;font-size:0.72rem;" placeholder="${h('reco_desc_en_hint')}" onchange="recoData[${globalIdx}].desc_en=this.value">${r.desc_en||r.desc||''}</textarea>
           </div>
           <div style="margin-bottom:8px;">
-            <label style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);display:block;margin-bottom:3px;">Descrizione (IT)</label>
-            <textarea class="form-textarea" style="min-height:40px;font-size:0.72rem;" placeholder="Perché lo consigli — 1-2 frasi" onchange="recoData[${globalIdx}].desc_it=this.value">${r.desc_it||''}</textarea>
+            <label style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);display:block;margin-bottom:3px;">${h('reco_desc_it')}</label>
+            <textarea class="form-textarea" style="min-height:40px;font-size:0.72rem;" placeholder="${h('reco_desc_it_hint')}" onchange="recoData[${globalIdx}].desc_it=this.value">${r.desc_it||''}</textarea>
           </div>
           <div style="margin-bottom:6px;">
-            <label style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);display:block;margin-bottom:5px;">Tags</label>
+            <label style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);display:block;margin-bottom:5px;">${h('reco_tags')}</label>
             <div style="display:flex;flex-wrap:wrap;gap:4px;" id="tagPicker_${globalIdx}">
               ${tags.map(t => {
                 const isActive = activeTags.includes(t.icon + ' ' + t.label) || activeTags.includes(t.label);

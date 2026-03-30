@@ -650,7 +650,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     <!-- ════════════ RECOMMENDATIONS ════════════ -->
     <div class="panel" id="panel-recos">
       <div class="alert alert-info">
-        ℹ️ These appear in the guest app's "Explore" tab. Add your favorite restaurants, bars, sights, beaches, and shops.
+        ℹ️ These appear in the guest app's "Explore" tab. Add your favorite restaurants, bars, sights, beaches, and shops. Include an address for the Google Maps link.
       </div>
 
       <div class="panel-tabs" id="recoTabs">
@@ -1339,28 +1339,94 @@ function setRecoCat(cat, btn) {
 
 function renderRecos() {
   const filtered = recoData.filter(r => r.category === activeRecoCat || r.cat === activeRecoCat);
+  const PRESET_TAGS = {
+    food: [
+      {icon:'💰',label:'Budget'},{icon:'💎',label:'Fine Dining'},{icon:'🍕',label:'Pizza'},
+      {icon:'🐟',label:'Seafood'},{icon:'🥗',label:'Healthy'},{icon:'🍝',label:'Pasta'},
+      {icon:'🥡',label:'Takeaway'},{icon:'👨‍👩‍👧',label:'Family'},{icon:'❤️',label:'Romantic'},
+      {icon:'🌿',label:'Vegan'},{icon:'🔥',label:'Must Try'},{icon:'📍',label:'Nearby'},
+    ],
+    drink: [
+      {icon:'🍷',label:'Wine'},{icon:'🍸',label:'Cocktails'},{icon:'🍺',label:'Beer'},
+      {icon:'☕',label:'Coffee'},{icon:'🌅',label:'Sunset'},{icon:'🎵',label:'Live Music'},
+      {icon:'📍',label:'Nearby'},{icon:'🔥',label:'Must Try'},{icon:'💰',label:'Budget'},
+    ],
+    see: [
+      {icon:'⛪',label:'Church'},{icon:'🏛',label:'Museum'},{icon:'🏰',label:'Castle'},
+      {icon:'🌳',label:'Park'},{icon:'📸',label:'Instagrammable'},{icon:'🚶',label:'Walking'},
+      {icon:'🆓',label:'Free'},{icon:'🔥',label:'Must See'},{icon:'📍',label:'Nearby'},
+    ],
+    beach: [
+      {icon:'🏖',label:'Sandy'},{icon:'🪨',label:'Rocky'},{icon:'🏊',label:'Swimming'},
+      {icon:'👶',label:'Kid-Friendly'},{icon:'🍹',label:'Beach Bar'},{icon:'🚗',label:'Drive'},
+      {icon:'🚶',label:'Walkable'},{icon:'🔥',label:'Must Visit'},{icon:'🆓',label:'Free'},
+    ],
+    shop: [
+      {icon:'🛍',label:'Souvenirs'},{icon:'🏺',label:'Ceramics'},{icon:'🫒',label:'Local Food'},
+      {icon:'👗',label:'Fashion'},{icon:'📚',label:'Books'},{icon:'🥯',label:'Bakery'},
+      {icon:'💰',label:'Budget'},{icon:'📍',label:'Nearby'},{icon:'🔥',label:'Must Visit'},
+    ],
+  };
+  const tags = PRESET_TAGS[activeRecoCat] || PRESET_TAGS.food;
+
   document.getElementById('recoList').innerHTML = filtered.length === 0
-    ? '<div style="text-align:center;padding:30px;color:var(--ink-soft);font-size:0.78rem;">No recommendations in this category yet.</div>'
+    ? '<div style="text-align:center;padding:30px;color:var(--ink-soft);font-size:0.78rem;">No recommendations in this category yet. Click "+ Add" below.</div>'
     : filtered.map((r, i) => {
       const globalIdx = recoData.indexOf(r);
+      const activeTags = (r.tags || '').split(',').map(t => t.trim()).filter(Boolean);
       return `
-      <div class="edit-item">
-        <div class="edit-item-body">
-          <div style="display:flex;gap:8px;margin-bottom:6px;">
-            <input class="form-input" style="flex:1" value="${r.name}" placeholder="Name" onchange="recoData[${globalIdx}].name=this.value">
-            <input class="form-input" style="flex:1" value="${r.tags||''}" placeholder="Tags (comma separated)" onchange="recoData[${globalIdx}].tags=this.value">
+      <div class="edit-item" style="padding:14px;">
+        <div class="edit-item-body" style="flex:1;">
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <div style="flex:1;">
+              <label style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);display:block;margin-bottom:3px;">Name</label>
+              <input class="form-input" value="${r.name}" placeholder="e.g., Terranima" onchange="recoData[${globalIdx}].name=this.value">
+            </div>
+            <div style="flex:1;">
+              <label style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);display:block;margin-bottom:3px;">Address / Location</label>
+              <input class="form-input" value="${r.address||''}" placeholder="e.g., Via Putignani 213, Bari" onchange="recoData[${globalIdx}].address=this.value">
+            </div>
           </div>
-          <textarea class="form-textarea" style="min-height:44px;font-size:0.72rem;" placeholder="Description" onchange="recoData[${globalIdx}].desc_en=this.value">${r.desc_en||r.desc||''}</textarea>
+          <div style="margin-bottom:8px;">
+            <label style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);display:block;margin-bottom:3px;">Description (EN)</label>
+            <textarea class="form-textarea" style="min-height:40px;font-size:0.72rem;" placeholder="Why you love it — 1-2 sentences" onchange="recoData[${globalIdx}].desc_en=this.value">${r.desc_en||r.desc||''}</textarea>
+          </div>
+          <div style="margin-bottom:8px;">
+            <label style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);display:block;margin-bottom:3px;">Descrizione (IT)</label>
+            <textarea class="form-textarea" style="min-height:40px;font-size:0.72rem;" placeholder="Perché lo consigli — 1-2 frasi" onchange="recoData[${globalIdx}].desc_it=this.value">${r.desc_it||''}</textarea>
+          </div>
+          <div style="margin-bottom:6px;">
+            <label style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);display:block;margin-bottom:5px;">Tags</label>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;" id="tagPicker_${globalIdx}">
+              ${tags.map(t => {
+                const isActive = activeTags.includes(t.icon + ' ' + t.label) || activeTags.includes(t.label);
+                return `<button type="button" onclick="toggleRecoTag(${globalIdx},'${t.icon} ${t.label}',this)" style="padding:3px 8px;border-radius:5px;font-size:0.58rem;border:1px solid ${isActive ? 'var(--warm)' : 'var(--cream-3)'};background:${isActive ? 'rgba(194,113,79,0.08)' : 'var(--bg)'};color:${isActive ? 'var(--warm)' : 'var(--ink-soft)'};cursor:pointer;transition:all 0.15s;">${t.icon} ${t.label}</button>`;
+              }).join('')}
+            </div>
+          </div>
         </div>
-        <div class="edit-item-actions">
-          <button onclick="recoData.splice(${globalIdx},1);renderRecos()">🗑</button>
+        <div class="edit-item-actions" style="align-self:flex-start;padding-top:20px;">
+          <button onclick="recoData.splice(${globalIdx},1);renderRecos()" title="Delete">🗑</button>
         </div>
       </div>`;
     }).join('');
 }
 
+function toggleRecoTag(idx, tag, btn) {
+  const current = (recoData[idx].tags || '').split(',').map(t => t.trim()).filter(Boolean);
+  const i = current.indexOf(tag);
+  if (i >= 0) { current.splice(i, 1); }
+  else { current.push(tag); }
+  recoData[idx].tags = current.join(', ');
+  // Toggle button style
+  const isActive = i < 0; // was just added
+  btn.style.borderColor = isActive ? 'var(--warm)' : 'var(--cream-3)';
+  btn.style.background = isActive ? 'rgba(194,113,79,0.08)' : 'var(--bg)';
+  btn.style.color = isActive ? 'var(--warm)' : 'var(--ink-soft)';
+}
+
 function addReco() {
-  recoData.push({ category: activeRecoCat, name: '', desc_en: '', tags: '' });
+  recoData.push({ category: activeRecoCat, name: '', desc_en: '', desc_it: '', tags: '', address: '' });
   renderRecos();
 }
 
@@ -1372,7 +1438,9 @@ async function saveRecos() {
     category: r.category || r.cat || 'food',
     name: r.name,
     desc_en: r.desc_en || r.desc || '',
+    desc_it: r.desc_it || '',
     tags: r.tags || '',
+    address: r.address || '',
     sort_order: i,
   }));
   if (rows.length > 0) {

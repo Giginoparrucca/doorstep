@@ -417,7 +417,11 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 <div class="login-overlay" id="loginOverlay">
   <div class="login-card">
     <div class="login-logo">Door<em>step</em></div>
-    <div class="login-badge">Host Console</div>
+    <div class="login-badge" data-h="login_badge">Host Console</div>
+    <div style="display:flex;gap:4px;justify-content:center;margin-bottom:12px;">
+      <button class="lang-opt-h" onclick="setHostLang('en')" style="padding:4px 10px;border:1px solid var(--cream-3);border-radius:4px;font-size:0.6rem;cursor:pointer;background:var(--white);color:var(--warm);box-shadow:0 1px 3px rgba(30,16,8,0.06);">EN</button>
+      <button class="lang-opt-h" onclick="setHostLang('it')" style="padding:4px 10px;border:1px solid var(--cream-3);border-radius:4px;font-size:0.6rem;cursor:pointer;background:none;color:var(--ink-soft);">IT</button>
+    </div>
     <div class="login-error" id="loginError"></div>
     <div id="loginForm">
       <div class="form-group">
@@ -430,7 +434,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       </div>
       <button class="login-btn" id="authBtn" onclick="handleAuth()">Sign In</button>
       <div class="login-toggle" id="authToggle">
-        Don't have an account? <a onclick="toggleAuthMode()">Create one</a>
+        <span data-h="login_no_account">Don't have an account?</span> <a onclick="toggleAuthMode()" data-h="login_create_link">Create one</a>
       </div>
     </div>
   </div>
@@ -837,10 +841,10 @@ async function checkAuth() {
 
 function toggleAuthMode() {
   isSignUp = !isSignUp;
-  document.getElementById('authBtn').textContent = isSignUp ? 'Create Account' : 'Sign In';
+  document.getElementById('authBtn').textContent = isSignUp ? h('login_create') : h('login_signin');
   document.getElementById('authToggle').innerHTML = isSignUp
-    ? 'Already have an account? <a onclick="toggleAuthMode()">Sign in</a>'
-    : 'Don\'t have an account? <a onclick="toggleAuthMode()">Create one</a>';
+    ? `${h('login_has_account')} <a onclick="toggleAuthMode()">${h('login_signin_link')}</a>`
+    : `${h('login_no_account')} <a onclick="toggleAuthMode()">${h('login_create_link')}</a>`;
   document.getElementById('loginError').classList.remove('show');
 }
 
@@ -850,11 +854,11 @@ async function handleAuth() {
   const errEl = document.getElementById('loginError');
   const btn = document.getElementById('authBtn');
 
-  if (!email || !password) { errEl.textContent = 'Please fill in both fields'; errEl.classList.add('show'); return; }
-  if (password.length < 6) { errEl.textContent = 'Password must be at least 6 characters'; errEl.classList.add('show'); return; }
+  if (!email || !password) { errEl.textContent = h('login_err_fields'); errEl.classList.add('show'); return; }
+  if (password.length < 6) { errEl.textContent = h('login_err_password'); errEl.classList.add('show'); return; }
 
   btn.disabled = true;
-  btn.textContent = isSignUp ? 'Creating account…' : 'Signing in…';
+  btn.textContent = isSignUp ? h('login_creating') : h('login_signing_in');
   errEl.classList.remove('show');
 
   try {
@@ -869,15 +873,15 @@ async function handleAuth() {
       errEl.textContent = result.error.message;
       errEl.classList.add('show');
       btn.disabled = false;
-      btn.textContent = isSignUp ? 'Create Account' : 'Sign In';
+      btn.textContent = isSignUp ? h('login_create') : h('login_signin');
       return;
     }
 
     if (isSignUp && result.data?.user?.identities?.length === 0) {
-      errEl.textContent = 'An account with this email already exists. Try signing in.';
+      errEl.textContent = h('login_err_exists');
       errEl.classList.add('show');
       btn.disabled = false;
-      btn.textContent = 'Create Account';
+      btn.textContent = h('login_create');
       return;
     }
 
@@ -885,10 +889,10 @@ async function handleAuth() {
     document.getElementById('loginOverlay').classList.add('hidden');
     init();
   } catch (e) {
-    errEl.textContent = 'Connection error. Please try again.';
+    errEl.textContent = h('login_err_connection');
     errEl.classList.add('show');
     btn.disabled = false;
-    btn.textContent = isSignUp ? 'Create Account' : 'Sign In';
+    btn.textContent = isSignUp ? h('login_create') : h('login_signin');
   }
 }
 
@@ -949,6 +953,16 @@ const HT = {
   en: {
     // Sidebar
     sidebar_overview: 'Overview', sidebar_property_sec: 'Property', sidebar_guests_sec: 'Guests', sidebar_share_sec: 'Share',
+    // Login
+    login_badge: 'Host Console',
+    login_signin: 'Sign In', login_create: 'Create Account',
+    login_signing_in: 'Signing in…', login_creating: 'Creating account…',
+    login_no_account: 'Don\'t have an account?', login_create_link: 'Create one',
+    login_has_account: 'Already have an account?', login_signin_link: 'Sign in',
+    login_err_fields: 'Please fill in both fields',
+    login_err_password: 'Password must be at least 6 characters',
+    login_err_exists: 'An account with this email already exists. Try signing in.',
+    login_err_connection: 'Connection error. Please try again.',
     sidebar_dashboard: 'Dashboard', sidebar_property: 'Property Details', sidebar_rules: 'House Rules',
     sidebar_recos: 'Recommendations', sidebar_checkins: 'Check-in Data', sidebar_export: 'Export / Alloggiati',
     sidebar_qr: 'QR Code & Link', sidebar_role: 'Property Manager',
@@ -1011,6 +1025,7 @@ const HT = {
     btn_copy_template: '📋 Copy Template',
     // Toasts
     toast_property_saved: 'Property details saved!', toast_rules_saved: 'House rules saved to database!',
+    toast_new_property: 'Welcome! Fill in your property details to get started.',
     toast_recos_saved: 'Recommendations saved to database!', toast_link_copied: 'Link copied to clipboard!',
     toast_template_copied: 'Template copied!', toast_istat: 'ISTAT report generated!',
     // Checkin table
@@ -1046,6 +1061,16 @@ const HT = {
   },
   it: {
     sidebar_overview: 'Panoramica', sidebar_property_sec: 'Proprietà', sidebar_guests_sec: 'Ospiti', sidebar_share_sec: 'Condividi',
+    // Login
+    login_badge: 'Console Host',
+    login_signin: 'Accedi', login_create: 'Crea Account',
+    login_signing_in: 'Accesso in corso…', login_creating: 'Creazione account…',
+    login_no_account: 'Non hai un account?', login_create_link: 'Creane uno',
+    login_has_account: 'Hai già un account?', login_signin_link: 'Accedi',
+    login_err_fields: 'Compila entrambi i campi',
+    login_err_password: 'La password deve essere di almeno 6 caratteri',
+    login_err_exists: 'Esiste già un account con questa email. Prova ad accedere.',
+    login_err_connection: 'Errore di connessione. Riprova.',
     sidebar_dashboard: 'Dashboard', sidebar_property: 'Dettagli Proprietà', sidebar_rules: 'Regole della Casa',
     sidebar_recos: 'Consigli', sidebar_checkins: 'Dati Check-in', sidebar_export: 'Export / Alloggiati',
     sidebar_qr: 'QR Code & Link', sidebar_role: 'Gestore Proprietà',
@@ -1099,6 +1124,7 @@ const HT = {
     template_desc: 'Invia questo agli ospiti quando prenotano. Personalizza come preferisci.',
     btn_copy_template: '📋 Copia Modello',
     toast_property_saved: 'Dettagli proprietà salvati!', toast_rules_saved: 'Regole salvate nel database!',
+    toast_new_property: 'Benvenuto! Compila i dettagli della tua proprietà per iniziare.',
     toast_recos_saved: 'Consigli salvati nel database!', toast_link_copied: 'Link copiato!',
     toast_template_copied: 'Modello copiato!', toast_istat: 'Report ISTAT generato!',
     all_checkins_title: 'Tutti i Check-in Ospiti',
@@ -1151,6 +1177,17 @@ function setHostLang(l) {
     const el = document.getElementById(id);
     if (el) el.textContent = h(key);
   });
+  // Update login form if visible
+  const authBtn = document.getElementById('authBtn');
+  if (authBtn && !authBtn.disabled) {
+    authBtn.textContent = isSignUp ? h('login_create') : h('login_signin');
+  }
+  const authToggle = document.getElementById('authToggle');
+  if (authToggle) {
+    authToggle.innerHTML = isSignUp
+      ? `${h('login_has_account')} <a onclick="toggleAuthMode()">${h('login_signin_link')}</a>`
+      : `${h('login_no_account')} <a onclick="toggleAuthMode()">${h('login_create_link')}</a>`;
+  }
   // Re-render dynamic content
   renderDashboard();
   renderCheckins();
@@ -2079,110 +2116,115 @@ async function init() {
   const authed = await checkAuth();
   if (!authed) return;
 
-  // Set sidebar user info from auth session
+  // Get current user
+  let userId = null;
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (session?.user) {
+      userId = session.user.id;
       const email = session.user.email || '';
       document.getElementById('sidebarUserName').textContent = email.split('@')[0];
       document.getElementById('sidebarAvatar').textContent = email.charAt(0).toUpperCase();
     }
   } catch (e) {}
 
-  // 1. Load property
+  if (!userId) { document.getElementById('loginOverlay').classList.remove('hidden'); return; }
+
+  // 1. Load property OWNED by this user
   try {
-    const { data } = await sb.from('properties').select('*').limit(1).single();
+    const { data, error } = await sb.from('properties').select('*').eq('owner_id', userId).limit(1).single();
     if (data) {
       propertyId = data.id;
       propertyData = data;
       console.log('✅ Property loaded:', data.name);
-      // Fill in property form fields
-      if (document.getElementById('propName')) document.getElementById('propName').value = data.name || '';
-      if (document.getElementById('propAddress')) document.getElementById('propAddress').value = data.address || '';
-      if (document.getElementById('propCity')) document.getElementById('propCity').value = `${data.city || ''} ${data.zip || ''}`.trim();
-      if (document.getElementById('propRegion')) document.getElementById('propRegion').value = data.region || '';
-      if (document.getElementById('cirCode')) document.getElementById('cirCode').value = data.cir_code || '';
-      if (document.getElementById('propCheckinTime')) document.getElementById('propCheckinTime').value = data.checkin_time || '15:00';
-      if (document.getElementById('propCheckoutTime')) document.getElementById('propCheckoutTime').value = data.checkout_time || '10:00';
-      if (document.getElementById('propAccess')) document.getElementById('propAccess').value = data.access_method || 'Self check-in · Keybox';
-      if (document.getElementById('propKeybox')) document.getElementById('propKeybox').value = data.keybox_code || '';
-      if (document.getElementById('propWifiName')) document.getElementById('propWifiName').value = data.wifi_name || '';
-      if (document.getElementById('propWifiPass')) document.getElementById('propWifiPass').value = data.wifi_password || '';
-      if (document.getElementById('propWelcome')) document.getElementById('propWelcome').value = data.welcome_message || '';
-      if (document.getElementById('propPhone')) document.getElementById('propPhone').value = data.host_phone || '';
-      if (document.getElementById('propHostNames')) document.getElementById('propHostNames').value = data.host_names || '';
-      // Load cover photo preview
-      if (data.hero_image_url) {
-        const preview = document.getElementById('coverPhotoPreview');
-        if (preview) {
-          preview.src = data.hero_image_url;
-          preview.style.display = 'block';
-          document.getElementById('coverPhotoPlaceholder').style.display = 'none';
-          document.getElementById('coverPhotoZone').classList.add('has-photo');
+      fillPropertyForm(data);
+    } else {
+      // No property for this user — try legacy (unowned properties) and claim it
+      const { data: unclaimed } = await sb.from('properties').select('*').is('owner_id', null).limit(1).single();
+      if (unclaimed) {
+        // Claim this property for the user
+        await sb.from('properties').update({ owner_id: userId }).eq('id', unclaimed.id);
+        propertyId = unclaimed.id;
+        propertyData = unclaimed;
+        console.log('✅ Claimed unowned property:', unclaimed.name);
+        fillPropertyForm(unclaimed);
+      } else {
+        // No property at all — create a blank one
+        const { data: newProp, error: createErr } = await sb.from('properties').insert({
+          owner_id: userId,
+          name: 'My Property',
+          city: '',
+          region: '',
+          property_type: 'apartment',
+        }).select('*').single();
+        if (newProp) {
+          propertyId = newProp.id;
+          propertyData = newProp;
+          console.log('✅ Created new property for user');
+          fillPropertyForm(newProp);
+          // Go straight to property details so they can fill it in
+          showPanel('property', document.querySelector('[onclick*=property]'));
+          toast(h('toast_new_property'));
         }
       }
-      // Update sidebar with host names
-      if (data.host_names) {
-        document.getElementById('sidebarUserName').textContent = data.host_names;
-        document.getElementById('sidebarAvatar').textContent = data.host_names.charAt(0);
-      }
     }
-  } catch (e) { console.log('No property found'); }
+  } catch (e) { console.log('Property load error:', e); }
 
-  // 2. Load check-ins
-  try {
-    const { data } = await sb.from('checkins').select('*').order('submitted_at', { ascending: false });
-    if (data) { allCheckins = data; console.log('✅ Loaded', data.length, 'check-ins'); }
-  } catch (e) {}
-
-  // 3. Load chat messages
-  try {
-    const { data } = await sb.from('chat_messages').select('*').order('created_at', { ascending: false });
-    if (data) { allChats = data; console.log('✅ Loaded', data.length, 'chat messages'); }
-  } catch (e) {}
-
-  // 4. Load rules
+  // 2. Load rules, recos, checkins, chats — all scoped by propertyId
   if (propertyId) {
     try {
       const { data } = await sb.from('rules').select('*').eq('property_id', propertyId).order('sort_order');
-      if (data && data.length > 0) { rulesData = data; console.log('✅ Loaded', data.length, 'rules'); }
-      else {
-        // Load defaults if DB is empty
-        rulesData = [
-          { icon: '🔇', title_en: 'Quiet Hours', desc_en: 'Keep noise to a minimum between 22:00 and 8:00.', is_important: true },
-          { icon: '🚭', title_en: 'No Smoking Inside', desc_en: 'Smoking not allowed inside. Use the balcony.', is_important: true },
-          { icon: '🐾', title_en: 'No Pets', desc_en: 'Unfortunately we cannot accommodate pets.', is_important: false },
-          { icon: '🗑', title_en: 'Waste Separation', desc_en: 'Separate bins: organic, plastic, paper, glass, general.', is_important: false },
-          { icon: '🔑', title_en: 'Keys & Lockbox', desc_en: 'Return keys to lockbox on departure, scramble the code.', is_important: false },
-          { icon: '💧', title_en: 'Water is Precious', desc_en: 'Puglia is dry — short showers appreciated!', is_important: false },
-        ];
-      }
+      if (data) rulesData = data;
     } catch (e) {}
-  }
-
-  // 5. Load recommendations
-  if (propertyId) {
     try {
       const { data } = await sb.from('recommendations').select('*').eq('property_id', propertyId).order('sort_order');
-      if (data && data.length > 0) { recoData = data; console.log('✅ Loaded', data.length, 'recommendations'); }
-      else {
-        recoData = [
-          { category: 'food', name: 'Terranima', desc_en: 'Best orecchiette in Bari. Book ahead.', tags: '🍝 Pasta, 💰 €€, 📍 5 min walk' },
-          { category: 'food', name: 'Pescaria', desc_en: 'Gourmet fish sandwiches — fast, fresh.', tags: '🐟 Seafood, 💰 €, 📍 3 min walk' },
-          { category: 'food', name: 'Al Pescatore', desc_en: 'Seafood lunch by the harbour.', tags: '🐟 Seafood, 💰 €€€, 📍 8 min walk' },
-          { category: 'drink', name: 'Piazza Mercantile', desc_en: 'Spritz + passeggiata at golden hour.', tags: '🍷 Wine, ☀ Sunset, 📍 4 min walk' },
-          { category: 'see', name: 'Basilica di San Nicola', desc_en: 'Great Romanesque church. See the crypt.', tags: '⛪ Church, 🎟 Free, 📍 4 min walk' },
-          { category: 'beach', name: 'Pane e Pomodoro', desc_en: 'Urban beach, sandy and free.', tags: '🏖 Sandy, 🎟 Free, 📍 10 min walk' },
-        ];
-      }
+      if (data) recoData = data;
+    } catch (e) {}
+    try {
+      const { data } = await sb.from('checkins').select('*').eq('property_id', propertyId).order('submitted_at', { ascending: false });
+      if (data) allCheckins = data;
+    } catch (e) {}
+    try {
+      const { data } = await sb.from('chat_messages').select('*').eq('property_id', propertyId).order('created_at', { ascending: false }).limit(50);
+      if (data) allChats = data;
     } catch (e) {}
   }
 
-  // 6. Render everything
   renderDashboard();
   renderCheckins();
   renderRules();
   renderRecos();
+}
+
+function fillPropertyForm(data) {
+  const el = (id) => document.getElementById(id);
+  if (el('propName')) el('propName').value = data.name || '';
+  if (el('propAddress')) el('propAddress').value = data.address || '';
+  if (el('propCity')) el('propCity').value = `${data.city || ''} ${data.zip || ''}`.trim();
+  if (el('propRegion')) el('propRegion').value = data.region || '';
+  if (el('cirCode')) el('cirCode').value = data.cir_code || '';
+  if (el('propCheckinTime')) el('propCheckinTime').value = data.checkin_time || '15:00';
+  if (el('propCheckoutTime')) el('propCheckoutTime').value = data.checkout_time || '10:00';
+  if (el('propAccess')) el('propAccess').value = data.access_method || 'Self check-in · Keybox';
+  if (el('propKeybox')) el('propKeybox').value = data.keybox_code || '';
+  if (el('propWifiName')) el('propWifiName').value = data.wifi_name || '';
+  if (el('propWifiPass')) el('propWifiPass').value = data.wifi_password || '';
+  if (el('propWelcome')) el('propWelcome').value = data.welcome_message || '';
+  if (el('propPhone')) el('propPhone').value = data.host_phone || '';
+  if (el('propHostNames')) el('propHostNames').value = data.host_names || '';
+  if (data.hero_image_url) {
+    const preview = el('coverPhotoPreview');
+    if (preview) {
+      preview.src = data.hero_image_url;
+      preview.style.display = 'block';
+      el('coverPhotoPlaceholder').style.display = 'none';
+      el('coverPhotoZone').classList.add('has-photo');
+    }
+  }
+  if (data.host_names) {
+    el('sidebarUserName').textContent = data.host_names;
+    el('sidebarAvatar').textContent = data.host_names.charAt(0);
+  }
 }
 
 init();

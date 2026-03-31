@@ -596,13 +596,13 @@ body {
     <div class="quick-card">
       <div class="quick-card-icon">🔑</div>
       <div class="quick-card-label">Check-in</div>
-      <div class="quick-card-value" id="checkinTime">&nbsp;</div>
+      <div class="quick-card-value" id="checkinTime" style="font-size:0.88rem">&nbsp;</div>
       <div class="quick-card-sub" id="accessMethod" data-i18n="checkin_sub">&nbsp;</div>
     </div>
     <div class="quick-card">
       <div class="quick-card-icon">🚪</div>
       <div class="quick-card-label">Check-out</div>
-      <div class="quick-card-value" id="checkoutTime">&nbsp;</div>
+      <div class="quick-card-value" id="checkoutTime" style="font-size:0.88rem">&nbsp;</div>
       <div class="quick-card-sub" data-i18n="checkout_sub">&nbsp;</div>
     </div>
   </div>
@@ -2361,8 +2361,16 @@ async function init() {
       if (el('wifiPass')) el('wifiPass').textContent = `Password: ${d.wifi_password || '—'}`;
       if (el('propAddress')) el('propAddress').textContent = d.address || '—';
       if (el('propCityZip')) el('propCityZip').textContent = `${d.zip || ''} ${d.city || ''} (${d.region || ''})`;
-      if (el('checkinTime')) el('checkinTime').textContent = d.checkin_time ? d.checkin_time.slice(0,5) : '15:00';
-      if (el('checkoutTime')) el('checkoutTime').textContent = d.checkout_time ? d.checkout_time.slice(0,5) : '10:00';
+      if (el('checkinTime')) {
+        const ci = d.checkin_time || '15:00';
+        const ciParts = ci.split('-');
+        el('checkinTime').textContent = ciParts.length === 2 ? `${ciParts[0].slice(0,5)} — ${ciParts[1].slice(0,5)}` : ci.slice(0,5);
+      }
+      if (el('checkoutTime')) {
+        const co = d.checkout_time || '10:00';
+        const coParts = co.split('-');
+        el('checkoutTime').textContent = coParts.length === 2 ? `${coParts[0].slice(0,5)} — ${coParts[1].slice(0,5)}` : co.slice(0,5);
+      }
       if (el('accessMethod')) el('accessMethod').textContent = d.access_method || 'Self check-in';
       if (el('hostName')) el('hostName').textContent = d.host_names || 'Your Host';
       if (el('hostAvatar')) el('hostAvatar').textContent = (d.host_names || 'H').charAt(0);
@@ -2387,9 +2395,10 @@ async function init() {
         chatKB.it.wifi = `La rete WiFi è **${d.wifi_name}**, password **${d.wifi_password}**. Ottima copertura.`;
       }
       if (d.checkout_time) {
-        const ct = d.checkout_time.slice(0,5);
-        chatKB.en.checkout = `Check-out is at **${ct}**. Leave keys in the lockbox and scramble the code. Strip bed linen and run the dishwasher if you can!`;
-        chatKB.it.checkout = `Check-out alle **${ct}**. Chiavi nella lockbox, mescolate il codice. Togliete le lenzuola e avviate la lavastoviglie!`;
+        const coParts = d.checkout_time.split('-');
+        const ct = coParts.length === 2 ? coParts[1].slice(0,5) : d.checkout_time.slice(0,5);
+        chatKB.en.checkout = `Check-out is by **${ct}**. Leave keys in the lockbox and scramble the code. Strip bed linen and run the dishwasher if you can!`;
+        chatKB.it.checkout = `Check-out entro le **${ct}**. Chiavi nella lockbox, mescolate il codice. Togliete le lenzuola e avviate la lavastoviglie!`;
       }
     }
   } catch (e) { console.log('Using fallback property data'); }

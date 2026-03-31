@@ -528,175 +528,182 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     <!-- ════════════ PROPERTY DETAILS ════════════ -->
     <div class="panel" id="panel-property">
       <div class="form-card">
-        <div class="form-card-title">Cover Photo</div>
-        <div class="form-card-desc">This photo appears as the hero image on the guest welcome screen.</div>
+        <div class="form-card-title" data-h="prop_cover">Cover Photo</div>
+        <div class="form-card-desc" data-h="prop_cover_desc">This photo appears as the hero image on the guest welcome screen.</div>
         <div class="photo-upload-zone" id="coverPhotoZone" onclick="document.getElementById('coverPhotoInput').click()">
           <img id="coverPhotoPreview" src="" style="display:none">
           <div class="photo-placeholder" id="coverPhotoPlaceholder">
             <div class="ph-icon">📸</div>
-            <div class="ph-text">Click to upload <strong>cover photo</strong></div>
-            <div class="ph-text" style="font-size:0.6rem;color:rgba(122,90,72,0.4)">JPG or PNG · Recommended 1200×600px</div>
+            <div class="ph-text" data-h="prop_cover_click">Click to upload cover photo</div>
+            <div class="ph-text" style="font-size:0.6rem;color:rgba(122,90,72,0.4)">JPG / PNG · 1200×600px</div>
           </div>
-          <div class="photo-upload-overlay">📸 Change Photo</div>
+          <div class="photo-upload-overlay">📸</div>
         </div>
         <input type="file" id="coverPhotoInput" accept="image/*" style="display:none" onchange="handleCoverUpload(this)">
         <div style="margin-top:8px;font-size:0.6rem;color:var(--ink-soft)" id="coverPhotoStatus"></div>
       </div>
 
       <div class="form-card">
-        <div class="form-card-title">Basic Information</div>
-        <div class="form-card-desc">This information will appear on the guest welcome screen.</div>
+        <div class="form-card-title" data-h="prop_basic">Basic Information</div>
+        <div class="form-card-desc" data-h="prop_basic_desc">This information will appear on the guest welcome screen.</div>
         <div class="form-grid">
           <div class="form-group">
-            <label class="form-label">Property Name</label>
+            <label class="form-label" data-h="prop_name">Property Name</label>
             <input class="form-input" value="" id="propName">
           </div>
           <div class="form-group">
-            <label class="form-label">Property Type</label>
-            <select class="form-select">
-              <option selected>Apartment</option>
-              <option>House</option>
-              <option>Villa</option>
-              <option>Room</option>
+            <label class="form-label" data-h="prop_type">Property Type</label>
+            <select class="form-select" id="propType">
+              <option value="apartment" data-h="prop_type_apt">Apartment</option>
+              <option value="house" data-h="prop_type_house">House</option>
+              <option value="villa" data-h="prop_type_villa">Villa</option>
+              <option value="room" data-h="prop_type_room">Room</option>
+              <option value="trullo" data-h="prop_type_trullo">Trullo</option>
+              <option value="masseria" data-h="prop_type_masseria">Masseria</option>
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Street Address</label>
+            <label class="form-label" data-h="prop_address">Street Address</label>
             <input class="form-input" value="" id="propAddress">
           </div>
           <div class="form-group">
-            <label class="form-label">City / ZIP</label>
+            <label class="form-label" data-h="prop_city">City / ZIP</label>
             <input class="form-input" value="" id="propCity">
           </div>
           <div class="form-group">
-            <label class="form-label">Region</label>
+            <label class="form-label" data-h="prop_region">Region</label>
             <input class="form-input" value="" id="propRegion">
           </div>
           <div class="form-group">
-            <label class="form-label">CIR Code (Regional ID)</label>
+            <label class="form-label" data-h="prop_cir">CIR Code (Regional ID)</label>
             <input class="form-input" placeholder="e.g., 072006-APP-00123" id="cirCode">
-            <div class="form-hint">Required for Puglia DMS reporting</div>
+            <div class="form-hint" data-h="prop_cir_hint">Required for Puglia DMS reporting</div>
           </div>
         </div>
       </div>
 
       <div class="form-card">
-        <div class="form-card-title">Check-in / Check-out</div>
-        <div class="form-card-desc">Times and access instructions for your guests.</div>
+        <div class="form-card-title" data-h="prop_times">Check-in / Check-out</div>
+        <div class="form-card-desc" data-h="prop_times_desc">Times and access instructions for your guests.</div>
         <div class="form-grid">
           <div class="form-group">
-            <label class="form-label">Check-in Time</label>
+            <label class="form-label" data-h="prop_checkin_time">Check-in Time</label>
             <input class="form-input" type="time" value="15:00" id="propCheckinTime">
           </div>
           <div class="form-group">
-            <label class="form-label">Check-out Time</label>
+            <label class="form-label" data-h="prop_checkout_time">Check-out Time</label>
             <input class="form-input" type="time" value="10:00" id="propCheckoutTime">
           </div>
           <div class="form-group">
-            <label class="form-label">Access Method</label>
+            <label class="form-label" data-h="prop_access">Access Method</label>
             <select class="form-select" id="propAccess">
-              <option selected>Self check-in · Keybox</option>
-              <option>In person handover</option>
-              <option>Smart lock</option>
+              <option value="Self check-in · Keybox" data-h="access_keybox">Self check-in · Keybox</option>
+              <option value="In person" data-h="access_person">In person handover</option>
+              <option value="Smart lock" data-h="access_smart">Smart lock</option>
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Keybox Code</label>
+            <label class="form-label" data-h="prop_keybox">Keybox Code</label>
             <input class="form-input" type="text" value="" id="propKeybox">
-            <div class="form-hint">Sent to guest before arrival (not shown in app)</div>
+            <div class="form-hint" data-h="prop_keybox_hint">Sent to guest before arrival (not shown in app)</div>
           </div>
         </div>
       </div>
 
       <div class="form-card">
-        <div class="form-card-title">WiFi & Essentials</div>
+        <div class="form-card-title" data-h="prop_wifi">WiFi & Essentials</div>
         <div class="form-grid">
           <div class="form-group">
-            <label class="form-label">WiFi Network</label>
+            <label class="form-label" data-h="prop_wifi_name">WiFi Network</label>
             <input class="form-input" value="" id="propWifiName">
           </div>
           <div class="form-group">
-            <label class="form-label">WiFi Password</label>
+            <label class="form-label" data-h="prop_wifi_pass">WiFi Password</label>
             <input class="form-input" value="" id="propWifiPass">
           </div>
           <div class="form-group full">
-            <label class="form-label">Host Welcome Message</label>
+            <label class="form-label" data-h="prop_welcome">Host Welcome Message</label>
             <textarea class="form-textarea" id="propWelcome"></textarea>
           </div>
           <div class="form-group">
-            <label class="form-label">Emergency Phone</label>
+            <label class="form-label" data-h="prop_emergency">Emergency Phone</label>
             <input class="form-input" value="" id="propPhone">
           </div>
           <div class="form-group">
-            <label class="form-label">Host Name(s)</label>
+            <label class="form-label" data-h="prop_host">Host Name(s)</label>
             <input class="form-input" value="" id="propHostNames">
           </div>
         </div>
       </div>
 
-      <button class="btn btn-primary" onclick="saveProperty()">💾 Save Property Details</button>
+      <button class="btn btn-primary" onclick="saveProperty()" data-h="btn_save_property">💾 Save Property Details</button>
     </div>
 
     <!-- ════════════ HOUSE RULES ════════════ -->
     <div class="panel" id="panel-rules">
-      <div class="alert alert-info">
-        ℹ️ These rules appear in the guest app's "Rules" tab. Drag to reorder. Mark important rules so they're highlighted.
+      <div class="alert alert-info" data-h="rules_info">
+        ℹ️ These rules appear in the guest app's "Rules" tab. Pick from common rules below, or add your own custom rules.
       </div>
 
+      <div style="margin-bottom:16px;">
+        <div style="font-size:0.55rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;" data-h="rules_preset_label">Quick-add common rules</div>
+        <div id="presetRulesGrid" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      </div>
+
+      <div style="font-size:0.55rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;" data-h="rules_your_rules">Your rules</div>
       <div class="edit-list" id="rulesList"></div>
 
       <div style="margin-top:16px; display:flex; gap:10px;">
-        <button class="btn btn-secondary" onclick="addRule()">+ Add Rule</button>
-        <button class="btn btn-primary" onclick="saveRules()">💾 Save Rules</button>
+        <button class="btn btn-secondary" onclick="addRule()" data-h="btn_add_rule">+ Add Custom Rule</button>
+        <button class="btn btn-primary" onclick="saveRules()" data-h="btn_save_rules">💾 Save Rules</button>
       </div>
     </div>
 
     <!-- ════════════ RECOMMENDATIONS ════════════ -->
     <div class="panel" id="panel-recos">
-      <div class="alert alert-info">
-        ℹ️ These appear in the guest app's "Explore" tab. Add your favorite restaurants, bars, sights, beaches, and shops. Include an address for the Google Maps link.
+      <div class="alert alert-info" data-h="recos_info">
       </div>
 
       <div class="panel-tabs" id="recoTabs">
-        <button class="panel-tab active" onclick="setRecoCat('food',this)">🍝 Food</button>
-        <button class="panel-tab" onclick="setRecoCat('drink',this)">🍷 Drinks</button>
-        <button class="panel-tab" onclick="setRecoCat('see',this)">👁 Sights</button>
-        <button class="panel-tab" onclick="setRecoCat('beach',this)">🏖 Beach</button>
-        <button class="panel-tab" onclick="setRecoCat('shop',this)">🛍 Shop</button>
+        <button class="panel-tab active" onclick="setRecoCat('food',this)" data-h="tab_food">🍝 Food</button>
+        <button class="panel-tab" onclick="setRecoCat('drink',this)" data-h="tab_drink">🍷 Drinks</button>
+        <button class="panel-tab" onclick="setRecoCat('see',this)" data-h="tab_see">👁 Sights</button>
+        <button class="panel-tab" onclick="setRecoCat('beach',this)" data-h="tab_beach">🏖 Beach</button>
+        <button class="panel-tab" onclick="setRecoCat('shop',this)" data-h="tab_shop">🛍 Shop</button>
       </div>
 
       <div class="edit-list" id="recoList"></div>
 
       <div style="margin-top:16px; display:flex; gap:10px;">
-        <button class="btn btn-secondary" onclick="addReco()">+ Add Recommendation</button>
-        <button class="btn btn-primary" onclick="saveRecos()">💾 Save</button>
+        <button class="btn btn-secondary" onclick="addReco()" data-h="btn_add_reco">+ Add Recommendation</button>
+        <button class="btn btn-primary" onclick="saveRecos()" data-h="btn_save_recos">💾 Save</button>
       </div>
     </div>
 
     <!-- ════════════ CHECK-IN DATA ════════════ -->
     <div class="panel" id="panel-checkins">
-      <div class="alert alert-warn">
+      <div class="alert alert-warn" data-h="checkins_warn">
         ⚠️ Italian law requires all guest data to be submitted to <strong>Alloggiati Web</strong> (State Police) within 24 hours of arrival. Puglia also requires <strong>Puglia DMS</strong> reporting.
       </div>
 
       <div class="table-wrap">
         <div class="table-header">
-          <div class="table-title" id="allCheckinsTitle">All Guest Check-ins</div>
+          <div class="table-title" id="allCheckinsTitle" data-h="all_checkins_title">All Guest Check-ins</div>
           <div style="display:flex;gap:8px;align-items:center;">
-            <button class="btn btn-secondary btn-sm" onclick="deleteAllCheckins()" style="color:var(--red);border-color:rgba(217,75,75,0.3);" id="btnDeleteAll">🗑 Delete All</button>
+            <button class="btn btn-secondary btn-sm" onclick="deleteAllCheckins()" style="color:var(--red);border-color:rgba(217,75,75,0.3);" id="btnDeleteAll" data-h="btn_delete_all">🗑 Delete All</button>
           </div>
         </div>
         <table>
           <thead>
             <tr>
-              <th>Guest</th>
-              <th>Type</th>
-              <th>Birth</th>
-              <th>Citizenship</th>
-              <th>Document</th>
-              <th>Submitted</th>
-              <th>Docs</th>
-              <th>Actions</th>
+              <th data-h="th_guest">Guest</th>
+              <th data-h="th_type">Type</th>
+              <th data-h="th_birth">Birth</th>
+              <th data-h="th_citizenship">Citizenship</th>
+              <th data-h="th_document">Document</th>
+              <th data-h="th_submitted">Submitted</th>
+              <th data-h="th_docs">Docs</th>
+              <th data-h="th_actions">Actions</th>
             </tr>
           </thead>
           <tbody id="checkinTable">
@@ -707,47 +714,19 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
     <!-- ════════════ EXPORT / ALLOGGIATI ════════════ -->
     <div class="panel" id="panel-export">
-      <div class="alert alert-info">
-        ℹ️ Generate files formatted for the Italian police portal (Alloggiati Web) and the regional tourism platform (Puglia DMS).
-      </div>
+      <div class="alert alert-info" data-h="export_info"></div>
 
       <div class="export-grid">
         <div class="export-card">
-          <h3>🏛 Alloggiati Web Export</h3>
-          <p>Generates a <strong>.txt file</strong> in the exact format required by the Polizia di Stato's Alloggiati Web portal. Includes all guest data: name, birth details, document info, check-in date.</p>
-          <div class="form-group" style="margin-bottom:12px">
-            <label class="form-label">Date Range</label>
-            <div style="display:flex;gap:8px;">
-              <input class="form-input" type="date" value="2026-03-15" style="font-size:0.72rem;">
-              <input class="form-input" type="date" value="2026-03-18" style="font-size:0.72rem;">
-            </div>
-          </div>
-          <button class="btn btn-primary" onclick="exportAlloggiati()">📥 Generate Alloggiati File</button>
+          <h3 data-h="export_alloggiati">🏛 Alloggiati Web Export</h3>
+          <p data-h="export_alloggiati_desc"></p>
+          <button class="btn btn-primary" onclick="exportAlloggiati()" data-h="btn_gen_alloggiati">📥 Generate Alloggiati File</button>
         </div>
 
         <div class="export-card">
-          <h3>🌐 Puglia DMS Export</h3>
-          <p>Generates a file for the <strong>Puglia regional tourism authority</strong>. Includes guest count, stay dates, property CIR code, and statistical data.</p>
-          <div class="form-group" style="margin-bottom:12px">
-            <label class="form-label">Month</label>
-            <select class="form-select" style="font-size:0.72rem;">
-              <option>March 2026</option>
-              <option>February 2026</option>
-            </select>
-          </div>
-          <button class="btn btn-primary" onclick="exportDMS()">📥 Generate DMS File</button>
-        </div>
-
-        <div class="export-card">
-          <h3>📊 CSV Export</h3>
-          <p>Download all guest check-in data as a <strong>CSV spreadsheet</strong> for your own records, accounting, or analysis.</p>
-          <button class="btn btn-secondary" onclick="exportCSV()" style="margin-top:auto">📥 Download CSV</button>
-        </div>
-
-        <div class="export-card">
-          <h3>📋 ISTAT / C59 Report</h3>
-          <p>Monthly statistical report for <strong>ISTAT tourism statistics</strong>. Nationality breakdown, arrival counts, average stay length.</p>
-          <button class="btn btn-secondary" onclick="exportISTAT()" style="margin-top:auto">📥 Generate Report</button>
+          <h3 data-h="export_csv">📊 CSV Export</h3>
+          <p data-h="export_csv_desc"></p>
+          <button class="btn btn-secondary" onclick="exportCSV()" style="margin-top:auto" data-h="btn_dl_csv">📥 Download CSV</button>
         </div>
       </div>
     </div>
@@ -995,9 +974,21 @@ const HT = {
     prop_wifi: 'WiFi & Essentials', prop_wifi_name: 'WiFi Network', prop_wifi_pass: 'WiFi Password',
     prop_welcome: 'Host Welcome Message', prop_emergency: 'Emergency Phone', prop_host: 'Host Name(s)',
     btn_save_property: '💾 Save Property Details',
+    // Property form
+    prop_cover: 'Cover Photo', prop_cover_desc: 'This photo appears as the hero image on the guest welcome screen.',
+    prop_cover_click: 'Click to upload cover photo',
+    prop_type_apt: 'Apartment', prop_type_house: 'House', prop_type_villa: 'Villa', prop_type_room: 'Room',
+    prop_type_trullo: 'Trullo', prop_type_masseria: 'Masseria',
+    access_keybox: 'Self check-in · Keybox', access_person: 'In person handover', access_smart: 'Smart lock',
     // Rules
-    rules_info: 'These rules appear in the guest app\'s "Rules" tab. Drag to reorder. Mark important rules so they\'re highlighted.',
-    btn_add_rule: '+ Add Rule', btn_save_rules: '💾 Save Rules',
+    rules_info: 'ℹ️ These rules appear in the guest app\'s "Rules" tab. Pick from common rules below, or add your own custom rules.',
+    rules_preset_label: 'Quick-add common rules',
+    rules_your_rules: 'Your rules',
+    rules_no_rules: 'No rules yet. Pick from presets above or add a custom rule.',
+    rules_title_en: 'Title (EN)', rules_title_it: 'Titolo (IT)',
+    rules_desc_en: 'Description (EN)', rules_desc_it: 'Descrizione (IT)',
+    rules_important: 'Important',
+    btn_add_rule: '+ Add Custom Rule', btn_save_rules: '💾 Save Rules',
     // Recos
     recos_info: 'These appear in the guest app\'s "Explore" tab. Add your favorite restaurants, bars, sights, beaches, and shops.',
     btn_add_reco: '+ Add Recommendation', btn_save_recos: '💾 Save',
@@ -1100,7 +1091,18 @@ const HT = {
     prop_wifi: 'WiFi & Essenziali', prop_wifi_name: 'Rete WiFi', prop_wifi_pass: 'Password WiFi',
     prop_welcome: 'Messaggio di Benvenuto', prop_emergency: 'Telefono Emergenza', prop_host: 'Nome Host',
     btn_save_property: '💾 Salva Dettagli Proprietà',
-    rules_info: 'Queste regole appaiono nella scheda "Regole" dell\'app ospiti. Trascina per riordinare. Segna le regole importanti.',
+    prop_cover: 'Foto Copertina', prop_cover_desc: 'Questa foto appare come immagine principale nella schermata di benvenuto.',
+    prop_cover_click: 'Clicca per caricare la foto',
+    prop_type_apt: 'Appartamento', prop_type_house: 'Casa', prop_type_villa: 'Villa', prop_type_room: 'Stanza',
+    prop_type_trullo: 'Trullo', prop_type_masseria: 'Masseria',
+    access_keybox: 'Self check-in · Lockbox', access_person: 'Consegna di persona', access_smart: 'Serratura smart',
+    rules_info: 'ℹ️ Queste regole appaiono nella scheda "Regole" dell\'app ospiti. Scegli dalle regole comuni o aggiungine di personalizzate.',
+    rules_preset_label: 'Aggiungi regole comuni',
+    rules_your_rules: 'Le tue regole',
+    rules_no_rules: 'Nessuna regola ancora. Scegli dai preset sopra o aggiungi una regola personalizzata.',
+    rules_title_en: 'Title (EN)', rules_title_it: 'Titolo (IT)',
+    rules_desc_en: 'Description (EN)', rules_desc_it: 'Descrizione (IT)',
+    rules_important: 'Importante',
     btn_add_rule: '+ Aggiungi Regola', btn_save_rules: '💾 Salva Regole',
     recos_info: 'Questi appaiono nella scheda "Esplora" dell\'app ospiti. Aggiungi i tuoi ristoranti, bar, luoghi preferiti.',
     btn_add_reco: '+ Aggiungi Consiglio', btn_save_recos: '💾 Salva',
@@ -1164,8 +1166,12 @@ function setHostLang(l) {
     btn.style.color = isActive ? 'var(--warm)' : 'var(--ink-soft)';
     btn.style.boxShadow = isActive ? '0 1px 3px rgba(30,16,8,0.06)' : 'none';
   });
-  // Update sidebar
-  document.querySelectorAll('[data-h]').forEach(el => { el.textContent = h(el.getAttribute('data-h')); });
+  // Update sidebar and all data-h elements
+  document.querySelectorAll('[data-h]').forEach(el => {
+    const val = h(el.getAttribute('data-h'));
+    if (val.includes('<')) el.innerHTML = val;
+    else el.textContent = val;
+  });
   // Update dynamic elements with IDs
   const idMap = {
     'allCheckinsTitle': 'all_checkins_title', 'btnDeleteAll': 'btn_delete_all',
@@ -1370,41 +1376,98 @@ async function saveProperty() {
 ══════════════════════════════════════ */
 let rulesData = [];
 
+/* ── Preset Rules Library (bilingual) ── */
+const PRESET_RULES = [
+  { icon:'🔇', title_en:'Quiet Hours', title_it:'Ore di Silenzio', desc_en:'Keep noise to a minimum between 22:00 and 8:00.', desc_it:'Mantenere il silenzio tra le 22:00 e le 8:00.', is_important:true },
+  { icon:'🚭', title_en:'No Smoking Inside', title_it:'Vietato Fumare', desc_en:'Smoking is not allowed inside. Please use the balcony or outdoor areas.', desc_it:'Vietato fumare all\'interno. Usare il balcone o le aree esterne.', is_important:true },
+  { icon:'🐾', title_en:'No Pets', title_it:'No Animali', desc_en:'Unfortunately we cannot accommodate pets.', desc_it:'Purtroppo non possiamo ospitare animali domestici.', is_important:false },
+  { icon:'🗑', title_en:'Waste Separation', title_it:'Raccolta Differenziata', desc_en:'Separate waste: organic, plastic, paper, glass, general. Bins are under the sink.', desc_it:'Separare i rifiuti: umido, plastica, carta, vetro, indifferenziata. I bidoni sono sotto il lavello.', is_important:false },
+  { icon:'🔑', title_en:'Keys & Lockbox', title_it:'Chiavi & Lockbox', desc_en:'On departure, return keys to the lockbox and scramble the code.', desc_it:'Alla partenza, rimettere le chiavi nella lockbox e mescolare il codice.', is_important:false },
+  { icon:'💧', title_en:'Water is Precious', title_it:'L\'Acqua è Preziosa', desc_en:'Puglia is dry — short showers are appreciated!', desc_it:'La Puglia è secca — docce brevi sono apprezzate!', is_important:false },
+  { icon:'🧹', title_en:'Leave it Tidy', title_it:'Lascia in Ordine', desc_en:'Strip bed linen and start the dishwasher before you leave. Thank you!', desc_it:'Togliere le lenzuola e avviare la lavastoviglie prima di partire. Grazie!', is_important:false },
+  { icon:'🅿️', title_en:'Parking', title_it:'Parcheggio', desc_en:'Free parking is available on the street. No reserved spot.', desc_it:'Parcheggio gratuito in strada. Nessun posto riservato.', is_important:false },
+  { icon:'🌡️', title_en:'Air Conditioning', title_it:'Aria Condizionata', desc_en:'Please close windows when the AC is on. Turn it off when you leave.', desc_it:'Chiudere le finestre quando il condizionatore è acceso. Spegnerlo quando si esce.', is_important:false },
+  { icon:'🏊', title_en:'Pool Rules', title_it:'Regole Piscina', desc_en:'No diving. Shower before entering. Children must be supervised at all times.', desc_it:'Vietato tuffarsi. Doccia prima di entrare. I bambini devono essere sempre sorvegliati.', is_important:true },
+  { icon:'🔥', title_en:'No Open Flames', title_it:'Niente Fiamme Libere', desc_en:'No candles, incense, or open flames inside the property.', desc_it:'Vietato accendere candele, incenso o fiamme libere all\'interno.', is_important:true },
+  { icon:'👥', title_en:'No Parties / Events', title_it:'No Feste / Eventi', desc_en:'Parties and events are not allowed. Maximum occupancy must be respected.', desc_it:'Feste ed eventi non sono permessi. Rispettare la capienza massima.', is_important:true },
+  { icon:'📶', title_en:'WiFi Fair Use', title_it:'WiFi Uso Corretto', desc_en:'WiFi is shared — please avoid heavy downloads or streaming on multiple devices.', desc_it:'Il WiFi è condiviso — evitare download pesanti o streaming su più dispositivi.', is_important:false },
+  { icon:'🚿', title_en:'Bathroom', title_it:'Bagno', desc_en:'Please don\'t flush anything other than toilet paper. Use the bin provided.', desc_it:'Non gettare nulla nel water tranne la carta igienica. Usare il cestino.', is_important:false },
+  { icon:'👟', title_en:'Shoes Off Inside', title_it:'Scarpe Fuori', desc_en:'Please remove shoes when entering. Slippers are provided.', desc_it:'Togliere le scarpe all\'ingresso. Le ciabatte sono a disposizione.', is_important:false },
+  { icon:'🚪', title_en:'Check-out by 10:00', title_it:'Check-out entro le 10:00', desc_en:'Please leave by 10:00 AM. Late check-out available on request.', desc_it:'Partenza entro le 10:00. Check-out tardivo disponibile su richiesta.', is_important:false },
+];
+
+function renderPresetRules() {
+  const existing = rulesData.map(r => (r.title_en || r.title || '').toLowerCase());
+  document.getElementById('presetRulesGrid').innerHTML = PRESET_RULES.map((p, i) => {
+    const alreadyAdded = existing.includes(p.title_en.toLowerCase());
+    return `<button type="button" onclick="addPresetRule(${i})" style="padding:5px 10px;border-radius:6px;font-size:0.62rem;border:1px solid ${alreadyAdded ? 'var(--green)' : 'var(--cream-3)'};background:${alreadyAdded ? 'rgba(109,191,130,0.06)' : 'var(--bg)'};color:${alreadyAdded ? 'var(--green)' : 'var(--ink-soft)'};cursor:${alreadyAdded ? 'default' : 'pointer'};transition:all 0.15s;" ${alreadyAdded ? 'disabled' : ''}>${p.icon} ${hostLang === 'it' ? p.title_it : p.title_en}${alreadyAdded ? ' ✓' : ''}</button>`;
+  }).join('');
+}
+
+function addPresetRule(idx) {
+  const p = PRESET_RULES[idx];
+  rulesData.push({ ...p });
+  renderRules();
+  renderPresetRules();
+}
+
 function renderRules() {
-  document.getElementById('rulesList').innerHTML = rulesData.map((r, i) => `
-    <div class="edit-item">
+  document.getElementById('rulesList').innerHTML = rulesData.length === 0
+    ? `<div style="text-align:center;padding:20px;color:var(--ink-soft)">${h('rules_no_rules')}</div>`
+    : rulesData.map((r, i) => `
+    <div class="edit-item" style="padding:12px;">
       <div class="edit-item-drag">⠿</div>
-      <div class="edit-item-body">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-          <input class="form-input" style="width:50px;text-align:center;padding:6px;" value="${r.icon}" onchange="rulesData[${i}].icon=this.value">
-          <input class="form-input" style="flex:1" value="${r.title_en||r.title||''}" onchange="rulesData[${i}].title_en=this.value">
-          <label style="display:flex;align-items:center;gap:4px;font-size:0.62rem;white-space:nowrap;color:var(--red);cursor:pointer;">
-            <input type="checkbox" ${r.is_important?'checked':''} onchange="rulesData[${i}].is_important=this.checked"> Important
+      <div class="edit-item-body" style="flex:1;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <input class="form-input" style="width:50px;text-align:center;padding:6px;font-size:1.1rem;" value="${r.icon}" onchange="rulesData[${i}].icon=this.value" title="Emoji">
+          <div style="flex:1;display:flex;gap:6px;">
+            <div style="flex:1;">
+              <label style="font-size:0.5rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:2px;">${h('rules_title_en')}</label>
+              <input class="form-input" style="font-size:0.75rem;" value="${r.title_en||r.title||''}" onchange="rulesData[${i}].title_en=this.value">
+            </div>
+            <div style="flex:1;">
+              <label style="font-size:0.5rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:2px;">${h('rules_title_it')}</label>
+              <input class="form-input" style="font-size:0.75rem;" value="${r.title_it||''}" onchange="rulesData[${i}].title_it=this.value">
+            </div>
+          </div>
+          <label style="display:flex;align-items:center;gap:4px;font-size:0.58rem;white-space:nowrap;color:var(--red);cursor:pointer;">
+            <input type="checkbox" ${r.is_important?'checked':''} onchange="rulesData[${i}].is_important=this.checked"> ${h('rules_important')}
           </label>
         </div>
-        <textarea class="form-textarea" style="min-height:44px;font-size:0.72rem;" onchange="rulesData[${i}].desc_en=this.value">${r.desc_en||r.desc||''}</textarea>
+        <div style="display:flex;gap:6px;">
+          <div style="flex:1;">
+            <label style="font-size:0.5rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:2px;">${h('rules_desc_en')}</label>
+            <textarea class="form-textarea" style="min-height:38px;font-size:0.7rem;" onchange="rulesData[${i}].desc_en=this.value">${r.desc_en||r.desc||''}</textarea>
+          </div>
+          <div style="flex:1;">
+            <label style="font-size:0.5rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:2px;">${h('rules_desc_it')}</label>
+            <textarea class="form-textarea" style="min-height:38px;font-size:0.7rem;" onchange="rulesData[${i}].desc_it=this.value">${r.desc_it||''}</textarea>
+          </div>
+        </div>
       </div>
-      <div class="edit-item-actions">
-        <button onclick="rulesData.splice(${i},1);renderRules()">🗑</button>
+      <div class="edit-item-actions" style="align-self:flex-start;padding-top:18px;">
+        <button onclick="rulesData.splice(${i},1);renderRules();renderPresetRules()">🗑</button>
       </div>
     </div>
-  `).join('') || '<div style="text-align:center;padding:20px;color:var(--ink-soft)">No rules yet. Click "Add Rule" to create one.</div>';
+  `).join('');
+  renderPresetRules();
 }
 
 function addRule() {
-  rulesData.push({ icon: '📌', title_en: 'New Rule', desc_en: 'Describe the rule...', is_important: false });
+  rulesData.push({ icon: '📌', title_en: '', title_it: '', desc_en: '', desc_it: '', is_important: false });
   renderRules();
 }
 
 async function saveRules() {
   if (!propertyId) return;
-  // Delete existing rules and re-insert
   await sb.from('rules').delete().eq('property_id', propertyId);
   const rows = rulesData.map((r, i) => ({
     property_id: propertyId,
     icon: r.icon,
     title_en: r.title_en || r.title || '',
+    title_it: r.title_it || '',
     desc_en: r.desc_en || r.desc || '',
+    desc_it: r.desc_it || '',
     is_important: r.is_important || false,
     sort_order: i,
   }));
@@ -1412,7 +1475,7 @@ async function saveRules() {
     const { error } = await sb.from('rules').insert(rows);
     if (error) { console.error(error); toast('Error saving rules!'); return; }
   }
-  toast('House rules saved to database!');
+  toast(h('toast_rules_saved'));
 }
 
 /* ══════════════════════════════════════

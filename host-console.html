@@ -71,7 +71,7 @@ body { display: flex; overflow: hidden; }
   display: flex; align-items: center; gap: 10px;
   padding: 9px 12px; border-radius: var(--radius-s);
   cursor: pointer; transition: all 0.15s;
-  font-size: 0.78rem; color: rgba(244,237,224,0.55);
+  font-size: 0.85rem; color: rgba(244,237,224,0.55);
   font-weight: 400; border: none; background: none;
   width: 100%; text-align: left; font-family: 'DM Sans', sans-serif;
 }
@@ -94,7 +94,7 @@ body { display: flex; overflow: hidden; }
   display: flex; align-items: center; justify-content: center;
   font-size: 0.72rem; color: #fff; font-weight: 600;
 }
-.sidebar-user-name { font-size: 0.72rem; color: rgba(244,237,224,0.8); }
+.sidebar-user-name { font-size: 0.82rem; color: rgba(244,237,224,0.8); }
 .sidebar-user-role { font-size: 0.52rem; color: rgba(244,237,224,0.35); }
 
 /* ── MAIN CONTENT ── */
@@ -108,13 +108,13 @@ body { display: flex; overflow: hidden; }
   position: sticky; top: 0; z-index: 50;
 }
 .main-title { font-family: 'Playfair Display', serif; font-size: 1.35rem; font-weight: 500; }
-.main-subtitle { font-size: 0.72rem; color: var(--ink-soft); font-weight: 300; margin-top: 2px; }
+.main-subtitle { font-size: 0.82rem; color: var(--ink-soft); font-weight: 300; margin-top: 2px; }
 
 .header-actions { display: flex; gap: 8px; }
 .btn {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 8px 16px; border-radius: var(--radius-s);
-  font-family: 'DM Sans', sans-serif; font-size: 0.75rem;
+  font-family: 'DM Sans', sans-serif; font-size: 0.82rem;
   font-weight: 600; cursor: pointer; transition: all 0.15s;
   border: none; text-decoration: none;
 }
@@ -124,7 +124,7 @@ body { display: flex; overflow: hidden; }
 .btn-secondary:hover { background: var(--cream-3); }
 .btn-success { background: var(--green); color: #fff; }
 .btn-danger { background: var(--red); color: #fff; }
-.btn-sm { padding: 5px 10px; font-size: 0.68rem; }
+.btn-sm { padding: 5px 10px; font-size: 0.75rem; }
 
 .content { flex: 1; padding: 24px 28px 40px; }
 
@@ -143,14 +143,14 @@ body { display: flex; overflow: hidden; }
   box-shadow: var(--shadow-s);
 }
 .stat-label {
-  font-size: 0.5rem; letter-spacing: 0.16em;
+  font-size: 0.6rem; letter-spacing: 0.16em;
   text-transform: uppercase; color: var(--ink-soft); margin-bottom: 6px;
 }
 .stat-value {
   font-family: 'Playfair Display', serif;
   font-size: 1.8rem; font-weight: 500; color: var(--ink); line-height: 1;
 }
-.stat-change { font-size: 0.62rem; margin-top: 4px; font-weight: 500; }
+.stat-change { font-size: 0.72rem; margin-top: 4px; font-weight: 500; }
 .stat-change.up { color: var(--green); }
 .stat-change.down { color: var(--red); }
 
@@ -164,18 +164,18 @@ body { display: flex; overflow: hidden; }
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 18px; border-bottom: 1px solid var(--border);
 }
-.table-title { font-weight: 600; font-size: 0.85rem; }
+.table-title { font-weight: 600; font-size: 0.95rem; }
 table { width: 100%; border-collapse: collapse; }
 th {
   text-align: left; padding: 10px 16px;
-  font-size: 0.5rem; letter-spacing: 0.14em;
+  font-size: 0.62rem; letter-spacing: 0.14em;
   text-transform: uppercase; color: var(--ink-soft);
   border-bottom: 1px solid var(--border);
   background: rgba(250,246,240,0.5);
   font-weight: 600;
 }
 td {
-  padding: 12px 16px; font-size: 0.78rem;
+  padding: 12px 16px; font-size: 0.85rem;
   border-bottom: 1px solid rgba(194,113,79,0.06);
   color: var(--ink-2);
 }
@@ -184,7 +184,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
 .status-badge {
   display: inline-block; padding: 2px 8px;
-  border-radius: 4px; font-size: 0.6rem;
+  border-radius: 4px; font-size: 0.7rem;
   font-weight: 600; letter-spacing: 0.04em;
 }
 .status-badge.complete { background: var(--green-bg); color: var(--green); }
@@ -201,16 +201,16 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   font-family: 'Playfair Display', serif;
   font-size: 1.1rem; font-weight: 500; margin-bottom: 4px;
 }
-.form-card-desc { font-size: 0.72rem; color: var(--ink-soft); margin-bottom: 18px; font-weight: 300; }
+.form-card-desc { font-size: 0.82rem; color: var(--ink-soft); margin-bottom: 18px; font-weight: 300; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .form-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
 .form-group { display: flex; flex-direction: column; gap: 4px; }
 .form-group.full { grid-column: 1 / -1; }
-.form-label { font-size: 0.65rem; font-weight: 600; color: var(--ink-2); letter-spacing: 0.04em; }
+.form-label { font-size: 0.75rem; font-weight: 600; color: var(--ink-2); letter-spacing: 0.04em; }
 .form-input, .form-select, .form-textarea {
-  padding: 9px 12px; border: 1px solid var(--border);
+  padding: 10px 12px; border: 1px solid var(--border);
   border-radius: var(--radius-s); font-family: 'DM Sans', sans-serif;
-  font-size: 0.8rem; color: var(--ink); background: var(--white);
+  font-size: 0.88rem; color: var(--ink); background: var(--white);
   transition: border-color 0.2s; width: 100%;
 }
 .form-input:focus, .form-select:focus, .form-textarea:focus {
@@ -218,7 +218,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   box-shadow: 0 0 0 3px rgba(194,113,79,0.08);
 }
 .form-textarea { min-height: 80px; resize: vertical; }
-.form-hint { font-size: 0.58rem; color: var(--ink-soft); }
+.form-hint { font-size: 0.68rem; color: var(--ink-soft); }
 
 /* ── EDITABLE LIST ── */
 .edit-list { display: flex; flex-direction: column; gap: 10px; }
@@ -239,9 +239,10 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
 /* ── ALERT ── */
 .alert {
-  padding: 12px 16px; border-radius: var(--radius-s);
-  font-size: 0.75rem; margin-bottom: 16px;
+  padding: 14px 18px; border-radius: var(--radius-s);
+  font-size: 0.85rem; margin-bottom: 16px;
   display: flex; align-items: flex-start; gap: 8px;
+  line-height: 1.5;
 }
 .alert-info { background: var(--blue-bg); color: var(--blue); border: 1px solid rgba(74,144,217,0.15); }
 .alert-success { background: var(--green-bg); color: #2d7a4a; border: 1px solid rgba(76,175,125,0.15); }
@@ -259,16 +260,16 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   background: #fff; border: 1px solid #eee;
   border-radius: 8px; display: flex;
   align-items: center; justify-content: center;
-  font-size: 0.7rem; color: var(--ink-soft);
+  font-size: 0.8rem; color: var(--ink-soft);
 }
 .qr-box canvas { width: 140px !important; height: 140px !important; }
-.qr-info h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; }
-.qr-info p { font-size: 0.72rem; color: var(--ink-soft); line-height: 1.6; font-weight: 300; }
+.qr-info h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 4px; }
+.qr-info p { font-size: 0.82rem; color: var(--ink-soft); line-height: 1.6; font-weight: 300; }
 .qr-link {
   display: inline-flex; align-items: center; gap: 6px;
   background: var(--cream-2); border-radius: 6px;
   padding: 6px 12px; margin-top: 10px;
-  font-size: 0.72rem; color: var(--warm); font-weight: 500;
+  font-size: 0.82rem; color: var(--warm); font-weight: 500;
   word-break: break-all;
 }
 
@@ -282,8 +283,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   border-radius: var(--radius); padding: 20px;
   box-shadow: var(--shadow-s);
 }
-.export-card h3 { font-size: 0.88rem; font-weight: 600; margin-bottom: 4px; }
-.export-card p { font-size: 0.68rem; color: var(--ink-soft); line-height: 1.5; margin-bottom: 12px; font-weight: 300; }
+.export-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; }
+.export-card p { font-size: 0.82rem; color: var(--ink-soft); line-height: 1.5; margin-bottom: 12px; font-weight: 300; }
 
 /* ── TABS inside panels ── */
 .panel-tabs {
@@ -291,7 +292,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   margin-bottom: 20px;
 }
 .panel-tab {
-  padding: 8px 18px; font-size: 0.75rem; font-weight: 500;
+  padding: 8px 18px; font-size: 0.82rem; font-weight: 500;
   color: var(--ink-soft); cursor: pointer; border: none;
   background: none; font-family: 'DM Sans', sans-serif;
   border-bottom: 2px solid transparent; transition: all 0.15s;
@@ -527,6 +528,36 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
     <!-- ════════════ PROPERTY DETAILS ════════════ -->
     <div class="panel" id="panel-property">
+
+      <!-- Onboarding banner for new users -->
+      <div id="onboardingBanner" style="display:none;position:relative;margin-bottom:20px;padding:20px 24px;background:linear-gradient(135deg,rgba(194,113,79,0.08),rgba(201,169,110,0.08));border:1px solid rgba(194,113,79,0.2);border-radius:12px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+          <span style="font-size:1.8rem;">👋</span>
+          <div>
+            <div style="font-family:'Playfair Display',serif;font-size:1.15rem;font-weight:500;color:var(--ink);" data-h="onboard_title">Welcome to Doorstep!</div>
+            <div style="font-size:0.82rem;color:var(--ink-soft);line-height:1.5;margin-top:4px;" data-h="onboard_desc">Start by filling in your property details below. This information will appear in your guest app. Once done, head to <strong>House Rules</strong> and <strong>Recommendations</strong> to set up the full guest experience.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--white);border-radius:6px;font-size:0.75rem;color:var(--ink-soft);border:1px solid var(--border);">
+            <span style="width:18px;height:18px;border-radius:50%;background:var(--warm);color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:700;">1</span>
+            <span data-h="onboard_step1">Property Details</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--white);border-radius:6px;font-size:0.75rem;color:var(--ink-soft);border:1px solid var(--border);">
+            <span style="width:18px;height:18px;border-radius:50%;background:var(--cream-3);color:var(--ink-soft);display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:700;">2</span>
+            <span data-h="onboard_step2">House Rules</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--white);border-radius:6px;font-size:0.75rem;color:var(--ink-soft);border:1px solid var(--border);">
+            <span style="width:18px;height:18px;border-radius:50%;background:var(--cream-3);color:var(--ink-soft);display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:700;">3</span>
+            <span data-h="onboard_step3">Recommendations</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--white);border-radius:6px;font-size:0.75rem;color:var(--ink-soft);border:1px solid var(--border);">
+            <span style="width:18px;height:18px;border-radius:50%;background:var(--cream-3);color:var(--ink-soft);display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:700;">4</span>
+            <span data-h="onboard_step4">Share with Guests</span>
+          </div>
+        </div>
+        <button onclick="document.getElementById('onboardingBanner').style.display='none'" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:1rem;color:var(--ink-soft);cursor:pointer;opacity:0.5;">✕</button>
+      </div>
       <div class="form-card">
         <div class="form-card-title" data-h="prop_cover">Cover Photo</div>
         <div class="form-card-desc" data-h="prop_cover_desc">This photo appears as the hero image on the guest welcome screen.</div>
@@ -588,11 +619,19 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label" data-h="prop_checkin_time">Check-in Time</label>
-            <input class="form-input" type="time" value="15:00" id="propCheckinTime">
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input class="form-input" type="time" value="15:00" id="propCheckinFrom" style="flex:1;">
+              <span style="font-size:0.75rem;color:var(--ink-soft);">→</span>
+              <input class="form-input" type="time" value="20:00" id="propCheckinTo" style="flex:1;">
+            </div>
           </div>
           <div class="form-group">
             <label class="form-label" data-h="prop_checkout_time">Check-out Time</label>
-            <input class="form-input" type="time" value="10:00" id="propCheckoutTime">
+            <div style="display:flex;gap:6px;align-items:center;">
+              <input class="form-input" type="time" value="08:00" id="propCheckoutFrom" style="flex:1;">
+              <span style="font-size:0.75rem;color:var(--ink-soft);">→</span>
+              <input class="form-input" type="time" value="10:00" id="propCheckoutTo" style="flex:1;">
+            </div>
           </div>
           <div class="form-group">
             <label class="form-label" data-h="prop_access">Access Method</label>
@@ -724,9 +763,21 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
 
         <div class="export-card">
+          <h3 data-h="export_dms">🌐 Puglia DMS Export</h3>
+          <p data-h="export_dms_desc"></p>
+          <button class="btn btn-primary" onclick="exportDMS()" data-h="btn_gen_dms">📥 Generate DMS File</button>
+        </div>
+
+        <div class="export-card">
           <h3 data-h="export_csv">📊 CSV Export</h3>
           <p data-h="export_csv_desc"></p>
           <button class="btn btn-secondary" onclick="exportCSV()" style="margin-top:auto" data-h="btn_dl_csv">📥 Download CSV</button>
+        </div>
+
+        <div class="export-card">
+          <h3 data-h="export_istat">📋 ISTAT / C59 Report</h3>
+          <p data-h="export_istat_desc"></p>
+          <button class="btn btn-secondary" onclick="exportISTAT()" style="margin-top:auto" data-h="btn_gen_istat">📥 Generate Report</button>
         </div>
       </div>
     </div>
@@ -1017,6 +1068,12 @@ const HT = {
     // Toasts
     toast_property_saved: 'Property details saved!', toast_rules_saved: 'House rules saved to database!',
     toast_new_property: 'Welcome! Fill in your property details to get started.',
+    onboard_title: 'Welcome to Doorstep!',
+    onboard_desc: 'Start by filling in your property details below. This information will appear in your guest app. Once done, head to <strong>House Rules</strong> and <strong>Recommendations</strong> to set up the full guest experience.',
+    onboard_step1: 'Property Details',
+    onboard_step2: 'House Rules',
+    onboard_step3: 'Recommendations',
+    onboard_step4: 'Share with Guests',
     toast_recos_saved: 'Recommendations saved to database!', toast_link_copied: 'Link copied to clipboard!',
     toast_template_copied: 'Template copied!', toast_istat: 'ISTAT report generated!',
     // Checkin table
@@ -1127,6 +1184,12 @@ const HT = {
     btn_copy_template: '📋 Copia Modello',
     toast_property_saved: 'Dettagli proprietà salvati!', toast_rules_saved: 'Regole salvate nel database!',
     toast_new_property: 'Benvenuto! Compila i dettagli della tua proprietà per iniziare.',
+    onboard_title: 'Benvenuto su Doorstep!',
+    onboard_desc: 'Inizia compilando i dettagli della tua proprietà qui sotto. Queste informazioni appariranno nell\'app ospiti. Poi vai su <strong>Regole della Casa</strong> e <strong>Consigli</strong> per completare l\'esperienza ospite.',
+    onboard_step1: 'Dettagli Proprietà',
+    onboard_step2: 'Regole della Casa',
+    onboard_step3: 'Consigli',
+    onboard_step4: 'Condividi con Ospiti',
     toast_recos_saved: 'Consigli salvati nel database!', toast_link_copied: 'Link copiato!',
     toast_template_copied: 'Modello copiato!', toast_istat: 'Report ISTAT generato!',
     all_checkins_title: 'Tutti i Check-in Ospiti',
@@ -1355,8 +1418,8 @@ async function saveProperty() {
     city: document.getElementById('propCity').value,
     region: document.getElementById('propRegion').value,
     cir_code: document.getElementById('cirCode').value,
-    checkin_time: document.getElementById('propCheckinTime').value,
-    checkout_time: document.getElementById('propCheckoutTime').value,
+    checkin_time: document.getElementById('propCheckinFrom').value + '-' + document.getElementById('propCheckinTo').value,
+    checkout_time: document.getElementById('propCheckoutFrom').value + '-' + document.getElementById('propCheckoutTo').value,
     access_method: document.getElementById('propAccess').value,
     keybox_code: document.getElementById('propKeybox').value,
     wifi_name: document.getElementById('propWifiName').value,
@@ -2225,8 +2288,9 @@ async function init() {
           propertyData = newProp;
           console.log('✅ Created new property for user');
           fillPropertyForm(newProp);
-          // Go straight to property details so they can fill it in
+          // Show onboarding
           showPanel('property', document.querySelector('[onclick*=property]'));
+          document.getElementById('onboardingBanner').style.display = 'block';
           toast(h('toast_new_property'));
         }
       }
@@ -2266,8 +2330,13 @@ function fillPropertyForm(data) {
   if (el('propCity')) el('propCity').value = `${data.city || ''} ${data.zip || ''}`.trim();
   if (el('propRegion')) el('propRegion').value = data.region || '';
   if (el('cirCode')) el('cirCode').value = data.cir_code || '';
-  if (el('propCheckinTime')) el('propCheckinTime').value = data.checkin_time || '15:00';
-  if (el('propCheckoutTime')) el('propCheckoutTime').value = data.checkout_time || '10:00';
+  // Check-in time: stored as "15:00-20:00" or legacy "15:00"
+  const ciParts = (data.checkin_time || '15:00-20:00').split('-');
+  if (el('propCheckinFrom')) el('propCheckinFrom').value = ciParts[0] || '15:00';
+  if (el('propCheckinTo')) el('propCheckinTo').value = ciParts[1] || '20:00';
+  const coParts = (data.checkout_time || '08:00-10:00').split('-');
+  if (el('propCheckoutFrom')) el('propCheckoutFrom').value = coParts[0] || '08:00';
+  if (el('propCheckoutTo')) el('propCheckoutTo').value = coParts[1] || '10:00';
   if (el('propAccess')) el('propAccess').value = data.access_method || 'Self check-in · Keybox';
   if (el('propKeybox')) el('propKeybox').value = data.keybox_code || '';
   if (el('propWifiName')) el('propWifiName').value = data.wifi_name || '';

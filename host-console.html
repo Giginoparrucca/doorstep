@@ -64,14 +64,14 @@ body { display: flex; overflow: hidden; }
 
 .sidebar-nav { flex: 1; padding: 12px 10px; overflow-y: auto; }
 .sidebar-section {
-  font-size: 0.46rem; letter-spacing: 0.2em; text-transform: uppercase;
+  font-size: 0.52rem; letter-spacing: 0.2em; text-transform: uppercase;
   color: rgba(201,169,110,0.4); padding: 12px 10px 6px;
 }
 .sidebar-item {
   display: flex; align-items: center; gap: 10px;
-  padding: 9px 12px; border-radius: var(--radius-s);
+  padding: 10px 12px; border-radius: var(--radius-s);
   cursor: pointer; transition: all 0.15s;
-  font-size: 0.85rem; color: rgba(244,237,224,0.55);
+  font-size: 0.88rem; color: rgba(244,237,224,0.55);
   font-weight: 400; border: none; background: none;
   width: 100%; text-align: left; font-family: 'DM Sans', sans-serif;
 }
@@ -285,6 +285,15 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 }
 .export-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; }
 .export-card p { font-size: 0.82rem; color: var(--ink-soft); line-height: 1.5; margin-bottom: 12px; font-weight: 300; }
+.export-portal-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-top: 10px; padding: 8px 14px;
+  background: var(--cream-2); border: 1px solid var(--border);
+  border-radius: 8px; font-size: 0.82rem; font-weight: 500;
+  color: var(--warm); text-decoration: none;
+  transition: all 0.15s; width: 100%; justify-content: center;
+}
+.export-portal-link:hover { background: rgba(194,113,79,0.08); border-color: var(--warm); }
 
 /* ── TABS inside panels ── */
 .panel-tabs {
@@ -300,6 +309,9 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 .panel-tab.active { color: var(--warm); border-bottom-color: var(--warm); }
 
 /* ── RESPONSIVE ── */
+/* ══════════════════════════════════════
+   MOBILE RESPONSIVE
+══════════════════════════════════════ */
 @media (max-width: 860px) {
   .sidebar { position: fixed; left: -260px; top: 0; bottom: 0; transition: left 0.3s; z-index: 200; }
   .sidebar.open { left: 0; }
@@ -307,19 +319,129 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   .form-grid { grid-template-columns: 1fr; }
   .export-grid { grid-template-columns: 1fr; }
   .stat-grid { grid-template-columns: 1fr 1fr; }
+  .qr-preview { flex-direction: column; text-align: center; }
+  .qr-box { margin: 0 auto; }
+  .main-header { padding: 14px 16px; }
+  .content { padding: 16px 14px 32px; }
+
+  /* Check-in table → card layout on mobile */
+  .table-wrap table, .table-wrap thead, .table-wrap tbody, .table-wrap th, .table-wrap td, .table-wrap tr {
+    display: block;
+  }
+  .table-wrap thead { display: none; }
+  .table-wrap tr {
+    padding: 14px 16px; margin-bottom: 8px;
+    border: 1px solid var(--border); border-radius: 10px;
+    background: var(--white); box-shadow: var(--shadow-s);
+  }
+  .table-wrap td {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 5px 0; border-bottom: none;
+    font-size: 0.88rem;
+  }
+  .table-wrap td::before {
+    content: attr(data-label);
+    font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--ink-soft); font-weight: 600; flex-shrink: 0; margin-right: 12px;
+  }
+  .table-wrap td:first-child { font-size: 0.95rem; font-weight: 600; margin-bottom: 2px; }
+  .table-wrap td:first-child::before { display: none; }
+
+  /* Edit items stack better */
+  .edit-item { flex-direction: column; }
+  .edit-item-drag { display: none; }
+  .edit-item-actions { align-self: flex-end; }
+}
+
+@media (max-width: 520px) {
+  /* Layout */
+  .main-header { padding: 12px 14px; gap: 8px; }
+  .main-title { font-size: 1.2rem; }
+  .main-subtitle { font-size: 0.82rem; }
+  .content { padding: 12px 10px 28px; }
+  .header-actions { gap: 4px; }
+
+  /* Bigger touch targets */
+  .btn { padding: 12px 18px; font-size: 0.92rem; min-height: 48px; }
+  .btn-sm { padding: 10px 14px; font-size: 0.82rem; min-height: 42px; }
+
+  /* Forms — bigger & more spaced */
+  .form-card { padding: 16px; margin-bottom: 14px; }
+  .form-card-title { font-size: 1.1rem; }
+  .form-card-desc { font-size: 0.88rem; margin-bottom: 14px; }
+  .form-label { font-size: 0.82rem; margin-bottom: 2px; }
+  .form-input, .form-select, .form-textarea {
+    padding: 12px 14px; font-size: 0.95rem; min-height: 48px;
+  }
+  .form-hint { font-size: 0.75rem; }
+  .form-group { gap: 5px; }
+  .form-grid { gap: 12px; }
+
+  /* Stats */
+  .stat-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat-card { padding: 14px 16px; }
+  .stat-label { font-size: 0.65rem; }
+  .stat-value { font-size: 1.5rem; }
+  .stat-change { font-size: 0.75rem; }
+
+  /* Tables (card mode) */
+  .table-wrap tr { padding: 12px 14px; }
+  .table-wrap td { font-size: 0.88rem; padding: 4px 0; }
+
+  /* Alerts */
+  .alert { padding: 14px 16px; font-size: 0.88rem; line-height: 1.6; }
+
+  /* Tabs — horizontal scroll */
+  .panel-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; gap: 0; }
+  .panel-tab { padding: 10px 16px; font-size: 0.85rem; white-space: nowrap; flex-shrink: 0; }
+
+  /* Export — full width prominent buttons */
+  .export-grid { gap: 12px; }
+  .export-card { padding: 18px; }
+  .export-card h3 { font-size: 1rem; }
+  .export-card p { font-size: 0.85rem; line-height: 1.6; }
+  .export-card .btn { width: 100%; justify-content: center; font-size: 0.95rem; }
+
+  /* QR section */
+  .qr-preview { padding: 16px; gap: 16px; }
+  .qr-box { width: 120px; height: 120px; }
+  .qr-info h3 { font-size: 1rem; }
+  .qr-info p { font-size: 0.85rem; }
+
+  /* Edit list items — stack fields */
+  .edit-item { padding: 14px; gap: 10px; }
+  .edit-item-body { min-width: 0; width: 100%; }
+  .edit-item-body > div[style*="display:flex"][style*="gap:8px"],
+  .edit-item-body > div[style*="display:flex"][style*="gap:6px"] {
+    flex-direction: column !important;
+  }
+
+  /* Toast */
+  .toast { left: 10px; right: 10px; bottom: 16px; text-align: center; font-size: 0.88rem; padding: 14px 18px; }
+
+  /* Onboarding steps wrap */
+  #onboardingBanner > div:last-of-type { flex-wrap: wrap; }
+  #onboardingBanner > div:last-of-type > div { flex: 1 1 45%; }
+
+  /* Login */
+  .login-card { padding: 28px 22px; width: 95%; }
+  .login-btn { font-size: 0.95rem; padding: 14px; min-height: 52px; }
+
+  /* Sidebar items — bigger touch targets */
+  .sidebar-item { padding: 12px 18px; font-size: 0.9rem; min-height: 44px; }
 }
 .mobile-toggle {
   display: none; align-items: center; justify-content: center;
-  width: 36px; height: 36px; border-radius: 8px;
+  width: 42px; height: 42px; border-radius: 8px;
   background: var(--cream-2); border: 1px solid var(--border);
-  cursor: pointer; font-size: 1.1rem;
+  cursor: pointer; font-size: 1.3rem;
 }
 
 /* ── TOAST ── */
 .toast {
   position: fixed; bottom: 24px; right: 24px; z-index: 9999;
   background: var(--ink); color: #fff; padding: 12px 20px;
-  border-radius: var(--radius-s); font-size: 0.78rem;
+  border-radius: var(--radius-s); font-size: 0.88rem;
   box-shadow: 0 8px 30px rgba(0,0,0,0.2);
   transform: translateY(80px); opacity: 0;
   transition: all 0.3s ease;
@@ -441,6 +563,12 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   </div>
 </div>
 
+<!-- SIDEBAR OVERLAY (mobile) -->
+<div id="sidebarOverlay" onclick="document.getElementById('sidebar').classList.remove('open');this.classList.remove('show')" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:150;opacity:0;transition:opacity 0.3s;"></div>
+<style>
+#sidebarOverlay.show { display:block !important; opacity:1; }
+</style>
+
 <!-- SIDEBAR -->
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-brand">
@@ -503,7 +631,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 <div class="main">
   <div class="main-header">
     <div style="display:flex;align-items:center;gap:12px;">
-      <div class="mobile-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</div>
+      <div class="mobile-toggle" onclick="toggleSidebar()">☰</div>
       <div>
         <div class="main-title" id="panelTitle">Dashboard</div>
         <div class="main-subtitle" id="panelSubtitle">Overview of your property and guests</div>
@@ -760,12 +888,18 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           <h3 data-h="export_alloggiati">🏛 Alloggiati Web Export</h3>
           <p data-h="export_alloggiati_desc"></p>
           <button class="btn btn-primary" onclick="exportAlloggiati()" data-h="btn_gen_alloggiati">📥 Generate Alloggiati File</button>
+          <a href="https://alloggiatiweb.poliziadistato.it" target="_blank" rel="noopener" class="export-portal-link">
+            🔗 <span data-h="link_alloggiati">Open Alloggiati Web Portal</span> ↗
+          </a>
         </div>
 
         <div class="export-card">
           <h3 data-h="export_dms">🌐 Puglia DMS Export</h3>
           <p data-h="export_dms_desc"></p>
           <button class="btn btn-primary" onclick="exportDMS()" data-h="btn_gen_dms">📥 Generate DMS File</button>
+          <a href="https://spot.regione.puglia.it" target="_blank" rel="noopener" class="export-portal-link">
+            🔗 <span data-h="link_dms">Open SPOT Easy (Puglia DMS)</span> ↗
+          </a>
         </div>
 
         <div class="export-card">
@@ -778,6 +912,9 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           <h3 data-h="export_istat">📋 ISTAT / C59 Report</h3>
           <p data-h="export_istat_desc"></p>
           <button class="btn btn-secondary" onclick="exportISTAT()" style="margin-top:auto" data-h="btn_gen_istat">📥 Generate Report</button>
+          <a href="https://infrturweb.istat.it" target="_blank" rel="noopener" class="export-portal-link">
+            🔗 <span data-h="link_istat">Open ISTAT Tourism Portal</span> ↗
+          </a>
         </div>
       </div>
     </div>
@@ -1058,6 +1195,9 @@ const HT = {
     date_range: 'Date Range', month: 'Month',
     btn_gen_alloggiati: '📥 Generate Alloggiati File', btn_gen_dms: '📥 Generate DMS File',
     btn_dl_csv: '📥 Download CSV', btn_gen_istat: '📥 Generate Report',
+    link_alloggiati: 'Open Alloggiati Web Portal',
+    link_dms: 'Open SPOT Easy (Puglia DMS)',
+    link_istat: 'Open ISTAT Tourism Portal',
     // QR
     qr_title: 'Guest App Link',
     qr_desc: 'Share this link with guests before arrival, or print the QR code and place it in the apartment.',
@@ -1176,6 +1316,9 @@ const HT = {
     date_range: 'Intervallo Date', month: 'Mese',
     btn_gen_alloggiati: '📥 Genera File Alloggiati', btn_gen_dms: '📥 Genera File DMS',
     btn_dl_csv: '📥 Scarica CSV', btn_gen_istat: '📥 Genera Report',
+    link_alloggiati: 'Apri Portale Alloggiati Web',
+    link_dms: 'Apri SPOT Easy (Puglia DMS)',
+    link_istat: 'Apri Portale Turismo ISTAT',
     qr_title: 'Link App Ospiti',
     qr_desc: 'Condividi questo link con gli ospiti prima dell\'arrivo, o stampa il QR code e mettilo nell\'appartamento.',
     btn_copy_link: '📋 Copia Link', btn_print_qr: '🖨 Stampa QR',
@@ -1288,6 +1431,13 @@ Object.keys(titlesMap).forEach(k => {
   Object.defineProperty(titles, k, { get: () => [h(titlesMap[k][0]), h(titlesMap[k][1])] });
 });
 
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('sidebarOverlay');
+  sb.classList.toggle('open');
+  ov.classList.toggle('show');
+}
+
 function showPanel(id, btn) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('panel-' + id).classList.add('active');
@@ -1295,7 +1445,9 @@ function showPanel(id, btn) {
   if (btn) btn.classList.add('active');
   document.getElementById('panelTitle').textContent = titles[id][0];
   document.getElementById('panelSubtitle').textContent = titles[id][1];
+  // Close sidebar + overlay on mobile
   document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('show');
   if (id === 'qrlink') initQRPanel();
 }
 
@@ -1341,12 +1493,12 @@ function renderDashboard() {
         <tbody>
           ${allCheckins.slice(0,5).map(c => `
             <tr>
-              <td><strong>${c.surname} ${c.name}</strong></td>
-              <td>${c.guest_type}</td>
-              <td>${c.citizenship}</td>
-              <td>${c.document_type}<br><span style="font-size:0.6rem;color:var(--ink-soft)">${c.document_number}</span></td>
-              <td><span class="status-badge ${c.docs_status==='complete'?'complete':c.docs_status==='partial'?'pending':'missing'}">${c.docs_status==='complete'?h('doc_complete'):c.docs_status==='partial'?h('doc_partial'):h('doc_missing')}</span></td>
-              <td style="font-size:0.68rem;color:var(--ink-soft)">${new Date(c.submitted_at).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB')}</td>
+              <td data-label=""><strong>${c.surname} ${c.name}</strong></td>
+              <td data-label="${h('th_type')}">${c.guest_type}</td>
+              <td data-label="${h('th_citizenship')}">${c.citizenship}</td>
+              <td data-label="${h('th_document')}">${c.document_type} <span style="font-size:0.72rem;color:var(--ink-soft)">${c.document_number}</span></td>
+              <td data-label="${h('th_docs')}"><span class="status-badge ${c.docs_status==='complete'?'complete':c.docs_status==='partial'?'pending':'missing'}">${c.docs_status==='complete'?h('doc_complete'):c.docs_status==='partial'?h('doc_partial'):h('doc_missing')}</span></td>
+              <td data-label="${h('th_submitted')}" style="color:var(--ink-soft)">${new Date(c.submitted_at).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB')}</td>
             </tr>
           `).join('') || `<tr><td colspan="6" style="text-align:center;color:var(--ink-soft);padding:24px;">${h('no_checkins')}</td></tr>`}
         </tbody>
@@ -1361,17 +1513,17 @@ function renderDashboard() {
 function renderCheckins() {
   document.getElementById('checkinTable').innerHTML = allCheckins.map(c => `
     <tr>
-      <td><strong>${c.surname} ${c.name}</strong>${c.booking_code ? '<br><span style="font-size:0.5rem;color:var(--warm);letter-spacing:0.05em;font-family:monospace;">'+c.booking_code+'</span>' : ''}</td>
-      <td>${c.guest_type}</td>
-      <td>${c.date_of_birth ? new Date(c.date_of_birth).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB') : '—'}<br><span style="font-size:0.6rem;color:var(--ink-soft)">${c.place_of_birth || ''}${c.birth_province && c.birth_province!=='EE' ? ' ('+c.birth_province+')' : ''}${c.birth_country && c.birth_country !== c.place_of_birth ? ', '+c.birth_country : ''}</span></td>
-      <td>${c.citizenship}</td>
-      <td>${c.document_type || '—'}<br><span style="font-size:0.6rem;color:var(--ink-soft)">${c.document_number || ''}</span></td>
-      <td style="font-size:0.68rem">${new Date(c.submitted_at).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB')}</td>
-      <td><span class="status-badge ${c.docs_status==='complete'?'complete':c.docs_status==='not_required'?'complete':c.docs_status==='partial'?'pending':'missing'}">${c.docs_status==='complete'?'✓':c.docs_status==='not_required'?'—':c.docs_status==='partial'?'⏳':'✗'}</span></td>
-      <td>
-        <div style="display:flex;gap:4px;">
+      <td data-label=""><strong>${c.surname} ${c.name}</strong>${c.booking_code ? ' <span style="font-size:0.6rem;color:var(--warm);letter-spacing:0.05em;font-family:monospace;">'+c.booking_code+'</span>' : ''}</td>
+      <td data-label="${h('th_type')}">${c.guest_type}</td>
+      <td data-label="${h('th_birth')}">${c.date_of_birth ? new Date(c.date_of_birth).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB') : '—'} <span style="font-size:0.72rem;color:var(--ink-soft)">${c.place_of_birth || ''}${c.birth_province && c.birth_province!=='EE' ? ' ('+c.birth_province+')' : ''}</span></td>
+      <td data-label="${h('th_citizenship')}">${c.citizenship}</td>
+      <td data-label="${h('th_document')}">${c.document_type || '—'} <span style="font-size:0.72rem;color:var(--ink-soft)">${c.document_number || ''}</span></td>
+      <td data-label="${h('th_submitted')}">${new Date(c.submitted_at).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB')}</td>
+      <td data-label="${h('th_docs')}"><span class="status-badge ${c.docs_status==='complete'?'complete':c.docs_status==='not_required'?'complete':c.docs_status==='partial'?'pending':'missing'}">${c.docs_status==='complete'?'✓':c.docs_status==='not_required'?'—':c.docs_status==='partial'?'⏳':'✗'}</span></td>
+      <td data-label="">
+        <div style="display:flex;gap:6px;justify-content:flex-end;">
           <button class="btn btn-secondary btn-sm" onclick="viewGuest('${c.id}')">${h('btn_view')}</button>
-          <button class="btn btn-secondary btn-sm" onclick="deleteCheckin('${c.id}','${(c.surname||'').replace(/'/g,'\\\'')}')" style="color:var(--red);border-color:rgba(217,75,75,0.2);padding:4px 8px;">🗑</button>
+          <button class="btn btn-secondary btn-sm" onclick="deleteCheckin('${c.id}','${(c.surname||'').replace(/'/g,'\\\'')}')" style="color:var(--red);border-color:rgba(217,75,75,0.2);">🗑</button>
         </div>
       </td>
     </tr>

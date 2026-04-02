@@ -358,7 +358,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   .main-header { padding: 12px 14px; gap: 8px; }
   .main-title { font-size: 1.2rem; }
   .main-subtitle { font-size: 0.82rem; }
-  .content { padding: 12px 10px 28px; }
+  .content { padding: 12px 10px 60px; }
   .header-actions { gap: 4px; }
 
   /* Bigger touch targets */
@@ -429,6 +429,15 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
   /* Sidebar items — bigger touch targets */
   .sidebar-item { padding: 12px 18px; font-size: 0.9rem; min-height: 44px; }
+
+  /* Sticky save buttons at bottom */
+  .panel-actions {
+    position: sticky; bottom: 0; z-index: 20;
+    background: var(--cream); border-top: 1px solid var(--border);
+    padding: 12px 0; margin: 16px -10px 0; padding-left: 10px; padding-right: 10px;
+    display: flex; gap: 10px;
+  }
+  .panel-actions .btn { flex: 1; justify-content: center; min-height: 52px; font-size: 0.92rem; }
 }
 .mobile-toggle {
   display: none; align-items: center; justify-content: center;
@@ -803,7 +812,9 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
       </div>
 
-      <button class="btn btn-primary" onclick="saveProperty()" data-h="btn_save_property">💾 Save Property Details</button>
+      <div class="panel-actions">
+        <button class="btn btn-primary" onclick="saveProperty()" data-h="btn_save_property">💾 Save Property Details</button>
+      </div>
     </div>
 
     <!-- ════════════ HOUSE RULES ════════════ -->
@@ -820,7 +831,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       <div style="font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;" data-h="rules_your_rules">Your rules</div>
       <div class="edit-list" id="rulesList"></div>
 
-      <div style="margin-top:16px; display:flex; gap:10px;">
+      <div class="panel-actions" style="margin-top:16px; display:flex; gap:10px;">
         <button class="btn btn-secondary" onclick="addRule()" data-h="btn_add_rule">+ Add Custom Rule</button>
         <button class="btn btn-primary" onclick="saveRules()" data-h="btn_save_rules">💾 Save Rules</button>
       </div>
@@ -841,7 +852,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
       <div class="edit-list" id="recoList"></div>
 
-      <div style="margin-top:16px; display:flex; gap:10px;">
+      <div class="panel-actions" style="margin-top:16px; display:flex; gap:10px;">
         <button class="btn btn-secondary" onclick="addReco()" data-h="btn_add_reco">+ Add Recommendation</button>
         <button class="btn btn-primary" onclick="saveRecos()" data-h="btn_save_recos">💾 Save</button>
       </div>

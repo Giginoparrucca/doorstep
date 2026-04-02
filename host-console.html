@@ -2134,101 +2134,128 @@ function lookupPoliceCode(cityName) {
 
 function exportAlloggiati() {
   if (allCheckins.length === 0) { toast('No check-in data to export!'); return; }
+
+  // Default: last 48 hours from now
+  const cutoff48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const recentGuests = allCheckins.filter(c => {
+    const arr = c.arrival_date || c.submitted_at?.split('T')[0] || '';
+    return arr >= cutoff48h;
+  });
+
+  // If no recent guests, offer to export all
+  let toExport = recentGuests;
+  if (recentGuests.length === 0) {
+    if (!confirm(hostLang === 'it'
+      ? `Nessun ospite nelle ultime 48 ore. Esportare tutti i ${allCheckins.length} ospiti?`
+      : `No guests in the last 48 hours. Export all ${allCheckins.length} guests?`)) return;
+    toExport = allCheckins;
+  }
+
+  // ── GROUP BY STAY ──
+  // Guests with same booking_code = same stay
+  // Guests without booking_code grouped by arrival_date
+  const groups = {};
+  toExport.forEach(c => {
+    const key = c.booking_code || `_arrival_${c.arrival_date || 'unknown'}_${c.submitted_at?.slice(0,13) || ''}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(c);
+  });
+
+  // ── SORT WITHIN EACH GROUP: head first, then members ──
   const warnings = [];
   const lines = [];
+  const mainTypes = ['single', 'head', 'group'];
 
-  // Sort: main guests (16/17/18) first, then members (19/20) — per Alloggiati rules
-  const sorted = [...allCheckins].sort((a, b) => {
-    const mainTypes = ['single','head','group'];
-    const aMain = mainTypes.includes(a.guest_type) ? 0 : 1;
-    const bMain = mainTypes.includes(b.guest_type) ? 0 : 1;
-    if (aMain !== bMain) return aMain - bMain;
-    return new Date(a.submitted_at) - new Date(b.submitted_at);
+  Object.values(groups).forEach(group => {
+    // Sort: main guest first (16/17/18), then members (19/20)
+    group.sort((a, b) => {
+      const aMain = mainTypes.includes(a.guest_type) ? 0 : 1;
+      const bMain = mainTypes.includes(b.guest_type) ? 0 : 1;
+      return aMain - bMain;
+    });
+
+    // Build lines for this group
+    group.forEach((c, idx) => {
+      const globalIdx = lines.length + 1;
+      const tipoAll = GUEST_TYPE_CODES[c.guest_type] || '16';
+      const dataArrivo = fmtDateIT(c.arrival_date || c.submitted_at);
+      const permanenza = padNum(Math.min(c.nights || 1, 99), 2);
+      const cognome = pad((c.surname || '').toUpperCase(), 50);
+      const nome = pad((c.name || '').toUpperCase(), 30);
+      const sesso = c.sex === 'F' ? '2' : '1';
+      const dataNascita = fmtDateIT(c.date_of_birth);
+
+      // === BIRTH LOCATION ===
+      const citizenshipCode = lookupStateCode(c.citizenship);
+      const birthCountry = c.birth_country || c.citizenship || '';
+      const birthCountryCode = lookupStateCode(birthCountry);
+      const bornInItaly = (c.birth_province && c.birth_province !== 'EE' && c.birth_province !== '') ||
+                          isItalianCitizenshipCode(birthCountryCode);
+
+      let comuneNascita, provinciaNascita, statoNascita;
+      if (bornInItaly) {
+        const prov = (c.birth_province || '').toUpperCase().substring(0,2);
+        const policeCode = lookupPoliceCode(c.place_of_birth);
+        if (policeCode) {
+          comuneNascita = policeCode;
+        } else {
+          comuneNascita = pad('', 9);
+          warnings.push(`⚠ Row ${globalIdx}: ${c.name} ${c.surname} — "${c.place_of_birth}" (${prov}) not found. Look up code at Supporto → Scarica Tabelle → Luoghi.`);
+        }
+        provinciaNascita = prov || '  ';
+        statoNascita = '100000100';
+      } else {
+        comuneNascita = '         ';
+        provinciaNascita = '  ';
+        statoNascita = birthCountryCode;
+      }
+
+      const cittadinanza = citizenshipCode;
+
+      // === DOCUMENT (required for types 16/17/18, blank for 19/20) ===
+      const needsDoc = ['16','17','18'].includes(tipoAll);
+      let tipoDoc, numDoc, luogoRilascio;
+      if (needsDoc && c.document_number) {
+        tipoDoc = lookupDocCode(c.document_type);
+        numDoc = pad((c.document_number || '').toUpperCase(), 20);
+        const docPlace = (c.doc_issue_place || '').trim();
+        const docCityKey = docPlace.toLowerCase().trim().replace(/\s*\([^)]*\)\s*/g, '');
+        const docIstat = ISTAT_COMUNI[docCityKey];
+        if (docIstat) {
+          const policeDocCode = lookupPoliceCode(docPlace);
+          luogoRilascio = policeDocCode || pad(docPlace.toUpperCase(), 9);
+        } else {
+          const docState = lookupStateCode(docPlace);
+          luogoRilascio = docState.trim() ? docState : cittadinanza;
+        }
+      } else {
+        tipoDoc = pad('', 5);
+        numDoc = pad('', 20);
+        luogoRilascio = pad('', 9);
+      }
+
+      // === BUILD 168-char LINE ===
+      const line = tipoAll + dataArrivo + permanenza + cognome + nome + sesso + dataNascita +
+                   comuneNascita + provinciaNascita + statoNascita + cittadinanza +
+                   tipoDoc + numDoc + luogoRilascio;
+
+      if (line.length !== 168) {
+        warnings.push(`⚠ Row ${globalIdx}: Line is ${line.length} chars (expected 168). Check data for ${c.name} ${c.surname}.`);
+      }
+      lines.push(line);
+    });
   });
 
-  sorted.forEach((c, idx) => {
-    const tipoAll = GUEST_TYPE_CODES[c.guest_type] || '16';
-    const dataArrivo = fmtDateIT(c.arrival_date || c.submitted_at);
-    const permanenza = padNum(Math.min(c.nights || 1, 99), 2);
-    const cognome = pad((c.surname || '').toUpperCase(), 50);
-    const nome = pad((c.name || '').toUpperCase(), 30);
-    const sesso = c.sex === 'F' ? '2' : '1';
-    const dataNascita = fmtDateIT(c.date_of_birth);
-
-    // === BIRTH LOCATION ===
-    const citizenshipCode = lookupStateCode(c.citizenship);
-    const birthCountry = c.birth_country || c.citizenship || '';
-    const birthCountryCode = lookupStateCode(birthCountry);
-    const bornInItaly = (c.birth_province && c.birth_province !== 'EE' && c.birth_province !== '') ||
-                        isItalianCitizenshipCode(birthCountryCode);
-
-    let comuneNascita, provinciaNascita, statoNascita;
-    if (bornInItaly) {
-      const prov = (c.birth_province || '').toUpperCase().substring(0,2);
-      const policeCode = lookupPoliceCode(c.place_of_birth);
-      if (policeCode) {
-        comuneNascita = policeCode;
-      } else {
-        comuneNascita = pad('', 9);
-        warnings.push(`⚠ Row ${idx+1}: ${c.name} ${c.surname} — "${c.place_of_birth}" (${prov}) not found. Look up code at Supporto → Scarica Tabelle → Luoghi.`);
-      }
-      provinciaNascita = prov || '  ';
-      statoNascita = '100000100'; // Born in Italy → stato = Italy
-    } else {
-      // Born abroad: Comune = 9 blanks, Provincia = 2 blanks (per official manual)
-      comuneNascita = '         '; // 9 spaces
-      provinciaNascita = '  ';     // 2 spaces
-      statoNascita = birthCountryCode; // e.g. 100000227 for Switzerland
-    }
-
-    const cittadinanza = citizenshipCode;
-
-    // === DOCUMENT (required for types 16/17/18, blank for 19/20) ===
-    const needsDoc = ['16','17','18'].includes(tipoAll);
-    let tipoDoc, numDoc, luogoRilascio;
-    if (needsDoc && c.document_number) {
-      tipoDoc = lookupDocCode(c.document_type);
-      numDoc = pad((c.document_number || '').toUpperCase(), 20);
-      // Luogo rilascio
-      const docPlace = (c.doc_issue_place || '').trim();
-      // Try as Italian city first
-      const docCityKey = docPlace.toLowerCase().trim().replace(/\s*\([^)]*\)\s*/g, '');
-      const docIstat = ISTAT_COMUNI[docCityKey];
-      if (docIstat) {
-        const policeDocCode = lookupPoliceCode(docPlace);
-        luogoRilascio = policeDocCode || pad(docPlace.toUpperCase(), 9);
-      } else {
-        // Try as country name → state code
-        const docState = lookupStateCode(docPlace);
-        luogoRilascio = docState.trim() ? docState : cittadinanza;
-      }
-    } else {
-      tipoDoc = pad('', 5);
-      numDoc = pad('', 20);
-      luogoRilascio = pad('', 9);
-    }
-
-    // === BUILD 168-char LINE (DM 7/1/2013 tracciato record) ===
-    // Fields: 2+10+2+50+30+1+10+9+2+9+9+5+20+9 = 168
-    const line = tipoAll + dataArrivo + permanenza + cognome + nome + sesso + dataNascita +
-                 comuneNascita + provinciaNascita + statoNascita + cittadinanza +
-                 tipoDoc + numDoc + luogoRilascio;
-
-    if (line.length !== 168) {
-      warnings.push(`⚠ Row ${idx+1}: Line is ${line.length} chars (expected 168). Check data for ${c.name} ${c.surname}.`);
-    }
-    lines.push(line);
-  });
-
+  const groupCount = Object.keys(groups).length;
   const fileContent = lines.join('\r\n');
   downloadFile('alloggiati_' + new Date().toISOString().slice(0,10) + '.txt', fileContent);
-  track('export_alloggiati', { guests: lines.length, warnings: warnings.length });
+  track('export_alloggiati', { guests: lines.length, groups: groupCount, warnings: warnings.length });
 
   if (warnings.length > 0) {
-    alert(`File generated: ${lines.length} guests.\n\n⚠️ Review:\n` + warnings.join('\n'));
+    alert(`File generated: ${lines.length} guests in ${groupCount} stay(s).\n\n⚠️ Review:\n` + warnings.join('\n'));
     toast(`Alloggiati — ${warnings.length} item(s) need review`);
   } else {
-    toast(`✅ Alloggiati file ready — ${lines.length} guests, 168 chars/line`);
+    toast(`✅ Alloggiati: ${lines.length} guests · ${groupCount} stay(s) · 168 chars/line`);
   }
 }
 

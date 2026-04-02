@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doorstep · Admin Analytics</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --warm:#C2714F; --warm-d:#A85D3E; --ink:#1E1008; --ink-2:#3A2418; --ink-soft:#7A5A48;
+  --cream:#FAF6F0; --cream-2:#F0E8DC; --cream-3:#E4D8C8; --white:#FFFFFF;
+  --green:#4CAF7D; --amber:#E8A840; --red:#D94B4B; --blue:#4A90D9;
+  --border:rgba(194,113,79,0.12); --shadow:0 2px 12px rgba(30,16,8,0.06);
+  --radius:10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);min-height:100vh;}
+
+.top-bar{
+  background:var(--ink);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:50;
+}
+.top-bar-brand{font-family:'Playfair Display',serif;font-size:1.1rem;color:#fff;font-weight:400;}
+.top-bar-brand em{color:var(--warm);font-style:normal;}
+.top-bar-badge{font-size:0.6rem;letter-spacing:0.15em;text-transform:uppercase;color:rgba(244,237,224,0.4);margin-left:10px;}
+.top-bar-right{display:flex;align-items:center;gap:12px;}
+.top-bar-right select{
+  background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:6px;
+  color:rgba(244,237,224,0.7);padding:6px 10px;font-size:0.78rem;font-family:'DM Sans',sans-serif;
+}
+.refresh-btn{
+  background:var(--warm);border:none;color:#fff;padding:8px 14px;border-radius:6px;
+  font-size:0.78rem;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;
+}
+.refresh-btn:hover{background:var(--warm-d);}
+
+.container{max-width:1100px;margin:0 auto;padding:20px 20px 60px;}
+
+.section-title{
+  font-size:0.58rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--ink-soft);
+  margin:28px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border);
+}
+.section-title:first-child{margin-top:0;}
+
+/* Stats grid */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:8px;}
+.stat{
+  background:var(--white);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px 18px;box-shadow:var(--shadow);
+}
+.stat-label{font-size:0.6rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px;}
+.stat-val{font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:500;line-height:1;}
+.stat-sub{font-size:0.72rem;color:var(--ink-soft);margin-top:4px;}
+.stat-val.green{color:var(--green);} .stat-val.amber{color:var(--amber);} .stat-val.red{color:var(--red);} .stat-val.blue{color:var(--blue);}
+
+/* Bar chart */
+.bar-chart{display:flex;flex-direction:column;gap:6px;}
+.bar-row{display:flex;align-items:center;gap:10px;}
+.bar-label{width:140px;font-size:0.78rem;color:var(--ink-2);text-align:right;flex-shrink:0;}
+.bar-track{flex:1;height:24px;background:var(--cream-2);border-radius:4px;overflow:hidden;position:relative;}
+.bar-fill{height:100%;border-radius:4px;transition:width 0.6s ease;}
+.bar-count{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:0.68rem;font-weight:600;color:var(--ink);}
+
+/* Table */
+.data-table{
+  width:100%;border-collapse:collapse;background:var(--white);
+  border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);
+}
+.data-table th{
+  text-align:left;padding:10px 14px;font-size:0.6rem;letter-spacing:0.12em;
+  text-transform:uppercase;color:var(--ink-soft);border-bottom:1px solid var(--border);
+  background:rgba(250,246,240,0.5);font-weight:600;
+}
+.data-table td{padding:10px 14px;font-size:0.82rem;border-bottom:1px solid rgba(194,113,79,0.06);color:var(--ink-2);}
+.data-table tr:last-child td{border-bottom:none;}
+.data-table tr:hover td{background:rgba(250,246,240,0.6);}
+
+/* Event log */
+.event-log{max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--white);box-shadow:var(--shadow);}
+.event-row{
+  display:flex;align-items:center;gap:10px;padding:8px 14px;
+  border-bottom:1px solid rgba(194,113,79,0.04);font-size:0.78rem;
+}
+.event-row:last-child{border-bottom:none;}
+.event-time{font-size:0.68rem;color:var(--ink-soft);min-width:130px;flex-shrink:0;}
+.event-type{
+  padding:2px 8px;border-radius:4px;font-size:0.65rem;font-weight:600;letter-spacing:0.04em;
+  background:var(--cream-2);color:var(--ink-soft);flex-shrink:0;
+}
+.event-type.login{background:rgba(76,175,125,0.1);color:var(--green);}
+.event-type.export{background:rgba(194,113,79,0.1);color:var(--warm);}
+.event-type.save{background:rgba(74,144,217,0.1);color:var(--blue);}
+.event-user{font-size:0.72rem;color:var(--ink-soft);flex-shrink:0;min-width:120px;}
+.event-detail{font-size:0.72rem;color:var(--ink-soft);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+.loading{text-align:center;padding:40px;color:var(--ink-soft);font-size:0.88rem;}
+
+@media(max-width:600px){
+  .container{padding:14px 12px 40px;}
+  .stats{grid-template-columns:1fr 1fr;}
+  .stat{padding:12px 14px;}
+  .stat-val{font-size:1.4rem;}
+  .bar-label{width:100px;font-size:0.7rem;}
+  .event-row{flex-wrap:wrap;gap:4px;}
+  .event-time{min-width:auto;}
+  .event-user{min-width:auto;}
+  .data-table th,.data-table td{padding:8px 10px;font-size:0.75rem;}
+}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div>
+    <span class="top-bar-brand">Door<em>step</em></span>
+    <span class="top-bar-badge">Admin Analytics</span>
+  </div>
+  <div class="top-bar-right">
+    <select id="timeRange" onchange="loadData()">
+      <option value="7">Last 7 days</option>
+      <option value="30" selected>Last 30 days</option>
+      <option value="90">Last 90 days</option>
+      <option value="365">Last year</option>
+      <option value="9999">All time</option>
+    </select>
+    <button class="refresh-btn" onclick="loadData()">↻ Refresh</button>
+  </div>
+</div>
+
+<div class="container">
+  <div id="content"><div class="loading">Loading analytics…</div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL = 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjandhcXFhYmd3cWhoemhmYnRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4OTM0MjMsImV4cCI6MjA4OTQ2OTQyM30.BCskfjawOLqayI7xXV8ebIBEcXf12WygH52w204NzWk';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+async function loadData() {
+  const days = parseInt(document.getElementById('timeRange').value);
+  const since = new Date(Date.now() - days * 86400000).toISOString();
+
+  const { data: events, error } = await sb.from('analytics_events')
+    .select('*')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(5000);
+
+  if (error) { document.getElementById('content').innerHTML = `<div class="loading">Error: ${error.message}</div>`; return; }
+  if (!events || events.length === 0) { document.getElementById('content').innerHTML = `<div class="loading">No events recorded yet. Use the host console to generate data.</div>`; return; }
+
+  // ── Compute metrics ──
+  const uniqueUsers = [...new Set(events.filter(e => e.user_email).map(e => e.user_email))];
+  const sessions = [...new Set(events.map(e => e.session_id).filter(Boolean))];
+  const sessionEnds = events.filter(e => e.event_type === 'session_end');
+  const avgDuration = sessionEnds.length > 0
+    ? Math.round(sessionEnds.reduce((s, e) => s + (e.event_data?.duration_seconds || 0), 0) / sessionEnds.length)
+    : 0;
+
+  const logins = events.filter(e => e.event_type === 'login').length;
+  const signups = events.filter(e => e.event_type === 'signup').length;
+
+  const saves = {
+    property: events.filter(e => e.event_type === 'save_property').length,
+    rules: events.filter(e => e.event_type === 'save_rules').length,
+    recos: events.filter(e => e.event_type === 'save_recos').length,
+  };
+
+  const exports = {
+    alloggiati: events.filter(e => e.event_type === 'export_alloggiati').length,
+    dms: events.filter(e => e.event_type === 'export_dms').length,
+    csv: events.filter(e => e.event_type === 'export_csv').length,
+    istat: events.filter(e => e.event_type === 'export_istat').length,
+  };
+
+  const bookings = events.filter(e => e.event_type === 'generate_booking').length;
+  const deletes = events.filter(e => e.event_type === 'delete_checkin' || e.event_type === 'delete_all_checkins').length;
+
+  // Panel usage from panel_view events
+  const panelViews = {};
+  events.filter(e => e.event_type === 'panel_view').forEach(e => {
+    const p = e.event_data?.panel || 'unknown';
+    panelViews[p] = (panelViews[p] || 0) + 1;
+  });
+
+  // Panel time from session_end events
+  const panelTimes = {};
+  sessionEnds.forEach(e => {
+    const pt = e.event_data?.panel_times || {};
+    Object.entries(pt).forEach(([k, v]) => { panelTimes[k] = (panelTimes[k] || 0) + v; });
+  });
+
+  // Per-user breakdown
+  const userStats = {};
+  events.forEach(e => {
+    const u = e.user_email || 'unknown';
+    if (!userStats[u]) userStats[u] = { sessions: new Set(), events: 0, logins: 0, saves: 0, exports: 0, lastSeen: e.created_at };
+    userStats[u].events++;
+    if (e.session_id) userStats[u].sessions.add(e.session_id);
+    if (e.event_type === 'login' || e.event_type === 'session_start') userStats[u].logins++;
+    if (e.event_type.startsWith('save_')) userStats[u].saves++;
+    if (e.event_type.startsWith('export_')) userStats[u].exports++;
+    if (e.created_at > userStats[u].lastSeen) userStats[u].lastSeen = e.created_at;
+  });
+
+  // Daily activity (for sparkline-like view)
+  const dailyCounts = {};
+  events.forEach(e => {
+    const day = e.created_at.slice(0, 10);
+    dailyCounts[day] = (dailyCounts[day] || 0) + 1;
+  });
+
+  // Feature usage for bar chart
+  const featureUsage = [
+    { label: 'Panel Navigation', count: events.filter(e => e.event_type === 'panel_view').length, color: 'var(--ink-soft)' },
+    { label: 'Save Property', count: saves.property, color: 'var(--blue)' },
+    { label: 'Save Rules', count: saves.rules, color: 'var(--blue)' },
+    { label: 'Save Recommendations', count: saves.recos, color: 'var(--blue)' },
+    { label: 'Export Alloggiati', count: exports.alloggiati, color: 'var(--warm)' },
+    { label: 'Export DMS', count: exports.dms, color: 'var(--warm)' },
+    { label: 'Export CSV', count: exports.csv, color: 'var(--warm)' },
+    { label: 'Export ISTAT', count: exports.istat, color: 'var(--warm)' },
+    { label: 'Generate Booking', count: bookings, color: 'var(--green)' },
+    { label: 'Delete Records', count: deletes, color: 'var(--red)' },
+  ].sort((a, b) => b.count - a.count);
+  const maxFeature = Math.max(...featureUsage.map(f => f.count), 1);
+
+  // Panel time bar chart
+  const panelTimeEntries = Object.entries(panelTimes).sort((a, b) => b[1] - a[1]);
+  const maxPanelTime = Math.max(...panelTimeEntries.map(e => e[1]), 1);
+  const panelLabels = { dashboard:'Dashboard', property:'Property', rules:'Rules', recos:'Recommendations', checkins:'Check-ins', export:'Export', qrlink:'QR & Link' };
+
+  // Format seconds
+  const fmtSec = (s) => s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s/60)}m ${s%60}s` : `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
+
+  // ── Render ──
+  document.getElementById('content').innerHTML = `
+
+    <div class="section-title">Overview</div>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Total Users</div>
+        <div class="stat-val blue">${uniqueUsers.length}</div>
+        <div class="stat-sub">${signups} sign-up${signups !== 1 ? 's' : ''}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Sessions</div>
+        <div class="stat-val">${sessions.length}</div>
+        <div class="stat-sub">${logins} login${logins !== 1 ? 's' : ''}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Avg Session</div>
+        <div class="stat-val green">${fmtSec(avgDuration)}</div>
+        <div class="stat-sub">${sessionEnds.length} completed</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Total Events</div>
+        <div class="stat-val">${events.length}</div>
+        <div class="stat-sub">${Object.keys(dailyCounts).length} active day${Object.keys(dailyCounts).length !== 1 ? 's' : ''}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Total Exports</div>
+        <div class="stat-val amber">${exports.alloggiati + exports.dms + exports.csv + exports.istat}</div>
+        <div class="stat-sub">Alloggiati: ${exports.alloggiati} · DMS: ${exports.dms}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Booking Links</div>
+        <div class="stat-val green">${bookings}</div>
+        <div class="stat-sub">generated</div>
+      </div>
+    </div>
+
+    <div class="section-title">Feature Usage (by action count)</div>
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);">
+      <div class="bar-chart">
+        ${featureUsage.filter(f => f.count > 0).map(f => `
+          <div class="bar-row">
+            <div class="bar-label">${f.label}</div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width:${Math.round(f.count/maxFeature*100)}%;background:${f.color};"></div>
+              <div class="bar-count">${f.count}</div>
+            </div>
+          </div>
+        `).join('')}
+        ${featureUsage.every(f => f.count === 0) ? '<div style="text-align:center;padding:20px;color:var(--ink-soft);">No feature usage yet</div>' : ''}
+      </div>
+    </div>
+
+    ${panelTimeEntries.length > 0 ? `
+    <div class="section-title">Time Spent per Section (aggregated)</div>
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);">
+      <div class="bar-chart">
+        ${panelTimeEntries.map(([k, v]) => `
+          <div class="bar-row">
+            <div class="bar-label">${panelLabels[k] || k}</div>
+            <div class="bar-track">
+              <div class="bar-fill" style="width:${Math.round(v/maxPanelTime*100)}%;background:var(--blue);"></div>
+              <div class="bar-count">${fmtSec(v)}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>` : ''}
+
+    <div class="section-title">Users</div>
+    <table class="data-table">
+      <thead>
+        <tr><th>Email</th><th>Sessions</th><th>Events</th><th>Saves</th><th>Exports</th><th>Last Seen</th></tr>
+      </thead>
+      <tbody>
+        ${Object.entries(userStats).sort((a,b) => b[1].events - a[1].events).map(([email, s]) => `
+          <tr>
+            <td><strong>${email}</strong></td>
+            <td>${s.sessions.size}</td>
+            <td>${s.events}</td>
+            <td>${s.saves}</td>
+            <td>${s.exports}</td>
+            <td style="font-size:0.75rem;color:var(--ink-soft);">${new Date(s.lastSeen).toLocaleString()}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+
+    <div class="section-title">Event Log (latest ${Math.min(events.length, 100)})</div>
+    <div class="event-log">
+      ${events.slice(0, 100).map(e => {
+        const cls = e.event_type.includes('login') || e.event_type.includes('signup') || e.event_type.includes('session') ? 'login'
+          : e.event_type.includes('export') ? 'export'
+          : e.event_type.includes('save') ? 'save' : '';
+        const detail = e.event_data ? Object.entries(e.event_data).map(([k,v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join(' · ') : '';
+        return `
+          <div class="event-row">
+            <div class="event-time">${new Date(e.created_at).toLocaleString()}</div>
+            <div class="event-type ${cls}">${e.event_type}</div>
+            <div class="event-user">${e.user_email || '—'}</div>
+            <div class="event-detail">${detail}</div>
+          </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+loadData();
+</script>
+</body>
+</html>

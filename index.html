@@ -1431,15 +1431,13 @@ async function lookupCheckin() {
     return;
   }
 
-  // Show loading
   loadEl.style.display = 'block';
   document.getElementById('lookupBtn').disabled = true;
 
   try {
-    // Search by surname (case-insensitive) + arrival_date + property_id
+    // Search across ALL properties by surname + arrival_date
     const { data, error } = await sb.from('checkins')
       .select('*')
-      .eq('property_id', propertyId)
       .eq('arrival_date', date)
       .ilike('surname', surname.toUpperCase());
 
@@ -1454,22 +1452,37 @@ async function lookupCheckin() {
       return;
     }
 
-    // Found! Get the booking_code from the first match (all guests in same booking share it)
+    // Found! Switch to the correct property if different
+    const foundPropId = data[0].property_id;
+    if (foundPropId && foundPropId !== propertyId) {
+      console.log('🔄 Switching to property:', foundPropId);
+      localStorage.setItem('doorstep_property', foundPropId);
+      propertyId = foundPropId;
+      // Reload property data for welcome page
+      const { data: propData } = await sb.from('properties').select('*').eq('id', foundPropId).single();
+      if (propData) {
+        propertyData = propData;
+        const el = (id) => document.getElementById(id);
+        if (el('topBarTitle')) el('topBarTitle').textContent = propData.name || 'Property';
+        if (el('heroTitle')) el('heroTitle').innerHTML = `Welcome to<br><em>${propData.name || 'Your Stay'}</em>`;
+        if (el('heroBadge')) el('heroBadge').textContent = `☀ ${propData.city || ''}, ${propData.region || ''}`;
+        if (el('heroImg') && propData.hero_image_url) el('heroImg').src = propData.hero_image_url;
+      }
+    }
+
+    // Get the booking_code from the first match
     const foundCode = data[0].booking_code;
 
     // If they have a booking code, find ALL guests in that booking
-    let allGuests = data;
+    let allGuests = data.filter(g => g.property_id === propertyId);
     if (foundCode) {
       const { data: fullGroup } = await sb.from('checkins')
         .select('*')
         .eq('booking_code', foundCode)
-        .eq('property_id', propertyId)
         .order('submitted_at');
       if (fullGroup && fullGroup.length > 0) allGuests = fullGroup;
-      // Store booking code for future visits
       localStorage.setItem('doorstep_booking', foundCode);
     } else {
-      // No booking code — store a lookup key instead
       localStorage.setItem('doorstep_lookup', JSON.stringify({ surname: surname.toUpperCase(), date }));
     }
 

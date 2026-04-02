@@ -116,6 +116,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
     <span class="top-bar-badge">Admin Analytics</span>
   </div>
   <div class="top-bar-right">
+    <select id="userFilter" onchange="renderView()">
+      <option value="all">All Users</option>
+    </select>
     <select id="timeRange" onchange="loadData()">
       <option value="7">Last 7 days</option>
       <option value="30" selected>Last 30 days</option>
@@ -123,6 +126,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
       <option value="365">Last year</option>
       <option value="9999">All time</option>
     </select>
+    <button class="refresh-btn" onclick="exportData('csv')" title="Export CSV">📥 CSV</button>
+    <button class="refresh-btn" onclick="exportData('json')" title="Export JSON">📥 JSON</button>
     <button class="refresh-btn" onclick="loadData()">↻ Refresh</button>
   </div>
 </div>
@@ -137,18 +142,92 @@ const SUPABASE_URL = 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjandhcXFhYmd3cWhoemhmYnRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4OTM0MjMsImV4cCI6MjA4OTQ2OTQyM30.BCskfjawOLqayI7xXV8ebIBEcXf12WygH52w204NzWk';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+let allEvents = [];
+
 async function loadData() {
   const days = parseInt(document.getElementById('timeRange').value);
   const since = new Date(Date.now() - days * 86400000).toISOString();
+
+  document.getElementById('content').innerHTML = '<div class="loading">Loading analytics…</div>';
 
   const { data: events, error } = await sb.from('analytics_events')
     .select('*')
     .gte('created_at', since)
     .order('created_at', { ascending: false })
-    .limit(5000);
+    .limit(10000);
 
   if (error) { document.getElementById('content').innerHTML = `<div class="loading">Error: ${error.message}</div>`; return; }
-  if (!events || events.length === 0) { document.getElementById('content').innerHTML = `<div class="loading">No events recorded yet. Use the host console to generate data.</div>`; return; }
+  if (!events || events.length === 0) { document.getElementById('content').innerHTML = `<div class="loading">No events recorded yet.</div>`; return; }
+
+  allEvents = events;
+
+  // Populate user dropdown
+  const users = [...new Set(events.filter(e => e.user_email).map(e => e.user_email))].sort();
+  const sel = document.getElementById('userFilter');
+  const current = sel.value;
+  sel.innerHTML = '<option value="all">All Users (' + users.length + ')</option>' +
+    users.map(u => `<option value="${u}" ${u===current?'selected':''}>${u}</option>`).join('');
+
+  renderView();
+}
+
+function getFilteredEvents() {
+  const user = document.getElementById('userFilter').value;
+  if (user === 'all') return allEvents;
+  return allEvents.filter(e => e.user_email === user);
+}
+
+/* ══════════════════════════════════════
+   EXPORT
+══════════════════════════════════════ */
+function exportData(format) {
+  const events = getFilteredEvents();
+  if (events.length === 0) return;
+
+  const user = document.getElementById('userFilter').value;
+  const prefix = user === 'all' ? 'doorstep_analytics' : `doorstep_${user.split('@')[0]}`;
+  const date = new Date().toISOString().slice(0,10);
+
+  if (format === 'csv') {
+    const headers = ['created_at','event_type','user_email','user_id','property_id','session_id','event_data'];
+    const rows = events.map(e => [
+      e.created_at,
+      e.event_type,
+      e.user_email || '',
+      e.user_id || '',
+      e.property_id || '',
+      e.session_id || '',
+      JSON.stringify(e.event_data || {})
+    ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','));
+    const csv = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+    downloadFile(`${prefix}_${date}.csv`, csv, 'text/csv');
+  } else {
+    const json = JSON.stringify(events, null, 2);
+    downloadFile(`${prefix}_${date}.json`, json, 'application/json');
+  }
+}
+
+function downloadFile(name, content, type) {
+  const blob = new Blob([content], { type: type + ';charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ══════════════════════════════════════
+   RENDER
+══════════════════════════════════════ */
+function renderView() {
+  const events = getFilteredEvents();
+  const selectedUser = document.getElementById('userFilter').value;
+  const isUserView = selectedUser !== 'all';
+
+  if (events.length === 0) {
+    document.getElementById('content').innerHTML = '<div class="loading">No events for this selection.</div>';
+    return;
+  }
 
   // ── Compute metrics ──
   const uniqueUsers = [...new Set(events.filter(e => e.user_email).map(e => e.user_email))];
@@ -157,61 +236,47 @@ async function loadData() {
   const avgDuration = sessionEnds.length > 0
     ? Math.round(sessionEnds.reduce((s, e) => s + (e.event_data?.duration_seconds || 0), 0) / sessionEnds.length)
     : 0;
+  const totalDuration = sessionEnds.reduce((s, e) => s + (e.event_data?.duration_seconds || 0), 0);
 
   const logins = events.filter(e => e.event_type === 'login').length;
   const signups = events.filter(e => e.event_type === 'signup').length;
-
   const saves = {
     property: events.filter(e => e.event_type === 'save_property').length,
     rules: events.filter(e => e.event_type === 'save_rules').length,
     recos: events.filter(e => e.event_type === 'save_recos').length,
   };
-
   const exports = {
     alloggiati: events.filter(e => e.event_type === 'export_alloggiati').length,
     dms: events.filter(e => e.event_type === 'export_dms').length,
     csv: events.filter(e => e.event_type === 'export_csv').length,
     istat: events.filter(e => e.event_type === 'export_istat').length,
   };
-
+  const totalExports = exports.alloggiati + exports.dms + exports.csv + exports.istat;
   const bookings = events.filter(e => e.event_type === 'generate_booking').length;
   const deletes = events.filter(e => e.event_type === 'delete_checkin' || e.event_type === 'delete_all_checkins').length;
 
-  // Panel usage from panel_view events
+  // Panel views
   const panelViews = {};
   events.filter(e => e.event_type === 'panel_view').forEach(e => {
     const p = e.event_data?.panel || 'unknown';
     panelViews[p] = (panelViews[p] || 0) + 1;
   });
 
-  // Panel time from session_end events
+  // Panel times
   const panelTimes = {};
   sessionEnds.forEach(e => {
     const pt = e.event_data?.panel_times || {};
     Object.entries(pt).forEach(([k, v]) => { panelTimes[k] = (panelTimes[k] || 0) + v; });
   });
 
-  // Per-user breakdown
-  const userStats = {};
-  events.forEach(e => {
-    const u = e.user_email || 'unknown';
-    if (!userStats[u]) userStats[u] = { sessions: new Set(), events: 0, logins: 0, saves: 0, exports: 0, lastSeen: e.created_at };
-    userStats[u].events++;
-    if (e.session_id) userStats[u].sessions.add(e.session_id);
-    if (e.event_type === 'login' || e.event_type === 'session_start') userStats[u].logins++;
-    if (e.event_type.startsWith('save_')) userStats[u].saves++;
-    if (e.event_type.startsWith('export_')) userStats[u].exports++;
-    if (e.created_at > userStats[u].lastSeen) userStats[u].lastSeen = e.created_at;
-  });
-
-  // Daily activity (for sparkline-like view)
+  // Daily activity
   const dailyCounts = {};
   events.forEach(e => {
     const day = e.created_at.slice(0, 10);
     dailyCounts[day] = (dailyCounts[day] || 0) + 1;
   });
 
-  // Feature usage for bar chart
+  // Feature usage bar chart
   const featureUsage = [
     { label: 'Panel Navigation', count: events.filter(e => e.event_type === 'panel_view').length, color: 'var(--ink-soft)' },
     { label: 'Save Property', count: saves.property, color: 'var(--blue)' },
@@ -223,7 +288,7 @@ async function loadData() {
     { label: 'Export ISTAT', count: exports.istat, color: 'var(--warm)' },
     { label: 'Generate Booking', count: bookings, color: 'var(--green)' },
     { label: 'Delete Records', count: deletes, color: 'var(--red)' },
-  ].sort((a, b) => b.count - a.count);
+  ].filter(f => f.count > 0).sort((a, b) => b.count - a.count);
   const maxFeature = Math.max(...featureUsage.map(f => f.count), 1);
 
   // Panel time bar chart
@@ -231,19 +296,54 @@ async function loadData() {
   const maxPanelTime = Math.max(...panelTimeEntries.map(e => e[1]), 1);
   const panelLabels = { dashboard:'Dashboard', property:'Property', rules:'Rules', recos:'Recommendations', checkins:'Check-ins', export:'Export', qrlink:'QR & Link' };
 
-  // Format seconds
   const fmtSec = (s) => s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s/60)}m ${s%60}s` : `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m`;
 
-  // ── Render ──
-  document.getElementById('content').innerHTML = `
+  // Per-user table (only in "all" view)
+  const userStats = {};
+  allEvents.forEach(e => {
+    const u = e.user_email || 'unknown';
+    if (!userStats[u]) userStats[u] = { sessions: new Set(), events: 0, logins: 0, saves: 0, exports: 0, bookings: 0, firstSeen: e.created_at, lastSeen: e.created_at };
+    userStats[u].events++;
+    if (e.session_id) userStats[u].sessions.add(e.session_id);
+    if (e.event_type === 'login' || e.event_type === 'session_start') userStats[u].logins++;
+    if (e.event_type.startsWith('save_')) userStats[u].saves++;
+    if (e.event_type.startsWith('export_')) userStats[u].exports++;
+    if (e.event_type === 'generate_booking') userStats[u].bookings++;
+    if (e.created_at < userStats[u].firstSeen) userStats[u].firstSeen = e.created_at;
+    if (e.created_at > userStats[u].lastSeen) userStats[u].lastSeen = e.created_at;
+  });
 
-    <div class="section-title">Overview</div>
+  // Daily activity chart (simple text sparkline)
+  const sortedDays = Object.entries(dailyCounts).sort((a,b) => a[0].localeCompare(b[0]));
+  const maxDay = Math.max(...sortedDays.map(d => d[1]), 1);
+
+  // ── RENDER ──
+  let html = '';
+
+  // User header if filtered
+  if (isUserView) {
+    const us = userStats[selectedUser];
+    html += `
+      <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:18px 22px;box-shadow:var(--shadow);margin-bottom:20px;display:flex;align-items:center;gap:16px;">
+        <div style="width:48px;height:48px;border-radius:50%;background:var(--warm);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:600;flex-shrink:0;">${selectedUser.charAt(0).toUpperCase()}</div>
+        <div style="flex:1;">
+          <div style="font-size:1.05rem;font-weight:600;color:var(--ink);">${selectedUser}</div>
+          <div style="font-size:0.78rem;color:var(--ink-soft);margin-top:2px;">
+            ${us ? `First seen: ${new Date(us.firstSeen).toLocaleDateString()} · Last active: ${new Date(us.lastSeen).toLocaleString()}` : ''}
+          </div>
+        </div>
+        <button class="refresh-btn" onclick="document.getElementById('userFilter').value='all';renderView();" style="background:var(--cream-3);color:var(--ink);">← All Users</button>
+      </div>`;
+  }
+
+  // Stats
+  html += `<div class="section-title">Overview${isUserView ? ' · ' + selectedUser.split('@')[0] : ''}</div>
     <div class="stats">
-      <div class="stat">
+      ${!isUserView ? `<div class="stat">
         <div class="stat-label">Total Users</div>
         <div class="stat-val blue">${uniqueUsers.length}</div>
         <div class="stat-sub">${signups} sign-up${signups !== 1 ? 's' : ''}</div>
-      </div>
+      </div>` : ''}
       <div class="stat">
         <div class="stat-label">Sessions</div>
         <div class="stat-val">${sessions.length}</div>
@@ -252,7 +352,7 @@ async function loadData() {
       <div class="stat">
         <div class="stat-label">Avg Session</div>
         <div class="stat-val green">${fmtSec(avgDuration)}</div>
-        <div class="stat-sub">${sessionEnds.length} completed</div>
+        <div class="stat-sub">Total: ${fmtSec(totalDuration)}</div>
       </div>
       <div class="stat">
         <div class="stat-label">Total Events</div>
@@ -260,85 +360,120 @@ async function loadData() {
         <div class="stat-sub">${Object.keys(dailyCounts).length} active day${Object.keys(dailyCounts).length !== 1 ? 's' : ''}</div>
       </div>
       <div class="stat">
-        <div class="stat-label">Total Exports</div>
-        <div class="stat-val amber">${exports.alloggiati + exports.dms + exports.csv + exports.istat}</div>
-        <div class="stat-sub">Alloggiati: ${exports.alloggiati} · DMS: ${exports.dms}</div>
+        <div class="stat-label">Saves</div>
+        <div class="stat-val blue">${saves.property + saves.rules + saves.recos}</div>
+        <div class="stat-sub">Property: ${saves.property} · Rules: ${saves.rules} · Recos: ${saves.recos}</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Exports</div>
+        <div class="stat-val amber">${totalExports}</div>
+        <div class="stat-sub">Alloggiati: ${exports.alloggiati} · DMS: ${exports.dms} · CSV: ${exports.csv}</div>
       </div>
       <div class="stat">
         <div class="stat-label">Booking Links</div>
         <div class="stat-val green">${bookings}</div>
         <div class="stat-sub">generated</div>
       </div>
-    </div>
+    </div>`;
 
-    <div class="section-title">Feature Usage (by action count)</div>
-    <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);">
-      <div class="bar-chart">
-        ${featureUsage.filter(f => f.count > 0).map(f => `
-          <div class="bar-row">
-            <div class="bar-label">${f.label}</div>
-            <div class="bar-track">
-              <div class="bar-fill" style="width:${Math.round(f.count/maxFeature*100)}%;background:${f.color};"></div>
-              <div class="bar-count">${f.count}</div>
+  // Daily activity
+  if (sortedDays.length > 1) {
+    html += `<div class="section-title">Daily Activity</div>
+      <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);">
+        <div style="display:flex;align-items:flex-end;gap:2px;height:60px;">
+          ${sortedDays.slice(-30).map(([day, count]) => {
+            const h = Math.max(4, Math.round(count / maxDay * 56));
+            return `<div title="${day}: ${count} events" style="flex:1;height:${h}px;background:var(--warm);border-radius:2px 2px 0 0;min-width:4px;opacity:${0.4 + (count/maxDay)*0.6};cursor:pointer;"></div>`;
+          }).join('')}
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:0.6rem;color:var(--ink-soft);">
+          <span>${sortedDays.slice(-30)[0]?.[0] || ''}</span>
+          <span>${sortedDays[sortedDays.length-1]?.[0] || ''}</span>
+        </div>
+      </div>`;
+  }
+
+  // Feature usage
+  if (featureUsage.length > 0) {
+    html += `<div class="section-title">Feature Usage</div>
+      <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);">
+        <div class="bar-chart">
+          ${featureUsage.map(f => `
+            <div class="bar-row">
+              <div class="bar-label">${f.label}</div>
+              <div class="bar-track">
+                <div class="bar-fill" style="width:${Math.round(f.count/maxFeature*100)}%;background:${f.color};"></div>
+                <div class="bar-count">${f.count}</div>
+              </div>
             </div>
-          </div>
-        `).join('')}
-        ${featureUsage.every(f => f.count === 0) ? '<div style="text-align:center;padding:20px;color:var(--ink-soft);">No feature usage yet</div>' : ''}
-      </div>
-    </div>
+          `).join('')}
+        </div>
+      </div>`;
+  }
 
-    ${panelTimeEntries.length > 0 ? `
-    <div class="section-title">Time Spent per Section (aggregated)</div>
-    <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);">
-      <div class="bar-chart">
-        ${panelTimeEntries.map(([k, v]) => `
-          <div class="bar-row">
-            <div class="bar-label">${panelLabels[k] || k}</div>
-            <div class="bar-track">
-              <div class="bar-fill" style="width:${Math.round(v/maxPanelTime*100)}%;background:var(--blue);"></div>
-              <div class="bar-count">${fmtSec(v)}</div>
+  // Panel time
+  if (panelTimeEntries.length > 0) {
+    html += `<div class="section-title">Time Spent per Section</div>
+      <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);">
+        <div class="bar-chart">
+          ${panelTimeEntries.map(([k, v]) => `
+            <div class="bar-row">
+              <div class="bar-label">${panelLabels[k] || k}</div>
+              <div class="bar-track">
+                <div class="bar-fill" style="width:${Math.round(v/maxPanelTime*100)}%;background:var(--blue);"></div>
+                <div class="bar-count">${fmtSec(v)}</div>
+              </div>
             </div>
-          </div>
-        `).join('')}
-      </div>
-    </div>` : ''}
+          `).join('')}
+        </div>
+      </div>`;
+  }
 
-    <div class="section-title">Users</div>
-    <table class="data-table">
-      <thead>
-        <tr><th>Email</th><th>Sessions</th><th>Events</th><th>Saves</th><th>Exports</th><th>Last Seen</th></tr>
-      </thead>
-      <tbody>
-        ${Object.entries(userStats).sort((a,b) => b[1].events - a[1].events).map(([email, s]) => `
-          <tr>
-            <td><strong>${email}</strong></td>
-            <td>${s.sessions.size}</td>
-            <td>${s.events}</td>
-            <td>${s.saves}</td>
-            <td>${s.exports}</td>
-            <td style="font-size:0.75rem;color:var(--ink-soft);">${new Date(s.lastSeen).toLocaleString()}</td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
+  // Users table (only in "all" view)
+  if (!isUserView) {
+    html += `<div class="section-title">Users</div>
+      <table class="data-table">
+        <thead>
+          <tr><th>Email</th><th>Sessions</th><th>Events</th><th>Saves</th><th>Exports</th><th>Bookings</th><th>First Seen</th><th>Last Active</th><th></th></tr>
+        </thead>
+        <tbody>
+          ${Object.entries(userStats).sort((a,b) => b[1].lastSeen.localeCompare(a[1].lastSeen)).map(([email, s]) => `
+            <tr>
+              <td><strong>${email}</strong></td>
+              <td>${s.sessions.size}</td>
+              <td>${s.events}</td>
+              <td>${s.saves}</td>
+              <td>${s.exports}</td>
+              <td>${s.bookings}</td>
+              <td style="font-size:0.75rem;color:var(--ink-soft);">${new Date(s.firstSeen).toLocaleDateString()}</td>
+              <td style="font-size:0.75rem;color:var(--ink-soft);">${new Date(s.lastSeen).toLocaleString()}</td>
+              <td><button onclick="document.getElementById('userFilter').value='${email}';renderView();" style="background:var(--cream-2);border:1px solid var(--border);border-radius:4px;padding:4px 10px;font-size:0.7rem;cursor:pointer;color:var(--warm);font-weight:500;">View →</button></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+  }
 
-    <div class="section-title">Event Log (latest ${Math.min(events.length, 100)})</div>
+  // Event log
+  const logEvents = events.slice(0, 200);
+  html += `<div class="section-title">Event Log (${logEvents.length} of ${events.length})</div>
     <div class="event-log">
-      ${events.slice(0, 100).map(e => {
+      ${logEvents.map(e => {
         const cls = e.event_type.includes('login') || e.event_type.includes('signup') || e.event_type.includes('session') ? 'login'
           : e.event_type.includes('export') ? 'export'
-          : e.event_type.includes('save') ? 'save' : '';
+          : e.event_type.includes('save') || e.event_type.includes('booking') ? 'save' : '';
         const detail = e.event_data ? Object.entries(e.event_data).map(([k,v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join(' · ') : '';
         return `
           <div class="event-row">
             <div class="event-time">${new Date(e.created_at).toLocaleString()}</div>
             <div class="event-type ${cls}">${e.event_type}</div>
-            <div class="event-user">${e.user_email || '—'}</div>
+            ${!isUserView ? `<div class="event-user">${e.user_email || '—'}</div>` : ''}
             <div class="event-detail">${detail}</div>
           </div>`;
       }).join('')}
-    </div>
-  `;
+    </div>`;
+
+  document.getElementById('content').innerHTML = html;
 }
 
 loadData();

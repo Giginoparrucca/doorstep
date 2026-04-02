@@ -994,6 +994,66 @@ let hostLang = 'en';
 let isSignUp = false;
 
 /* ══════════════════════════════════════
+   ANALYTICS — event tracking
+══════════════════════════════════════ */
+const _sessionId = 'S' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+let _trackUserId = null;
+let _trackEmail = null;
+let _sessionStart = Date.now();
+let _panelViewTimes = {};
+let _lastPanelSwitch = Date.now();
+let _lastPanel = 'dashboard';
+
+async function track(eventType, eventData = {}) {
+  try {
+    await sb.from('analytics_events').insert({
+      user_id: _trackUserId,
+      user_email: _trackEmail,
+      event_type: eventType,
+      event_data: eventData,
+      property_id: propertyId,
+      session_id: _sessionId,
+    });
+  } catch (e) { /* silent fail — analytics should never break the app */ }
+}
+
+// Track panel time spent
+function trackPanelSwitch(newPanel) {
+  const now = Date.now();
+  const elapsed = Math.round((now - _lastPanelSwitch) / 1000);
+  if (_lastPanel && elapsed > 0 && elapsed < 1800) { // ignore if > 30min (user left tab)
+    _panelViewTimes[_lastPanel] = (_panelViewTimes[_lastPanel] || 0) + elapsed;
+  }
+  _lastPanelSwitch = now;
+  _lastPanel = newPanel;
+  track('panel_view', { panel: newPanel });
+}
+
+// Send session summary on page unload
+function sendSessionSummary() {
+  const duration = Math.round((Date.now() - _sessionStart) / 1000);
+  if (duration < 2) return; // skip instant bounces
+  // Record final panel time
+  const now = Date.now();
+  const elapsed = Math.round((now - _lastPanelSwitch) / 1000);
+  if (_lastPanel && elapsed > 0 && elapsed < 1800) {
+    _panelViewTimes[_lastPanel] = (_panelViewTimes[_lastPanel] || 0) + elapsed;
+  }
+  try {
+    fetch(`${SUPABASE_URL}/rest/v1/analytics_events`, {
+      method: 'POST', keepalive: true,
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY },
+      body: JSON.stringify({
+        user_id: _trackUserId, user_email: _trackEmail, event_type: 'session_end',
+        event_data: { duration_seconds: duration, panel_times: _panelViewTimes },
+        property_id: propertyId, session_id: _sessionId,
+      })
+    });
+  } catch (e) {}
+}
+window.addEventListener('beforeunload', sendSessionSummary);
+
+/* ══════════════════════════════════════
    AUTHENTICATION
 ══════════════════════════════════════ */
 async function checkAuth() {
@@ -1053,6 +1113,9 @@ async function handleAuth() {
     }
 
     // Success
+    _trackUserId = result.data?.user?.id || null;
+    _trackEmail = result.data?.user?.email || null;
+    track(isSignUp ? 'signup' : 'login', { email: _trackEmail });
     document.getElementById('loginOverlay').classList.add('hidden');
     init();
   } catch (e) {
@@ -1449,6 +1512,7 @@ function showPanel(id, btn) {
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebarOverlay').classList.remove('show');
   if (id === 'qrlink') initQRPanel();
+  trackPanelSwitch(id);
 }
 
 /* ══════════════════════════════════════
@@ -1542,6 +1606,7 @@ async function deleteCheckin(id, name) {
   renderCheckins();
   renderDashboard();
   toast(h('deleted_record').replace('{name}', name));
+  track('delete_checkin', { name });
 }
 
 async function deleteAllCheckins() {
@@ -1557,6 +1622,7 @@ async function deleteAllCheckins() {
   renderCheckins();
   renderDashboard();
   toast(h('deleted_all'));
+  track('delete_all_checkins', { count: allCheckins.length });
 }
 
 /* ══════════════════════════════════════
@@ -1584,6 +1650,7 @@ async function saveProperty() {
   if (error) { console.error(error); toast('Error saving!'); return; }
   propertyData = { ...propertyData, ...update };
   toast(h('toast_property_saved'));
+  track('save_property', { name: document.getElementById('propName').value });
 }
 
 /* ══════════════════════════════════════
@@ -1691,6 +1758,7 @@ async function saveRules() {
     if (error) { console.error(error); toast('Error saving rules!'); return; }
   }
   toast(h('toast_rules_saved'));
+  track('save_rules', { count: rulesData.length });
 }
 
 /* ══════════════════════════════════════
@@ -1816,7 +1884,8 @@ async function saveRecos() {
     const { error } = await sb.from('recommendations').insert(rows);
     if (error) { console.error(error); toast('Error saving!'); return; }
   }
-  toast('Recommendations saved to database!');
+  toast(h('toast_recos_saved'));
+  track('save_recos', { count: recoData.length, categories: [...new Set(recoData.map(r => r.category))] });
 }
 
 /* ══════════════════════════════════════
@@ -2150,6 +2219,7 @@ function exportAlloggiati() {
 
   const fileContent = lines.join('\r\n');
   downloadFile('alloggiati_' + new Date().toISOString().slice(0,10) + '.txt', fileContent);
+  track('export_alloggiati', { guests: lines.length, warnings: warnings.length });
 
   if (warnings.length > 0) {
     alert(`File generated: ${lines.length} guests.\n\n⚠️ Review:\n` + warnings.join('\n'));
@@ -2226,6 +2296,7 @@ function exportDMS() {
   xml += `</MovimentazioneTuristica>`;
 
   downloadFile('spot_puglia_' + new Date().toISOString().slice(0,7) + '.xml', xml);
+  track('export_dms', { guests: allCheckins.length });
 
   if (cis === 'CODICE_CIS_MANCANTE') {
     alert('⚠️ File generated but your CIS/CIR code is missing!\nGo to Property Details and add your CIR Code before uploading to SPOT.');
@@ -2259,6 +2330,7 @@ function exportCSV() {
   // Use BOM for Excel compatibility
   const bom = '\uFEFF';
   downloadFile('checkins_' + new Date().toISOString().slice(0,7) + '.csv', bom + [header, ...rows].join('\n'));
+  track('export_csv', { guests: allCheckins.length });
   toast(`CSV downloaded — ${allCheckins.length} guests with code mappings`);
 }
 
@@ -2295,6 +2367,7 @@ function exportISTAT() {
     ...Object.entries(byNat).map(([n, d]) => `  ${n}: Arrivi ${d.arr}, Presenze ${d.pres}`),
   ];
   downloadFile('istat_c59_' + new Date().toISOString().slice(0,7) + '.txt', lines.join('\n'));
+  track('export_istat', { lines: lines.length });
   toast('ISTAT C/59 report generated!');
 }
 
@@ -2358,6 +2431,7 @@ function generateBookingCode() {
 
   renderPastCodes();
   toast(`Booking code generated: ${bookingCode}`);
+  track('generate_booking', { code: bookingCode });
 }
 
 function renderPastCodes() {
@@ -2401,8 +2475,11 @@ async function init() {
     if (session?.user) {
       userId = session.user.id;
       const email = session.user.email || '';
+      _trackUserId = userId;
+      _trackEmail = email;
       document.getElementById('sidebarUserName').textContent = email.split('@')[0];
       document.getElementById('sidebarAvatar').textContent = email.charAt(0).toUpperCase();
+      track('session_start', { email });
     }
   } catch (e) {}
 

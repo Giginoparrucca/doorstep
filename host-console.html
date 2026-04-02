@@ -894,11 +894,14 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
 
         <div class="export-card">
-          <h3 data-h="export_dms">🌐 Puglia DMS Export</h3>
-          <p data-h="export_dms_desc"></p>
-          <button class="btn btn-primary" onclick="exportDMS()" data-h="btn_gen_dms">📥 Generate DMS File</button>
-          <a href="https://spot.regione.puglia.it" target="_blank" rel="noopener" class="export-portal-link">
-            🔗 <span data-h="link_dms">Open SPOT Easy (Puglia DMS)</span> ↗
+          <h3 data-h="export_dms_istat">🌐 Puglia DMS + ISTAT</h3>
+          <p data-h="export_dms_istat_desc"></p>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <button class="btn btn-primary" onclick="exportDMS()" data-h="btn_gen_dms">📥 Generate DMS File</button>
+            <button class="btn btn-secondary" onclick="exportISTAT()" data-h="btn_gen_istat">📥 Generate ISTAT / C59 Report</button>
+          </div>
+          <a href="https://dms.puglia.it" target="_blank" rel="noopener" class="export-portal-link">
+            🔗 <span data-h="link_dms">Open Puglia DMS Portal</span> ↗
           </a>
         </div>
 
@@ -906,15 +909,6 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           <h3 data-h="export_csv">📊 CSV Export</h3>
           <p data-h="export_csv_desc"></p>
           <button class="btn btn-secondary" onclick="exportCSV()" style="margin-top:auto" data-h="btn_dl_csv">📥 Download CSV</button>
-        </div>
-
-        <div class="export-card">
-          <h3 data-h="export_istat">📋 ISTAT / C59 Report</h3>
-          <p data-h="export_istat_desc"></p>
-          <button class="btn btn-secondary" onclick="exportISTAT()" style="margin-top:auto" data-h="btn_gen_istat">📥 Generate Report</button>
-          <a href="https://infrturweb.istat.it" target="_blank" rel="noopener" class="export-portal-link">
-            🔗 <span data-h="link_istat">Open ISTAT Tourism Portal</span> ↗
-          </a>
         </div>
       </div>
     </div>
@@ -1006,15 +1000,18 @@ let _lastPanel = 'dashboard';
 
 async function track(eventType, eventData = {}) {
   try {
-    await sb.from('analytics_events').insert({
-      user_id: _trackUserId,
-      user_email: _trackEmail,
+    const row = {
       event_type: eventType,
       event_data: eventData,
-      property_id: propertyId,
       session_id: _sessionId,
-    });
-  } catch (e) { /* silent fail — analytics should never break the app */ }
+    };
+    if (_trackUserId) row.user_id = _trackUserId;
+    if (_trackEmail) row.user_email = _trackEmail;
+    if (propertyId) row.property_id = propertyId;
+    const { error } = await sb.from('analytics_events').insert(row);
+    if (error) console.warn('Analytics:', error.message);
+    else console.log('📊', eventType, eventData);
+  } catch (e) { console.warn('Analytics error:', e); }
 }
 
 // Track panel time spent
@@ -1040,14 +1037,18 @@ function sendSessionSummary() {
     _panelViewTimes[_lastPanel] = (_panelViewTimes[_lastPanel] || 0) + elapsed;
   }
   try {
+    const row = {
+      event_type: 'session_end',
+      event_data: { duration_seconds: duration, panel_times: _panelViewTimes },
+      session_id: _sessionId,
+    };
+    if (_trackUserId) row.user_id = _trackUserId;
+    if (_trackEmail) row.user_email = _trackEmail;
+    if (propertyId) row.property_id = propertyId;
     fetch(`${SUPABASE_URL}/rest/v1/analytics_events`, {
       method: 'POST', keepalive: true,
-      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY },
-      body: JSON.stringify({
-        user_id: _trackUserId, user_email: _trackEmail, event_type: 'session_end',
-        event_data: { duration_seconds: duration, panel_times: _panelViewTimes },
-        property_id: propertyId, session_id: _sessionId,
-      })
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Prefer': 'return=minimal' },
+      body: JSON.stringify(row)
     });
   } catch (e) {}
 }
@@ -1253,14 +1254,15 @@ const HT = {
     export_alloggiati_desc: 'Generates a <strong>.txt file</strong> in the exact format required by the Polizia di Stato\'s Alloggiati Web portal.',
     export_dms: 'Puglia DMS Export',
     export_dms_desc: 'Generates a file for the <strong>Puglia regional tourism authority</strong>.',
+    export_dms_istat: '🌐 Puglia DMS + ISTAT',
+    export_dms_istat_desc: 'Both the DMS tourist report and the ISTAT/C59 statistical report are uploaded to the <strong>Puglia DMS portal</strong>.',
     export_csv: 'CSV Export', export_csv_desc: 'Download all guest check-in data as a <strong>CSV spreadsheet</strong>.',
     export_istat: 'ISTAT / C59 Report', export_istat_desc: 'Monthly statistical report for <strong>ISTAT tourism statistics</strong>.',
     date_range: 'Date Range', month: 'Month',
     btn_gen_alloggiati: '📥 Generate Alloggiati File', btn_gen_dms: '📥 Generate DMS File',
-    btn_dl_csv: '📥 Download CSV', btn_gen_istat: '📥 Generate Report',
+    btn_dl_csv: '📥 Download CSV', btn_gen_istat: '📥 Generate ISTAT / C59 Report',
     link_alloggiati: 'Open Alloggiati Web Portal',
-    link_dms: 'Open SPOT Easy (Puglia DMS)',
-    link_istat: 'Open ISTAT Tourism Portal',
+    link_dms: 'Open Puglia DMS Portal',
     // QR
     qr_title: 'Guest App Link',
     qr_desc: 'Share this link with guests before arrival, or print the QR code and place it in the apartment.',
@@ -1374,14 +1376,15 @@ const HT = {
     export_alloggiati_desc: 'Genera un <strong>file .txt</strong> nel formato richiesto dal portale Alloggiati Web della Polizia di Stato.',
     export_dms: 'Export Puglia DMS',
     export_dms_desc: 'Genera un file per l\'<strong>autorità turistica regionale pugliese</strong>.',
+    export_dms_istat: '🌐 Puglia DMS + ISTAT',
+    export_dms_istat_desc: 'Sia il report DMS turistico che il report statistico ISTAT/C59 si caricano sul <strong>portale DMS Puglia</strong>.',
     export_csv: 'Export CSV', export_csv_desc: 'Scarica tutti i dati di check-in come <strong>foglio di calcolo CSV</strong>.',
     export_istat: 'Report ISTAT / C59', export_istat_desc: 'Report statistico mensile per le <strong>statistiche turistiche ISTAT</strong>.',
     date_range: 'Intervallo Date', month: 'Mese',
     btn_gen_alloggiati: '📥 Genera File Alloggiati', btn_gen_dms: '📥 Genera File DMS',
-    btn_dl_csv: '📥 Scarica CSV', btn_gen_istat: '📥 Genera Report',
+    btn_dl_csv: '📥 Scarica CSV', btn_gen_istat: '📥 Genera Report ISTAT / C59',
     link_alloggiati: 'Apri Portale Alloggiati Web',
-    link_dms: 'Apri SPOT Easy (Puglia DMS)',
-    link_istat: 'Apri Portale Turismo ISTAT',
+    link_dms: 'Apri Portale DMS Puglia',
     qr_title: 'Link App Ospiti',
     qr_desc: 'Condividi questo link con gli ospiti prima dell\'arrivo, o stampa il QR code e mettilo nell\'appartamento.',
     btn_copy_link: '📋 Copia Link', btn_print_qr: '🖨 Stampa QR',

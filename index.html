@@ -1024,13 +1024,17 @@ let existingCheckins = [];
 function getBookingCode() {
   const params = new URLSearchParams(window.location.search);
   const urlCode = params.get('b');
-  if (urlCode) {
-    localStorage.setItem('doorstep_booking', urlCode);
-    // Clean URL without reload
+  const urlProp = params.get('p');
+  if (urlCode) localStorage.setItem('doorstep_booking', urlCode);
+  if (urlProp) localStorage.setItem('doorstep_property', urlProp);
+  if (urlCode || urlProp) {
     window.history.replaceState({}, '', window.location.pathname);
-    return urlCode;
   }
   return localStorage.getItem('doorstep_booking') || null;
+}
+
+function getStoredPropertyId() {
+  return localStorage.getItem('doorstep_property') || null;
 }
 let uploadedIdFile = null;
 
@@ -2342,9 +2346,24 @@ function sendSuggestion(text) {
    INIT — Load from Supabase, fallback to local data
 ══════════════════════════════════════ */
 async function init() {
-  // 1. Load property
+  // 1. Load property — by ID from booking link, or first available
+  const storedPropId = getStoredPropertyId();
   try {
-    const { data } = await sb.from('properties').select('*').limit(1).single();
+    let data;
+    if (storedPropId) {
+      const res = await sb.from('properties').select('*').eq('id', storedPropId).single();
+      data = res.data;
+    }
+    if (!data) {
+      // Fallback: load first property that has an owner (skip blank/unclaimed ones)
+      const res = await sb.from('properties').select('*').not('owner_id', 'is', null).limit(1).single();
+      data = res.data;
+    }
+    if (!data) {
+      // Last resort: any property
+      const res = await sb.from('properties').select('*').limit(1).single();
+      data = res.data;
+    }
     if (data) {
       propertyId = data.id;
       propertyData = data;

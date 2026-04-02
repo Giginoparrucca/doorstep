@@ -2445,7 +2445,7 @@ function generateBookingCode() {
   // Update UI
   document.getElementById('bookingCodeDisplay').textContent = bookingCode;
   const baseUrl = 'https://doorstep-rust.vercel.app';
-  const fullLink = `${baseUrl}/?b=${bookingCode}`;
+  const fullLink = `${baseUrl}/?b=${bookingCode}&p=${propertyId}`;
   document.getElementById('guestLink').textContent = fullLink;
   document.getElementById('bookingLinkSection').style.display = 'block';
 

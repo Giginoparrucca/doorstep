@@ -943,6 +943,16 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
       </div>
 
+      <!-- Apartment QR — generic property link for printing -->
+      <div class="form-card" style="margin-top:16px;">
+        <div class="form-card-title" data-h="qr_apartment_title">🏠 QR Code for Apartment</div>
+        <div class="form-card-desc" data-h="qr_apartment_desc">Print this QR code and place it in your property. Guests who scan it can browse property info, house rules, and recommendations — and look up their check-in with surname + arrival date.</div>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="qr-link" id="apartmentLink" style="font-size:0.72rem;flex:1;word-break:break-all;">—</div>
+          <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard?.writeText(document.getElementById('apartmentLink').textContent);toast(h('toast_link_copied'));" style="white-space:nowrap;">📋</button>
+        </div>
+      </div>
+
       <div id="pastBookingCodes" style="margin-top:16px;display:none;">
         <div style="font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;" id="recentCodesTitle">Recent Booking Codes</div>
         <div id="pastCodesTable"></div>
@@ -1296,6 +1306,8 @@ const HT = {
     btn_gen_booking: '🔑 Generate New Booking Link',
     booking_code_label: 'Booking Code',
     qr_returning_hint: '💡 Returning guests who use the same link will see their check-in status and details automatically.',
+    qr_apartment_title: '🏠 QR Code for Apartment',
+    qr_apartment_desc: 'Print this QR code and place it in your property. Guests who scan it can browse property info, house rules, and recommendations — and look up their check-in with surname + arrival date.',
     recent_codes_title: 'Recent Booking Codes',
     template_title: 'Pre-Arrival Message Template',
     template_desc: 'Generate a booking link above, then copy this message to send to your guests.',
@@ -1414,6 +1426,8 @@ const HT = {
     btn_gen_booking: '🔑 Genera Nuovo Link Prenotazione',
     booking_code_label: 'Codice Prenotazione',
     qr_returning_hint: '💡 Gli ospiti che tornano con lo stesso link vedranno automaticamente il loro stato di check-in e i dettagli.',
+    qr_apartment_title: '🏠 QR Code per l\'Appartamento',
+    qr_apartment_desc: 'Stampa questo QR code e posizionalo nella tua proprietà. Gli ospiti che lo scansionano possono consultare le info, le regole e i consigli — e cercare il loro check-in con cognome + data di arrivo.',
     recent_codes_title: 'Codici Prenotazione Recenti',
     template_title: 'Modello Messaggio Pre-Arrivo',
     template_desc: 'Genera un link prenotazione qui sopra, poi copia questo messaggio da inviare ai tuoi ospiti.',
@@ -2483,6 +2497,10 @@ function renderPastCodes() {
 // Load past codes on panel open
 function initQRPanel() {
   renderPastCodes();
+  // Set apartment QR link
+  if (propertyId) {
+    document.getElementById('apartmentLink').textContent = `https://doorstep-rust.vercel.app/?p=${propertyId}`;
+  }
 }
 
 function viewGuest(id) {

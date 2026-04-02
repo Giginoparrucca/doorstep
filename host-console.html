@@ -813,11 +813,11 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       </div>
 
       <div style="margin-bottom:16px;">
-        <div style="font-size:0.55rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;" data-h="rules_preset_label">Quick-add common rules</div>
+        <div style="font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;" data-h="rules_preset_label">Quick-add common rules</div>
         <div id="presetRulesGrid" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
       </div>
 
-      <div style="font-size:0.55rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;" data-h="rules_your_rules">Your rules</div>
+      <div style="font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;" data-h="rules_your_rules">Your rules</div>
       <div class="edit-list" id="rulesList"></div>
 
       <div style="margin-top:16px; display:flex; gap:10px;">
@@ -982,6 +982,7 @@ See you soon!</textarea>
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <script>
 /* ══════════════════════════════════════
    SUPABASE CONNECTION
@@ -1664,7 +1665,7 @@ async function saveProperty() {
     host_names: document.getElementById('propHostNames').value,
   };
   const { error } = await sb.from('properties').update(update).eq('id', propertyId);
-  if (error) { console.error(error); toast('Error saving!'); return; }
+  if (error) { console.error('Save error:', error); toast('Error: ' + error.message); return; }
   propertyData = { ...propertyData, ...update };
   toast(h('toast_property_saved'));
   track('save_property', { name: document.getElementById('propName').value });
@@ -1699,7 +1700,7 @@ function renderPresetRules() {
   const existing = rulesData.map(r => (r.title_en || r.title || '').toLowerCase());
   document.getElementById('presetRulesGrid').innerHTML = PRESET_RULES.map((p, i) => {
     const alreadyAdded = existing.includes(p.title_en.toLowerCase());
-    return `<button type="button" onclick="addPresetRule(${i})" style="padding:5px 10px;border-radius:6px;font-size:0.62rem;border:1px solid ${alreadyAdded ? 'var(--green)' : 'var(--cream-3)'};background:${alreadyAdded ? 'rgba(109,191,130,0.06)' : 'var(--bg)'};color:${alreadyAdded ? 'var(--green)' : 'var(--ink-soft)'};cursor:${alreadyAdded ? 'default' : 'pointer'};transition:all 0.15s;" ${alreadyAdded ? 'disabled' : ''}>${p.icon} ${hostLang === 'it' ? p.title_it : p.title_en}${alreadyAdded ? ' ✓' : ''}</button>`;
+    return `<button type="button" onclick="addPresetRule(${i})" style="padding:8px 14px;border-radius:8px;font-size:0.82rem;border:1px solid ${alreadyAdded ? 'var(--green)' : 'var(--cream-3)'};background:${alreadyAdded ? 'rgba(109,191,130,0.06)' : 'var(--bg)'};color:${alreadyAdded ? 'var(--green)' : 'var(--ink-soft)'};cursor:${alreadyAdded ? 'default' : 'pointer'};transition:all 0.15s;min-height:40px;" ${alreadyAdded ? 'disabled' : ''}>${p.icon} ${hostLang === 'it' ? p.title_it : p.title_en}${alreadyAdded ? ' ✓' : ''}</button>`;
   }).join('');
 }
 
@@ -1721,25 +1722,25 @@ function renderRules() {
           <input class="form-input" style="width:50px;text-align:center;padding:6px;font-size:1.1rem;" value="${r.icon}" onchange="rulesData[${i}].icon=this.value" title="Emoji">
           <div style="flex:1;display:flex;gap:6px;">
             <div style="flex:1;">
-              <label style="font-size:0.5rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:2px;">${h('rules_title_en')}</label>
+              <label style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:2px;">${h('rules_title_en')}</label>
               <input class="form-input" style="font-size:0.75rem;" value="${r.title_en||r.title||''}" onchange="rulesData[${i}].title_en=this.value">
             </div>
             <div style="flex:1;">
-              <label style="font-size:0.5rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:2px;">${h('rules_title_it')}</label>
+              <label style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:2px;">${h('rules_title_it')}</label>
               <input class="form-input" style="font-size:0.75rem;" value="${r.title_it||''}" onchange="rulesData[${i}].title_it=this.value">
             </div>
           </div>
-          <label style="display:flex;align-items:center;gap:4px;font-size:0.58rem;white-space:nowrap;color:var(--red);cursor:pointer;">
+          <label style="display:flex;align-items:center;gap:4px;font-size:0.75rem;white-space:nowrap;color:var(--red);cursor:pointer;">
             <input type="checkbox" ${r.is_important?'checked':''} onchange="rulesData[${i}].is_important=this.checked"> ${h('rules_important')}
           </label>
         </div>
         <div style="display:flex;gap:6px;">
           <div style="flex:1;">
-            <label style="font-size:0.5rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:2px;">${h('rules_desc_en')}</label>
+            <label style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:2px;">${h('rules_desc_en')}</label>
             <textarea class="form-textarea" style="min-height:38px;font-size:0.7rem;" onchange="rulesData[${i}].desc_en=this.value">${r.desc_en||r.desc||''}</textarea>
           </div>
           <div style="flex:1;">
-            <label style="font-size:0.5rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:2px;">${h('rules_desc_it')}</label>
+            <label style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:2px;">${h('rules_desc_it')}</label>
             <textarea class="form-textarea" style="min-height:38px;font-size:0.7rem;" onchange="rulesData[${i}].desc_it=this.value">${r.desc_it||''}</textarea>
           </div>
         </div>
@@ -1833,28 +1834,28 @@ function renderRecos() {
         <div class="edit-item-body" style="flex:1;">
           <div style="display:flex;gap:8px;margin-bottom:8px;">
             <div style="flex:1;">
-              <label style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);display:block;margin-bottom:3px;">${h('reco_name')}</label>
+              <label style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:3px;">${h('reco_name')}</label>
               <input class="form-input" value="${r.name}" placeholder="${h('reco_name_hint')}" onchange="recoData[${globalIdx}].name=this.value">
             </div>
             <div style="flex:1;">
-              <label style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);display:block;margin-bottom:3px;">${h('reco_address')}</label>
+              <label style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:3px;">${h('reco_address')}</label>
               <input class="form-input" value="${r.address||''}" placeholder="${h('reco_address_hint')}" onchange="recoData[${globalIdx}].address=this.value">
             </div>
           </div>
           <div style="margin-bottom:8px;">
-            <label style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);display:block;margin-bottom:3px;">${h('reco_desc_en')}</label>
+            <label style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:3px;">${h('reco_desc_en')}</label>
             <textarea class="form-textarea" style="min-height:40px;font-size:0.72rem;" placeholder="${h('reco_desc_en_hint')}" onchange="recoData[${globalIdx}].desc_en=this.value">${r.desc_en||r.desc||''}</textarea>
           </div>
           <div style="margin-bottom:8px;">
-            <label style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);display:block;margin-bottom:3px;">${h('reco_desc_it')}</label>
+            <label style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:3px;">${h('reco_desc_it')}</label>
             <textarea class="form-textarea" style="min-height:40px;font-size:0.72rem;" placeholder="${h('reco_desc_it_hint')}" onchange="recoData[${globalIdx}].desc_it=this.value">${r.desc_it||''}</textarea>
           </div>
           <div style="margin-bottom:6px;">
-            <label style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);display:block;margin-bottom:5px;">${h('reco_tags')}</label>
+            <label style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:5px;">${h('reco_tags')}</label>
             <div style="display:flex;flex-wrap:wrap;gap:4px;" id="tagPicker_${globalIdx}">
               ${tags.map(t => {
                 const isActive = activeTags.includes(t.icon + ' ' + t.label) || activeTags.includes(t.label);
-                return `<button type="button" onclick="toggleRecoTag(${globalIdx},'${t.icon} ${t.label}',this)" style="padding:3px 8px;border-radius:5px;font-size:0.58rem;border:1px solid ${isActive ? 'var(--warm)' : 'var(--cream-3)'};background:${isActive ? 'rgba(194,113,79,0.08)' : 'var(--bg)'};color:${isActive ? 'var(--warm)' : 'var(--ink-soft)'};cursor:pointer;transition:all 0.15s;">${t.icon} ${t.label}</button>`;
+                return `<button type="button" onclick="toggleRecoTag(${globalIdx},'${t.icon} ${t.label}',this)" style="padding:7px 12px;border-radius:6px;font-size:0.78rem;border:1px solid ${isActive ? 'var(--warm)' : 'var(--cream-3)'};background:${isActive ? 'rgba(194,113,79,0.08)' : 'var(--bg)'};color:${isActive ? 'var(--warm)' : 'var(--ink-soft)'};cursor:pointer;transition:all 0.15s;min-height:36px;">${t.icon} ${t.label}</button>`;
               }).join('')}
             </div>
           </div>
@@ -2474,6 +2475,7 @@ function generateBookingCode() {
   localStorage.setItem('doorstep_booking_codes', JSON.stringify(stored));
 
   renderPastCodes();
+  renderQR(fullLink);
   toast(`Booking code generated: ${bookingCode}`);
   track('generate_booking', { code: bookingCode });
 }
@@ -2497,10 +2499,29 @@ function renderPastCodes() {
 // Load past codes on panel open
 function initQRPanel() {
   renderPastCodes();
-  // Set apartment QR link
+  // Set apartment QR link and render QR
   if (propertyId) {
-    document.getElementById('apartmentLink').textContent = `https://doorstep-rust.vercel.app/?p=${propertyId}`;
+    const aptLink = `https://doorstep-rust.vercel.app/?p=${propertyId}`;
+    document.getElementById('apartmentLink').textContent = aptLink;
+    renderQR(aptLink);
   }
+}
+
+function renderQR(url) {
+  try {
+    const qr = qrcode(0, 'M');
+    qr.addData(url);
+    qr.make();
+    const canvas = document.getElementById('qrCanvas');
+    canvas.innerHTML = qr.createSvgTag({ cellSize: 3, margin: 4, scalable: true });
+    // Style the SVG
+    const svg = canvas.querySelector('svg');
+    if (svg) {
+      svg.style.width = '100%';
+      svg.style.height = '100%';
+      svg.style.borderRadius = '6px';
+    }
+  } catch (e) { console.warn('QR error:', e); }
 }
 
 function viewGuest(id) {

@@ -905,6 +905,15 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
 
         <div class="export-card">
+          <h3 data-h="export_paytourist">💰 PayTourist Export</h3>
+          <p data-h="export_paytourist_desc"></p>
+          <button class="btn btn-primary" onclick="exportPayTourist()" data-h="btn_gen_paytourist">📥 Generate PayTourist CSV</button>
+          <a href="https://bari.paytourist.com/admin/ps/import" target="_blank" rel="noopener" class="export-portal-link">
+            🔗 <span data-h="link_paytourist">Open PayTourist Import</span> ↗
+          </a>
+        </div>
+
+        <div class="export-card">
           <h3 data-h="export_dms_istat">🌐 Puglia DMS + ISTAT</h3>
           <p data-h="export_dms_istat_desc"></p>
           <div style="display:flex;flex-direction:column;gap:8px;">
@@ -920,6 +929,15 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           <h3 data-h="export_csv">📊 CSV Export</h3>
           <p data-h="export_csv_desc"></p>
           <button class="btn btn-secondary" onclick="exportCSV()" style="margin-top:auto" data-h="btn_dl_csv">📥 Download CSV</button>
+        </div>
+
+        <div class="export-card">
+          <h3 data-h="export_paytourist">💳 PayTourist Export</h3>
+          <p data-h="export_paytourist_desc"></p>
+          <button class="btn btn-primary" onclick="exportPayTourist()" data-h="btn_gen_paytourist">📥 Generate PayTourist CSV</button>
+          <a href="https://bari.paytourist.com/admin" target="_blank" rel="noopener" class="export-portal-link">
+            🔗 <span data-h="link_paytourist">Open PayTourist Portal</span> ↗
+          </a>
         </div>
       </div>
     </div>
@@ -1284,7 +1302,15 @@ const HT = {
     btn_gen_alloggiati: '📥 Generate Alloggiati File', btn_gen_dms: '📥 Generate DMS File',
     btn_dl_csv: '📥 Download CSV', btn_gen_istat: '📥 Generate ISTAT / C59 Report',
     link_alloggiati: 'Open Alloggiati Web Portal',
+    export_paytourist: '💰 PayTourist Export',
+    export_paytourist_desc: 'CSV file for <strong>PayTourist</strong> municipal tourist tax portal. Groups guests by stay, auto-fills tax codes. Upload at your municipality\'s PayTourist import page.',
+    btn_gen_paytourist: '📥 Generate PayTourist CSV',
+    link_paytourist: 'Open PayTourist Import',
     link_dms: 'Open Puglia DMS Portal',
+    export_paytourist: '💳 PayTourist Export',
+    export_paytourist_desc: 'CSV file for <strong>PayTourist</strong> (municipal tourist tax). Auto-fills guest groups, CIR code, nationality codes. Upload at Soggiorni → Importa.',
+    btn_gen_paytourist: '📥 Generate PayTourist CSV',
+    link_paytourist: 'Open PayTourist Portal',
     // QR
     qr_title: 'Guest App Link',
     qr_desc: 'Share this link with guests before arrival, or print the QR code and place it in the apartment.',
@@ -1408,7 +1434,15 @@ const HT = {
     btn_gen_alloggiati: '📥 Genera File Alloggiati', btn_gen_dms: '📥 Genera File DMS',
     btn_dl_csv: '📥 Scarica CSV', btn_gen_istat: '📥 Genera Report ISTAT / C59',
     link_alloggiati: 'Apri Portale Alloggiati Web',
+    export_paytourist: '💰 Export PayTourist',
+    export_paytourist_desc: 'File CSV per il portale <strong>PayTourist</strong> dell\'imposta di soggiorno comunale. Raggruppa gli ospiti per soggiorno, compila automaticamente i codici fiscali. Carica nella pagina di importazione PayTourist del tuo comune.',
+    btn_gen_paytourist: '📥 Genera CSV PayTourist',
+    link_paytourist: 'Apri Importazione PayTourist',
     link_dms: 'Apri Portale DMS Puglia',
+    export_paytourist: '💳 Export PayTourist',
+    export_paytourist_desc: 'File CSV per <strong>PayTourist</strong> (tassa di soggiorno comunale). Compila automaticamente gruppi ospiti, codice CIR, codici nazionalità. Carica su Soggiorni → Importa.',
+    btn_gen_paytourist: '📥 Genera CSV PayTourist',
+    link_paytourist: 'Apri Portale PayTourist',
     qr_title: 'Link App Ospiti',
     qr_desc: 'Condividi questo link con gli ospiti prima dell\'arrivo, o stampa il QR code e mettilo nell\'appartamento.',
     btn_copy_link: '📋 Copia Link', btn_print_qr: '🖨 Stampa QR',
@@ -2286,6 +2320,115 @@ function exportAlloggiati() {
 }
 
 /* ══════════════════════════════════════
+   PAYTOURIST — CSV format for municipal tourist tax
+   Format: Group,Name,Surname,CheckIn,CheckOut,Amount,License,Sex,DOB,Exemption,Reduction,Nationality,BirthCity,Citizenship,ResidenceCity,ResidenceCountry,Email,PortalID,SendReceipt
+══════════════════════════════════════ */
+function exportPayTourist() {
+  if (allCheckins.length === 0) { toast('No check-in data to export!'); return; }
+
+  const cirCode = (propertyData?.cir_code || '').trim();
+  if (!cirCode) {
+    toast(hostLang === 'it' ? '⚠ Inserisci il Codice CIR nelle Impostazioni Proprietà prima di esportare.' : '⚠ Enter your CIR Code in Property Details before exporting.');
+    return;
+  }
+
+  // 48h default filter
+  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString().split('T')[0];
+  let toExport = allCheckins.filter(c => (c.arrival_date || '') >= cutoff);
+  if (toExport.length === 0) {
+    if (!confirm(hostLang === 'it'
+      ? `Nessun ospite nelle ultime 48 ore. Esportare tutti i ${allCheckins.length} ospiti?`
+      : `No guests in the last 48 hours. Export all ${allCheckins.length} guests?`)) return;
+    toExport = allCheckins;
+  }
+
+  // Group by stay (booking_code or arrival_date)
+  const groups = {};
+  toExport.forEach(c => {
+    const key = c.booking_code || `_arr_${c.arrival_date || 'unknown'}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(c);
+  });
+
+  const fmtD = (iso) => {
+    if (!iso) return '';
+    const p = iso.split('T')[0].split('-');
+    return `${p[2]}/${p[1]}/${p[0]}`;
+  };
+
+  const warnings = [];
+  const lines = [];
+  let groupNum = 0;
+
+  Object.values(groups).forEach(group => {
+    groupNum++;
+    const gId = `G${groupNum}`;
+
+    // Sort: main guest first
+    const mainTypes = ['single', 'head', 'group'];
+    group.sort((a, b) => {
+      const aM = mainTypes.includes(a.guest_type) ? 0 : 1;
+      const bM = mainTypes.includes(b.guest_type) ? 0 : 1;
+      return aM - bM;
+    });
+
+    group.forEach((c, idx) => {
+      const name = (c.name || '').trim();
+      const surname = (c.surname || '').trim();
+      const checkin = fmtD(c.arrival_date || c.submitted_at);
+      const checkout = fmtD(c.departure_date);
+      const amount = ''; // Auto-calculated by PayTourist for fixed-rate municipalities
+      const license = cirCode;
+      const sex = c.sex === 'F' ? '2' : '1';
+      const dob = fmtD(c.date_of_birth);
+      const exemption = '0'; // No exemption by default
+      const reduction = '0'; // No reduction by default
+
+      // Nationality & citizenship (same Alloggiati state codes)
+      const nationalityCode = lookupStateCode(c.citizenship) || '100000100';
+      const citizenshipCode = nationalityCode;
+
+      // Birth city (police commune code)
+      const birthCountry = c.birth_country || c.citizenship || '';
+      const birthCountryCode = lookupStateCode(birthCountry);
+      const bornInItaly = (c.birth_province && c.birth_province !== 'EE' && c.birth_province !== '') ||
+                          isItalianCitizenshipCode(birthCountryCode);
+      let birthCityCode;
+      if (bornInItaly) {
+        birthCityCode = lookupPoliceCode(c.place_of_birth) || '';
+        if (!birthCityCode) warnings.push(`⚠ ${name} ${surname}: birth city "${c.place_of_birth}" not found in police codes.`);
+      } else {
+        birthCityCode = birthCountryCode; // Foreign-born: use country code
+      }
+
+      // Residence: use nationality as country, leave city blank (not collected)
+      const residenceCity = '';
+      const residenceCountry = nationalityCode;
+
+      const email = ''; // Not collected
+      const portalId = ''; // Not applicable
+      const sendReceipt = '1';
+
+      // Build CSV row — fields must not contain commas
+      const row = [gId, name, surname, checkin, checkout, amount, license, sex, dob,
+                   exemption, reduction, nationalityCode, birthCityCode, citizenshipCode,
+                   residenceCity, residenceCountry, email, portalId, sendReceipt].join(',');
+      lines.push(row);
+    });
+  });
+
+  const csv = lines.join('\n');
+  downloadFile('paytourist_' + new Date().toISOString().slice(0,10) + '.csv', csv);
+  track('export_paytourist', { guests: lines.length, groups: groupNum, warnings: warnings.length });
+
+  if (warnings.length > 0) {
+    alert(`PayTourist CSV: ${lines.length} guests in ${groupNum} group(s).\n\n⚠️ Review:\n` + warnings.join('\n'));
+  } else {
+    toast(`✅ PayTourist: ${lines.length} guests · ${groupNum} group(s)`);
+  }
+}
+
+/* ══════════════════════════════════════
    PUGLIA SPOT/DMS — XML format for SPOT BASE
    Anonymous statistical data: arrivals, nationalities, nights
 ══════════════════════════════════════ */
@@ -2425,6 +2568,135 @@ function exportISTAT() {
   downloadFile('istat_c59_' + new Date().toISOString().slice(0,7) + '.txt', lines.join('\n'));
   track('export_istat', { lines: lines.length });
   toast('ISTAT C/59 report generated!');
+}
+
+/* ══════════════════════════════════════
+   PAYTOURIST CSV EXPORT
+   Format: Group,Name,Surname,CheckIn,CheckOut,Amount,CIR,Sex,DOB,Exemption,Reduction,
+           Nationality,BirthCity,ResCountry,ResCity,Citizenship,Email,PortalID,SendReceipt
+══════════════════════════════════════ */
+function exportPayTourist() {
+  if (allCheckins.length === 0) { toast('No check-in data to export!'); return; }
+
+  const cirCode = (propertyData?.cir_code || '').trim();
+  if (!cirCode) {
+    toast(hostLang === 'it'
+      ? '⚠ Inserisci il codice CIR in Dettagli Proprietà prima di esportare'
+      : '⚠ Enter your CIR code in Property Details before exporting');
+    return;
+  }
+
+  // 48h default window
+  const cutoff48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString().split('T')[0];
+  let toExport = allCheckins.filter(c => {
+    const arr = c.arrival_date || c.submitted_at?.split('T')[0] || '';
+    return arr >= cutoff48h;
+  });
+  if (toExport.length === 0) {
+    if (!confirm(hostLang === 'it'
+      ? `Nessun ospite nelle ultime 48 ore. Esportare tutti i ${allCheckins.length} ospiti?`
+      : `No guests in the last 48 hours. Export all ${allCheckins.length} guests?`)) return;
+    toExport = allCheckins;
+  }
+
+  // Group by stay (booking_code or arrival_date)
+  const groups = {};
+  toExport.forEach(c => {
+    const key = c.booking_code || `G_${c.arrival_date || 'X'}_${c.submitted_at?.slice(11,13) || ''}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(c);
+  });
+
+  const mainTypes = ['single', 'head', 'group'];
+  const warnings = [];
+  const rows = [];
+  let groupNum = 0;
+
+  Object.entries(groups).forEach(([key, group]) => {
+    groupNum++;
+    const gId = `G${groupNum}`;
+
+    // Sort: main guest first
+    group.sort((a, b) => {
+      const aM = mainTypes.includes(a.guest_type) ? 0 : 1;
+      const bM = mainTypes.includes(b.guest_type) ? 0 : 1;
+      return aM - bM;
+    });
+
+    group.forEach((c, idx) => {
+      // Dates DD/MM/YYYY
+      const fmtD = (iso) => {
+        if (!iso) return '';
+        const p = iso.split('T')[0].split('-');
+        return `${p[2]}/${p[1]}/${p[0]}`;
+      };
+      const checkin = fmtD(c.arrival_date || c.submitted_at);
+      const checkout = fmtD(c.departure_date);
+
+      // Sex: 1=M, 2=F
+      const sex = c.sex === 'F' ? '2' : '1';
+
+      // DOB DD/MM/YYYY
+      const dob = fmtD(c.date_of_birth);
+
+      // Codes — reuse Alloggiati lookups
+      const citizenshipCode = lookupStateCode(c.citizenship);
+      const birthCountry = c.birth_country || c.citizenship || '';
+      const birthCountryCode = lookupStateCode(birthCountry);
+      const bornInItaly = (c.birth_province && c.birth_province !== 'EE' && c.birth_province !== '') ||
+                          isItalianCitizenshipCode(birthCountryCode);
+
+      let birthCityCode;
+      if (bornInItaly) {
+        birthCityCode = lookupPoliceCode(c.place_of_birth) || '';
+        if (!birthCityCode) warnings.push(`⚠ ${c.name} ${c.surname}: birth city "${c.place_of_birth}" not found`);
+      } else {
+        birthCityCode = birthCountryCode;
+      }
+
+      // Residence — use citizenship/birth as proxy (we don't collect residence separately)
+      const resCountry = citizenshipCode;
+      const resCity = bornInItaly ? birthCityCode : citizenshipCode;
+
+      // Amount — empty (host enters on PayTourist or it's calculated automatically)
+      const amount = '';
+
+      // Exemption/Reduction — 0 = none
+      const exemption = '0';
+      const reduction = '0';
+
+      // Email — empty
+      const email = '';
+
+      // Portal ID, Send receipt
+      const portalId = '';
+      const sendReceipt = '1';
+
+      // Build CSV row (no quotes needed unless field contains comma)
+      const row = [
+        gId, c.name || '', c.surname || '',
+        checkin, checkout, amount,
+        cirCode, sex, dob,
+        exemption, reduction,
+        citizenshipCode, birthCityCode,
+        resCountry, resCity, citizenshipCode,
+        email, portalId, sendReceipt
+      ].join(',');
+
+      rows.push(row);
+    });
+  });
+
+  const csv = rows.join('\n');
+  downloadFile('paytourist_' + new Date().toISOString().slice(0, 10) + '.csv', csv);
+  track('export_paytourist', { guests: rows.length, groups: groupNum, warnings: warnings.length });
+
+  if (warnings.length > 0) {
+    alert(`PayTourist CSV: ${rows.length} guests in ${groupNum} group(s).\n\n⚠️ Review:\n` + warnings.join('\n'));
+    toast(`PayTourist — ${warnings.length} item(s) need review`);
+  } else {
+    toast(`✅ PayTourist CSV: ${rows.length} guests · ${groupNum} group(s)`);
+  }
 }
 
 function downloadFile(filename, content) {

@@ -15,8 +15,8 @@
   --cream-3: #E8DFD0;
   --gold: #C9A96E;
   --ink: #1E1008;
-  --ink-2: #3A2218;
-  --ink-soft: #7A5A48;
+  --ink-2: #261208;
+  --ink-soft: #4A2E20;
   --white: #FFFFFF;
   --green: #4CAF7D;
   --green-bg: #E8F5EE;
@@ -65,13 +65,13 @@ body { display: flex; overflow: hidden; }
 .sidebar-nav { flex: 1; padding: 12px 10px; overflow-y: auto; }
 .sidebar-section {
   font-size: 0.52rem; letter-spacing: 0.2em; text-transform: uppercase;
-  color: rgba(201,169,110,0.4); padding: 12px 10px 6px;
+  color: rgba(201,169,110,0.65); padding: 12px 10px 6px;
 }
 .sidebar-item {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 12px; border-radius: var(--radius-s);
   cursor: pointer; transition: all 0.15s;
-  font-size: 0.88rem; color: rgba(244,237,224,0.55);
+  font-size: 0.88rem; color: rgba(244,237,224,0.85);
   font-weight: 400; border: none; background: none;
   width: 100%; text-align: left; font-family: 'DM Sans', sans-serif;
 }
@@ -95,7 +95,7 @@ body { display: flex; overflow: hidden; }
   font-size: 0.72rem; color: #fff; font-weight: 600;
 }
 .sidebar-user-name { font-size: 0.82rem; color: rgba(244,237,224,0.8); }
-.sidebar-user-role { font-size: 0.52rem; color: rgba(244,237,224,0.35); }
+.sidebar-user-role { font-size: 0.55rem; color: rgba(244,237,224,0.55); }
 
 /* ── MAIN CONTENT ── */
 .main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
@@ -143,8 +143,8 @@ body { display: flex; overflow: hidden; }
   box-shadow: var(--shadow-s);
 }
 .stat-label {
-  font-size: 0.6rem; letter-spacing: 0.16em;
-  text-transform: uppercase; color: var(--ink-soft); margin-bottom: 6px;
+  font-size: 0.62rem; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--ink-2); margin-bottom: 6px; font-weight: 600;
 }
 .stat-value {
   font-family: 'Playfair Display', serif;
@@ -169,7 +169,7 @@ table { width: 100%; border-collapse: collapse; }
 th {
   text-align: left; padding: 10px 16px;
   font-size: 0.62rem; letter-spacing: 0.14em;
-  text-transform: uppercase; color: var(--ink-soft);
+  text-transform: uppercase; color: var(--ink-2);
   border-bottom: 1px solid var(--border);
   background: rgba(250,246,240,0.5);
   font-weight: 600;
@@ -632,7 +632,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="sidebar-user-role" data-h="sidebar_role">Property Manager</div>
       </div>
     </div>
-    <button onclick="signOut()" style="width:100%;padding:6px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:none;color:rgba(244,237,224,0.4);font-size:0.6rem;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.color='#fff';this.style.borderColor='rgba(255,255,255,0.3)'" onmouseout="this.style.color='rgba(244,237,224,0.4)';this.style.borderColor='rgba(255,255,255,0.1)'">Sign Out</button>
+    <button onclick="signOut()" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:none;color:rgba(244,237,224,0.6);font-size:0.72rem;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.color='#fff';this.style.borderColor='rgba(255,255,255,0.3)'" onmouseout="this.style.color='rgba(244,237,224,0.6)';this.style.borderColor='rgba(255,255,255,0.15)'">Sign Out</button>
   </div>
 </aside>
 
@@ -648,8 +648,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     </div>
     <div class="header-actions" id="headerActions">
       <div class="lang-toggle" style="display:flex;align-items:center;background:var(--cream-2);border-radius:20px;padding:3px;gap:2px;border:1px solid var(--border);">
-        <button class="lang-opt-h active" onclick="setHostLang('en')" style="padding:4px 10px;border-radius:16px;font-size:0.62rem;font-weight:600;letter-spacing:0.06em;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;background:var(--white);color:var(--warm);box-shadow:0 1px 3px rgba(30,16,8,0.06);">EN</button>
-        <button class="lang-opt-h" onclick="setHostLang('it')" style="padding:4px 10px;border-radius:16px;font-size:0.62rem;font-weight:600;letter-spacing:0.06em;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;background:none;color:var(--ink-soft);">IT</button>
+        <button class="lang-opt-h active" onclick="setHostLang('en')" style="padding:5px 12px;border-radius:16px;font-size:0.72rem;font-weight:600;letter-spacing:0.06em;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;background:var(--white);color:var(--warm);box-shadow:0 1px 3px rgba(30,16,8,0.06);">EN</button>
+        <button class="lang-opt-h" onclick="setHostLang('it')" style="padding:5px 12px;border-radius:16px;font-size:0.72rem;font-weight:600;letter-spacing:0.06em;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;background:none;color:var(--ink-soft);">IT</button>
       </div>
     </div>
   </div>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Casa Sole · Doorstep</title>
+<title>Doorstep · Guest</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -952,12 +952,12 @@ body {
     </div>
 
     <div class="chat-header-area">
-      <h2 data-i18n="chat_h2">🏠 Casa Sole Concierge</h2>
-      <p data-i18n="chat_p">Ask me anything about the apartment, Bari, or your stay</p>
+      <h2 data-i18n="chat_h2">🏠 Concierge</h2>
+      <p data-i18n="chat_p">Ask me anything about the apartment, the area, or your stay</p>
     </div>
 
     <div class="chat-messages" id="chatMessages">
-      <div class="chat-bubble bot" data-i18n="chat_welcome">Ciao! 🌞 I'm the Casa Sole concierge. I know everything about the apartment, the neighbourhood, restaurants, and Bari. How can I help you today?</div>
+      <div class="chat-bubble bot" data-i18n="chat_welcome">Ciao! 🌞 I'm your concierge. I know everything about the apartment, the neighbourhood, restaurants, and the area. How can I help you today?</div>
     </div>
 
     <div class="chat-suggestions" id="chatSuggestions"></div>
@@ -1046,7 +1046,7 @@ let lang = 'en';
 const T = {
   en: {
     // Welcome
-    welcome_title: 'Welcome to<br><em>Casa Sole</em>',
+    welcome_title: 'Welcome to<br><em>Your Stay</em>',
     welcome_sub: 'Your home in the heart of the old city',
     wifi_pass: 'Password: sole2025!',
     address_label: 'Address',
@@ -1125,9 +1125,9 @@ const T = {
     explore_topbar: 'Explore', explore_h2: 'Our Recommendations',
     explore_p: 'Hand-picked by your hosts — no tourist traps',
     chat_topbar: 'Concierge',
-    chat_h2: '🏠 Casa Sole Concierge',
-    chat_p: 'Ask me anything about the apartment, Bari, or your stay',
-    chat_welcome: 'Ciao! 🌞 I\'m the Casa Sole concierge. I know everything about the apartment, the neighbourhood, restaurants, and Bari. How can I help you today?',
+    chat_h2: '🏠 Concierge',
+    chat_p: 'Ask me anything about the apartment, the area, or your stay',
+    chat_welcome: 'Ciao! 🌞 I\'m your concierge. I know everything about the apartment, the neighbourhood, restaurants, and the area. How can I help you today?',
     chat_placeholder: 'Ask anything…',
     nav_home: 'Home', nav_rules: 'Rules', nav_explore: 'Explore', nav_chat: 'Chat',
     sug1: 'What\'s the WiFi password?', sug2: 'Best restaurant nearby?', sug3: 'How does check-out work?', sug4: 'Talk to a human',
@@ -1156,7 +1156,7 @@ const T = {
     wb_companion: 'Companion',
   },
   it: {
-    welcome_title: 'Benvenuti a<br><em>Casa Sole</em>',
+    welcome_title: 'Benvenuti a<br><em>Il Vostro Soggiorno</em>',
     welcome_sub: 'La vostra casa nel cuore della città vecchia',
     wifi_pass: 'Password: sole2025!',
     address_label: 'Indirizzo',
@@ -1228,9 +1228,9 @@ const T = {
     explore_topbar: 'Esplora', explore_h2: 'I Nostri Consigli',
     explore_p: 'Scelti dai vostri host — nessuna trappola per turisti',
     chat_topbar: 'Concierge',
-    chat_h2: '🏠 Concierge Casa Sole',
-    chat_p: 'Chiedi qualsiasi cosa sull\'appartamento, Bari o il tuo soggiorno',
-    chat_welcome: 'Ciao! 🌞 Sono il concierge di Casa Sole. Conosco tutto sull\'appartamento, il quartiere, i ristoranti e Bari. Come posso aiutarti oggi?',
+    chat_h2: '🏠 Concierge',
+    chat_p: 'Chiedi qualsiasi cosa sull\'appartamento, la zona o il tuo soggiorno',
+    chat_welcome: 'Ciao! 🌞 Sono il tuo concierge. Conosco tutto sull\'appartamento, il quartiere, i ristoranti e la zona. Come posso aiutarti oggi?',
     chat_placeholder: 'Chiedi qualsiasi cosa…',
     nav_home: 'Home', nav_rules: 'Regole', nav_explore: 'Esplora', nav_chat: 'Chat',
     sug1: 'Qual è la password WiFi?', sug2: 'Miglior ristorante vicino?', sug3: 'Come funziona il check-out?', sug4: 'Parla con una persona',
@@ -2144,9 +2144,9 @@ const fallbackRules = {
     { icon: '🔇', title: 'Quiet Hours', desc: 'Please keep noise to a minimum between 22:00 and 8:00. The old city walls carry sound easily.', type: 'important' },
     { icon: '🚭', title: 'No Smoking Inside', desc: 'Smoking is not allowed anywhere inside the apartment. You can smoke on the balcony.', type: 'important' },
     { icon: '🐾', title: 'No Pets', desc: 'Unfortunately we cannot accommodate pets at this time.', type: '' },
-    { icon: '🗑', title: 'Waste Separation', desc: 'Bari has strict recycling rules. Separate bins are provided — organic, plastic, paper, glass, general.', type: '' },
+    { icon: '🗑', title: 'Waste Separation', desc: 'Please separate your waste. Bins are provided — organic, plastic, paper, glass, general.', type: '' },
     { icon: '🔑', title: 'Keys & Lockbox', desc: 'The keybox code was sent to you by message. On departure, return keys to the lockbox and scramble the code.', type: '' },
-    { icon: '💧', title: 'Water is Precious', desc: 'Puglia is a dry region. Please be mindful of water usage — short showers are appreciated!', type: 'tip' },
+    { icon: '💧', title: 'Water is Precious', desc: 'Please be mindful of water usage — short showers are appreciated!', type: 'tip' },
     { icon: '🧹', title: 'Leave it Tidy', desc: 'Please leave the apartment in a reasonable condition. Run the dishwasher, take out rubbish, strip the beds.', type: '' },
     { icon: '👕', title: 'Laundry', desc: 'The washing machine is in the bathroom. You can hang clothes on the balcony line. Detergent is under the sink.', type: 'tip' },
   ],
@@ -2191,30 +2191,7 @@ function renderRules() {
 /* ══════════════════════════════════════
    RECOMMENDATIONS — fallback data + DB load
 ══════════════════════════════════════ */
-const fallbackRecos = {
-  en: [
-    { cat: 'food', name: 'Terranima', desc: 'Homemade Puglian pasta — best orecchiette in Bari. Book ahead.', tags: ['🍝 Pasta','💰 €€','📍 5 min walk'], img: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600&q=75' },
-    { cat: 'food', name: 'Pescaria', desc: 'Gourmet fish sandwiches. Fast, fresh, unforgettable.', tags: ['🐟 Seafood','💰 €','📍 3 min walk'], img: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=600&q=75' },
-    { cat: 'food', name: 'Al Pescatore', desc: 'Long seafood lunch by the harbour. Let the waiter choose.', tags: ['🐟 Seafood','💰 €€€','📍 8 min walk'], img: 'https://images.unsplash.com/photo-1534482421-64566f976cfa?w=600&q=75' },
-    { cat: 'drink', name: 'Piazza Mercantile', desc: 'Any café with outdoor seating. Spritz + passeggiata at golden hour.', tags: ['🍷 Wine','☀ Sunset','📍 4 min walk'], img: 'https://images.unsplash.com/photo-1504753793761-46dba1ef0bae?w=600&q=75' },
-    { cat: 'drink', name: 'Reverse Cocktail Bar', desc: 'Best cocktails in Bari. Try the Puglia Sour.', tags: ['🍸 Cocktails','💰 €€','📍 6 min walk'], img: 'https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=600&q=75' },
-    { cat: 'see', name: 'Basilica di San Nicola', desc: 'Great Romanesque church. Don\'t miss the crypt.', tags: ['⛪ Church','🎟 Free','📍 4 min walk'], img: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=75' },
-    { cat: 'see', name: 'Bari Vecchia Streets', desc: 'Just wander. Get lost — that\'s the entire point.', tags: ['🚶 Walk','🎟 Free','📍 Outside your door'], img: 'https://images.unsplash.com/photo-1541451049-18b3dab1ba05?w=600&q=75' },
-    { cat: 'beach', name: 'Pane e Pomodoro', desc: 'Urban beach, 10 min along the lungomare. Sandy and free.', tags: ['🏖 Sandy','🎟 Free','📍 10 min walk'], img: 'https://images.unsplash.com/photo-1520637836993-5c20c01ac776?w=600&q=75' },
-    { cat: 'shop', name: 'Via Sparano Shopping', desc: 'Elegant pedestrianised shopping street.', tags: ['🛍 Fashion','📍 12 min walk'], img: 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=600&q=75' },
-  ],
-  it: [
-    { cat: 'food', name: 'Terranima', desc: 'Le migliori orecchiette di Bari. Prenotate.', tags: ['🍝 Pasta','💰 €€','📍 5 min'], img: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600&q=75' },
-    { cat: 'food', name: 'Pescaria', desc: 'Panini di pesce gourmet. Veloce e fresco.', tags: ['🐟 Pesce','💰 €','📍 3 min'], img: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=600&q=75' },
-    { cat: 'food', name: 'Al Pescatore', desc: 'Pranzo di pesce al porto. Lasciate scegliere al cameriere.', tags: ['🐟 Pesce','💰 €€€','📍 8 min'], img: 'https://images.unsplash.com/photo-1534482421-64566f976cfa?w=600&q=75' },
-    { cat: 'drink', name: 'Piazza Mercantile', desc: 'Spritz e passeggiata nell\'ora dorata.', tags: ['🍷 Vino','☀ Tramonto','📍 4 min'], img: 'https://images.unsplash.com/photo-1504753793761-46dba1ef0bae?w=600&q=75' },
-    { cat: 'drink', name: 'Reverse Cocktail Bar', desc: 'I migliori cocktail di Bari.', tags: ['🍸 Cocktail','💰 €€','📍 6 min'], img: 'https://images.unsplash.com/photo-1470337458703-46ad1756a187?w=600&q=75' },
-    { cat: 'see', name: 'Basilica di San Nicola', desc: 'Non perdetevi la cripta.', tags: ['⛪ Chiesa','🎟 Gratis','📍 4 min'], img: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=75' },
-    { cat: 'see', name: 'Strade di Bari Vecchia', desc: 'Perdetevi — è il punto.', tags: ['🚶 Passeggiata','🎟 Gratis'], img: 'https://images.unsplash.com/photo-1541451049-18b3dab1ba05?w=600&q=75' },
-    { cat: 'beach', name: 'Pane e Pomodoro', desc: 'Spiaggia urbana, gratuita.', tags: ['🏖 Sabbia','🎟 Gratis','📍 10 min'], img: 'https://images.unsplash.com/photo-1520637836993-5c20c01ac776?w=600&q=75' },
-    { cat: 'shop', name: 'Via Sparano Shopping', desc: 'Via dello shopping elegante e pedonale.', tags: ['🛍 Moda','📍 12 min'], img: 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=600&q=75' },
-  ]
-};
+const fallbackRecos = { en: [], it: [] };
 
 let recosFromDB = null;
 let activeCat = 'all';
@@ -2274,42 +2251,42 @@ function renderRecos() {
 }
 
 /* ══════════════════════════════════════
-   CHAT — saves messages to DB
+   CHAT — AI-powered concierge + host escalation
 ══════════════════════════════════════ */
-const chatKB = {
-  en: {
-    wifi: 'The WiFi network is **CasaSole_5G** and the password is **sole2025!** Great coverage throughout.',
-    checkout: 'Check-out is at **10:00 AM**. Leave keys in the lockbox and scramble the code. Strip bed linen and run the dishwasher if you can!',
-    restaurant: 'Top pick: **Terranima** (5 min) — best orecchiette. For seafood: **Al Pescatore**. Quick bite: **Pescaria**. Check the Explore tab!',
-    checkin: 'Complete your check-in in the **Check-in** tab. You\'ll need your passport or ID — takes about 2 minutes.',
-    human: '📞 I\'m connecting you with Marco now. He usually responds within minutes. Anything else I can help with?',
-    default: 'Great question! Check the **Explore** tab for local tips, or say "talk to a human" to reach Marco (your host) anytime.'
-  },
-  it: {
-    wifi: 'La rete WiFi è **CasaSole_5G**, password **sole2025!** Ottima copertura in tutto l\'appartamento.',
-    checkout: 'Check-out alle **10:00**. Chiavi nella lockbox, mescolate il codice. Togliete le lenzuola e avviate la lavastoviglie!',
-    restaurant: 'Consiglio: **Terranima** (5 min) — migliori orecchiette. Pesce: **Al Pescatore**. Veloce: **Pescaria**. Guardate Esplora!',
-    checkin: 'Completate il check-in nella scheda **Check-in**. Servono passaporto o carta d\'identità — circa 2 minuti.',
-    human: '📞 Vi metto in contatto con Marco. Di solito risponde entro pochi minuti. Posso aiutarvi con altro?',
-    default: 'Ottima domanda! Guardate la sezione **Esplora** per consigli, o dite "parla con una persona" per contattare Marco.'
-  }
-};
+let chatHistory = [];
+let chatEscalated = false;
+let chatSubscription = null;
 
-function matchResponse(msg) {
-  const m = msg.toLowerCase();
-  const kb = chatKB[lang];
-  if (m.includes('wifi') || m.includes('password') || m.includes('internet')) return kb.wifi;
-  if (m.includes('check-out') || m.includes('checkout') || m.includes('leave') || m.includes('partenza')) return kb.checkout;
-  if (m.includes('restaurant') || m.includes('eat') || m.includes('food') || m.includes('ristorante') || m.includes('mangiare')) return kb.restaurant;
-  if (m.includes('check-in') || m.includes('checkin') || m.includes('document') || m.includes('passport') || m.includes('documento')) return kb.checkin;
-  if (m.includes('human') || m.includes('person') || m.includes('marco') || m.includes('host') || m.includes('persona') || m.includes('umano')) return kb.human;
-  return kb.default;
+function buildPropertyContext() {
+  const d = propertyData || {};
+  const ciParts = (d.checkin_time || '15:00').split('-');
+  const coParts = (d.checkout_time || '10:00').split('-');
+  let ctx = `Property name: ${d.name || 'Unknown'}
+Address: ${d.address || ''}, ${d.city || ''} ${d.zip || ''}, ${d.region || ''}
+WiFi network: ${d.wifi_name || 'Not set'} — Password: ${d.wifi_password || 'Not set'}
+Check-in: ${ciParts[0] || '15:00'}${ciParts[1] ? ' to ' + ciParts[1] : ''} — Access: ${d.access_method || 'Self check-in'}
+Check-out: ${coParts[0] || '08:00'}${coParts[1] ? ' to ' + coParts[1] : ''}
+Host: ${d.host_names || 'Your host'} — Phone: ${d.host_phone || 'Not available'}
+Welcome message: ${d.welcome_message || ''}`;
+  if (rulesFromDB && rulesFromDB.length > 0) {
+    ctx += '\n\nHOUSE RULES:';
+    rulesFromDB.forEach(r => {
+      ctx += `\n- ${r.icon} ${r.title_en}${r.title_it ? ' / ' + r.title_it : ''}: ${r.desc_en || ''}${r.is_important ? ' [IMPORTANT]' : ''}`;
+    });
+  }
+  if (recosFromDB && recosFromDB.length > 0) {
+    ctx += '\n\nRECOMMENDATIONS (hand-picked by the host):';
+    recosFromDB.forEach(r => {
+      ctx += `\n- [${r.category}] ${r.name}${r.address ? ' — ' + r.address : ''}: ${r.desc_en || ''}${r.tags ? ' Tags: ' + r.tags : ''}`;
+    });
+  }
+  return ctx;
 }
 
 function renderChatSuggestions() {
   const keys = ['sug1','sug2','sug3','sug4'];
   document.getElementById('chatSuggestions').innerHTML = keys.map(k =>
-    `<button class="chat-sug" onclick="sendSuggestion('${T[lang][k]}')">${T[lang][k]}</button>`
+    `<button class="chat-sug" onclick="sendSuggestion(this.textContent)">${T[lang][k]}</button>`
   ).join('');
 }
 
@@ -2323,37 +2300,112 @@ function addBubble(text, type) {
 
 async function saveChatMsg(sender, message) {
   if (!propertyId) return;
-  await sb.from('chat_messages').insert({ property_id: propertyId, sender, message }).catch(() => {});
+  const row = { property_id: propertyId, sender, message };
+  if (bookingCode) row.booking_code = bookingCode;
+  await sb.from('chat_messages').insert(row).catch(() => {});
 }
 
-function sendChat() {
+async function sendChat() {
   const input = document.getElementById('chatInput');
   const msg = input.value.trim();
   if (!msg) return;
   addBubble(msg, 'user');
   saveChatMsg('guest', msg);
   input.value = '';
-  setTimeout(() => {
-    const reply = matchResponse(msg);
+  document.getElementById('chatSuggestions').style.display = 'none';
+
+  if (chatEscalated) {
+    addBubble(lang === 'it'
+      ? '📨 Messaggio inviato al tuo host. Risponderà al più presto.'
+      : '📨 Message sent to your host. They\'ll respond soon.', 'system');
+    return;
+  }
+
+  const typing = document.createElement('div');
+  typing.className = 'chat-bubble bot';
+  typing.id = 'typingIndicator';
+  typing.innerHTML = '<span style="opacity:0.5;">…</span>';
+  document.getElementById('chatMessages').appendChild(typing);
+  document.getElementById('chatMessages').scrollTop = 99999;
+
+  chatHistory.push({ role: 'user', content: msg });
+
+  try {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: chatHistory,
+        propertyContext: buildPropertyContext(),
+        lang: lang,
+      }),
+    });
+    document.getElementById('typingIndicator')?.remove();
+    if (!response.ok) throw new Error('API error');
+    const data = await response.json();
+    const reply = data.reply || (lang === 'it' ? 'Scusa, riprova.' : 'Sorry, please try again.');
+    chatHistory.push({ role: 'assistant', content: reply });
     addBubble(reply, 'bot');
     saveChatMsg('bot', reply);
-    // If escalated to human, mark it
-    if (msg.toLowerCase().match(/human|person|marco|host|persona|umano/)) {
+    if (data.escalated) {
+      chatEscalated = true;
       saveChatMsg('system', 'Guest requested human assistance — escalating to host.');
+      startHostChatListener();
     }
-  }, 600);
+  } catch (err) {
+    document.getElementById('typingIndicator')?.remove();
+    console.error('Chat error:', err);
+    const fallback = lang === 'it'
+      ? 'Mi dispiace, ho un problema tecnico. Prova a dire "parla con una persona" per contattare il tuo host.'
+      : 'Sorry, I\'m having a technical issue. Try saying "talk to a human" to reach your host directly.';
+    addBubble(fallback, 'bot');
+  }
 }
 
 function sendSuggestion(text) {
-  addBubble(text, 'user');
-  saveChatMsg('guest', text);
-  document.getElementById('chatSuggestions').innerHTML = '';
-  setTimeout(() => {
-    const reply = matchResponse(text);
-    addBubble(reply, 'bot');
-    saveChatMsg('bot', reply);
-  }, 600);
+  document.getElementById('chatInput').value = text;
+  sendChat();
 }
+
+function startHostChatListener() {
+  if (chatSubscription) return;
+  chatSubscription = sb.channel('host-replies')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'chat_messages',
+      filter: `property_id=eq.${propertyId}`,
+    }, (payload) => {
+      const msg = payload.new;
+      if (msg.sender === 'host') {
+        addBubble(`🏠 **${propertyData?.host_names || 'Host'}:** ${msg.message}`, 'bot');
+      }
+    })
+    .subscribe();
+}
+
+async function checkExistingChat() {
+  if (!propertyId) return;
+  try {
+    let q = sb.from('chat_messages').select('*').eq('property_id', propertyId);
+    if (bookingCode) q = q.eq('booking_code', bookingCode);
+    const { data } = await q.order('created_at', { ascending: true }).limit(50);
+    if (data && data.length > 0) {
+      const msgEl = document.getElementById('chatMessages');
+      msgEl.innerHTML = '';
+      data.forEach(m => {
+        if (m.sender === 'guest') addBubble(m.message, 'user');
+        else if (m.sender === 'host') addBubble(`🏠 **${propertyData?.host_names || 'Host'}:** ${m.message}`, 'bot');
+        else if (m.sender === 'bot') addBubble(m.message, 'bot');
+        if (m.sender === 'system' && m.message.includes('escalat')) chatEscalated = true;
+      });
+      if (chatEscalated) startHostChatListener();
+      document.getElementById('chatSuggestions').style.display = 'none';
+    }
+  } catch (e) {}
+}
+
+
 
 /* ══════════════════════════════════════
    INIT — Load from Supabase, fallback to local data
@@ -2418,20 +2470,11 @@ async function init() {
       T.it.host_msg = d.welcome_message || T.it.host_msg;
       T.en.chat_h2 = `🏠 ${d.name} Concierge`;
       T.it.chat_h2 = `🏠 Concierge ${d.name}`;
+      T.en.chat_p = `Ask me anything about ${d.name}, the area, or your stay`;
+      T.it.chat_p = `Chiedi qualsiasi cosa su ${d.name}, la zona o il tuo soggiorno`;
       T.en.chat_welcome = `Ciao! 🌞 I'm the ${d.name} concierge. I know everything about the apartment, the neighbourhood, restaurants, and the area. How can I help you today?`;
       T.it.chat_welcome = `Ciao! 🌞 Sono il concierge di ${d.name}. Conosco tutto sull'appartamento, il quartiere, i ristoranti e la zona. Come posso aiutarti oggi?`;
-
-      // Update chat knowledge base with real data
-      if (d.wifi_name && d.wifi_password) {
-        chatKB.en.wifi = `The WiFi network is **${d.wifi_name}** and the password is **${d.wifi_password}**. Great coverage throughout.`;
-        chatKB.it.wifi = `La rete WiFi è **${d.wifi_name}**, password **${d.wifi_password}**. Ottima copertura.`;
-      }
-      if (d.checkout_time) {
-        const coParts = d.checkout_time.split('-');
-        const ct = coParts.length === 2 ? coParts[1].slice(0,5) : d.checkout_time.slice(0,5);
-        chatKB.en.checkout = `Check-out is by **${ct}**. Leave keys in the lockbox and scramble the code. Strip bed linen and run the dishwasher if you can!`;
-        chatKB.it.checkout = `Check-out entro le **${ct}**. Chiavi nella lockbox, mescolate il codice. Togliete le lenzuola e avviate la lavastoviglie!`;
-      }
+      document.title = `${d.name} · Doorstep`;
     }
   } catch (e) { console.log('Using fallback property data'); }
 
@@ -2455,6 +2498,7 @@ async function init() {
   renderRules();
   renderRecos();
   renderChatSuggestions();
+  checkExistingChat();
 
   // Set default check-in dates
   const today = new Date().toISOString().split('T')[0];

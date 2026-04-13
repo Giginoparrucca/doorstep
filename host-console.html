@@ -622,6 +622,11 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3z"/><path d="M18 18h3v3h-3z"/><path d="M14 18h3v3h-3z"/></svg>
       <span data-h="sidebar_qr">QR Code & Link</span>
     </button>
+    <button class="sidebar-item" onclick="showPanel('chat', this)" style="position:relative;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      <span data-h="sidebar_chat">Guest Chat</span>
+      <div id="chatBadge" style="display:none;position:absolute;right:12px;width:8px;height:8px;border-radius:50%;background:var(--red);"></div>
+    </button>
   </nav>
 
   <div class="sidebar-footer" style="flex-direction:column;gap:10px;">
@@ -1004,10 +1009,29 @@ See you soon!</textarea>
       </div>
     </div>
 
+    <!-- ════════════ GUEST CHAT ════════════ -->
+    <div class="panel" id="panel-chat">
+      <div style="display:flex;flex-direction:column;height:calc(100vh - 140px);max-height:700px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div>
+            <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);" data-h="chat_active_convos">Active Conversations</div>
+          </div>
+          <select id="hostChatFilter" onchange="loadHostChat()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;font-family:'DM Sans',sans-serif;color:var(--ink);">
+            <option value="all" data-h="chat_all_guests">All Guests</option>
+          </select>
+        </div>
+        <div id="hostChatMessages" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:10px;background:var(--white);padding:14px;display:flex;flex-direction:column;gap:8px;">
+          <div style="text-align:center;color:var(--ink-soft);padding:30px;font-size:0.85rem;" data-h="chat_no_messages">No messages yet. Guest conversations will appear here.</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <input class="form-input" id="hostChatInput" style="flex:1;min-height:48px;font-size:0.92rem;" placeholder="" data-h-placeholder="chat_reply_placeholder" onkeydown="if(event.key==='Enter')sendHostReply()">
+          <button class="btn btn-primary" onclick="sendHostReply()" style="min-height:48px;padding:0 20px;" data-h="chat_send">Send</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
-
-<!-- Toast -->
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -1245,6 +1269,16 @@ const HT = {
     t_checkins: 'Check-in Data', s_checkins: 'View and manage guest registrations',
     t_export: 'Export & Compliance', s_export: 'Generate files for Italian authorities',
     t_qrlink: 'QR Code & Link', s_qrlink: 'Share your guest portal',
+    // Chat
+    sidebar_chat: 'Guest Chat',
+    t_chat: 'Guest Chat', s_chat: 'Respond to guest messages',
+    chat_active_convos: 'Active Conversations',
+    chat_all_guests: 'All Guests',
+    chat_no_messages: 'No messages yet. Guest conversations will appear here.',
+    chat_reply_placeholder: 'Type your reply…',
+    chat_send: 'Send',
+    chat_escalated: '⚠️ Guest requested human assistance',
+    chat_you: 'You',
     // Dashboard
     stat_checkins: 'Total Check-ins', stat_pending: 'Pending Documents', stat_filed: 'Alloggiati Filed',
     stat_chat: 'Chat Messages', stat_alltime: 'All time', stat_attention: 'Needs attention',
@@ -1384,6 +1418,15 @@ const HT = {
     t_checkins: 'Dati Check-in', s_checkins: 'Visualizza e gestisci le registrazioni degli ospiti',
     t_export: 'Export & Conformità', s_export: 'Genera file per le autorità italiane',
     t_qrlink: 'QR Code & Link', s_qrlink: 'Condividi il portale ospiti',
+    sidebar_chat: 'Chat Ospiti',
+    t_chat: 'Chat Ospiti', s_chat: 'Rispondi ai messaggi degli ospiti',
+    chat_active_convos: 'Conversazioni Attive',
+    chat_all_guests: 'Tutti gli Ospiti',
+    chat_no_messages: 'Nessun messaggio ancora. Le conversazioni degli ospiti appariranno qui.',
+    chat_reply_placeholder: 'Scrivi la tua risposta…',
+    chat_send: 'Invia',
+    chat_escalated: '⚠️ L\'ospite ha richiesto assistenza umana',
+    chat_you: 'Tu',
     stat_checkins: 'Check-in Totali', stat_pending: 'Documenti in Attesa', stat_filed: 'Alloggiati Inviati',
     stat_chat: 'Messaggi Chat', stat_alltime: 'Totale', stat_attention: 'Richiede attenzione',
     stat_complete: 'Tutti completi', stat_done: '% fatto', stat_no_guests: 'Nessun ospite ancora',
@@ -1504,6 +1547,10 @@ function setHostLang(l) {
     if (val.includes('<')) el.innerHTML = val;
     else el.textContent = val;
   });
+  // Update placeholders
+  document.querySelectorAll('[data-h-placeholder]').forEach(el => {
+    el.placeholder = h(el.getAttribute('data-h-placeholder'));
+  });
   // Update dynamic elements with IDs
   const idMap = {
     'allCheckinsTitle': 'all_checkins_title', 'btnDeleteAll': 'btn_delete_all',
@@ -1550,6 +1597,7 @@ const titlesMap = {
   checkins: ['t_checkins', 's_checkins'],
   export: ['t_export', 's_export'],
   qrlink: ['t_qrlink', 's_qrlink'],
+  chat: ['t_chat', 's_chat'],
 };
 // Keep old titles object for compatibility
 const titles = {};
@@ -1575,6 +1623,7 @@ function showPanel(id, btn) {
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebarOverlay').classList.remove('show');
   if (id === 'qrlink') initQRPanel();
+  if (id === 'chat') { loadHostChat(); document.getElementById('chatBadge').style.display = 'none'; }
   trackPanelSwitch(id);
 }
 
@@ -2807,6 +2856,107 @@ function renderQR(url) {
   } catch (e) { console.warn('QR error:', e); }
 }
 
+/* ══════════════════════════════════════
+   HOST CHAT — real-time guest messaging
+══════════════════════════════════════ */
+let hostChatSub = null;
+
+async function loadHostChat() {
+  if (!propertyId) return;
+  const filter = document.getElementById('hostChatFilter').value;
+  const container = document.getElementById('hostChatMessages');
+
+  let q = sb.from('chat_messages').select('*').eq('property_id', propertyId);
+  if (filter !== 'all') q = q.eq('booking_code', filter);
+  const { data, error } = await q.order('created_at', { ascending: true }).limit(200);
+
+  if (error || !data || data.length === 0) {
+    container.innerHTML = `<div style="text-align:center;color:var(--ink-soft);padding:30px;font-size:0.85rem;">${h('chat_no_messages')}</div>`;
+    return;
+  }
+
+  // Populate booking code filter dropdown
+  const codes = [...new Set(data.filter(m => m.booking_code).map(m => m.booking_code))];
+  const sel = document.getElementById('hostChatFilter');
+  const current = sel.value;
+  sel.innerHTML = `<option value="all">${h('chat_all_guests')}</option>` +
+    codes.map(c => `<option value="${c}" ${c===current?'selected':''}>${c}</option>`).join('');
+
+  // Render messages
+  container.innerHTML = data.map(m => {
+    const time = new Date(m.created_at).toLocaleTimeString(hostLang==='it'?'it-IT':'en-GB', {hour:'2-digit',minute:'2-digit'});
+    const date = new Date(m.created_at).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB');
+    if (m.sender === 'guest') {
+      return `<div style="align-self:flex-start;max-width:80%;background:var(--cream-2);border-radius:10px 10px 10px 2px;padding:10px 14px;">
+        <div style="font-size:0.72rem;color:var(--ink-soft);margin-bottom:3px;">${m.booking_code || 'Guest'} · ${date} ${time}</div>
+        <div style="font-size:0.88rem;color:var(--ink);line-height:1.5;">${m.message}</div>
+      </div>`;
+    } else if (m.sender === 'host') {
+      return `<div style="align-self:flex-end;max-width:80%;background:var(--warm);border-radius:10px 10px 2px 10px;padding:10px 14px;">
+        <div style="font-size:0.72rem;color:rgba(255,255,255,0.6);margin-bottom:3px;">${h('chat_you')} · ${time}</div>
+        <div style="font-size:0.88rem;color:#fff;line-height:1.5;">${m.message}</div>
+      </div>`;
+    } else if (m.sender === 'bot') {
+      return `<div style="align-self:flex-start;max-width:80%;background:rgba(74,144,217,0.06);border:1px solid rgba(74,144,217,0.12);border-radius:10px;padding:10px 14px;">
+        <div style="font-size:0.72rem;color:var(--blue);margin-bottom:3px;">🤖 AI · ${time}</div>
+        <div style="font-size:0.85rem;color:var(--ink-2);line-height:1.5;">${m.message.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</div>
+      </div>`;
+    } else if (m.sender === 'system') {
+      return `<div style="text-align:center;font-size:0.75rem;color:var(--amber);padding:6px;"><em>${m.message}</em></div>`;
+    }
+    return '';
+  }).join('');
+
+  container.scrollTop = container.scrollHeight;
+
+  // Start real-time listener
+  startHostChatSubscription();
+}
+
+function startHostChatSubscription() {
+  if (hostChatSub) return;
+  hostChatSub = sb.channel('host-chat-live')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'chat_messages',
+      filter: `property_id=eq.${propertyId}`,
+    }, (payload) => {
+      const m = payload.new;
+      if (m.sender === 'guest' || m.sender === 'system') {
+        // Show notification badge
+        document.getElementById('chatBadge').style.display = 'block';
+        // If chat panel is active, reload
+        if (document.getElementById('panel-chat')?.classList.contains('active')) {
+          loadHostChat();
+        }
+      }
+    })
+    .subscribe();
+}
+
+async function sendHostReply() {
+  const input = document.getElementById('hostChatInput');
+  const msg = input.value.trim();
+  if (!msg || !propertyId) return;
+
+  // Determine booking code from filter
+  const code = document.getElementById('hostChatFilter').value;
+  const row = {
+    property_id: propertyId,
+    sender: 'host',
+    message: msg,
+  };
+  if (code !== 'all') row.booking_code = code;
+
+  const { error } = await sb.from('chat_messages').insert(row);
+  if (error) { toast('Error sending message'); return; }
+
+  input.value = '';
+  loadHostChat();
+  track('host_chat_reply', { booking_code: code });
+}
+
 function viewGuest(id) {
   const c = allCheckins.find(g => g.id === id);
   if (c) toast(`${c.name} ${c.surname} — ${c.citizenship} — ${c.document_type} ${c.document_number}`);
@@ -2902,6 +3052,7 @@ async function init() {
   renderCheckins();
   renderRules();
   renderRecos();
+  startHostChatSubscription();
 }
 
 function fillPropertyForm(data) {

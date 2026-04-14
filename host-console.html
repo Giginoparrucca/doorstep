@@ -1279,6 +1279,7 @@ const HT = {
     chat_reply_placeholder: 'Type your reply…',
     chat_send: 'Send',
     chat_resolve: '✓ Resolve',
+    chat_resolved_status: 'Conversation resolved — guest returned to AI concierge',
     chat_escalated: '⚠️ Guest requested human assistance',
     chat_you: 'You',
     // Dashboard
@@ -1428,6 +1429,7 @@ const HT = {
     chat_reply_placeholder: 'Scrivi la tua risposta…',
     chat_send: 'Invia',
     chat_resolve: '✓ Risolvi',
+    chat_resolved_status: 'Conversazione risolta — l\'ospite è tornato al concierge AI',
     chat_escalated: '⚠️ L\'ospite ha richiesto assistenza umana',
     chat_you: 'Tu',
     stat_checkins: 'Check-in Totali', stat_pending: 'Documenti in Attesa', stat_filed: 'Alloggiati Inviati',
@@ -2901,11 +2903,22 @@ async function loadHostChat() {
       return `<option value="${c}" ${c===current?'selected':''}>${c} (${count})</option>`;
     }).join('');
 
-  // Check if any conversations are escalated
-  const hasEscalation = chatMsgs.some(m => m.sender === 'system' && m.message?.includes('escalat'));
+  // Check escalation status — resolved if last system message is a resolve
+  const systemMsgs = chatMsgs.filter(m => m.sender === 'system');
+  const lastSystem = systemMsgs[systemMsgs.length - 1];
+  const isEscalated = lastSystem && lastSystem.message?.includes('escalat') && !lastSystem.message?.includes('resolved') && !lastSystem.message?.includes('returned to AI');
+  const isResolved = lastSystem && (lastSystem.message?.includes('resolved') || lastSystem.message?.includes('returned to AI'));
+
+  // Status banner
+  let statusBanner = '';
+  if (isEscalated) {
+    statusBanner = `<div style="background:rgba(232,168,64,0.1);border:1px solid rgba(232,168,64,0.25);border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:0.85rem;color:var(--amber);text-align:center;font-weight:500;">⚠️ ${h('chat_escalated')}</div>`;
+  } else if (isResolved) {
+    statusBanner = `<div style="background:rgba(76,175,125,0.08);border:1px solid rgba(76,175,125,0.2);border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:0.85rem;color:var(--green);text-align:center;font-weight:500;">✅ ${h('chat_resolved_status')}</div>`;
+  }
 
   // Render messages
-  container.innerHTML = (hasEscalation ? `<div style="background:rgba(232,168,64,0.1);border:1px solid rgba(232,168,64,0.25);border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:0.82rem;color:var(--amber);text-align:center;">⚠️ ${h('chat_escalated')}</div>` : '') +
+  container.innerHTML = statusBanner +
   chatMsgs.map(m => {
     const time = new Date(m.created_at).toLocaleTimeString(hostLang==='it'?'it-IT':'en-GB', {hour:'2-digit',minute:'2-digit'});
     const date = new Date(m.created_at).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB');

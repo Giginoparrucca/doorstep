@@ -962,6 +962,12 @@ body {
 
     <div class="chat-suggestions" id="chatSuggestions"></div>
 
+    <!-- Escalation banner -->
+    <div id="chatEscalatedBanner" style="display:none;padding:8px 14px;background:rgba(232,168,64,0.08);border-top:1px solid rgba(232,168,64,0.2);display:none;align-items:center;justify-content:space-between;gap:8px;">
+      <span style="font-size:0.75rem;color:var(--ink-soft);" id="escalatedBannerText">💬 Chatting with your host</span>
+      <button onclick="endEscalation()" style="padding:6px 12px;border-radius:6px;border:1px solid var(--warm);background:rgba(194,113,79,0.06);color:var(--warm);font-size:0.72rem;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;white-space:nowrap;" id="backToAiBtn">🤖 Back to AI</button>
+    </div>
+
     <div class="chat-input-bar">
       <input class="chat-input" id="chatInput" data-i18n-placeholder="chat_placeholder" placeholder="Ask anything…" onkeydown="if(event.key==='Enter')sendChat()">
       <button class="chat-send" onclick="sendChat()">
@@ -2353,6 +2359,7 @@ async function sendChat() {
     if (data.escalated) {
       chatEscalated = true;
       saveChatMsg('system', 'Guest requested human assistance — escalating to host.');
+      showEscalatedBanner();
       startHostChatListener();
     }
   } catch (err) {
@@ -2370,21 +2377,60 @@ function sendSuggestion(text) {
   sendChat();
 }
 
+function showEscalatedBanner() {
+  const banner = document.getElementById('chatEscalatedBanner');
+  banner.style.display = 'flex';
+  document.getElementById('escalatedBannerText').textContent = lang === 'it' ? '💬 In chat con il tuo host' : '💬 Chatting with your host';
+  document.getElementById('backToAiBtn').textContent = lang === 'it' ? '🤖 Torna all\'AI' : '🤖 Back to AI';
+}
+
+function endEscalation() {
+  chatEscalated = false;
+  document.getElementById('chatEscalatedBanner').style.display = 'none';
+  saveChatMsg('system', 'Guest returned to AI concierge.');
+  const msg = lang === 'it'
+    ? '🤖 Sono di nuovo io, il tuo concierge AI! Come posso aiutarti?'
+    : '🤖 I\'m back! Your AI concierge is here. How can I help?';
+  addBubble(msg, 'bot');
+  saveChatMsg('bot', msg);
+}
+
 function startHostChatListener() {
   if (chatSubscription) return;
-  chatSubscription = sb.channel('host-replies')
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'chat_messages',
-      filter: `property_id=eq.${propertyId}`,
-    }, (payload) => {
-      const msg = payload.new;
-      if (msg.sender === 'host') {
-        addBubble(`🏠 **${propertyData?.host_names || 'Host'}:** ${msg.message}`, 'bot');
+
+  // Polling fallback — check every 8 seconds for host replies
+  chatSubscription = setInterval(async () => {
+    if (!propertyId || !chatEscalated) return;
+    try {
+      let q = sb.from('chat_messages').select('*').eq('property_id', propertyId);
+      if (bookingCode) q = q.eq('booking_code', bookingCode);
+      const { data } = await q.in('sender', ['host', 'system']).order('created_at', { ascending: false }).limit(5);
+      if (!data) return;
+
+      const lastSeen = parseInt(localStorage.getItem('doorstep_chat_seen') || '0');
+
+      data.forEach(m => {
+        const ts = new Date(m.created_at).getTime();
+        if (ts <= lastSeen) return;
+
+        if (m.sender === 'host') {
+          addBubble(`🏠 **${propertyData?.host_names || 'Host'}:** ${m.message}`, 'bot');
+        }
+        if (m.sender === 'system' && (m.message.includes('resolved') || m.message.includes('returned to AI'))) {
+          chatEscalated = false;
+          document.getElementById('chatEscalatedBanner').style.display = 'none';
+          const resolveMsg = lang === 'it'
+            ? '🤖 L\'host ha chiuso la conversazione. Sono di nuovo il tuo concierge AI!'
+            : '🤖 Your host has closed the conversation. I\'m your AI concierge again!';
+          addBubble(resolveMsg, 'bot');
+        }
+      });
+
+      if (data.length > 0) {
+        localStorage.setItem('doorstep_chat_seen', new Date(data[0].created_at).getTime().toString());
       }
-    })
-    .subscribe();
+    } catch (e) {}
+  }, 8000);
 }
 
 async function checkExistingChat() {
@@ -2401,8 +2447,9 @@ async function checkExistingChat() {
         else if (m.sender === 'host') addBubble(`🏠 **${propertyData?.host_names || 'Host'}:** ${m.message}`, 'bot');
         else if (m.sender === 'bot') addBubble(m.message, 'bot');
         if (m.sender === 'system' && m.message.includes('escalat')) chatEscalated = true;
+        if (m.sender === 'system' && m.message.includes('returned to AI')) chatEscalated = false;
       });
-      if (chatEscalated) startHostChatListener();
+      if (chatEscalated) { startHostChatListener(); showEscalatedBanner(); }
       document.getElementById('chatSuggestions').style.display = 'none';
     }
   } catch (e) {}

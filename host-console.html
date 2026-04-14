@@ -1026,6 +1026,7 @@ See you soon!</textarea>
         <div style="display:flex;gap:8px;margin-top:12px;">
           <input class="form-input" id="hostChatInput" style="flex:1;min-height:48px;font-size:0.92rem;" placeholder="" data-h-placeholder="chat_reply_placeholder" onkeydown="if(event.key==='Enter')sendHostReply()">
           <button class="btn btn-primary" onclick="sendHostReply()" style="min-height:48px;padding:0 20px;" data-h="chat_send">Send</button>
+          <button class="btn btn-secondary" onclick="resolveChat()" style="min-height:48px;padding:0 16px;color:var(--green);border-color:rgba(76,175,125,0.3);" data-h="chat_resolve">✓ Resolve</button>
         </div>
       </div>
     </div>
@@ -1277,6 +1278,7 @@ const HT = {
     chat_no_messages: 'No messages yet. Guest conversations will appear here.',
     chat_reply_placeholder: 'Type your reply…',
     chat_send: 'Send',
+    chat_resolve: '✓ Resolve',
     chat_escalated: '⚠️ Guest requested human assistance',
     chat_you: 'You',
     // Dashboard
@@ -1425,6 +1427,7 @@ const HT = {
     chat_no_messages: 'Nessun messaggio ancora. Le conversazioni degli ospiti appariranno qui.',
     chat_reply_placeholder: 'Scrivi la tua risposta…',
     chat_send: 'Invia',
+    chat_resolve: '✓ Risolvi',
     chat_escalated: '⚠️ L\'ospite ha richiesto assistenza umana',
     chat_you: 'Tu',
     stat_checkins: 'Check-in Totali', stat_pending: 'Documenti in Attesa', stat_filed: 'Alloggiati Inviati',
@@ -2988,7 +2991,6 @@ async function sendHostReply() {
   const msg = input.value.trim();
   if (!msg || !propertyId) return;
 
-  // Determine booking code from filter
   const code = document.getElementById('hostChatFilter').value;
   const row = {
     property_id: propertyId,
@@ -3003,6 +3005,27 @@ async function sendHostReply() {
   input.value = '';
   loadHostChat();
   track('host_chat_reply', { booking_code: code });
+}
+
+async function resolveChat() {
+  if (!propertyId) return;
+  const code = document.getElementById('hostChatFilter').value;
+  const confirmMsg = hostLang === 'it'
+    ? 'Risolvere questa conversazione? L\'ospite tornerà al concierge AI.'
+    : 'Resolve this conversation? The guest will return to the AI concierge.';
+  if (!confirm(confirmMsg)) return;
+
+  const row = {
+    property_id: propertyId,
+    sender: 'system',
+    message: 'Host resolved the conversation. Guest returned to AI concierge.',
+  };
+  if (code !== 'all') row.booking_code = code;
+
+  await sb.from('chat_messages').insert(row);
+  loadHostChat();
+  toast(hostLang === 'it' ? 'Conversazione risolta' : 'Conversation resolved');
+  track('chat_resolved', { booking_code: code });
 }
 
 function viewGuest(id) {

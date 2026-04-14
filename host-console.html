@@ -1017,7 +1017,6 @@ See you soon!</textarea>
             <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);" data-h="chat_active_convos">Active Conversations</div>
           </div>
           <select id="hostChatFilter" onchange="loadHostChat()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;font-family:'DM Sans',sans-serif;color:var(--ink);">
-            <option value="all" data-h="chat_all_guests">All Guests</option>
           </select>
         </div>
         <div id="hostChatMessages" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:10px;background:var(--white);padding:14px;display:flex;flex-direction:column;gap:8px;">
@@ -1276,6 +1275,7 @@ const HT = {
     chat_active_convos: 'Active Conversations',
     chat_all_guests: 'All Guests',
     chat_no_messages: 'No messages yet. Guest conversations will appear here.',
+    chat_no_booking: 'Guest (no booking code)',
     chat_reply_placeholder: 'Type your reply…',
     chat_send: 'Send',
     chat_resolve: '✓ Resolve',
@@ -1426,6 +1426,7 @@ const HT = {
     chat_active_convos: 'Conversazioni Attive',
     chat_all_guests: 'Tutti gli Ospiti',
     chat_no_messages: 'Nessun messaggio ancora. Le conversazioni degli ospiti appariranno qui.',
+    chat_no_booking: 'Ospite (senza codice prenotazione)',
     chat_reply_placeholder: 'Scrivi la tua risposta…',
     chat_send: 'Invia',
     chat_resolve: '✓ Risolvi',
@@ -1628,7 +1629,7 @@ function showPanel(id, btn) {
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebarOverlay').classList.remove('show');
   if (id === 'qrlink') initQRPanel();
-  if (id === 'chat') { loadHostChat(); document.getElementById('chatBadge').style.display = 'none'; }
+  if (id === 'chat') { loadHostChat(); document.getElementById('chatBadge').style.display = 'none'; requestNotifPermission(); }
   trackPanelSwitch(id);
 }
 
@@ -2865,46 +2866,83 @@ function renderQR(url) {
    HOST CHAT — real-time guest messaging
 ══════════════════════════════════════ */
 let hostChatSub = null;
+let hostNotifGranted = false;
+
+// Request notification permission
+async function requestNotifPermission() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') { hostNotifGranted = true; return; }
+  if (Notification.permission !== 'denied') {
+    const perm = await Notification.requestPermission();
+    hostNotifGranted = perm === 'granted';
+  }
+}
+
+function showHostNotification(title, body) {
+  if (!hostNotifGranted) return;
+  try {
+    const n = new Notification(title, { body, icon: '🏠', tag: 'doorstep-chat', renotify: true });
+    n.onclick = () => { window.focus(); showPanel('chat', document.querySelector('[onclick*=chat]')); n.close(); };
+  } catch (e) {}
+}
 
 async function loadHostChat() {
   if (!propertyId) return;
   const filter = document.getElementById('hostChatFilter').value;
   const container = document.getElementById('hostChatMessages');
 
-  let q = sb.from('chat_messages').select('*').eq('property_id', propertyId);
-  if (filter !== 'all') q = q.eq('booking_code', filter);
-  const { data, error } = await q.order('created_at', { ascending: true }).limit(500);
+  // Load ALL chat messages for this property
+  const { data, error } = await sb.from('chat_messages').select('*')
+    .eq('property_id', propertyId)
+    .order('created_at', { ascending: true }).limit(500);
 
   if (error || !data || data.length === 0) {
     container.innerHTML = `<div style="text-align:center;color:var(--ink-soft);padding:30px;font-size:0.85rem;">${h('chat_no_messages')}</div>`;
+    document.getElementById('hostChatFilter').innerHTML = '';
     return;
   }
 
-  // Filter: only show actual chat messages (guest, host, bot, escalation)
-  // Exclude system "Check-in complete" messages
+  // Filter out check-in system messages, keep only real chat + escalation/resolve
   const chatMsgs = data.filter(m =>
     m.sender === 'guest' || m.sender === 'host' || m.sender === 'bot' ||
-    (m.sender === 'system' && m.message && m.message.toLowerCase().includes('escalat'))
+    (m.sender === 'system' && m.message && (m.message.includes('escalat') || m.message.includes('resolved') || m.message.includes('returned to AI')))
   );
 
   if (chatMsgs.length === 0) {
     container.innerHTML = `<div style="text-align:center;color:var(--ink-soft);padding:30px;font-size:0.85rem;">${h('chat_no_messages')}</div>`;
+    document.getElementById('hostChatFilter').innerHTML = '';
     return;
   }
 
-  // Populate booking code filter from ALL chat messages (not just filtered)
-  const allChatMsgs = data.filter(m => m.sender === 'guest' || m.sender === 'host' || m.sender === 'bot');
-  const codes = [...new Set(allChatMsgs.filter(m => m.booking_code).map(m => m.booking_code))];
-  const sel = document.getElementById('hostChatFilter');
-  const current = sel.value;
-  sel.innerHTML = `<option value="all">${h('chat_all_guests')} (${allChatMsgs.length})</option>` +
-    codes.map(c => {
-      const count = allChatMsgs.filter(m => m.booking_code === c).length;
-      return `<option value="${c}" ${c===current?'selected':''}>${c} (${count})</option>`;
-    }).join('');
+  // Build list of conversations by booking code
+  const conversations = {};
+  chatMsgs.forEach(m => {
+    const code = m.booking_code || '_no_code';
+    if (!conversations[code]) conversations[code] = { msgs: [], lastTime: m.created_at, hasEscalation: false };
+    conversations[code].msgs.push(m);
+    if (m.created_at > conversations[code].lastTime) conversations[code].lastTime = m.created_at;
+    if (m.sender === 'system' && m.message?.includes('escalat')) conversations[code].hasEscalation = true;
+  });
 
-  // Check escalation status — resolved if last system message is a resolve
-  const systemMsgs = chatMsgs.filter(m => m.sender === 'system');
+  // Sort by most recent first
+  const sortedCodes = Object.keys(conversations).sort((a, b) => conversations[b].lastTime.localeCompare(conversations[a].lastTime));
+
+  // Populate dropdown — individual conversations only, no "All"
+  const sel = document.getElementById('hostChatFilter');
+  const current = sel.value && sortedCodes.includes(sel.value) ? sel.value : sortedCodes[0];
+  sel.innerHTML = sortedCodes.map(c => {
+    const conv = conversations[c];
+    const label = c === '_no_code' ? h('chat_no_booking') : c;
+    const badge = conv.hasEscalation ? ' ⚠️' : '';
+    return `<option value="${c}" ${c===current?'selected':''}>${label} (${conv.msgs.length})${badge}</option>`;
+  }).join('');
+
+  // Show selected conversation
+  const selected = current;
+  const selectedMsgs = conversations[selected]?.msgs || [];
+
+  // Check escalation status for selected conversation
+  const systemMsgs = selectedMsgs.filter(m => m.sender === 'system');
   const lastSystem = systemMsgs[systemMsgs.length - 1];
   const isEscalated = lastSystem && lastSystem.message?.includes('escalat') && !lastSystem.message?.includes('resolved') && !lastSystem.message?.includes('returned to AI');
   const isResolved = lastSystem && (lastSystem.message?.includes('resolved') || lastSystem.message?.includes('returned to AI'));
@@ -2917,14 +2955,12 @@ async function loadHostChat() {
     statusBanner = `<div style="background:rgba(76,175,125,0.08);border:1px solid rgba(76,175,125,0.2);border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:0.85rem;color:var(--green);text-align:center;font-weight:500;">✅ ${h('chat_resolved_status')}</div>`;
   }
 
-  // Render messages
-  container.innerHTML = statusBanner +
-  chatMsgs.map(m => {
+  container.innerHTML = statusBanner + selectedMsgs.map(m => {
     const time = new Date(m.created_at).toLocaleTimeString(hostLang==='it'?'it-IT':'en-GB', {hour:'2-digit',minute:'2-digit'});
     const date = new Date(m.created_at).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB');
     if (m.sender === 'guest') {
       return `<div style="align-self:flex-start;max-width:85%;background:var(--cream-2);border-radius:12px 12px 12px 2px;padding:10px 14px;">
-        <div style="font-size:0.72rem;color:var(--ink-soft);margin-bottom:3px;">${m.booking_code || 'Guest'} · ${date} ${time}</div>
+        <div style="font-size:0.72rem;color:var(--ink-soft);margin-bottom:3px;">${date} ${time}</div>
         <div style="font-size:0.88rem;color:var(--ink);line-height:1.5;">${m.message}</div>
       </div>`;
     } else if (m.sender === 'host') {
@@ -2944,59 +2980,39 @@ async function loadHostChat() {
   }).join('');
 
   container.scrollTop = container.scrollHeight;
-
-  // Start real-time listener + polling fallback
   startHostChatSubscription();
 }
 
 let hostChatPoll = null;
 
 function startHostChatSubscription() {
-  // Polling fallback — check every 10 seconds (works even without Realtime enabled)
-  if (!hostChatPoll) {
-    hostChatPoll = setInterval(async () => {
-      if (!propertyId) return;
-      // Quick check for new messages
-      const { data } = await sb.from('chat_messages')
-        .select('id, sender, created_at')
-        .eq('property_id', propertyId)
-        .in('sender', ['guest'])
-        .order('created_at', { ascending: false })
-        .limit(1);
-      if (data && data.length > 0) {
-        const latest = new Date(data[0].created_at).getTime();
-        const stored = parseInt(localStorage.getItem('doorstep_last_chat') || '0');
-        if (latest > stored) {
-          localStorage.setItem('doorstep_last_chat', latest.toString());
-          document.getElementById('chatBadge').style.display = 'block';
-          if (document.getElementById('panel-chat')?.classList.contains('active')) {
-            loadHostChat();
-          }
+  if (hostChatPoll) return;
+  requestNotifPermission();
+
+  hostChatPoll = setInterval(async () => {
+    if (!propertyId) return;
+    const { data } = await sb.from('chat_messages')
+      .select('id, sender, message, booking_code, created_at')
+      .eq('property_id', propertyId)
+      .eq('sender', 'guest')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (data && data.length > 0) {
+      const latest = data[0].created_at;
+      const stored = localStorage.getItem('doorstep_host_last_chat') || '';
+      if (latest > stored) {
+        localStorage.setItem('doorstep_host_last_chat', latest);
+        document.getElementById('chatBadge').style.display = 'block';
+        showHostNotification(
+          hostLang === 'it' ? '💬 Nuovo messaggio ospite' : '💬 New guest message',
+          data[0].message.substring(0, 100)
+        );
+        if (document.getElementById('panel-chat')?.classList.contains('active')) {
+          loadHostChat();
         }
       }
-    }, 10000);
-  }
-
-  // Also try Realtime (bonus — instant if configured)
-  if (hostChatSub) return;
-  try {
-    hostChatSub = sb.channel('host-chat-live')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'chat_messages',
-        filter: `property_id=eq.${propertyId}`,
-      }, (payload) => {
-        const m = payload.new;
-        if (m.sender === 'guest' || (m.sender === 'system' && m.message?.includes('escalat'))) {
-          document.getElementById('chatBadge').style.display = 'block';
-          if (document.getElementById('panel-chat')?.classList.contains('active')) {
-            loadHostChat();
-          }
-        }
-      })
-      .subscribe();
-  } catch (e) { console.warn('Realtime not available, using polling'); }
+    }
+  }, 8000);
 }
 
 async function sendHostReply() {
@@ -3010,7 +3026,7 @@ async function sendHostReply() {
     sender: 'host',
     message: msg,
   };
-  if (code !== 'all') row.booking_code = code;
+  if (code && code !== '_no_code') row.booking_code = code;
 
   const { error } = await sb.from('chat_messages').insert(row);
   if (error) { toast('Error sending message'); return; }
@@ -3033,11 +3049,11 @@ async function resolveChat() {
     sender: 'system',
     message: 'Host resolved the conversation. Guest returned to AI concierge.',
   };
-  if (code !== 'all') row.booking_code = code;
+  if (code && code !== '_no_code') row.booking_code = code;
 
   await sb.from('chat_messages').insert(row);
   loadHostChat();
-  toast(hostLang === 'it' ? 'Conversazione risolta' : 'Conversation resolved');
+  toast(hostLang === 'it' ? '✅ Conversazione risolta' : '✅ Conversation resolved');
   track('chat_resolved', { booking_code: code });
 }
 

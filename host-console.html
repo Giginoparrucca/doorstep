@@ -1011,19 +1011,19 @@ See you soon!</textarea>
 
     <!-- ════════════ GUEST CHAT ════════════ -->
     <div class="panel" id="panel-chat">
-      <div style="display:flex;flex-direction:column;height:calc(100vh - 140px);max-height:700px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div style="display:flex;flex-direction:column;height:calc(100vh - 160px);min-height:300px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-shrink:0;">
           <div>
             <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);" data-h="chat_active_convos">Active Conversations</div>
           </div>
           <select id="hostChatFilter" onchange="loadHostChat()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;font-family:'DM Sans',sans-serif;color:var(--ink);">
           </select>
         </div>
-        <div id="hostChatMessages" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:10px;background:var(--white);padding:14px;display:flex;flex-direction:column;gap:8px;">
+        <div id="hostChatMessages" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:10px;background:var(--white);padding:14px;display:flex;flex-direction:column;gap:8px;min-height:0;">
           <div style="text-align:center;color:var(--ink-soft);padding:30px;font-size:0.85rem;" data-h="chat_no_messages">No messages yet. Guest conversations will appear here.</div>
         </div>
-        <div style="display:flex;gap:8px;margin-top:12px;">
-          <input class="form-input" id="hostChatInput" style="flex:1;min-height:48px;font-size:0.92rem;" placeholder="" data-h-placeholder="chat_reply_placeholder" onkeydown="if(event.key==='Enter')sendHostReply()">
+        <div style="display:flex;gap:8px;margin-top:12px;flex-shrink:0;">
+          <input class="form-input" id="hostChatInput" style="flex:1;min-height:48px;font-size:0.92rem;" placeholder="Type your reply…" onkeydown="if(event.key==='Enter')sendHostReply()">
           <button class="btn btn-primary" onclick="sendHostReply()" style="min-height:48px;padding:0 20px;" data-h="chat_send">Send</button>
           <button class="btn btn-secondary" onclick="resolveChat()" style="min-height:48px;padding:0 16px;color:var(--green);border-color:rgba(76,175,125,0.3);" data-h="chat_resolve">✓ Resolve</button>
         </div>
@@ -2918,22 +2918,28 @@ async function loadHostChat() {
   const conversations = {};
   chatMsgs.forEach(m => {
     const code = m.booking_code || '_no_code';
-    if (!conversations[code]) conversations[code] = { msgs: [], lastTime: m.created_at, hasEscalation: false };
+    if (!conversations[code]) conversations[code] = { msgs: [], lastTime: m.created_at, escalationState: 'none' };
     conversations[code].msgs.push(m);
     if (m.created_at > conversations[code].lastTime) conversations[code].lastTime = m.created_at;
-    if (m.sender === 'system' && m.message?.includes('escalat')) conversations[code].hasEscalation = true;
+    // Track escalation state: escalated → resolved
+    if (m.sender === 'system' && m.message?.includes('escalat') && !m.message?.includes('resolved') && !m.message?.includes('returned to AI')) {
+      conversations[code].escalationState = 'escalated';
+    }
+    if (m.sender === 'system' && (m.message?.includes('resolved') || m.message?.includes('returned to AI'))) {
+      conversations[code].escalationState = 'resolved';
+    }
   });
 
   // Sort by most recent first
   const sortedCodes = Object.keys(conversations).sort((a, b) => conversations[b].lastTime.localeCompare(conversations[a].lastTime));
 
-  // Populate dropdown — individual conversations only, no "All"
+  // Populate dropdown — individual conversations only
   const sel = document.getElementById('hostChatFilter');
   const current = sel.value && sortedCodes.includes(sel.value) ? sel.value : sortedCodes[0];
   sel.innerHTML = sortedCodes.map(c => {
     const conv = conversations[c];
     const label = c === '_no_code' ? h('chat_no_booking') : c;
-    const badge = conv.hasEscalation ? ' ⚠️' : '';
+    const badge = conv.escalationState === 'escalated' ? ' ⚠️' : conv.escalationState === 'resolved' ? ' ✅' : '';
     return `<option value="${c}" ${c===current?'selected':''}>${label} (${conv.msgs.length})${badge}</option>`;
   }).join('');
 

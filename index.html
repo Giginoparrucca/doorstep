@@ -2360,7 +2360,6 @@ async function sendChat() {
       chatEscalated = true;
       saveChatMsg('system', 'Guest requested human assistance — escalating to host.');
       showEscalatedBanner();
-      localStorage.setItem('doorstep_chat_seen', new Date().toISOString());
       startHostChatListener();
     }
   } catch (err) {
@@ -2398,13 +2397,25 @@ function endEscalation() {
 
 function startHostChatListener() {
   if (chatSubscription) return;
-  console.log('🔄 Starting host chat listener (polling every 5s)');
+  console.log('🔄 Starting host chat listener');
 
-  // Polling — check every 5 seconds for host replies and resolve messages
-  chatSubscription = setInterval(async () => {
+  // Clear stale cursor
+  localStorage.removeItem('doorstep_chat_seen');
+
+  // Set cursor to now (only show messages after this point)
+  const setCursor = async () => {
+    const { data } = await sb.from('chat_messages')
+      .select('created_at')
+      .eq('property_id', propertyId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (data?.[0]) localStorage.setItem('doorstep_chat_seen', data[0].created_at);
+  };
+  setCursor();
+
+  const pollForReplies = async () => {
     if (!propertyId) return;
     try {
-      // Don't filter by booking_code — host replies may not have one
       const { data } = await sb.from('chat_messages')
         .select('*')
         .eq('property_id', propertyId)
@@ -2417,7 +2428,7 @@ function startHostChatListener() {
       const lastSeen = localStorage.getItem('doorstep_chat_seen') || '';
       const newMsgs = data.filter(m => m.created_at > lastSeen).reverse();
 
-      if (newMsgs.length > 0) console.log('🔄 New messages found:', newMsgs.length);
+      if (newMsgs.length > 0) console.log('🔄 New messages:', newMsgs.length);
 
       newMsgs.forEach(m => {
         if (m.sender === 'host') {
@@ -2435,17 +2446,27 @@ function startHostChatListener() {
         }
       });
 
-      // Use server timestamp as cursor
       localStorage.setItem('doorstep_chat_seen', data[0].created_at);
 
-      // Stop polling if no longer escalated
       if (!chatEscalated && chatSubscription) {
-        console.log('🔄 Stopping poll — chat de-escalated');
         clearInterval(chatSubscription);
         chatSubscription = null;
+        document.removeEventListener('visibilitychange', onVisible);
       }
     } catch (e) { console.warn('🔄 Poll error:', e); }
-  }, 5000);
+  };
+
+  // Poll on interval
+  chatSubscription = setInterval(pollForReplies, 5000);
+
+  // Also poll immediately when user returns to the app (critical for mobile)
+  const onVisible = () => {
+    if (document.visibilityState === 'visible' && chatEscalated) {
+      console.log('🔄 App visible — checking for replies');
+      pollForReplies();
+    }
+  };
+  document.addEventListener('visibilitychange', onVisible);
 }
 
 async function checkExistingChat() {

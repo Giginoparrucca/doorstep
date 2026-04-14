@@ -2360,6 +2360,7 @@ async function sendChat() {
       chatEscalated = true;
       saveChatMsg('system', 'Guest requested human assistance — escalating to host.');
       showEscalatedBanner();
+      localStorage.setItem('doorstep_chat_seen', new Date().toISOString());
       startHostChatListener();
     }
   } catch (err) {
@@ -2398,21 +2399,21 @@ function endEscalation() {
 function startHostChatListener() {
   if (chatSubscription) return;
 
-  // Polling fallback — check every 8 seconds for host replies
+  // Polling — check every 5 seconds for host replies and resolve messages
   chatSubscription = setInterval(async () => {
-    if (!propertyId || !chatEscalated) return;
+    if (!propertyId) return;
     try {
       let q = sb.from('chat_messages').select('*').eq('property_id', propertyId);
       if (bookingCode) q = q.eq('booking_code', bookingCode);
       const { data } = await q.in('sender', ['host', 'system']).order('created_at', { ascending: false }).limit(5);
-      if (!data) return;
+      if (!data || data.length === 0) return;
 
-      const lastSeen = parseInt(localStorage.getItem('doorstep_chat_seen') || '0');
+      const lastSeen = localStorage.getItem('doorstep_chat_seen') || '';
 
-      data.forEach(m => {
-        const ts = new Date(m.created_at).getTime();
-        if (ts <= lastSeen) return;
+      // Process oldest first so messages appear in correct order
+      const newMsgs = data.filter(m => m.created_at > lastSeen).reverse();
 
+      newMsgs.forEach(m => {
         if (m.sender === 'host') {
           addBubble(`🏠 **${propertyData?.host_names || 'Host'}:** ${m.message}`, 'bot');
         }
@@ -2426,11 +2427,16 @@ function startHostChatListener() {
         }
       });
 
-      if (data.length > 0) {
-        localStorage.setItem('doorstep_chat_seen', new Date(data[0].created_at).getTime().toString());
+      // Use server timestamp as cursor (avoids clock skew)
+      localStorage.setItem('doorstep_chat_seen', data[0].created_at);
+
+      // Stop polling if no longer escalated
+      if (!chatEscalated && chatSubscription) {
+        clearInterval(chatSubscription);
+        chatSubscription = null;
       }
     } catch (e) {}
-  }, 8000);
+  }, 5000);
 }
 
 async function checkExistingChat() {
@@ -2448,6 +2454,7 @@ async function checkExistingChat() {
         else if (m.sender === 'bot') addBubble(m.message, 'bot');
         if (m.sender === 'system' && m.message.includes('escalat')) chatEscalated = true;
         if (m.sender === 'system' && m.message.includes('returned to AI')) chatEscalated = false;
+        if (m.sender === 'system' && m.message.includes('resolved')) chatEscalated = false;
       });
       if (chatEscalated) { startHostChatListener(); showEscalatedBanner(); }
       document.getElementById('chatSuggestions').style.display = 'none';

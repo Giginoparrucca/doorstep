@@ -2299,10 +2299,13 @@ function addBubble(text, type) {
 }
 
 async function saveChatMsg(sender, message) {
-  if (!propertyId) return;
+  if (!propertyId) { console.warn('💬 No propertyId, skipping save'); return; }
   const row = { property_id: propertyId, sender, message };
   if (bookingCode) row.booking_code = bookingCode;
-  await sb.from('chat_messages').insert(row).catch(() => {});
+  console.log('💬 Saving chat:', sender, message.substring(0, 50));
+  const { error } = await sb.from('chat_messages').insert(row);
+  if (error) console.error('💬 Chat save FAILED:', error.message, error);
+  else console.log('💬 Chat saved OK');
 }
 
 async function sendChat() {
@@ -2432,7 +2435,7 @@ async function init() {
     if (data) {
       propertyId = data.id;
       propertyData = data;
-      console.log('✅ Property loaded from Supabase:', data.name);
+      console.log('✅ Property loaded from Supabase:', data.name, 'ID:', data.id);
 
       // Populate welcome page from DB
       const d = data;

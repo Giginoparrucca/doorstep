@@ -2868,71 +2868,119 @@ async function loadHostChat() {
 
   let q = sb.from('chat_messages').select('*').eq('property_id', propertyId);
   if (filter !== 'all') q = q.eq('booking_code', filter);
-  const { data, error } = await q.order('created_at', { ascending: true }).limit(200);
+  const { data, error } = await q.order('created_at', { ascending: true }).limit(500);
 
   if (error || !data || data.length === 0) {
     container.innerHTML = `<div style="text-align:center;color:var(--ink-soft);padding:30px;font-size:0.85rem;">${h('chat_no_messages')}</div>`;
     return;
   }
 
-  // Populate booking code filter dropdown
-  const codes = [...new Set(data.filter(m => m.booking_code).map(m => m.booking_code))];
+  // Filter: only show actual chat messages (guest, host, bot, escalation)
+  // Exclude system "Check-in complete" messages
+  const chatMsgs = data.filter(m =>
+    m.sender === 'guest' || m.sender === 'host' || m.sender === 'bot' ||
+    (m.sender === 'system' && m.message && m.message.toLowerCase().includes('escalat'))
+  );
+
+  if (chatMsgs.length === 0) {
+    container.innerHTML = `<div style="text-align:center;color:var(--ink-soft);padding:30px;font-size:0.85rem;">${h('chat_no_messages')}</div>`;
+    return;
+  }
+
+  // Populate booking code filter from ALL chat messages (not just filtered)
+  const allChatMsgs = data.filter(m => m.sender === 'guest' || m.sender === 'host' || m.sender === 'bot');
+  const codes = [...new Set(allChatMsgs.filter(m => m.booking_code).map(m => m.booking_code))];
   const sel = document.getElementById('hostChatFilter');
   const current = sel.value;
-  sel.innerHTML = `<option value="all">${h('chat_all_guests')}</option>` +
-    codes.map(c => `<option value="${c}" ${c===current?'selected':''}>${c}</option>`).join('');
+  sel.innerHTML = `<option value="all">${h('chat_all_guests')} (${allChatMsgs.length})</option>` +
+    codes.map(c => {
+      const count = allChatMsgs.filter(m => m.booking_code === c).length;
+      return `<option value="${c}" ${c===current?'selected':''}>${c} (${count})</option>`;
+    }).join('');
+
+  // Check if any conversations are escalated
+  const hasEscalation = chatMsgs.some(m => m.sender === 'system' && m.message?.includes('escalat'));
 
   // Render messages
-  container.innerHTML = data.map(m => {
+  container.innerHTML = (hasEscalation ? `<div style="background:rgba(232,168,64,0.1);border:1px solid rgba(232,168,64,0.25);border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:0.82rem;color:var(--amber);text-align:center;">⚠️ ${h('chat_escalated')}</div>` : '') +
+  chatMsgs.map(m => {
     const time = new Date(m.created_at).toLocaleTimeString(hostLang==='it'?'it-IT':'en-GB', {hour:'2-digit',minute:'2-digit'});
     const date = new Date(m.created_at).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB');
     if (m.sender === 'guest') {
-      return `<div style="align-self:flex-start;max-width:80%;background:var(--cream-2);border-radius:10px 10px 10px 2px;padding:10px 14px;">
+      return `<div style="align-self:flex-start;max-width:85%;background:var(--cream-2);border-radius:12px 12px 12px 2px;padding:10px 14px;">
         <div style="font-size:0.72rem;color:var(--ink-soft);margin-bottom:3px;">${m.booking_code || 'Guest'} · ${date} ${time}</div>
         <div style="font-size:0.88rem;color:var(--ink);line-height:1.5;">${m.message}</div>
       </div>`;
     } else if (m.sender === 'host') {
-      return `<div style="align-self:flex-end;max-width:80%;background:var(--warm);border-radius:10px 10px 2px 10px;padding:10px 14px;">
+      return `<div style="align-self:flex-end;max-width:85%;background:var(--warm);border-radius:12px 12px 2px 12px;padding:10px 14px;">
         <div style="font-size:0.72rem;color:rgba(255,255,255,0.6);margin-bottom:3px;">${h('chat_you')} · ${time}</div>
         <div style="font-size:0.88rem;color:#fff;line-height:1.5;">${m.message}</div>
       </div>`;
     } else if (m.sender === 'bot') {
-      return `<div style="align-self:flex-start;max-width:80%;background:rgba(74,144,217,0.06);border:1px solid rgba(74,144,217,0.12);border-radius:10px;padding:10px 14px;">
+      return `<div style="align-self:flex-start;max-width:85%;background:rgba(74,144,217,0.06);border:1px solid rgba(74,144,217,0.12);border-radius:12px;padding:10px 14px;">
         <div style="font-size:0.72rem;color:var(--blue);margin-bottom:3px;">🤖 AI · ${time}</div>
         <div style="font-size:0.85rem;color:var(--ink-2);line-height:1.5;">${m.message.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</div>
       </div>`;
     } else if (m.sender === 'system') {
-      return `<div style="text-align:center;font-size:0.75rem;color:var(--amber);padding:6px;"><em>${m.message}</em></div>`;
+      return `<div style="text-align:center;font-size:0.78rem;color:var(--amber);padding:8px;font-weight:500;">⚠️ ${m.message}</div>`;
     }
     return '';
   }).join('');
 
   container.scrollTop = container.scrollHeight;
 
-  // Start real-time listener
+  // Start real-time listener + polling fallback
   startHostChatSubscription();
 }
 
+let hostChatPoll = null;
+
 function startHostChatSubscription() {
-  if (hostChatSub) return;
-  hostChatSub = sb.channel('host-chat-live')
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'chat_messages',
-      filter: `property_id=eq.${propertyId}`,
-    }, (payload) => {
-      const m = payload.new;
-      if (m.sender === 'guest' || m.sender === 'system') {
-        // Show notification badge
-        document.getElementById('chatBadge').style.display = 'block';
-        // If chat panel is active, reload
-        if (document.getElementById('panel-chat')?.classList.contains('active')) {
-          loadHostChat();
+  // Polling fallback — check every 10 seconds (works even without Realtime enabled)
+  if (!hostChatPoll) {
+    hostChatPoll = setInterval(async () => {
+      if (!propertyId) return;
+      // Quick check for new messages
+      const { data } = await sb.from('chat_messages')
+        .select('id, sender, created_at')
+        .eq('property_id', propertyId)
+        .in('sender', ['guest'])
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (data && data.length > 0) {
+        const latest = new Date(data[0].created_at).getTime();
+        const stored = parseInt(localStorage.getItem('doorstep_last_chat') || '0');
+        if (latest > stored) {
+          localStorage.setItem('doorstep_last_chat', latest.toString());
+          document.getElementById('chatBadge').style.display = 'block';
+          if (document.getElementById('panel-chat')?.classList.contains('active')) {
+            loadHostChat();
+          }
         }
       }
-    })
-    .subscribe();
+    }, 10000);
+  }
+
+  // Also try Realtime (bonus — instant if configured)
+  if (hostChatSub) return;
+  try {
+    hostChatSub = sb.channel('host-chat-live')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'chat_messages',
+        filter: `property_id=eq.${propertyId}`,
+      }, (payload) => {
+        const m = payload.new;
+        if (m.sender === 'guest' || (m.sender === 'system' && m.message?.includes('escalat'))) {
+          document.getElementById('chatBadge').style.display = 'block';
+          if (document.getElementById('panel-chat')?.classList.contains('active')) {
+            loadHostChat();
+          }
+        }
+      })
+      .subscribe();
+  } catch (e) { console.warn('Realtime not available, using polling'); }
 }
 
 async function sendHostReply() {

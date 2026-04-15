@@ -436,58 +436,59 @@ function renderView() {
       </div>`;
   }
 
-  // Users table (only in "all" view)
+  // ── Hosts & Properties (merged table) ──
   if (!isUserView) {
-    html += `<div class="section-title">Users</div>
-      <table class="data-table">
-        <thead>
-          <tr><th>Email</th><th>Sessions</th><th>Events</th><th>Saves</th><th>Exports</th><th>Bookings</th><th>First Seen</th><th>Last Active</th><th></th></tr>
-        </thead>
+    const userIdToEmail = {};
+    events.forEach(e => { if (e.user_id && e.user_email) userIdToEmail[e.user_id] = e.user_email; });
+
+    const hostRows = allProperties.map(p => {
+      const email = p.owner_id ? (userIdToEmail[p.owner_id] || null) : null;
+      const stats = email ? (userStats[email] || { sessions: new Set(), events: 0, saves: 0, exports: 0, bookings: 0, firstSeen: null, lastSeen: null }) : { sessions: new Set(), events: 0, saves: 0, exports: 0, bookings: 0, firstSeen: null, lastSeen: null };
+      return { ...p, _email: email, _stats: stats };
+    });
+
+    const ownedEmails = new Set(hostRows.map(h => h._email).filter(Boolean));
+    const orphanedUsers = Object.entries(userStats).filter(([email]) => !ownedEmails.has(email));
+
+    html += `<div class="section-title">Hosts & Properties (${allProperties.length})</div>
+      <div style="overflow-x:auto;margin-bottom:24px;">
+      <table class="data-table" style="width:100%;">
+        <thead><tr><th>Property</th><th>Host</th><th>City</th><th>Guests</th><th>Setup</th><th>Activity</th><th>Last Active</th><th>Actions</th></tr></thead>
         <tbody>
-          ${Object.entries(userStats).sort((a,b) => b[1].lastSeen.localeCompare(a[1].lastSeen)).map(([email, s]) => `
-            <tr>
-              <td><strong>${email}</strong></td>
-              <td>${s.sessions.size}</td>
-              <td>${s.events}</td>
-              <td>${s.saves}</td>
-              <td>${s.exports}</td>
-              <td>${s.bookings}</td>
-              <td style="font-size:0.75rem;color:var(--ink-soft);">${new Date(s.firstSeen).toLocaleDateString()}</td>
-              <td style="font-size:0.75rem;color:var(--ink-soft);">${new Date(s.lastSeen).toLocaleString()}</td>
-              <td><button onclick="document.getElementById('userFilter').value='${email}';renderView();" style="background:var(--cream-2);border:1px solid var(--border);border-radius:4px;padding:4px 10px;font-size:0.7rem;cursor:pointer;color:var(--warm);font-weight:500;">View →</button></td>
-            </tr>
-          `).join('')}
+          ${hostRows.sort((a, b) => (b._stats.lastSeen || '').localeCompare(a._stats.lastSeen || '')).map(p => {
+            const s = p._stats;
+            const setupScore = [p.wifi_name, p.host_names, p.host_phone, p.address, p.cir_code].filter(Boolean).length;
+            const setupPct = Math.round(setupScore / 5 * 100);
+            const setupColor = setupPct >= 80 ? 'var(--green)' : setupPct >= 40 ? 'var(--amber)' : 'var(--red)';
+            return `<tr>
+              <td><strong>${p.name || 'Unnamed'}</strong><br><span style="font-size:0.62rem;color:var(--ink-soft);font-family:monospace;">${p.id.substring(0,8)}…</span></td>
+              <td>${p._email ? `<strong>${p._email.split('@')[0]}</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">${p._email}</span>` : `${p.host_names || '—'}<br><span style="font-size:0.65rem;color:var(--ink-soft)">${p.host_phone || 'No account'}</span>`}</td>
+              <td>${p.city || '—'}${p.region ? '<br><span style="font-size:0.65rem;color:var(--ink-soft)">' + p.region + '</span>' : ''}</td>
+              <td style="text-align:center;font-weight:600;">${p._checkin_count}</td>
+              <td style="text-align:center;"><span style="color:${setupColor};font-weight:600;">${setupPct}%</span></td>
+              <td style="font-size:0.72rem;">${s.sessions.size || 0} sess · ${s.saves || 0} saves · ${s.exports || 0} exp</td>
+              <td style="font-size:0.72rem;color:var(--ink-soft);">${s.lastSeen ? new Date(s.lastSeen).toLocaleDateString() : '—'}</td>
+              <td><div style="display:flex;gap:4px;flex-wrap:wrap;">
+                <a href="host-console.html?p=${p.id}" target="_blank" style="padding:4px 8px;background:#C2714F;color:#fff;border-radius:4px;font-size:0.65rem;text-decoration:none;white-space:nowrap;">✏️ Edit</a>
+                <a href="/?p=${p.id}" target="_blank" style="padding:4px 8px;background:#4A2A18;color:#fff;border-radius:4px;font-size:0.65rem;text-decoration:none;white-space:nowrap;">👁 View</a>
+                ${p._email ? `<button onclick="document.getElementById('userFilter').value='${p._email}';renderView();" style="padding:4px 8px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.65rem;cursor:pointer;color:var(--warm);font-weight:500;white-space:nowrap;">📊</button>` : ''}
+              </div></td>
+            </tr>`;
+          }).join('') || '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--ink-soft);">No properties yet.</td></tr>'}
+          ${orphanedUsers.map(([email, s]) => `<tr style="opacity:0.55;">
+            <td style="font-style:italic;color:var(--ink-soft);">No property</td>
+            <td><strong>${email.split('@')[0]}</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">${email}</span></td>
+            <td>—</td><td style="text-align:center;">0</td><td>—</td>
+            <td style="font-size:0.72rem;">${s.sessions.size} sess · ${s.saves} saves</td>
+            <td style="font-size:0.72rem;color:var(--ink-soft);">${new Date(s.lastSeen).toLocaleDateString()}</td>
+            <td><button onclick="document.getElementById('userFilter').value='${email}';renderView();" style="padding:4px 8px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.65rem;cursor:pointer;color:var(--warm);">📊</button></td>
+          </tr>`).join('')}
         </tbody>
-      </table>`;
+      </table></div>`;
   }
 
   // Event log
   const logEvents = events.slice(0, 200);
-  // ── Manage Properties ──
-  html += `<div class="section-title">Manage Properties (${allProperties.length})</div>
-    <div style="overflow-x:auto;margin-bottom:24px;">
-      <table class="data-table" style="width:100%;">
-        <thead><tr>
-          <th>Property</th><th>Host</th><th>City</th><th>Guests</th><th>CIR Code</th><th>Rules</th><th>Actions</th>
-        </tr></thead>
-        <tbody>
-          ${allProperties.map(p => `<tr>
-            <td><strong>${p.name || '—'}</strong><br><span style="font-size:0.65rem;color:var(--ink-soft);font-family:monospace;">${p.id.substring(0,8)}…</span></td>
-            <td>${p.host_names || '—'}<br><span style="font-size:0.65rem;color:var(--ink-soft)">${p.host_phone || ''}</span></td>
-            <td>${p.city || '—'}${p.region ? ', ' + p.region : ''}</td>
-            <td style="text-align:center;">${p._checkin_count}</td>
-            <td style="font-size:0.72rem;">${p.cir_code || '—'}</td>
-            <td style="text-align:center;">${p.wifi_name ? '✅' : '⚠️'}</td>
-            <td>
-              <div style="display:flex;gap:6px;">
-                <a href="host-console.html?p=${p.id}" target="_blank" style="padding:5px 10px;background:#C2714F;color:#fff;border-radius:5px;font-size:0.68rem;text-decoration:none;white-space:nowrap;">✏️ Edit</a>
-                <a href="/?p=${p.id}" target="_blank" style="padding:5px 10px;background:#4A2A18;color:#fff;border-radius:5px;font-size:0.68rem;text-decoration:none;white-space:nowrap;">👁 Guest View</a>
-              </div>
-            </td>
-          </tr>`).join('') || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--ink-soft);">No properties yet.</td></tr>'}
-        </tbody>
-      </table>
-    </div>`;
 
   html += `<div class="section-title">Event Log (${logEvents.length} of ${events.length})</div>
     <div class="event-log">

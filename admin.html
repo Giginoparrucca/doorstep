@@ -144,6 +144,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let allEvents = [];
+let allProperties = [];
 
 async function loadData() {
   const days = parseInt(document.getElementById('timeRange').value);
@@ -151,19 +152,24 @@ async function loadData() {
 
   document.getElementById('content').innerHTML = '<div class="loading">Loading analytics…</div>';
 
-  const { data: events, error } = await sb.from('analytics_events')
-    .select('*')
-    .gte('created_at', since)
-    .order('created_at', { ascending: false })
-    .limit(10000);
+  const [eventsRes, propsRes, checkinsRes] = await Promise.all([
+    sb.from('analytics_events').select('*').gte('created_at', since).order('created_at', { ascending: false }).limit(10000),
+    sb.from('properties').select('*').order('name'),
+    sb.from('checkins').select('property_id'),
+  ]);
 
-  if (error) { document.getElementById('content').innerHTML = `<div class="loading">Error: ${error.message}</div>`; return; }
-  if (!events || events.length === 0) { document.getElementById('content').innerHTML = `<div class="loading">No events recorded yet.</div>`; return; }
+  if (eventsRes.error) { document.getElementById('content').innerHTML = `<div class="loading">Error: ${eventsRes.error.message}</div>`; return; }
 
-  allEvents = events;
+  allEvents = eventsRes.data || [];
+  allProperties = propsRes.data || [];
+
+  // Count check-ins per property
+  const checkinCounts = {};
+  (checkinsRes.data || []).forEach(c => { checkinCounts[c.property_id] = (checkinCounts[c.property_id] || 0) + 1; });
+  allProperties.forEach(p => { p._checkin_count = checkinCounts[p.id] || 0; });
 
   // Populate user dropdown
-  const users = [...new Set(events.filter(e => e.user_email).map(e => e.user_email))].sort();
+  const users = [...new Set(allEvents.filter(e => e.user_email).map(e => e.user_email))].sort();
   const sel = document.getElementById('userFilter');
   const current = sel.value;
   sel.innerHTML = '<option value="all">All Users (' + users.length + ')</option>' +
@@ -457,6 +463,32 @@ function renderView() {
 
   // Event log
   const logEvents = events.slice(0, 200);
+  // ── Manage Properties ──
+  html += `<div class="section-title">Manage Properties (${allProperties.length})</div>
+    <div style="overflow-x:auto;margin-bottom:24px;">
+      <table class="data-table" style="width:100%;">
+        <thead><tr>
+          <th>Property</th><th>Host</th><th>City</th><th>Guests</th><th>CIR Code</th><th>Rules</th><th>Actions</th>
+        </tr></thead>
+        <tbody>
+          ${allProperties.map(p => `<tr>
+            <td><strong>${p.name || '—'}</strong><br><span style="font-size:0.65rem;color:var(--ink-soft);font-family:monospace;">${p.id.substring(0,8)}…</span></td>
+            <td>${p.host_names || '—'}<br><span style="font-size:0.65rem;color:var(--ink-soft)">${p.host_phone || ''}</span></td>
+            <td>${p.city || '—'}${p.region ? ', ' + p.region : ''}</td>
+            <td style="text-align:center;">${p._checkin_count}</td>
+            <td style="font-size:0.72rem;">${p.cir_code || '—'}</td>
+            <td style="text-align:center;">${p.wifi_name ? '✅' : '⚠️'}</td>
+            <td>
+              <div style="display:flex;gap:6px;">
+                <a href="host-console.html?p=${p.id}" target="_blank" style="padding:5px 10px;background:#C2714F;color:#fff;border-radius:5px;font-size:0.68rem;text-decoration:none;white-space:nowrap;">✏️ Edit</a>
+                <a href="/?p=${p.id}" target="_blank" style="padding:5px 10px;background:#4A2A18;color:#fff;border-radius:5px;font-size:0.68rem;text-decoration:none;white-space:nowrap;">👁 Guest View</a>
+              </div>
+            </td>
+          </tr>`).join('') || '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--ink-soft);">No properties yet.</td></tr>'}
+        </tbody>
+      </table>
+    </div>`;
+
   html += `<div class="section-title">Event Log (${logEvents.length} of ${events.length})</div>
     <div class="event-log">
       ${logEvents.map(e => {

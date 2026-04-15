@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Doorstep · Admin Analytics</title>
+<title>WelcomeBnB · Admin Analytics</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -113,7 +113,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 
 <div class="top-bar">
   <div>
-    <span class="top-bar-brand">Door<em>step</em></span>
+    <span class="top-bar-brand">Welcome<em>BnB</em></span>
     <span class="top-bar-badge">Admin Analytics</span>
   </div>
   <div class="top-bar-right">
@@ -186,7 +186,7 @@ function exportData(format) {
   if (events.length === 0) return;
 
   const user = document.getElementById('userFilter').value;
-  const prefix = user === 'all' ? 'doorstep_analytics' : `doorstep_${user.split('@')[0]}`;
+  const prefix = user === 'all' ? 'wbnb_analytics' : `wbnb_${user.split('@')[0]}`;
   const date = new Date().toISOString().slice(0,10);
 
   if (format === 'csv') {

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Doorstep · Guest</title>
+<title>WelcomeBnB</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -532,7 +532,7 @@ body {
   transition: opacity 0.2s;
 }
 .powered-by a:hover { opacity: 0.8; }
-.powered-by .doorstep-mark {
+.powered-by .wbnb-mark {
   width: 14px; height: 14px;
   background: var(--warm);
   border-radius: 3px;
@@ -551,7 +551,7 @@ body {
 
 <!-- LOADING OVERLAY -->
 <div id="loadingOverlay" style="position:fixed;inset:0;z-index:9999;background:var(--cream);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;transition:opacity 0.4s;">
-  <div style="font-family:'Playfair Display',serif;font-size:1.3rem;color:var(--ink);font-weight:400;">Door<em style="color:var(--warm)">step</em></div>
+  <div style="font-family:'Playfair Display',serif;font-size:1.3rem;color:var(--ink);font-weight:400;">Welcome<span style="color:var(--warm);font-weight:600;">BnB</span></div>
   <div style="width:40px;height:3px;background:var(--cream-3);border-radius:2px;overflow:hidden;"><div style="width:60%;height:100%;background:var(--warm);border-radius:2px;animation:loadSlide 1s ease infinite;"></div></div>
 </div>
 <style>@keyframes loadSlide{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}</style>
@@ -977,11 +977,11 @@ body {
   </div>
 </div>
 
-<!-- Powered by Doorstep -->
+<!-- Powered by WelcomeBnB -->
 <div class="powered-by">
-  <a href="https://getdoorstep.app" target="_blank">
-    <div class="doorstep-mark">D</div>
-    Powered by <strong style="font-weight:600;color:var(--ink-2)">Doorstep</strong>
+  <a href="https://getwelcomebnb.com" target="_blank">
+    <div class="wbnb-mark">W</div>
+    Powered by <strong style="font-weight:600;color:var(--ink-2);">Welcome</strong><strong style="font-weight:600;color:var(--warm);">BnB</strong>
   </a>
 </div>
 
@@ -1031,16 +1031,16 @@ function getBookingCode() {
   const params = new URLSearchParams(window.location.search);
   const urlCode = params.get('b');
   const urlProp = params.get('p');
-  if (urlCode) localStorage.setItem('doorstep_booking', urlCode);
-  if (urlProp) localStorage.setItem('doorstep_property', urlProp);
+  if (urlCode) localStorage.setItem('wbnb_booking', urlCode);
+  if (urlProp) localStorage.setItem('wbnb_property', urlProp);
   if (urlCode || urlProp) {
     window.history.replaceState({}, '', window.location.pathname);
   }
-  return localStorage.getItem('doorstep_booking') || null;
+  return localStorage.getItem('wbnb_booking') || null;
 }
 
 function getStoredPropertyId() {
-  return localStorage.getItem('doorstep_property') || null;
+  return localStorage.getItem('wbnb_property') || null;
 }
 let uploadedIdFile = null;
 
@@ -1462,7 +1462,7 @@ async function lookupCheckin() {
     const foundPropId = data[0].property_id;
     if (foundPropId && foundPropId !== propertyId) {
       console.log('🔄 Switching to property:', foundPropId);
-      localStorage.setItem('doorstep_property', foundPropId);
+      localStorage.setItem('wbnb_property', foundPropId);
       propertyId = foundPropId;
       // Reload property data for welcome page
       const { data: propData } = await sb.from('properties').select('*').eq('id', foundPropId).single();
@@ -1487,9 +1487,9 @@ async function lookupCheckin() {
         .eq('booking_code', foundCode)
         .order('submitted_at');
       if (fullGroup && fullGroup.length > 0) allGuests = fullGroup;
-      localStorage.setItem('doorstep_booking', foundCode);
+      localStorage.setItem('wbnb_booking', foundCode);
     } else {
-      localStorage.setItem('doorstep_lookup', JSON.stringify({ surname: surname.toUpperCase(), date }));
+      localStorage.setItem('wbnb_lookup', JSON.stringify({ surname: surname.toUpperCase(), date }));
     }
 
     existingCheckins = allGuests;
@@ -2400,7 +2400,7 @@ function startHostChatListener() {
   console.log('🔄 Starting host chat listener');
 
   // Clear stale cursor
-  localStorage.removeItem('doorstep_chat_seen');
+  localStorage.removeItem('wbnb_chat_seen');
 
   // Set cursor to now (only show messages after this point)
   const setCursor = async () => {
@@ -2409,7 +2409,7 @@ function startHostChatListener() {
       .eq('property_id', propertyId)
       .order('created_at', { ascending: false })
       .limit(1);
-    if (data?.[0]) localStorage.setItem('doorstep_chat_seen', data[0].created_at);
+    if (data?.[0]) localStorage.setItem('wbnb_chat_seen', data[0].created_at);
   };
   setCursor();
 
@@ -2425,7 +2425,7 @@ function startHostChatListener() {
 
       if (!data || data.length === 0) return;
 
-      const lastSeen = localStorage.getItem('doorstep_chat_seen') || '';
+      const lastSeen = localStorage.getItem('wbnb_chat_seen') || '';
       const newMsgs = data.filter(m => m.created_at > lastSeen).reverse();
 
       if (newMsgs.length > 0) console.log('🔄 New messages:', newMsgs.length);
@@ -2446,7 +2446,7 @@ function startHostChatListener() {
         }
       });
 
-      localStorage.setItem('doorstep_chat_seen', data[0].created_at);
+      localStorage.setItem('wbnb_chat_seen', data[0].created_at);
 
       if (!chatEscalated && chatSubscription) {
         clearInterval(chatSubscription);
@@ -2561,7 +2561,7 @@ async function init() {
       T.it.chat_p = `Chiedi qualsiasi cosa su ${d.name}, la zona o il tuo soggiorno`;
       T.en.chat_welcome = `Ciao! 🌞 I'm the ${d.name} concierge. I know everything about the apartment, the neighbourhood, restaurants, and the area. How can I help you today?`;
       T.it.chat_welcome = `Ciao! 🌞 Sono il concierge di ${d.name}. Conosco tutto sull'appartamento, il quartiere, i ristoranti e la zona. Come posso aiutarti oggi?`;
-      document.title = `${d.name} · Doorstep`;
+      document.title = `${d.name} · WelcomeBnB`;
     }
   } catch (e) { console.log('Using fallback property data'); }
 
@@ -2615,7 +2615,7 @@ async function init() {
 
   // Fallback: check surname lookup from previous session
   if (!foundExisting && propertyId) {
-    const lookupStr = localStorage.getItem('doorstep_lookup');
+    const lookupStr = localStorage.getItem('wbnb_lookup');
     if (lookupStr) {
       try {
         const { surname, date } = JSON.parse(lookupStr);

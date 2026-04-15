@@ -2498,7 +2498,10 @@ async function checkExistingChat() {
    INIT — Load from Supabase, fallback to local data
 ══════════════════════════════════════ */
 async function init() {
-  // 1. Load property — by ID from booking link, or first available
+  // Extract URL params first (?b=CODE&p=PROPERTY_UUID) — MUST run before property load
+  bookingCode = getBookingCode();
+
+  // 1. Load property — by ID from URL/localStorage, or first available
   const storedPropId = getStoredPropertyId();
   try {
     let data;
@@ -2594,7 +2597,6 @@ async function init() {
   if (document.getElementById('departureDate')) document.getElementById('departureDate').value = tomorrow;
 
   // 5. Check booking code & load existing check-ins
-  bookingCode = getBookingCode();
   let foundExisting = false;
 
   if (bookingCode && propertyId) {

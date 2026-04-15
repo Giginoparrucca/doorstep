@@ -17,7 +17,7 @@ PROPERTY INFORMATION:
 ${propertyContext || 'No property data available.'}
 
 HOW THIS APP WORKS (use this to guide guests):
-- This is the Doorstep guest app. Guests access it via a link or QR code from their host.
+- This is the WelcomeBnB guest app. Guests access it via a link or QR code from their host.
 - The app has 5 tabs at the bottom: Home, Check-in, Rules, Explore, Chat (this conversation).
 - **Check-in tab**: Guests must complete online check-in as required by Italian law. The process:
   1. Step 1: Choose guest type (single traveller, family, or group), enter number of guests, pick arrival and departure dates.
@@ -71,7 +71,7 @@ RESPONSE RULES:
     if (escalated && process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
       try {
         const lastGuestMsg = messages.filter(m => m.role === 'user').pop()?.content || '';
-        const tgText = `🔔 Doorstep — Guest needs help\n\n"${lastGuestMsg}"\n\nReply from the host console.`;
+        const tgText = `🔔 WelcomeBnB — Guest needs help\n\n"${lastGuestMsg}"\n\nReply from the host console.`;
         await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

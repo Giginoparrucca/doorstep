@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Doorstep · Host Console</title>
+<title>WelcomeBnB · Host Console</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -51,9 +51,9 @@ body { display: flex; overflow: hidden; }
 }
 .sidebar-logo {
   font-family: 'Playfair Display', serif;
-  font-size: 1.25rem; font-weight: 500; color: #fff;
+  font-size: 1.25rem; font-weight: 400; color: #fff;
 }
-.sidebar-logo em { font-style: italic; color: var(--gold); }
+.sidebar-logo em { font-style: normal; font-weight: 700; color: var(--gold); }
 .sidebar-badge {
   display: inline-block; margin-top: 4px;
   font-size: 0.48rem; letter-spacing: 0.16em;
@@ -473,10 +473,10 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 }
 .login-logo {
   font-family: 'Playfair Display', serif;
-  font-size: 1.6rem; font-weight: 500; color: var(--ink);
+  font-size: 1.6rem; font-weight: 400; color: var(--ink);
   margin-bottom: 4px;
 }
-.login-logo em { font-style: italic; color: var(--warm); }
+.login-logo em { font-style: normal; font-weight: 700; color: var(--warm); }
 .login-badge {
   display: inline-block; font-size: 0.48rem; letter-spacing: 0.16em;
   text-transform: uppercase; color: var(--warm);
@@ -548,11 +548,11 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 <!-- LOGIN SCREEN -->
 <div class="login-overlay" id="loginOverlay">
   <div class="login-card">
-    <div class="login-logo">Door<em>step</em></div>
+    <div class="login-logo">Welcome<em>BnB</em></div>
     <div class="login-badge" data-h="login_badge">Host Console</div>
     <div style="display:flex;gap:4px;justify-content:center;margin-bottom:12px;">
-      <button class="lang-opt-h" onclick="setHostLang('en')" style="padding:4px 10px;border:1px solid var(--cream-3);border-radius:4px;font-size:0.6rem;cursor:pointer;background:var(--white);color:var(--warm);box-shadow:0 1px 3px rgba(30,16,8,0.06);">EN</button>
-      <button class="lang-opt-h" onclick="setHostLang('it')" style="padding:4px 10px;border:1px solid var(--cream-3);border-radius:4px;font-size:0.6rem;cursor:pointer;background:none;color:var(--ink-soft);">IT</button>
+      <button class="lang-opt-h" onclick="setHostLang('en')" style="padding:4px 10px;border:1px solid var(--cream-3);border-radius:4px;font-size:0.6rem;cursor:pointer;background:none;color:var(--ink-soft);">EN</button>
+      <button class="lang-opt-h" onclick="setHostLang('it')" style="padding:4px 10px;border:1px solid var(--cream-3);border-radius:4px;font-size:0.6rem;cursor:pointer;background:var(--white);color:var(--warm);box-shadow:0 1px 3px rgba(30,16,8,0.06);">IT</button>
     </div>
     <div class="login-error" id="loginError"></div>
     <div id="loginForm">
@@ -581,8 +581,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 <!-- SIDEBAR -->
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-brand">
-    <div class="sidebar-logo">Door<em>step</em></div>
-    <div class="sidebar-badge">Host Console</div>
+    <div class="sidebar-logo">Welcome<em>BnB</em></div>
+    <div class="sidebar-badge" data-h="login_badge">Host Console</div>
   </div>
 
   <nav class="sidebar-nav">
@@ -653,8 +653,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     </div>
     <div class="header-actions" id="headerActions">
       <div class="lang-toggle" style="display:flex;align-items:center;background:var(--cream-2);border-radius:20px;padding:3px;gap:2px;border:1px solid var(--border);">
-        <button class="lang-opt-h active" onclick="setHostLang('en')" style="padding:5px 12px;border-radius:16px;font-size:0.72rem;font-weight:600;letter-spacing:0.06em;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;background:var(--white);color:var(--warm);box-shadow:0 1px 3px rgba(30,16,8,0.06);">EN</button>
-        <button class="lang-opt-h" onclick="setHostLang('it')" style="padding:5px 12px;border-radius:16px;font-size:0.72rem;font-weight:600;letter-spacing:0.06em;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;background:none;color:var(--ink-soft);">IT</button>
+        <button class="lang-opt-h" onclick="setHostLang('en')" style="padding:5px 12px;border-radius:16px;font-size:0.72rem;font-weight:600;letter-spacing:0.06em;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;background:none;color:var(--ink-soft);">EN</button>
+        <button class="lang-opt-h active" onclick="setHostLang('it')" style="padding:5px 12px;border-radius:16px;font-size:0.72rem;font-weight:600;letter-spacing:0.06em;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;background:var(--white);color:var(--warm);box-shadow:0 1px 3px rgba(30,16,8,0.06);">IT</button>
       </div>
     </div>
   </div>
@@ -676,7 +676,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
           <span style="font-size:1.8rem;">👋</span>
           <div>
-            <div style="font-family:'Playfair Display',serif;font-size:1.15rem;font-weight:500;color:var(--ink);" data-h="onboard_title">Welcome to Doorstep!</div>
+            <div style="font-family:'Playfair Display',serif;font-size:1.15rem;font-weight:500;color:var(--ink);" data-h="onboard_title">Benvenuto su WelcomeBnB!</div>
             <div style="font-size:0.82rem;color:var(--ink-soft);line-height:1.5;margin-top:4px;" data-h="onboard_desc">Start by filling in your property details below. This information will appear in your guest app. Once done, head to <strong>House Rules</strong> and <strong>Recommendations</strong> to set up the full guest experience.</div>
           </div>
         </div>
@@ -1048,7 +1048,7 @@ let propertyId = null;
 let propertyData = null;
 let allCheckins = [];
 let allChats = [];
-let hostLang = 'en';
+let hostLang = 'it';
 let isSignUp = false;
 
 /* ══════════════════════════════════════
@@ -1358,7 +1358,7 @@ const HT = {
     // Toasts
     toast_property_saved: 'Property details saved!', toast_rules_saved: 'House rules saved to database!',
     toast_new_property: 'Welcome! Fill in your property details to get started.',
-    onboard_title: 'Welcome to Doorstep!',
+    onboard_title: 'Welcome to WelcomeBnB!',
     onboard_desc: 'Start by filling in your property details below. This information will appear in your guest app. Once done, head to <strong>House Rules</strong> and <strong>Recommendations</strong> to set up the full guest experience.',
     onboard_step1: 'Property Details',
     onboard_step2: 'House Rules',
@@ -1500,7 +1500,7 @@ const HT = {
     btn_copy_template: '📋 Copia Modello',
     toast_property_saved: 'Dettagli proprietà salvati!', toast_rules_saved: 'Regole salvate nel database!',
     toast_new_property: 'Benvenuto! Compila i dettagli della tua proprietà per iniziare.',
-    onboard_title: 'Benvenuto su Doorstep!',
+    onboard_title: 'Benvenuto su WelcomeBnB!',
     onboard_desc: 'Inizia compilando i dettagli della tua proprietà qui sotto. Queste informazioni appariranno nell\'app ospiti. Poi vai su <strong>Regole della Casa</strong> e <strong>Consigli</strong> per completare l\'esperienza ospite.',
     onboard_step1: 'Dettagli Proprietà',
     onboard_step2: 'Regole della Casa',
@@ -2807,10 +2807,10 @@ function generateBookingCode() {
   tpl.value = tpl.value.replace(/👉 .*/m, `👉 ${fullLink}`).replace(/\{guest_link\}/g, fullLink);
 
   // Save to recent codes (localStorage)
-  const stored = JSON.parse(localStorage.getItem('doorstep_booking_codes') || '[]');
+  const stored = JSON.parse(localStorage.getItem('wbnb_booking_codes') || '[]');
   stored.unshift({ code: bookingCode, link: fullLink, created: new Date().toISOString().split('T')[0] });
   if (stored.length > 20) stored.length = 20;
-  localStorage.setItem('doorstep_booking_codes', JSON.stringify(stored));
+  localStorage.setItem('wbnb_booking_codes', JSON.stringify(stored));
 
   renderPastCodes();
   renderQR(fullLink);
@@ -2819,7 +2819,7 @@ function generateBookingCode() {
 }
 
 function renderPastCodes() {
-  const stored = JSON.parse(localStorage.getItem('doorstep_booking_codes') || '[]');
+  const stored = JSON.parse(localStorage.getItem('wbnb_booking_codes') || '[]');
   if (stored.length === 0) { document.getElementById('pastBookingCodes').style.display = 'none'; return; }
 
   document.getElementById('pastBookingCodes').style.display = 'block';
@@ -2881,7 +2881,7 @@ async function requestNotifPermission() {
 function showHostNotification(title, body) {
   if (!hostNotifGranted) return;
   try {
-    const n = new Notification(title, { body, icon: '🏠', tag: 'doorstep-chat', renotify: true });
+    const n = new Notification(title, { body, icon: '🏠', tag: 'wbnb-chat', renotify: true });
     n.onclick = () => { window.focus(); showPanel('chat', document.querySelector('[onclick*=chat]')); n.close(); };
   } catch (e) {}
 }
@@ -3005,9 +3005,9 @@ function startHostChatSubscription() {
       .limit(1);
     if (data && data.length > 0) {
       const latest = data[0].created_at;
-      const stored = localStorage.getItem('doorstep_host_last_chat') || '';
+      const stored = localStorage.getItem('wbnb_host_last_chat') || '';
       if (latest > stored) {
-        localStorage.setItem('doorstep_host_last_chat', latest);
+        localStorage.setItem('wbnb_host_last_chat', latest);
         document.getElementById('chatBadge').style.display = 'block';
         showHostNotification(
           hostLang === 'it' ? '💬 Nuovo messaggio ospite' : '💬 New guest message',
@@ -3198,6 +3198,7 @@ function fillPropertyForm(data) {
 }
 
 init();
+setTimeout(() => setHostLang('it'), 200);
 </script>
 </body>
 </html>

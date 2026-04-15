@@ -3099,9 +3099,23 @@ async function init() {
 
   if (!userId) { document.getElementById('loginOverlay').classList.remove('hidden'); return; }
 
-  // 1. Load property OWNED by this user
+  // Admin override: ?p=UUID loads any property directly (for admin management)
+  const adminPropId = new URLSearchParams(window.location.search).get('p');
+
+  // 1. Load property
   try {
-    const { data, error } = await sb.from('properties').select('*').eq('owner_id', userId).limit(1).single();
+    let data;
+    if (adminPropId) {
+      // Admin mode — load specific property regardless of owner
+      const res = await sb.from('properties').select('*').eq('id', adminPropId).single();
+      data = res.data;
+      if (data) console.log('🔑 Admin mode — loaded property:', data.name);
+    }
+    if (!data) {
+      // Normal mode — load property owned by this user
+      const res = await sb.from('properties').select('*').eq('owner_id', userId).limit(1).single();
+      data = res.data;
+    }
     if (data) {
       propertyId = data.id;
       propertyData = data;
@@ -3111,7 +3125,6 @@ async function init() {
       // No property for this user — try legacy (unowned properties) and claim it
       const { data: unclaimed } = await sb.from('properties').select('*').is('owner_id', null).limit(1).single();
       if (unclaimed) {
-        // Claim this property for the user
         await sb.from('properties').update({ owner_id: userId }).eq('id', unclaimed.id);
         propertyId = unclaimed.id;
         propertyData = unclaimed;
@@ -3131,7 +3144,6 @@ async function init() {
           propertyData = newProp;
           console.log('✅ Created new property for user');
           fillPropertyForm(newProp);
-          // Show onboarding
           showPanel('property', document.querySelector('[onclick*=property]'));
           document.getElementById('onboardingBanner').style.display = 'block';
           toast(h('toast_new_property'));

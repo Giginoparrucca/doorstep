@@ -881,6 +881,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <tr>
               <th data-h="th_guest">Guest</th>
               <th data-h="th_type">Type</th>
+              <th data-h="th_arrival">Arrival</th>
+              <th data-h="th_departure">Departure</th>
               <th data-h="th_birth">Birth</th>
               <th data-h="th_citizenship">Citizenship</th>
               <th data-h="th_document">Document</th>
@@ -1287,7 +1289,7 @@ const HT = {
     stat_chat: 'Chat Messages', stat_alltime: 'All time', stat_attention: 'Needs attention',
     stat_complete: 'All complete', stat_done: '% done', stat_no_guests: 'No guests yet',
     stat_from_guests: 'from guests', recent_checkins: 'Recent Check-ins', view_all: 'View All →',
-    th_guest: 'Guest', th_type: 'Type', th_citizenship: 'Citizenship', th_document: 'Document',
+    th_guest: 'Guest', th_type: 'Type', th_arrival: 'Arrival', th_departure: 'Departure', th_citizenship: 'Citizenship', th_document: 'Document',
     th_docs: 'Docs', th_submitted: 'Submitted', th_birth: 'Birth', th_alloggiati: 'Alloggiati', th_actions: 'Actions',
     no_checkins: 'No check-ins yet. Share your guest link to get started!',
     doc_complete: '✓ Complete', doc_partial: '⏳ Partial', doc_missing: '✗ Missing',
@@ -1437,7 +1439,7 @@ const HT = {
     stat_chat: 'Messaggi Chat', stat_alltime: 'Totale', stat_attention: 'Richiede attenzione',
     stat_complete: 'Tutti completi', stat_done: '% fatto', stat_no_guests: 'Nessun ospite ancora',
     stat_from_guests: 'dagli ospiti', recent_checkins: 'Check-in Recenti', view_all: 'Vedi Tutti →',
-    th_guest: 'Ospite', th_type: 'Tipo', th_citizenship: 'Cittadinanza', th_document: 'Documento',
+    th_guest: 'Ospite', th_type: 'Tipo', th_arrival: 'Arrivo', th_departure: 'Partenza', th_citizenship: 'Cittadinanza', th_document: 'Documento',
     th_docs: 'Docs', th_submitted: 'Inviato', th_birth: 'Nascita', th_alloggiati: 'Alloggiati', th_actions: 'Azioni',
     no_checkins: 'Nessun check-in ancora. Condividi il link ospiti per iniziare!',
     doc_complete: '✓ Completo', doc_partial: '⏳ Parziale', doc_missing: '✗ Mancante',
@@ -1671,18 +1673,19 @@ function renderDashboard() {
         <button class="btn btn-secondary btn-sm" onclick="showPanel('checkins', document.querySelector('[onclick*=checkins]'))">${h('view_all')}</button>
       </div>
       <table>
-        <thead><tr><th>${h('th_guest')}</th><th>${h('th_type')}</th><th>${h('th_citizenship')}</th><th>${h('th_document')}</th><th>${h('th_docs')}</th><th>${h('th_submitted')}</th></tr></thead>
+        <thead><tr><th>${h('th_guest')}</th><th>${h('th_type')}</th><th>${h('th_arrival')}</th><th>${h('th_departure')}</th><th>${h('th_citizenship')}</th><th>${h('th_document')}</th><th>${h('th_docs')}</th></tr></thead>
         <tbody>
           ${allCheckins.slice(0,5).map(c => `
             <tr>
               <td data-label=""><strong>${c.surname} ${c.name}</strong></td>
               <td data-label="${h('th_type')}">${c.guest_type}</td>
+              <td data-label="${h('th_arrival')}">${c.arrival_date ? new Date(c.arrival_date).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB') : '—'}</td>
+              <td data-label="${h('th_departure')}">${c.departure_date ? new Date(c.departure_date).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB') : '—'}</td>
               <td data-label="${h('th_citizenship')}">${c.citizenship}</td>
               <td data-label="${h('th_document')}">${c.document_type} <span style="font-size:0.72rem;color:var(--ink-soft)">${c.document_number}</span></td>
               <td data-label="${h('th_docs')}"><span class="status-badge ${c.docs_status==='complete'?'complete':c.docs_status==='partial'?'pending':'missing'}">${c.docs_status==='complete'?h('doc_complete'):c.docs_status==='partial'?h('doc_partial'):h('doc_missing')}</span></td>
-              <td data-label="${h('th_submitted')}" style="color:var(--ink-soft)">${new Date(c.submitted_at).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB')}</td>
             </tr>
-          `).join('') || `<tr><td colspan="6" style="text-align:center;color:var(--ink-soft);padding:24px;">${h('no_checkins')}</td></tr>`}
+          `).join('') || `<tr><td colspan="7" style="text-align:center;color:var(--ink-soft);padding:24px;">${h('no_checkins')}</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -1693,14 +1696,17 @@ function renderDashboard() {
    CHECK-IN DATA TABLE — live from DB
 ══════════════════════════════════════ */
 function renderCheckins() {
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB') : '—';
   document.getElementById('checkinTable').innerHTML = allCheckins.map(c => `
     <tr>
       <td data-label=""><strong>${c.surname} ${c.name}</strong>${c.booking_code ? ' <span style="font-size:0.6rem;color:var(--warm);letter-spacing:0.05em;font-family:monospace;">'+c.booking_code+'</span>' : ''}</td>
       <td data-label="${h('th_type')}">${c.guest_type}</td>
-      <td data-label="${h('th_birth')}">${c.date_of_birth ? new Date(c.date_of_birth).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB') : '—'} <span style="font-size:0.72rem;color:var(--ink-soft)">${c.place_of_birth || ''}${c.birth_province && c.birth_province!=='EE' ? ' ('+c.birth_province+')' : ''}</span></td>
+      <td data-label="${h('th_arrival')}">${fmtDate(c.arrival_date)}</td>
+      <td data-label="${h('th_departure')}">${fmtDate(c.departure_date)}</td>
+      <td data-label="${h('th_birth')}">${fmtDate(c.date_of_birth)} <span style="font-size:0.72rem;color:var(--ink-soft)">${c.place_of_birth || ''}${c.birth_province && c.birth_province!=='EE' ? ' ('+c.birth_province+')' : ''}</span></td>
       <td data-label="${h('th_citizenship')}">${c.citizenship}</td>
       <td data-label="${h('th_document')}">${c.document_type || '—'} <span style="font-size:0.72rem;color:var(--ink-soft)">${c.document_number || ''}</span></td>
-      <td data-label="${h('th_submitted')}">${new Date(c.submitted_at).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB')}</td>
+      <td data-label="${h('th_submitted')}">${fmtDate(c.submitted_at)}</td>
       <td data-label="${h('th_docs')}"><span class="status-badge ${c.docs_status==='complete'?'complete':c.docs_status==='not_required'?'complete':c.docs_status==='partial'?'pending':'missing'}">${c.docs_status==='complete'?'✓':c.docs_status==='not_required'?'—':c.docs_status==='partial'?'⏳':'✗'}</span></td>
       <td data-label="">
         <div style="display:flex;gap:6px;justify-content:flex-end;">
@@ -1709,7 +1715,7 @@ function renderCheckins() {
         </div>
       </td>
     </tr>
-  `).join('') || `<tr><td colspan="8" style="text-align:center;color:var(--ink-soft);padding:24px;">${h('no_checkins')}</td></tr>`;
+  `).join('') || `<tr><td colspan="10" style="text-align:center;color:var(--ink-soft);padding:24px;">${h('no_checkins')}</td></tr>`;
 
   document.getElementById('checkinCount').textContent = allCheckins.length;
 }

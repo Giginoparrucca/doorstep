@@ -393,19 +393,12 @@ body {
   overflow: hidden; border: 1px solid rgba(194,113,79,0.08);
   box-shadow: var(--shadow-s);
 }
-.reco-icon-header {
-  height: 72px; display: flex; align-items: center; justify-content: center;
-  font-size: 2rem; position: relative;
-}
-.reco-icon-header::after {
-  content: ''; position: absolute; bottom: 0; left: 16px; right: 16px;
-  height: 1px; background: rgba(194,113,79,0.08);
-}
-.reco-body { padding: 12px 14px 14px; }
+.reco-body { padding: 14px 16px 14px; }
 .reco-cat {
-  font-size: 0.48rem; letter-spacing: 0.16em;
+  font-size: 0.68rem; letter-spacing: 0.12em;
   text-transform: uppercase; color: var(--warm);
-  margin-bottom: 4px; font-weight: 600;
+  margin-bottom: 6px; font-weight: 600;
+  display: flex; align-items: center; gap: 5px;
 }
 .reco-name {
   font-family: 'Playfair Display', serif;
@@ -2222,13 +2215,6 @@ function filterCat(c) { activeCat = c; renderRecos(); }
 function renderRecos() {
   renderCatTabs();
   const CAT_ICON = { food: '🍽️', drink: '🍷', see: '🏛️', beach: '🏖️', shop: '🛍️' };
-  const CAT_BG = {
-    food: 'linear-gradient(135deg, rgba(194,113,79,0.06) 0%, rgba(201,169,110,0.08) 100%)',
-    drink: 'linear-gradient(135deg, rgba(139,69,89,0.06) 0%, rgba(194,113,79,0.08) 100%)',
-    see: 'linear-gradient(135deg, rgba(107,174,214,0.06) 0%, rgba(109,191,130,0.08) 100%)',
-    beach: 'linear-gradient(135deg, rgba(107,174,214,0.06) 0%, rgba(201,169,110,0.08) 100%)',
-    shop: 'linear-gradient(135deg, rgba(194,113,79,0.06) 0%, rgba(139,69,89,0.08) 100%)',
-  };
   let data;
   if (recosFromDB && recosFromDB.length > 0) {
     data = recosFromDB.map(r => ({
@@ -2248,9 +2234,8 @@ function renderRecos() {
   };
   document.getElementById('recoContainer').innerHTML = filtered.map(r => `
     <div class="reco-card">
-      <div class="reco-icon-header" style="background:${CAT_BG[r.cat] || CAT_BG.food};">${CAT_ICON[r.cat] || '📌'}</div>
       <div class="reco-body">
-        <div class="reco-cat">${r.cat.toUpperCase()}</div>
+        <div class="reco-cat">${CAT_ICON[r.cat] || '📌'} ${r.cat.toUpperCase()}</div>
         <div class="reco-name">${r.name}</div>
         ${r.address ? `<div style="font-size:0.6rem;color:var(--ink-soft);margin-bottom:4px;display:flex;align-items:center;gap:3px;">📍 ${r.address}</div>` : ''}
         <div class="reco-desc">${r.desc}</div>

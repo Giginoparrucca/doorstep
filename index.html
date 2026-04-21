@@ -592,6 +592,7 @@ body {
       <div class="quick-card-label" data-i18n="address_label">Address</div>
       <div class="quick-card-value" id="propAddress" style="font-size:0.82rem">&nbsp;</div>
       <div class="quick-card-sub" id="propCityZip">&nbsp;</div>
+      <a id="mapsBtn" href="#" target="_blank" rel="noopener" style="display:none;margin-top:8px;padding:7px 12px;background:var(--warm);color:#fff;border-radius:6px;font-size:0.72rem;font-weight:500;text-decoration:none;text-align:center;" data-i18n="maps_btn">📍 Get Directions</a>
     </div>
     <div class="quick-card">
       <div class="quick-card-icon">🔑</div>
@@ -1055,7 +1056,7 @@ const T = {
     welcome_title: 'Welcome to<br><em>Your Stay</em>',
     welcome_sub: 'Your home in the heart of the old city',
     wifi_pass: 'Password: sole2025!',
-    address_label: 'Address',
+    address_label: 'Address', maps_btn: '📍 Get Directions',
     checkin_sub: 'Self check-in · Keybox',
     checkout_sub: 'Leave keys in the box',
     host_role: 'Your hosts',
@@ -1165,7 +1166,7 @@ const T = {
     welcome_title: 'Benvenuti a<br><em>Il Vostro Soggiorno</em>',
     welcome_sub: 'La vostra casa nel cuore della città vecchia',
     wifi_pass: 'Password: sole2025!',
-    address_label: 'Indirizzo',
+    address_label: 'Indirizzo', maps_btn: '📍 Indicazioni Stradali',
     checkin_sub: 'Self check-in · Keybox',
     checkout_sub: 'Lasciare le chiavi nella cassetta',
     host_role: 'I vostri host',
@@ -2269,6 +2270,7 @@ function buildPropertyContext() {
   const coParts = (d.checkout_time || '10:00').split('-');
   let ctx = `Property name: ${d.name || 'Unknown'}
 Address: ${d.address || ''}, ${d.city || ''} ${d.zip || ''}, ${d.region || ''}
+Google Maps: ${d.maps_link || 'Not available — guest can check the Home tab for directions'}
 WiFi network: ${d.wifi_name || 'Not set'} — Password: ${d.wifi_password || 'Not set'}
 Check-in: ${ciParts[0] || '15:00'}${ciParts[1] ? ' to ' + ciParts[1] : ''} — Access: ${d.access_method || 'Self check-in'}
 Check-out: ${coParts[0] || '08:00'}${coParts[1] ? ' to ' + coParts[1] : ''}
@@ -2535,6 +2537,10 @@ async function init() {
       if (el('wifiPass')) el('wifiPass').textContent = `Password: ${d.wifi_password || '—'}`;
       if (el('propAddress')) el('propAddress').textContent = d.address || '—';
       if (el('propCityZip')) el('propCityZip').textContent = `${d.zip || ''} ${d.city || ''} (${d.region || ''})`;
+      if (d.maps_link && el('mapsBtn')) {
+        el('mapsBtn').href = d.maps_link;
+        el('mapsBtn').style.display = 'inline-block';
+      }
       if (el('checkinTime')) {
         const ci = d.checkin_time || '15:00';
         const ciParts = ci.split('-');

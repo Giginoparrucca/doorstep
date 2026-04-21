@@ -740,6 +740,11 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <input class="form-input" value="" id="propAddress">
           </div>
           <div class="form-group">
+            <label class="form-label" data-h="prop_maps_link">Google Maps Link</label>
+            <input class="form-input" value="" id="propMapsLink" placeholder="https://maps.google.com/...">
+            <div style="font-size:0.62rem;color:var(--ink-soft);margin-top:3px;" data-h="prop_maps_hint">Open Google Maps, find your property, tap Share → Copy link, paste here</div>
+          </div>
+          <div class="form-group">
             <label class="form-label" data-h="prop_city">City</label>
             <input class="form-input" value="" id="propCity">
           </div>
@@ -1301,7 +1306,7 @@ const HT = {
     btn_view: 'View',
     // Property
     prop_basic: 'Basic Information', prop_basic_desc: 'This information will appear on the guest welcome screen.',
-    prop_name: 'Property Name', prop_type: 'Property Type', prop_address: 'Street Address',
+    prop_name: 'Property Name', prop_type: 'Property Type', prop_address: 'Street Address', prop_maps_link: 'Google Maps Link', prop_maps_hint: 'Open Google Maps, find your property, tap Share → Copy link, paste here',
     prop_city: 'City', prop_zip: 'ZIP / CAP', prop_region: 'Region', prop_cir: 'CIR Code (Regional ID)', prop_cir_hint: 'Required for Puglia DMS reporting',
     prop_times: 'Check-in / Check-out', prop_times_desc: 'Times and access instructions for your guests.',
     prop_checkin_time: 'Check-in Time', prop_checkout_time: 'Check-out Time',
@@ -1450,7 +1455,7 @@ const HT = {
     alloggiati_filed: '✓ Inviato', alloggiati_pending: 'In attesa',
     btn_view: 'Vedi',
     prop_basic: 'Informazioni Base', prop_basic_desc: 'Queste informazioni appariranno nella schermata di benvenuto.',
-    prop_name: 'Nome Proprietà', prop_type: 'Tipo Proprietà', prop_address: 'Indirizzo',
+    prop_name: 'Nome Proprietà', prop_type: 'Tipo Proprietà', prop_address: 'Indirizzo', prop_maps_link: 'Link Google Maps', prop_maps_hint: 'Apri Google Maps, trova la tua proprietà, tocca Condividi → Copia link, incolla qui',
     prop_city: 'Città', prop_zip: 'CAP', prop_region: 'Regione', prop_cir: 'Codice CIR (ID Regionale)', prop_cir_hint: 'Richiesto per la segnalazione Puglia DMS',
     prop_times: 'Check-in / Check-out', prop_times_desc: 'Orari e istruzioni di accesso per gli ospiti.',
     prop_checkin_time: 'Orario Check-in', prop_checkout_time: 'Orario Check-out',
@@ -1761,6 +1766,7 @@ async function saveProperty() {
   const update = {
     name: document.getElementById('propName').value,
     address: document.getElementById('propAddress').value,
+    maps_link: document.getElementById('propMapsLink').value,
     city: document.getElementById('propCity').value,
     zip: document.getElementById('propZip').value,
     region: document.getElementById('propRegion').value,
@@ -3188,6 +3194,7 @@ function fillPropertyForm(data) {
   const el = (id) => document.getElementById(id);
   if (el('propName')) el('propName').value = data.name || '';
   if (el('propAddress')) el('propAddress').value = data.address || '';
+  if (el('propMapsLink')) el('propMapsLink').value = data.maps_link || '';
   if (el('propCity')) el('propCity').value = data.city || '';
   if (el('propZip')) el('propZip').value = data.zip || '';
   if (el('propRegion')) el('propRegion').value = data.region || '';

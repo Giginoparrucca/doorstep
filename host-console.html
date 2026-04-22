@@ -2884,23 +2884,68 @@ function renderQR(url) {
 ══════════════════════════════════════ */
 let hostChatSub = null;
 let hostNotifGranted = false;
+let notifTitleInterval = null;
 
-// Request notification permission
+// Request on first user interaction (browsers require gesture)
+document.addEventListener('click', function askNotif() {
+  requestNotifPermission();
+  document.removeEventListener('click', askNotif);
+}, { once: true });
+
 async function requestNotifPermission() {
-  if (!('Notification' in window)) return;
-  if (Notification.permission === 'granted') { hostNotifGranted = true; return; }
+  if (!('Notification' in window)) { console.log('🔔 Notifications not supported'); return; }
+  if (Notification.permission === 'granted') { hostNotifGranted = true; console.log('🔔 Notifications: granted'); return; }
   if (Notification.permission !== 'denied') {
     const perm = await Notification.requestPermission();
     hostNotifGranted = perm === 'granted';
+    console.log('🔔 Notifications:', perm);
+  } else {
+    console.log('🔔 Notifications: blocked by user');
   }
 }
 
 function showHostNotification(title, body) {
-  if (!hostNotifGranted) return;
+  console.log('🔔 Notification:', title, body);
+
+  // 1. Browser notification (works when tab is open but not focused)
+  if (hostNotifGranted) {
+    try {
+      const n = new Notification(title, { body, icon: '🏠', tag: 'wbnb-chat', renotify: true });
+      n.onclick = () => { window.focus(); showPanel('chat', document.querySelector('[onclick*=chat]')); n.close(); };
+    } catch (e) { console.warn('🔔 Notification error:', e); }
+  }
+
+  // 2. Audio beep (works even without notification permission)
   try {
-    const n = new Notification(title, { body, icon: '🏠', tag: 'wbnb-chat', renotify: true });
-    n.onclick = () => { window.focus(); showPanel('chat', document.querySelector('[onclick*=chat]')); n.close(); };
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = 800; gain.gain.value = 0.3;
+    osc.start(); osc.stop(ctx.currentTime + 0.15);
+    setTimeout(() => {
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.connect(gain2); gain2.connect(ctx.destination);
+      osc2.frequency.value = 1000; gain2.gain.value = 0.3;
+      osc2.start(); osc2.stop(ctx.currentTime + 0.15);
+    }, 200);
   } catch (e) {}
+
+  // 3. Flash page title (visible even in background tab)
+  if (notifTitleInterval) clearInterval(notifTitleInterval);
+  const origTitle = document.title;
+  let flash = true;
+  notifTitleInterval = setInterval(() => {
+    document.title = flash ? `💬 ${body.substring(0, 30)}…` : origTitle;
+    flash = !flash;
+  }, 1000);
+  // Stop flashing when user focuses window
+  window.addEventListener('focus', function stopFlash() {
+    if (notifTitleInterval) { clearInterval(notifTitleInterval); notifTitleInterval = null; }
+    document.title = origTitle;
+    window.removeEventListener('focus', stopFlash);
+  }, { once: true });
 }
 
 async function loadHostChat() {
@@ -3010,31 +3055,45 @@ let hostChatPoll = null;
 
 function startHostChatSubscription() {
   if (hostChatPoll) return;
-  requestNotifPermission();
+
+  // Set initial cursor to latest message so old messages don't trigger
+  (async () => {
+    if (!propertyId) return;
+    if (!localStorage.getItem('wbnb_host_last_chat')) {
+      const { data } = await sb.from('chat_messages')
+        .select('created_at').eq('property_id', propertyId)
+        .order('created_at', { ascending: false }).limit(1);
+      if (data?.[0]) localStorage.setItem('wbnb_host_last_chat', data[0].created_at);
+      console.log('🔔 Chat cursor initialized');
+    }
+  })();
 
   hostChatPoll = setInterval(async () => {
     if (!propertyId) return;
-    const { data } = await sb.from('chat_messages')
-      .select('id, sender, message, booking_code, created_at')
-      .eq('property_id', propertyId)
-      .eq('sender', 'guest')
-      .order('created_at', { ascending: false })
-      .limit(1);
-    if (data && data.length > 0) {
-      const latest = data[0].created_at;
-      const stored = localStorage.getItem('wbnb_host_last_chat') || '';
-      if (latest > stored) {
-        localStorage.setItem('wbnb_host_last_chat', latest);
-        document.getElementById('chatBadge').style.display = 'block';
-        showHostNotification(
-          hostLang === 'it' ? '💬 Nuovo messaggio ospite' : '💬 New guest message',
-          data[0].message.substring(0, 100)
-        );
-        if (document.getElementById('panel-chat')?.classList.contains('active')) {
-          loadHostChat();
+    try {
+      const { data } = await sb.from('chat_messages')
+        .select('id, sender, message, booking_code, created_at')
+        .eq('property_id', propertyId)
+        .eq('sender', 'guest')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (data && data.length > 0) {
+        const latest = data[0].created_at;
+        const stored = localStorage.getItem('wbnb_host_last_chat') || '';
+        if (latest > stored) {
+          console.log('🔔 New guest message detected:', data[0].message.substring(0, 40));
+          localStorage.setItem('wbnb_host_last_chat', latest);
+          document.getElementById('chatBadge').style.display = 'block';
+          showHostNotification(
+            hostLang === 'it' ? '💬 Nuovo messaggio ospite' : '💬 New guest message',
+            data[0].message.substring(0, 100)
+          );
+          if (document.getElementById('panel-chat')?.classList.contains('active')) {
+            loadHostChat();
+          }
         }
       }
-    }
+    } catch (e) { console.warn('🔔 Poll error:', e); }
   }, 8000);
 }
 

@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>WelcomeBnB</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -1028,6 +1031,15 @@ let bookingCode = null;
 let existingCheckins = [];
 
 // Extract booking code from URL (?b=CODE) or localStorage
+// Migrate old localStorage keys (doorstep → wbnb)
+['booking', 'property', 'lookup', 'chat_seen'].forEach(k => {
+  const old = localStorage.getItem('doorstep_' + k);
+  if (old && !localStorage.getItem('wbnb_' + k)) {
+    localStorage.setItem('wbnb_' + k, old);
+    console.log(`🔄 Migrated doorstep_${k} → wbnb_${k}`);
+  }
+});
+
 function getBookingCode() {
   const params = new URLSearchParams(window.location.search);
   const urlCode = params.get('b');
@@ -1837,6 +1849,14 @@ async function saveCurrentGuest() {
   btn.innerHTML = T[lang].btn_saving;
   btn.disabled = true;
 
+  if (!propertyId) {
+    console.error('❌ No propertyId — cannot save check-in');
+    alert(lang === 'it' ? 'Errore: proprietà non trovata. Ricarica la pagina.' : 'Error: property not found. Please reload the page.');
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+    return;
+  }
+
   try {
     const idPath = await uploadFile(uploadedIdFile, 'id-photos');
 
@@ -1884,9 +1904,9 @@ async function saveCurrentGuest() {
     if (propertyId) record.property_id = propertyId;
     if (bookingCode) record.booking_code = bookingCode;
 
-    console.log(`Saving guest ${currentGuestIdx+1}/${totalGuests}:`, record);
+    console.log(`💾 Saving guest ${currentGuestIdx+1}/${totalGuests}:`, record);
     const { data, error } = await sb.from('checkins').insert(record).select('id');
-    if (error) { console.error('DB error:', JSON.stringify(error)); throw error; }
+    if (error) { console.error('❌ DB insert error:', error.code, error.message, error.details); throw error; }
 
     // Store locally with DB id
     record._dbId = data?.[0]?.id || null;
@@ -2492,8 +2512,10 @@ async function checkExistingChat() {
    INIT — Load from Supabase, fallback to local data
 ══════════════════════════════════════ */
 async function init() {
+  console.log('🏠 WelcomeBnB Guest App v2.1');
   // Extract URL params first (?b=CODE&p=PROPERTY_UUID) — MUST run before property load
   bookingCode = getBookingCode();
+  console.log('🔑 Booking:', bookingCode, 'Property from URL/storage:', getStoredPropertyId());
 
   // 1. Load property — by ID from URL/localStorage, or first available
   const storedPropId = getStoredPropertyId();

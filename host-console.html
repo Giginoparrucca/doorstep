@@ -980,7 +980,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
               <code style="background:var(--bg);padding:6px 12px;border-radius:6px;font-size:0.9rem;font-weight:600;color:var(--warm);letter-spacing:0.1em;" id="bookingCodeDisplay">—</code>
               <button class="btn btn-secondary btn-sm" onclick="copyLink()" style="white-space:nowrap;">📋 Copy Link</button>
             </div>
-            <div class="qr-link" id="guestLink" style="font-size:0.65rem;word-break:break-all;">https://doorstep-rust.vercel.app</div>
+            <div class="qr-link" id="guestLink" style="font-size:0.65rem;word-break:break-all;">https://welcomebnb.vercel.app</div>
           </div>
           <div style="margin-top:8px;font-size:0.6rem;color:var(--ink-soft);line-height:1.5;" id="qrReturningHint">
             💡 Returning guests who use the same link will see their check-in status and details automatically.
@@ -2814,7 +2814,7 @@ function generateBookingCode() {
 
   // Update UI
   document.getElementById('bookingCodeDisplay').textContent = bookingCode;
-  const baseUrl = 'https://doorstep-rust.vercel.app';
+  const baseUrl = 'https://welcomebnb.vercel.app';
   const fullLink = `${baseUrl}/?b=${bookingCode}&p=${propertyId}`;
   document.getElementById('guestLink').textContent = fullLink;
   document.getElementById('bookingLinkSection').style.display = 'block';
@@ -2856,7 +2856,7 @@ function initQRPanel() {
   renderPastCodes();
   // Set apartment QR link and render QR
   if (propertyId) {
-    const aptLink = `https://doorstep-rust.vercel.app/?p=${propertyId}`;
+    const aptLink = `https://welcomebnb.vercel.app/?p=${propertyId}`;
     document.getElementById('apartmentLink').textContent = aptLink;
     renderQR(aptLink);
   }

@@ -565,6 +565,9 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <input class="form-input" type="password" id="loginPassword" placeholder="••••••••" onkeydown="if(event.key==='Enter')handleAuth()">
       </div>
       <button class="login-btn" id="authBtn" onclick="handleAuth()">Sign In</button>
+      <div style="text-align:center;margin-top:8px;">
+        <a onclick="forgotPassword()" style="font-size:0.72rem;color:var(--warm);cursor:pointer;text-decoration:underline;" data-h="login_forgot">Forgot password?</a>
+      </div>
       <div class="login-toggle" id="authToggle">
         <span data-h="login_no_account">Don't have an account?</span> <a onclick="toggleAuthMode()" data-h="login_create_link">Create one</a>
       </div>
@@ -1142,6 +1145,24 @@ async function checkAuth() {
   return false;
 }
 
+// Handle password recovery from email link
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    const newPass = prompt(hostLang === 'it'
+      ? 'Inserisci la tua nuova password (minimo 6 caratteri):'
+      : 'Enter your new password (minimum 6 characters):');
+    if (newPass && newPass.length >= 6) {
+      const { error } = await sb.auth.updateUser({ password: newPass });
+      if (error) {
+        alert('Error: ' + error.message);
+      } else {
+        alert(hostLang === 'it' ? '✅ Password aggiornata! Ora puoi accedere.' : '✅ Password updated! You can now sign in.');
+        window.location.href = window.location.origin + '/host-console.html';
+      }
+    }
+  }
+});
+
 function toggleAuthMode() {
   isSignUp = !isSignUp;
   document.getElementById('authBtn').textContent = isSignUp ? h('login_create') : h('login_signin');
@@ -1208,6 +1229,29 @@ async function signOut() {
   document.getElementById('loginOverlay').classList.remove('hidden');
 }
 
+async function forgotPassword() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const errEl = document.getElementById('loginError');
+  if (!email) {
+    errEl.textContent = hostLang === 'it' ? 'Inserisci la tua email prima di cliccare "Password dimenticata"' : 'Enter your email first, then click "Forgot password"';
+    errEl.classList.add('show');
+    return;
+  }
+  errEl.classList.remove('show');
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/host-console.html`,
+  });
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.classList.add('show');
+  } else {
+    errEl.style.color = 'var(--green)';
+    errEl.textContent = hostLang === 'it' ? '📧 Email inviata! Controlla la tua casella per il link di reset.' : '📧 Email sent! Check your inbox for the reset link.';
+    errEl.classList.add('show');
+    setTimeout(() => { errEl.style.color = ''; }, 5000);
+  }
+}
+
 /* ══════════════════════════════════════
    COVER PHOTO UPLOAD
 ══════════════════════════════════════ */
@@ -1263,7 +1307,7 @@ const HT = {
     login_badge: 'Host Console',
     login_signin: 'Sign In', login_create: 'Create Account',
     login_signing_in: 'Signing in…', login_creating: 'Creating account…',
-    login_no_account: 'Don\'t have an account?', login_create_link: 'Create one',
+    login_no_account: 'Don\'t have an account?', login_create_link: 'Create one', login_forgot: 'Forgot password?',
     login_has_account: 'Already have an account?', login_signin_link: 'Sign in',
     login_err_fields: 'Please fill in both fields',
     login_err_password: 'Password must be at least 6 characters',
@@ -1416,7 +1460,7 @@ const HT = {
     login_badge: 'Console Host',
     login_signin: 'Accedi', login_create: 'Crea Account',
     login_signing_in: 'Accesso in corso…', login_creating: 'Creazione account…',
-    login_no_account: 'Non hai un account?', login_create_link: 'Creane uno',
+    login_no_account: 'Non hai un account?', login_create_link: 'Creane uno', login_forgot: 'Password dimenticata?',
     login_has_account: 'Hai già un account?', login_signin_link: 'Accedi',
     login_err_fields: 'Compila entrambi i campi',
     login_err_password: 'La password deve essere di almeno 6 caratteri',

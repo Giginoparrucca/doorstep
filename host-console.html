@@ -1347,7 +1347,7 @@ const HT = {
     no_checkins: 'No check-ins yet. Share your guest link to get started!',
     doc_complete: '✓ Complete', doc_partial: '⏳ Partial', doc_missing: '✗ Missing',
     alloggiati_filed: '✓ Filed', alloggiati_pending: 'Pending',
-    btn_view: 'View',
+    btn_view: 'View', btn_delete_single: 'Delete',
     // Property
     prop_basic: 'Basic Information', prop_basic_desc: 'This information will appear on the guest welcome screen.',
     prop_name: 'Property Name', prop_type: 'Property Type', prop_address: 'Street Address', prop_maps_link: 'Google Maps Link', prop_maps_hint: 'Open Google Maps, find your property, tap Share → Copy link, paste here',
@@ -1497,7 +1497,7 @@ const HT = {
     no_checkins: 'Nessun check-in ancora. Condividi il link ospiti per iniziare!',
     doc_complete: '✓ Completo', doc_partial: '⏳ Parziale', doc_missing: '✗ Mancante',
     alloggiati_filed: '✓ Inviato', alloggiati_pending: 'In attesa',
-    btn_view: 'Vedi',
+    btn_view: 'Vedi', btn_delete_single: 'Elimina',
     prop_basic: 'Informazioni Base', prop_basic_desc: 'Queste informazioni appariranno nella schermata di benvenuto.',
     prop_name: 'Nome Proprietà', prop_type: 'Tipo Proprietà', prop_address: 'Indirizzo', prop_maps_link: 'Link Google Maps', prop_maps_hint: 'Apri Google Maps, trova la tua proprietà, tocca Condividi → Copia link, incolla qui',
     prop_city: 'Città', prop_zip: 'CAP', prop_region: 'Regione', prop_cir: 'Codice CIR (ID Regionale)', prop_cir_hint: 'Richiesto per la segnalazione Puglia DMS',
@@ -1762,9 +1762,9 @@ function renderCheckins() {
       <td data-label="${h('th_submitted')}">${fmtDate(c.submitted_at)}</td>
       <td data-label="${h('th_docs')}"><span class="status-badge ${c.docs_status==='complete'?'complete':c.docs_status==='not_required'?'complete':c.docs_status==='partial'?'pending':'missing'}">${c.docs_status==='complete'?'✓':c.docs_status==='not_required'?'—':c.docs_status==='partial'?'⏳':'✗'}</span></td>
       <td data-label="">
-        <div style="display:flex;gap:6px;justify-content:flex-end;">
-          <button class="btn btn-secondary btn-sm" onclick="viewGuest('${c.id}')">${h('btn_view')}</button>
-          <button class="btn btn-secondary btn-sm" onclick="deleteCheckin('${c.id}','${(c.surname||'').replace(/'/g,'\\\'')}')" style="color:var(--red);border-color:rgba(217,75,75,0.2);">🗑</button>
+        <div style="display:flex;gap:8px;justify-content:flex-end;padding:4px 0;">
+          <button class="btn btn-secondary btn-sm" onclick="viewGuest('${c.id}')" style="min-height:36px;padding:6px 12px;">${h('btn_view')}</button>
+          <button class="btn btn-secondary btn-sm" onclick="deleteCheckin('${c.id}','${(c.surname||'').replace(/'/g,'\\\'')}')" style="color:var(--red);border-color:rgba(217,75,75,0.2);min-height:36px;padding:6px 12px;">🗑 ${h('btn_delete_single')}</button>
         </div>
       </td>
     </tr>
@@ -1774,10 +1774,12 @@ function renderCheckins() {
 }
 
 async function deleteCheckin(id, name) {
+  if (!id) { console.error('No ID to delete'); toast('Error: no ID'); return; }
   if (!confirm(h('delete_confirm').replace('{name}', name))) return;
 
-  const { error } = await sb.from('checkins').delete().eq('id', id);
-  if (error) { console.error(error); toast('Error deleting record'); return; }
+  console.log('🗑 Deleting checkin:', id, name);
+  const { error, count } = await sb.from('checkins').delete().eq('id', id);
+  if (error) { console.error('Delete error:', error); toast('Error: ' + error.message); return; }
 
   allCheckins = allCheckins.filter(c => c.id !== id);
   renderCheckins();

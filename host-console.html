@@ -1027,14 +1027,6 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           <button class="btn btn-secondary" onclick="exportCSV()" style="margin-top:auto" data-h="btn_dl_csv">📥 Download CSV</button>
         </div>
 
-        <div class="export-card">
-          <h3 data-h="export_paytourist">💳 PayTourist Export</h3>
-          <p data-h="export_paytourist_desc"></p>
-          <button class="btn btn-primary" onclick="exportPayTourist()" data-h="btn_gen_paytourist">📥 Generate PayTourist CSV</button>
-          <a href="https://bari.paytourist.com/admin" target="_blank" rel="noopener" class="export-portal-link">
-            🔗 <span data-h="link_paytourist">Open PayTourist Portal</span> ↗
-          </a>
-        </div>
       </div>
     </div>
 
@@ -2802,11 +2794,12 @@ function exportAlloggiati() {
         tipoDoc = lookupDocCode(c.document_type);
         numDoc = pad((c.document_number || '').toUpperCase(), 20);
         const docPlace = (c.doc_issue_place || '').trim();
-        const docCityKey = docPlace.toLowerCase().trim().replace(/\s*\([^)]*\)\s*/g, '');
-        const docIstat = ISTAT_COMUNI[docCityKey];
-        if (docIstat) {
-          const policeDocCode = lookupPoliceCode(docPlace);
-          luogoRilascio = policeDocCode || pad(docPlace.toUpperCase(), 9);
+        // Try Italian comune first (with optional province hint), then fall
+        // back to state code. If neither resolves, default to the guest's
+        // citizenship — a reasonable assumption for a government-issued doc.
+        const policeDocCode = lookupPoliceCode(docPlace);
+        if (policeDocCode) {
+          luogoRilascio = policeDocCode;
         } else {
           const docState = lookupStateCode(docPlace);
           luogoRilascio = docState.trim() ? docState : cittadinanza;
@@ -2825,14 +2818,11 @@ function exportAlloggiati() {
       if (line.length !== 168) {
         warnings.push(`⚠ Row ${globalIdx}: Line is ${line.length} chars (expected 168). Check data for ${c.name} ${c.surname}.`);
       }
-      // Foreign-born guest: surface the state code so the host can cross-check
-      // it against the Alloggiati portal dropdown BEFORE upload. Our hardcoded
-      // STATE_CODES table is known to have gaps — the portal is the source of
-      // truth. If a code is rejected, look up the correct one at
-      // https://alloggiatiweb.poliziadistato.it → Supporto → Download Tabelle → Stati
-      if (!bornInItaly) {
+      // Only warn if the state code couldn't be resolved (missing country name
+      // or an alias we don't know) — the official table is the source of truth.
+      if (!bornInItaly && !statoNascita.trim()) {
         const country = (c.birth_country || c.citizenship || 'Unknown').trim();
-        warnings.push(`ℹ Row ${globalIdx}: ${c.name} ${c.surname} — foreign-born (${country}) · state code = "${statoNascita.trim() || 'EMPTY'}". Verify on Alloggiati portal if rejected.`);
+        warnings.push(`⚠ Row ${globalIdx}: ${c.name} ${c.surname} — couldn't resolve birth country "${country}" to a 9-digit code. Check the country name spelling or add it to COUNTRY_ALIASES.`);
       }
       lines.push(line);
     });
@@ -2855,112 +2845,6 @@ function exportAlloggiati() {
    PAYTOURIST — CSV format for municipal tourist tax
    Format: Group,Name,Surname,CheckIn,CheckOut,Amount,License,Sex,DOB,Exemption,Reduction,Nationality,BirthCity,Citizenship,ResidenceCity,ResidenceCountry,Email,PortalID,SendReceipt
 ══════════════════════════════════════ */
-function exportPayTourist() {
-  if (allCheckins.length === 0) { toast('No check-in data to export!'); return; }
-
-  const cirCode = (propertyData?.cir_code || '').trim();
-  if (!cirCode) {
-    toast(hostLang === 'it' ? '⚠ Inserisci il Codice CIR nelle Impostazioni Proprietà prima di esportare.' : '⚠ Enter your CIR Code in Property Details before exporting.');
-    return;
-  }
-
-  // 48h default filter
-  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString().split('T')[0];
-  let toExport = allCheckins.filter(c => (c.arrival_date || '') >= cutoff);
-  if (toExport.length === 0) {
-    if (!confirm(hostLang === 'it'
-      ? `Nessun ospite nelle ultime 48 ore. Esportare tutti i ${allCheckins.length} ospiti?`
-      : `No guests in the last 48 hours. Export all ${allCheckins.length} guests?`)) return;
-    toExport = allCheckins;
-  }
-
-  // Group by stay (booking_code or arrival_date)
-  const groups = {};
-  toExport.forEach(c => {
-    const key = c.booking_code || `_arr_${c.arrival_date || 'unknown'}`;
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(c);
-  });
-
-  const fmtD = (iso) => {
-    if (!iso) return '';
-    const p = iso.split('T')[0].split('-');
-    return `${p[2]}/${p[1]}/${p[0]}`;
-  };
-
-  const warnings = [];
-  const lines = [];
-  let groupNum = 0;
-
-  Object.values(groups).forEach(group => {
-    groupNum++;
-    const gId = `G${groupNum}`;
-
-    // Sort: main guest first
-    const mainTypes = ['single', 'head', 'group'];
-    group.sort((a, b) => {
-      const aM = mainTypes.includes(a.guest_type) ? 0 : 1;
-      const bM = mainTypes.includes(b.guest_type) ? 0 : 1;
-      return aM - bM;
-    });
-
-    group.forEach((c, idx) => {
-      // Names sanitized to A-Z + space only — matches Alloggiati rules since
-      // PayTourist forwards the same data to the police portal downstream.
-      const name = sanitizeAllogName(c.name);
-      const surname = sanitizeAllogName(c.surname);
-      const checkin = fmtD(c.arrival_date || c.submitted_at);
-      const checkout = fmtD(c.departure_date);
-      const amount = ''; // Auto-calculated by PayTourist for fixed-rate municipalities
-      const license = cirCode;
-      const sex = c.sex === 'F' ? '2' : '1';
-      const dob = fmtD(c.date_of_birth);
-      const exemption = '0'; // No exemption by default
-      const reduction = '0'; // No reduction by default
-
-      // Nationality & citizenship (same Alloggiati state codes)
-      const nationalityCode = lookupStateCode(c.citizenship) || '100000100';
-      const citizenshipCode = nationalityCode;
-
-      // Birth city (police commune code)
-      const birthCountry = c.birth_country || c.citizenship || '';
-      const birthCountryCode = lookupStateCode(birthCountry);
-      const bornInItaly = (c.birth_province && c.birth_province !== 'EE' && c.birth_province !== '') ||
-                          isItalianCitizenshipCode(birthCountryCode);
-      let birthCityCode;
-      if (bornInItaly) {
-        birthCityCode = lookupPoliceCode(c.place_of_birth) || '';
-        if (!birthCityCode) warnings.push(`⚠ ${name} ${surname}: birth city "${c.place_of_birth}" not found in police codes.`);
-      } else {
-        birthCityCode = birthCountryCode; // Foreign-born: use country code
-      }
-
-      // Residence: use nationality as country, leave city blank (not collected)
-      const residenceCity = '';
-      const residenceCountry = nationalityCode;
-
-      const email = ''; // Not collected
-      const portalId = ''; // Not applicable
-      const sendReceipt = '1';
-
-      // Build CSV row — fields must not contain commas
-      const row = [gId, name, surname, checkin, checkout, amount, license, sex, dob,
-                   exemption, reduction, nationalityCode, birthCityCode, citizenshipCode,
-                   residenceCity, residenceCountry, email, portalId, sendReceipt].join(',');
-      lines.push(row);
-    });
-  });
-
-  const csv = lines.join('\n');
-  downloadFile('paytourist_' + new Date().toISOString().slice(0,10) + '.csv', csv);
-  track('export_paytourist', { guests: lines.length, groups: groupNum, warnings: warnings.length });
-
-  if (warnings.length > 0) {
-    alert(`PayTourist CSV: ${lines.length} guests in ${groupNum} group(s).\n\n⚠️ Review:\n` + warnings.join('\n'));
-  } else {
-    toast(`✅ PayTourist: ${lines.length} guests · ${groupNum} group(s)`);
-  }
-}
 
 /* ══════════════════════════════════════
    PUGLIA SPOT/DMS — XML format for SPOT BASE

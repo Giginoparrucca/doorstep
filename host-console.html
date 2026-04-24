@@ -300,6 +300,10 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 }
 .export-portal-link:hover { background: rgba(194,113,79,0.08); border-color: var(--warm); }
 
+/* Two side-by-side portal links inside the same card (used on the unified Police & Tourism card) */
+.export-portal-links { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.export-portal-links .export-portal-link { flex: 1 1 0; min-width: 180px; margin-top: 0; }
+
 /* ── TABS inside panels ── */
 .panel-tabs {
   display: flex; gap: 0; border-bottom: 1px solid var(--border);
@@ -991,17 +995,22 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       <div class="alert alert-info" data-h="export_info"></div>
 
       <div class="export-grid">
-        <div class="export-card">
-          <h3 data-h="export_alloggiati">🏛 Alloggiati Web Export</h3>
-          <p data-h="export_alloggiati_desc"></p>
-          <button class="btn btn-primary" onclick="exportAlloggiati()" data-h="btn_gen_alloggiati">📥 Generate Alloggiati File</button>
-          <a href="https://alloggiatiweb.poliziadistato.it" target="_blank" rel="noopener" class="export-portal-link">
-            🔗 <span data-h="link_alloggiati">Open Alloggiati Web Portal</span> ↗
-          </a>
+        <div class="export-card" style="grid-column: span 2;">
+          <h3 data-h="export_police_tourism">🏛 Police & Tourism Report</h3>
+          <p data-h="export_police_tourism_desc"></p>
+          <button class="btn btn-primary" onclick="exportAlloggiati()" data-h="btn_gen_alloggiati">📥 Generate Guest File (.txt)</button>
+          <div class="export-portal-links">
+            <a href="https://alloggiatiweb.poliziadistato.it" target="_blank" rel="noopener" class="export-portal-link">
+              🔗 <span data-h="link_alloggiati">Open Alloggiati Web</span> ↗
+            </a>
+            <a href="https://dms.puglia.it" target="_blank" rel="noopener" class="export-portal-link">
+              🔗 <span data-h="link_dms">Open Puglia DMS (SPOT Easy)</span> ↗
+            </a>
+          </div>
         </div>
 
         <div class="export-card">
-          <h3 data-h="export_paytourist">💰 PayTourist Export</h3>
+          <h3 data-h="export_paytourist">💰 PayTourist (Tourist Tax)</h3>
           <p data-h="export_paytourist_desc"></p>
           <button class="btn btn-primary" onclick="exportPayTourist()" data-h="btn_gen_paytourist">📥 Generate PayTourist CSV</button>
           <a href="https://bari.paytourist.com/admin/ps/import" target="_blank" rel="noopener" class="export-portal-link">
@@ -1010,18 +1019,13 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
 
         <div class="export-card">
-          <h3 data-h="export_dms_istat">🌐 Puglia DMS — SPOT Easy</h3>
-          <p data-h="export_dms_istat_desc"></p>
-          <div style="display:flex;flex-direction:column;gap:8px;">
-            <button class="btn btn-primary" onclick="exportISTAT()" data-h="btn_gen_istat">📊 Generate Monthly Summary (C/59)</button>
-          </div>
-          <a href="https://dms.puglia.it" target="_blank" rel="noopener" class="export-portal-link">
-            🔗 <span data-h="link_dms">Open Puglia DMS Portal</span> ↗
-          </a>
+          <h3 data-h="export_monthly_summary">📊 Monthly Summary (C/59)</h3>
+          <p data-h="export_monthly_summary_desc"></p>
+          <button class="btn btn-secondary" onclick="exportISTAT()" data-h="btn_gen_istat">📊 Generate C/59 Summary</button>
         </div>
 
         <div class="export-card">
-          <h3 data-h="export_csv">📊 CSV Export</h3>
+          <h3 data-h="export_csv">📋 Raw Data Export</h3>
           <p data-h="export_csv_desc"></p>
           <button class="btn btn-secondary" onclick="exportCSV()" style="margin-top:auto" data-h="btn_dl_csv">📥 Download CSV</button>
         </div>
@@ -1733,7 +1737,7 @@ const HT = {
     login_err_exists: 'An account with this email already exists. Try signing in.',
     login_err_connection: 'Connection error. Please try again.',
     sidebar_dashboard: 'Dashboard', sidebar_property: 'Property Details', sidebar_rules: 'House Rules',
-    sidebar_recos: 'Recommendations', sidebar_checkins: 'Check-in Data', sidebar_export: 'Export / Alloggiati',
+    sidebar_recos: 'Recommendations', sidebar_checkins: 'Check-in Data', sidebar_export: 'Export & Compliance',
     sidebar_qr: 'QR Code & Link', sidebar_role: 'Property Manager',
     sidebar_guest_analytics: 'Guest Analytics',
     // Panel titles
@@ -1816,28 +1820,23 @@ const HT = {
     checkins_warn: 'Italian law requires all guest data to be submitted to <strong>Alloggiati Web</strong> (State Police) within 24 hours of arrival. Puglia also requires <strong>Puglia DMS</strong> reporting.',
     filter_all: 'All Bookings',
     // Export
-    export_info: 'Generate files formatted for the Italian police portal (Alloggiati Web) and the regional tourism platform (Puglia DMS).',
-    export_alloggiati: 'Alloggiati Web Export',
-    export_alloggiati_desc: 'Generates a <strong>.txt file</strong> in the exact format required by the Polizia di Stato\'s Alloggiati Web portal.',
-    export_dms: 'Puglia DMS Export',
-    export_dms_desc: 'Generates a file for the <strong>Puglia regional tourism authority</strong>.',
-    export_dms_istat: '🌐 Puglia DMS — SPOT Easy',
-    export_dms_istat_desc: '<strong>SPOT Easy</strong> (for locazioni turistiche) doesn\'t accept XML file uploads — movements must be entered manually at <a href="https://dms.puglia.it" target="_blank" rel="noopener">dms.puglia.it</a>. The button below generates a monthly <strong>C/59 summary</strong> (totals by nationality) to speed up manual entry. For Alloggiati Web, use the <strong>.txt file above</strong> — SPOT Easy also accepts it via its <em>"Carica file PS"</em> button.',
-    export_csv: 'CSV Export', export_csv_desc: 'Download all guest check-in data as a <strong>CSV spreadsheet</strong>.',
-    export_istat: 'ISTAT / C59 Report', export_istat_desc: 'Monthly statistical report for <strong>ISTAT tourism statistics</strong>.',
+    export_info: 'Generate files for Italian compliance portals. The <strong>Guest File (.txt)</strong> is the same format accepted by both Alloggiati Web (police, required within 24h of arrival) and SPOT Easy (regional tourism, required by the 10th of the following month).',
+    export_police_tourism: '🏛 Police & Tourism Report',
+    export_police_tourism_desc: 'Generates a <strong>.txt file</strong> (Alloggiati Web tracciato record) accepted by <strong>both portals</strong>: upload it to Alloggiati Web → <em>Invio File</em> for the police (within 24h of each check-in), and to SPOT Easy → <em>Carica Scheda Alloggiati</em> for the regional tourism authority (monthly).',
+    export_monthly_summary: '📊 Monthly Summary (C/59)',
+    export_monthly_summary_desc: 'A human-readable <strong>monthly breakdown by nationality</strong> (italiani / stranieri, arrivi e presenze). Useful as a reference when filling out additional statistical reports or for your own records.',
+    export_csv: '📋 Raw Data Export',
+    export_csv_desc: 'Download all guest check-in data as a <strong>CSV spreadsheet</strong> — for your own accounting or backup.',
     date_range: 'Date Range', month: 'Month',
-    btn_gen_alloggiati: '📥 Generate Alloggiati File',
-    btn_dl_csv: '📥 Download CSV', btn_gen_istat: '📊 Generate Monthly Summary (C/59)',
-    link_alloggiati: 'Open Alloggiati Web Portal',
-    export_paytourist: '💰 PayTourist Export',
-    export_paytourist_desc: 'CSV file for <strong>PayTourist</strong> municipal tourist tax portal. Groups guests by stay, auto-fills tax codes. Upload at your municipality\'s PayTourist import page.',
-    btn_gen_paytourist: '📥 Generate PayTourist CSV',
-    link_paytourist: 'Open PayTourist Import',
-    link_dms: 'Open Puglia DMS Portal',
-    export_paytourist: '💳 PayTourist Export',
+    btn_gen_alloggiati: '📥 Generate Guest File (.txt)',
+    btn_dl_csv: '📥 Download CSV',
+    btn_gen_istat: '📊 Generate C/59 Summary',
+    link_alloggiati: 'Open Alloggiati Web',
+    link_dms: 'Open Puglia DMS (SPOT Easy)',
+    export_paytourist: '💰 PayTourist (Tourist Tax)',
     export_paytourist_desc: 'CSV file for <strong>PayTourist</strong> (municipal tourist tax). Auto-fills guest groups, CIR code, nationality codes. Upload at Soggiorni → Importa.',
     btn_gen_paytourist: '📥 Generate PayTourist CSV',
-    link_paytourist: 'Open PayTourist Portal',
+    link_paytourist: 'Open PayTourist Import',
     // QR
     qr_title: 'Guest App Link',
     qr_desc: 'Share this link with guests before arrival, or print the QR code and place it in the apartment.',
@@ -1902,7 +1901,7 @@ const HT = {
     login_err_exists: 'Esiste già un account con questa email. Prova ad accedere.',
     login_err_connection: 'Errore di connessione. Riprova.',
     sidebar_dashboard: 'Dashboard', sidebar_property: 'Dettagli Proprietà', sidebar_rules: 'Regole della Casa',
-    sidebar_recos: 'Consigli', sidebar_checkins: 'Dati Check-in', sidebar_export: 'Export / Alloggiati',
+    sidebar_recos: 'Consigli', sidebar_checkins: 'Dati Check-in', sidebar_export: 'Export & Conformità',
     sidebar_qr: 'QR Code & Link', sidebar_role: 'Gestore Proprietà',
     sidebar_guest_analytics: 'Analisi Ospiti',
     t_dashboard: 'Dashboard', s_dashboard: 'Panoramica della proprietà e degli ospiti',
@@ -1976,28 +1975,23 @@ const HT = {
     tab_food: '🍝 Cibo', tab_drink: '🍷 Bevande', tab_see: '👁 Luoghi', tab_beach: '🏖 Spiaggia', tab_shop: '🛍 Shopping',
     checkins_warn: 'La legge italiana richiede che tutti i dati degli ospiti siano inviati ad <strong>Alloggiati Web</strong> (Polizia di Stato) entro 24 ore dall\'arrivo. La Puglia richiede anche la segnalazione <strong>Puglia DMS</strong>.',
     filter_all: 'Tutte le Prenotazioni',
-    export_info: 'Genera file formattati per il portale della polizia italiana (Alloggiati Web) e la piattaforma turistica regionale (Puglia DMS).',
-    export_alloggiati: 'Export Alloggiati Web',
-    export_alloggiati_desc: 'Genera un <strong>file .txt</strong> nel formato richiesto dal portale Alloggiati Web della Polizia di Stato.',
-    export_dms: 'Export Puglia DMS',
-    export_dms_desc: 'Genera un file per l\'<strong>autorità turistica regionale pugliese</strong>.',
-    export_dms_istat: '🌐 Puglia DMS — SPOT Easy',
-    export_dms_istat_desc: '<strong>SPOT Easy</strong> (per locazioni turistiche) non accetta il caricamento di file XML — i movimenti devono essere inseriti manualmente su <a href="https://dms.puglia.it" target="_blank" rel="noopener">dms.puglia.it</a>. Il pulsante qui sotto genera un <strong>riepilogo mensile C/59</strong> (totali per nazionalità) per velocizzare l\'inserimento manuale. Per Alloggiati Web usa il <strong>file .txt sopra</strong> — SPOT Easy lo accetta anche tramite il pulsante <em>"Carica file PS"</em>.',
-    export_csv: 'Export CSV', export_csv_desc: 'Scarica tutti i dati di check-in come <strong>foglio di calcolo CSV</strong>.',
-    export_istat: 'Report ISTAT / C59', export_istat_desc: 'Report statistico mensile per le <strong>statistiche turistiche ISTAT</strong>.',
+    export_info: 'Genera i file per i portali di conformità italiani. Il <strong>File Ospiti (.txt)</strong> è lo stesso formato accettato sia da Alloggiati Web (polizia, entro 24h dall\'arrivo) sia da SPOT Easy (turismo regionale, entro il 10 del mese successivo).',
+    export_police_tourism: '🏛 Report Polizia & Turismo',
+    export_police_tourism_desc: 'Genera un <strong>file .txt</strong> (tracciato record Alloggiati Web) accettato da <strong>entrambi i portali</strong>: caricalo su Alloggiati Web → <em>Invio File</em> per la polizia (entro 24h da ogni check-in), e su SPOT Easy → <em>Carica Scheda Alloggiati</em> per l\'autorità turistica regionale (mensilmente).',
+    export_monthly_summary: '📊 Riepilogo Mensile (C/59)',
+    export_monthly_summary_desc: 'Un <strong>riepilogo mensile per nazionalità</strong> leggibile (italiani / stranieri, arrivi e presenze). Utile come riferimento quando compili report statistici aggiuntivi o per i tuoi archivi.',
+    export_csv: '📋 Esportazione Dati',
+    export_csv_desc: 'Scarica tutti i dati dei check-in come <strong>foglio di calcolo CSV</strong> — per la tua contabilità o backup.',
     date_range: 'Intervallo Date', month: 'Mese',
-    btn_gen_alloggiati: '📥 Genera File Alloggiati',
-    btn_dl_csv: '📥 Scarica CSV', btn_gen_istat: '📊 Genera Riepilogo Mensile (C/59)',
-    link_alloggiati: 'Apri Portale Alloggiati Web',
-    export_paytourist: '💰 Export PayTourist',
-    export_paytourist_desc: 'File CSV per il portale <strong>PayTourist</strong> dell\'imposta di soggiorno comunale. Raggruppa gli ospiti per soggiorno, compila automaticamente i codici fiscali. Carica nella pagina di importazione PayTourist del tuo comune.',
-    btn_gen_paytourist: '📥 Genera CSV PayTourist',
-    link_paytourist: 'Apri Importazione PayTourist',
-    link_dms: 'Apri Portale DMS Puglia',
-    export_paytourist: '💳 Export PayTourist',
+    btn_gen_alloggiati: '📥 Genera File Ospiti (.txt)',
+    btn_dl_csv: '📥 Scarica CSV',
+    btn_gen_istat: '📊 Genera Riepilogo C/59',
+    link_alloggiati: 'Apri Alloggiati Web',
+    link_dms: 'Apri Puglia DMS (SPOT Easy)',
+    export_paytourist: '💰 PayTourist (Imposta di Soggiorno)',
     export_paytourist_desc: 'File CSV per <strong>PayTourist</strong> (tassa di soggiorno comunale). Compila automaticamente gruppi ospiti, codice CIR, codici nazionalità. Carica su Soggiorni → Importa.',
     btn_gen_paytourist: '📥 Genera CSV PayTourist',
-    link_paytourist: 'Apri Portale PayTourist',
+    link_paytourist: 'Apri Importazione PayTourist',
     qr_title: 'Link App Ospiti',
     qr_desc: 'Condividi questo link con gli ospiti prima dell\'arrivo, o stampa il QR code e mettilo nell\'appartamento.',
     btn_copy_link: '📋 Copia Link', btn_print_qr: '🖨 Stampa QR',
@@ -2829,14 +2823,17 @@ function exportAlloggiati() {
 
   const groupCount = Object.keys(groups).length;
   const fileContent = lines.join('\r\n');
+  // Filename kept as alloggiati_YYYY-MM-DD for familiarity — this IS the
+  // Alloggiati tracciato record format, which SPOT Easy also accepts via
+  // its "Carica Scheda Alloggiati" button.
   downloadFile('alloggiati_' + new Date().toISOString().slice(0,10) + '.txt', fileContent);
   track('export_alloggiati', { guests: lines.length, groups: groupCount, warnings: warnings.length });
 
   if (warnings.length > 0) {
-    alert(`File generated: ${lines.length} guests in ${groupCount} stay(s).\n\n⚠️ Review:\n` + warnings.join('\n'));
-    toast(`Alloggiati — ${warnings.length} item(s) need review`);
+    alert(`File generated: ${lines.length} guest(s) in ${groupCount} stay(s).\n\nThis .txt file works on both:\n  • Alloggiati Web → Invio File (within 24h)\n  • SPOT Easy → Carica Scheda Alloggiati (monthly)\n\n⚠️ Review:\n` + warnings.join('\n'));
+    toast(`File generated — ${warnings.length} item(s) need review`);
   } else {
-    toast(`✅ Alloggiati: ${lines.length} guests · ${groupCount} stay(s) · 168 chars/line`);
+    toast(`✅ ${lines.length} guest(s) · ${groupCount} stay(s) · works on Alloggiati + SPOT Easy`);
   }
 }
 

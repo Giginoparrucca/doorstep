@@ -453,6 +453,72 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   cursor: pointer; font-size: 1.3rem;
 }
 
+/* ── GUEST ANALYTICS ── */
+.ga-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
+.ga-range-group { display:inline-flex; background:var(--white); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+.ga-range-btn {
+  background:transparent; border:none; padding:7px 14px;
+  font-family:'DM Sans',sans-serif; font-size:0.8rem; color:var(--ink-soft);
+  cursor:pointer; transition:all 0.15s; border-right:1px solid var(--border);
+}
+.ga-range-btn:last-child { border-right:none; }
+.ga-range-btn.active { background:var(--warm); color:#fff; font-weight:500; }
+.ga-range-btn:not(.active):hover { background:rgba(194,113,79,0.06); color:var(--ink); }
+.ga-grid {
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr));
+  gap:18px; margin-bottom:18px;
+}
+.ga-card {
+  background:var(--white); border:1px solid var(--border);
+  border-radius:var(--radius); padding:20px 22px; box-shadow:var(--shadow-s);
+}
+.ga-card.full { grid-column:1 / -1; }
+.ga-card-title { font-weight:600; font-size:1rem; color:var(--ink); margin-bottom:2px; }
+.ga-card-sub { font-size:0.75rem; color:var(--ink-soft); margin-bottom:16px; font-weight:300; }
+.ga-empty { text-align:center; color:var(--ink-soft); padding:30px 10px; font-size:0.85rem; font-weight:300; }
+.ga-kpi-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:10px; margin-bottom:14px; }
+.ga-kpi { background:rgba(250,246,240,0.6); border-radius:8px; padding:10px 12px; }
+.ga-kpi-label { font-size:0.58rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--ink-2); font-weight:600; }
+.ga-kpi-value { font-family:'Playfair Display',serif; font-size:1.5rem; color:var(--ink); margin-top:2px; line-height:1.1; }
+.ga-kpi-value.small { font-size:1.1rem; }
+/* Funnel */
+.ga-funnel { display:flex; flex-direction:column; gap:10px; }
+.ga-funnel-row { display:flex; align-items:center; gap:12px; }
+.ga-funnel-label { flex:0 0 160px; font-size:0.82rem; color:var(--ink); font-weight:500; }
+.ga-funnel-bar { flex:1; height:30px; background:rgba(250,246,240,0.7); border-radius:6px; overflow:hidden; position:relative; }
+.ga-funnel-fill {
+  height:100%; background:linear-gradient(90deg, var(--warm), var(--warm-l));
+  display:flex; align-items:center; padding:0 10px; color:#fff;
+  font-weight:600; font-size:0.82rem; transition:width 0.5s ease;
+}
+.ga-funnel-count { flex:0 0 80px; font-size:0.85rem; font-weight:500; color:var(--ink); text-align:right; }
+.ga-funnel-drop { font-size:0.68rem; color:var(--ink-soft); margin-left:6px; font-weight:300; }
+/* Reco list */
+.ga-reco-list { display:flex; flex-direction:column; gap:8px; }
+.ga-reco-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid rgba(194,113,79,0.06); }
+.ga-reco-row:last-child { border-bottom:none; }
+.ga-reco-rank { font-family:'Playfair Display',serif; font-size:1rem; color:var(--warm); width:22px; font-weight:500; }
+.ga-reco-name { flex:1; font-size:0.88rem; color:var(--ink); font-weight:500; }
+.ga-reco-cat { font-size:0.65rem; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.08em; margin-right:8px; }
+.ga-reco-bar { flex:1; max-width:140px; height:6px; background:rgba(250,246,240,0.8); border-radius:3px; overflow:hidden; }
+.ga-reco-fill { height:100%; background:var(--warm); border-radius:3px; }
+.ga-reco-count { font-size:0.82rem; font-weight:600; color:var(--ink); width:28px; text-align:right; }
+/* Timeline */
+.ga-timeline { display:block; width:100%; height:160px; }
+.ga-timeline-legend { display:flex; align-items:center; gap:14px; margin-top:8px; font-size:0.7rem; color:var(--ink-soft); }
+.ga-timeline-legend-dot { width:9px; height:9px; border-radius:50%; background:var(--warm); }
+/* Languages */
+.ga-lang-row { display:flex; align-items:center; gap:10px; margin-bottom:6px; font-size:0.85rem; }
+.ga-lang-code { flex:0 0 38px; font-weight:600; font-family:'DM Sans',sans-serif; color:var(--ink); text-transform:uppercase; }
+.ga-lang-bar { flex:1; height:8px; background:rgba(250,246,240,0.8); border-radius:4px; overflow:hidden; }
+.ga-lang-fill { height:100%; background:var(--warm); }
+.ga-lang-pct { font-size:0.78rem; color:var(--ink-soft); width:50px; text-align:right; font-weight:500; }
+.ga-info {
+  font-size:0.72rem; color:var(--ink-soft); padding:10px 14px;
+  background:rgba(250,246,240,0.5); border-radius:8px;
+  border-left:3px solid var(--warm); margin-top:4px; font-weight:300;
+}
+
 /* ── TOAST ── */
 .toast {
   position: fixed; bottom: 24px; right: 24px; z-index: 9999;
@@ -621,6 +687,10 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
       <span data-h="sidebar_checkins">Check-in Data</span>
       <span class="badge-count" id="checkinCount">0</span>
+    </button>
+    <button class="sidebar-item" onclick="showPanel('guestanalytics', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="M7 15l4-6 4 3 5-8"/></svg>
+      <span data-h="sidebar_guest_analytics">Guest Analytics</span>
     </button>
     <button class="sidebar-item" onclick="showPanel('export', this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -1030,6 +1100,83 @@ See you soon!</textarea>
       </div>
     </div>
 
+    <!-- ════════════ GUEST ANALYTICS ════════════ -->
+    <div class="panel" id="panel-guestanalytics">
+      <div class="panel-header" style="margin-bottom:18px;">
+        <h1 class="panel-title" data-h="t_guest_analytics">Guest Analytics</h1>
+        <p class="panel-sub" data-h="s_guest_analytics">How your guests use the app</p>
+      </div>
+
+      <div class="ga-toolbar">
+        <div class="ga-range-group" role="tablist">
+          <button class="ga-range-btn" data-ga-range="7"  data-h="ga_range_7"  onclick="setGaRange(7)">7 days</button>
+          <button class="ga-range-btn active" data-ga-range="30" data-h="ga_range_30" onclick="setGaRange(30)">30 days</button>
+          <button class="ga-range-btn" data-ga-range="90" data-h="ga_range_90" onclick="setGaRange(90)">90 days</button>
+        </div>
+        <div style="font-size:0.72rem;color:var(--ink-soft);" data-h="ga_info_tip">
+          Stats include anonymous guest interactions — no personal data is shown here.
+        </div>
+      </div>
+
+      <div id="gaLoading" class="ga-empty" data-h="ga_loading">Loading analytics…</div>
+      <div id="gaEmpty"   class="ga-empty" style="display:none;" data-h="ga_no_data">No guest activity yet for this property.</div>
+
+      <div id="gaContent" style="display:none;">
+        <!-- Row 1 — Funnel + Top Recos -->
+        <div class="ga-grid">
+          <div class="ga-card">
+            <div class="ga-card-title" data-h="ga_funnel_title">Check-in funnel</div>
+            <div class="ga-card-sub"   data-h="ga_funnel_sub">How many guests who opened the link completed their check-in</div>
+            <div id="gaFunnel" class="ga-funnel"></div>
+          </div>
+          <div class="ga-card">
+            <div class="ga-card-title" data-h="ga_recos_title">Top recommendations</div>
+            <div class="ga-card-sub"   data-h="ga_recos_sub">Which of your tips guests actually click</div>
+            <div id="gaRecos" class="ga-reco-list"></div>
+          </div>
+        </div>
+
+        <!-- Row 2 — Timeline (full-width) -->
+        <div class="ga-grid">
+          <div class="ga-card full">
+            <div class="ga-card-title" data-h="ga_timeline_title">Daily guest sessions</div>
+            <div class="ga-card-sub"   data-h="ga_timeline_sub">Unique guest sessions per day</div>
+            <svg id="gaTimeline" class="ga-timeline" viewBox="0 0 800 160" preserveAspectRatio="none"></svg>
+            <div class="ga-timeline-legend">
+              <span class="ga-timeline-legend-dot"></span>
+              <span id="gaTimelineLegend">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 3 — Chat + Engagement -->
+        <div class="ga-grid">
+          <div class="ga-card">
+            <div class="ga-card-title" data-h="ga_chat_title">Chat &amp; language</div>
+            <div class="ga-card-sub"   data-h="ga_chat_sub">Messaging volume and what language guests use</div>
+            <div class="ga-kpi-row">
+              <div class="ga-kpi">
+                <div class="ga-kpi-label" data-h="ga_chat_total">Guest messages</div>
+                <div class="ga-kpi-value" id="gaChatTotal">0</div>
+              </div>
+              <div class="ga-kpi">
+                <div class="ga-kpi-label" data-h="ga_chat_escalated">Escalated to host</div>
+                <div class="ga-kpi-value" id="gaChatEscalated">0</div>
+              </div>
+            </div>
+            <div style="font-size:0.65rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin:10px 0 8px;" data-h="ga_chat_langs">Languages</div>
+            <div id="gaLangs"></div>
+          </div>
+
+          <div class="ga-card">
+            <div class="ga-card-title" data-h="ga_engagement_title">Engagement</div>
+            <div class="ga-card-sub"   data-h="ga_engagement_sub">Other useful interactions</div>
+            <div class="ga-kpi-row" id="gaEngagement"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ════════════ GUEST CHAT ════════════ -->
     <div class="panel" id="panel-chat">
       <div style="display:flex;flex-direction:column;height:calc(100vh - 160px);min-height:300px;">
@@ -1138,6 +1285,280 @@ function sendSessionSummary() {
   } catch (e) {}
 }
 window.addEventListener('beforeunload', sendSessionSummary);
+
+/* ══════════════════════════════════════
+   GUEST ANALYTICS — host-side dashboard
+   Queries guest_* events scoped to the
+   currently selected property, aggregates
+   locally, and renders into #panel-guestanalytics.
+══════════════════════════════════════ */
+let _gaRangeDays = parseInt(localStorage.getItem('wbnb_ga_range') || '30', 10);
+if (![7, 30, 90].includes(_gaRangeDays)) _gaRangeDays = 30;
+let _gaLoading = false;
+
+function setGaRange(days) {
+  _gaRangeDays = days;
+  localStorage.setItem('wbnb_ga_range', String(days));
+  document.querySelectorAll('.ga-range-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.gaRange, 10) === days);
+  });
+  loadGuestAnalytics();
+}
+
+async function loadGuestAnalytics() {
+  if (_gaLoading) return;
+  if (!propertyId) { console.warn('GA: no propertyId yet'); return; }
+
+  _gaLoading = true;
+  const loadingEl = document.getElementById('gaLoading');
+  const emptyEl   = document.getElementById('gaEmpty');
+  const contentEl = document.getElementById('gaContent');
+  loadingEl.style.display = 'block';
+  emptyEl.style.display = 'none';
+  contentEl.style.display = 'none';
+
+  // Sync active range button to current state
+  document.querySelectorAll('.ga-range-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.gaRange, 10) === _gaRangeDays);
+  });
+
+  try {
+    const cutoff = new Date(Date.now() - _gaRangeDays * 86400000).toISOString();
+    // One query, filter by property + date + guest_* event types.
+    // 5000 row cap is a safety net — Bari-scale properties won't hit it;
+    // if they do the counts will be slightly low but UI still renders.
+    const { data, error } = await sb.from('analytics_events')
+      .select('event_type, event_data, session_id, created_at')
+      .eq('property_id', propertyId)
+      .like('event_type', 'guest_%')
+      .gte('created_at', cutoff)
+      .order('created_at', { ascending: true })
+      .limit(5000);
+
+    if (error) throw error;
+
+    loadingEl.style.display = 'none';
+    if (!data || data.length === 0) {
+      emptyEl.style.display = 'block';
+      _gaLoading = false;
+      return;
+    }
+
+    renderGuestAnalytics(data);
+    contentEl.style.display = 'block';
+  } catch (e) {
+    console.error('GA load error:', e);
+    loadingEl.style.display = 'none';
+    emptyEl.textContent = `Failed to load analytics: ${e.message || e}`;
+    emptyEl.style.display = 'block';
+  } finally {
+    _gaLoading = false;
+  }
+}
+
+function renderGuestAnalytics(events) {
+  // ── Aggregate by session_id for funnel (unique session counts) ──
+  const sessions = {};
+  for (const e of events) {
+    const sid = e.session_id || '_nosid_' + e.created_at;
+    if (!sessions[sid]) sessions[sid] = { events: {}, langs: {}, firstAt: e.created_at };
+    sessions[sid].events[e.event_type] = (sessions[sid].events[e.event_type] || 0) + 1;
+    const evLang = e.event_data && e.event_data.lang;
+    if (evLang) sessions[sid].langs[evLang] = (sessions[sid].langs[evLang] || 0) + 1;
+  }
+  const sessionList = Object.values(sessions);
+  const opened    = sessionList.filter(s => s.events['guest_link_opened']).length;
+  const started   = sessionList.filter(s => s.events['guest_checkin_started']).length;
+  const completed = sessionList.filter(s => s.events['guest_checkin_completed']).length;
+  // If a session somehow fired started/completed without link_opened (edge case:
+  // event fired before propertyId resolved, or legacy data), still count them.
+  const openedDisplay    = Math.max(opened, started, completed, sessionList.length);
+  const startedDisplay   = Math.max(started, completed);
+  const completedDisplay = completed;
+
+  renderGaFunnel(openedDisplay, startedDisplay, completedDisplay);
+
+  // ── Top recommendations ──
+  const recoCounts = {};
+  for (const e of events) {
+    if (e.event_type !== 'guest_reco_clicked') continue;
+    const d = e.event_data || {};
+    const name = d.name || 'Unknown';
+    if (!recoCounts[name]) recoCounts[name] = { count: 0, cat: d.category || '' };
+    recoCounts[name].count++;
+  }
+  const topRecos = Object.entries(recoCounts)
+    .map(([name, v]) => ({ name, count: v.count, cat: v.cat }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+  renderGaRecos(topRecos);
+
+  // ── Daily timeline (distinct sessions per day) ──
+  const byDay = {};
+  for (let i = 0; i < _gaRangeDays; i++) {
+    const d = new Date(Date.now() - i * 86400000);
+    const key = d.toISOString().slice(0, 10);
+    byDay[key] = new Set();
+  }
+  for (const e of events) {
+    const key = (e.created_at || '').slice(0, 10);
+    if (byDay[key] && e.session_id) byDay[key].add(e.session_id);
+  }
+  const timelineData = Object.keys(byDay).sort().map(day => ({
+    day, count: byDay[day].size
+  }));
+  renderGaTimeline(timelineData);
+
+  // ── Chat & language ──
+  const chatEvents = events.filter(e => e.event_type === 'guest_chat_message');
+  const chatTotal = chatEvents.length;
+  const chatEscalated = chatEvents.filter(e => e.event_data && e.event_data.escalated).length;
+  const langTotals = {};
+  // Use session-level language (the dominant lang in that session) to avoid
+  // overcounting chatty sessions. Fallback: count raw event langs.
+  for (const s of sessionList) {
+    const top = Object.entries(s.langs).sort((a, b) => b[1] - a[1])[0];
+    if (top) langTotals[top[0]] = (langTotals[top[0]] || 0) + 1;
+  }
+  renderGaChatAndLang(chatTotal, chatEscalated, langTotals);
+
+  // ── Engagement KPIs ──
+  const count = (et) => events.filter(e => e.event_type === et).length;
+  const engagement = [
+    { key: 'ga_eng_sessions',     value: sessionList.length },
+    { key: 'ga_eng_scans',        value: count('guest_doc_scanned') },
+    { key: 'ga_eng_lookups',      value: events.filter(e => e.event_type === 'guest_lookup_used' && e.event_data && e.event_data.cross_device).length },
+    { key: 'ga_eng_reco_clicks',  value: count('guest_reco_clicked') },
+    { key: 'ga_eng_lang_switches',value: count('guest_language_switch') },
+  ];
+  renderGaEngagement(engagement);
+}
+
+function renderGaFunnel(opened, started, completed) {
+  const pct = (n, d) => d > 0 ? Math.round((n / d) * 100) : 0;
+  const bar = (label, count, total, dropLabel) => {
+    const p = pct(count, total || 1);
+    return `
+      <div class="ga-funnel-row">
+        <div class="ga-funnel-label">${label}</div>
+        <div class="ga-funnel-bar">
+          <div class="ga-funnel-fill" style="width:${Math.max(p, 4)}%">${p > 15 ? p + '%' : ''}</div>
+        </div>
+        <div class="ga-funnel-count">${count}${dropLabel}</div>
+      </div>`;
+  };
+  const startDrop = opened > 0 && opened > started ? ` <span class="ga-funnel-drop">−${opened - started}</span>` : '';
+  const doneDrop  = started > 0 && started > completed ? ` <span class="ga-funnel-drop">−${started - completed}</span>` : '';
+
+  document.getElementById('gaFunnel').innerHTML =
+    bar(h('ga_funnel_opened'),    opened,    opened,  '') +
+    bar(h('ga_funnel_started'),   started,   opened,  startDrop) +
+    bar(h('ga_funnel_completed'), completed, opened,  doneDrop);
+}
+
+function renderGaRecos(top) {
+  const el = document.getElementById('gaRecos');
+  if (!top || top.length === 0) {
+    el.innerHTML = `<div class="ga-empty" style="padding:16px 0;">${h('ga_recos_empty')}</div>`;
+    return;
+  }
+  const max = top[0].count || 1;
+  el.innerHTML = top.map((r, i) => {
+    const w = Math.round((r.count / max) * 100);
+    const safeName = String(r.name).replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
+    const safeCat  = String(r.cat || '').replace(/[<>&"]/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;' }[c]));
+    return `
+      <div class="ga-reco-row">
+        <div class="ga-reco-rank">${i + 1}</div>
+        <div class="ga-reco-name">${safeName}${safeCat ? ` <span class="ga-reco-cat">· ${safeCat}</span>` : ''}</div>
+        <div class="ga-reco-bar"><div class="ga-reco-fill" style="width:${w}%"></div></div>
+        <div class="ga-reco-count">${r.count}</div>
+      </div>`;
+  }).join('');
+}
+
+function renderGaTimeline(data) {
+  const svg = document.getElementById('gaTimeline');
+  const legend = document.getElementById('gaTimelineLegend');
+  if (!data || data.length === 0 || data.every(d => d.count === 0)) {
+    svg.innerHTML = `<text x="400" y="80" fill="rgba(74,46,32,0.4)" text-anchor="middle" font-family="DM Sans, sans-serif" font-size="13">${h('ga_timeline_empty')}</text>`;
+    legend.textContent = '';
+    return;
+  }
+  const W = 800, H = 160, padL = 30, padR = 10, padT = 12, padB = 28;
+  const max = Math.max(1, ...data.map(d => d.count));
+  const bw = (W - padL - padR) / data.length;
+  const barW = Math.max(2, bw - 2);
+  const total = data.reduce((s, d) => s + d.count, 0);
+  const avg = (total / data.length).toFixed(1);
+
+  // Y ticks (3)
+  const ticks = [0, Math.ceil(max / 2), max];
+  let yAxisMarkup = '';
+  for (const t of ticks) {
+    const y = padT + (H - padT - padB) * (1 - t / max);
+    yAxisMarkup += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="rgba(74,46,32,0.06)" stroke-width="1" shape-rendering="crispEdges"/>`;
+    yAxisMarkup += `<text x="${padL - 6}" y="${y + 3}" fill="rgba(74,46,32,0.5)" text-anchor="end" font-family="DM Sans, sans-serif" font-size="9">${t}</text>`;
+  }
+
+  // Bars + rare x labels
+  const labelEvery = Math.max(1, Math.floor(data.length / 6));
+  let barsMarkup = '';
+  data.forEach((d, i) => {
+    const h = (H - padT - padB) * (d.count / max);
+    const x = padL + i * bw + 1;
+    const y = H - padB - h;
+    if (d.count > 0) {
+      barsMarkup += `<rect x="${x}" y="${y}" width="${barW}" height="${h}" fill="#C2714F" rx="1.5">
+        <title>${d.day}: ${d.count} session${d.count === 1 ? '' : 's'}</title>
+      </rect>`;
+    } else {
+      // Tiny grey tick so empty days are still visually represented
+      barsMarkup += `<rect x="${x}" y="${H - padB - 1}" width="${barW}" height="1" fill="rgba(74,46,32,0.12)">
+        <title>${d.day}: 0 sessions</title>
+      </rect>`;
+    }
+    if (i % labelEvery === 0 || i === data.length - 1) {
+      const parts = d.day.split('-');
+      const short = `${parts[2]}/${parts[1]}`;
+      barsMarkup += `<text x="${x + barW / 2}" y="${H - padB + 14}" fill="rgba(74,46,32,0.5)" text-anchor="middle" font-family="DM Sans, sans-serif" font-size="9">${short}</text>`;
+    }
+  });
+
+  svg.innerHTML = yAxisMarkup + barsMarkup;
+  legend.textContent = `${total} total · avg ${avg}/day · peak ${max}`;
+}
+
+function renderGaChatAndLang(total, escalated, langs) {
+  document.getElementById('gaChatTotal').textContent = total;
+  document.getElementById('gaChatEscalated').textContent = escalated;
+  const el = document.getElementById('gaLangs');
+  const totalLangs = Object.values(langs).reduce((a, b) => a + b, 0);
+  if (totalLangs === 0) {
+    el.innerHTML = `<div class="ga-empty" style="padding:6px 0;font-size:0.78rem;">—</div>`;
+    return;
+  }
+  const rows = Object.entries(langs)
+    .sort((a, b) => b[1] - a[1])
+    .map(([code, n]) => {
+      const p = Math.round((n / totalLangs) * 100);
+      return `
+        <div class="ga-lang-row">
+          <div class="ga-lang-code">${code}</div>
+          <div class="ga-lang-bar"><div class="ga-lang-fill" style="width:${p}%"></div></div>
+          <div class="ga-lang-pct">${p}% · ${n}</div>
+        </div>`;
+    }).join('');
+  el.innerHTML = rows;
+}
+
+function renderGaEngagement(items) {
+  document.getElementById('gaEngagement').innerHTML = items.map(i => `
+    <div class="ga-kpi">
+      <div class="ga-kpi-label">${h(i.key)}</div>
+      <div class="ga-kpi-value ${i.value >= 1000 ? 'small' : ''}">${i.value}</div>
+    </div>`).join('');
+}
 
 /* ══════════════════════════════════════
    AUTHENTICATION
@@ -1323,9 +1744,25 @@ const HT = {
     sidebar_dashboard: 'Dashboard', sidebar_property: 'Property Details', sidebar_rules: 'House Rules',
     sidebar_recos: 'Recommendations', sidebar_checkins: 'Check-in Data', sidebar_export: 'Export / Alloggiati',
     sidebar_qr: 'QR Code & Link', sidebar_role: 'Property Manager',
+    sidebar_guest_analytics: 'Guest Analytics',
     // Panel titles
     t_dashboard: 'Dashboard', s_dashboard: 'Overview of your property and guests',
     t_property: 'Property Details', s_property: 'Edit your property information',
+    t_guest_analytics: 'Guest Analytics', s_guest_analytics: 'How your guests use the app',
+    ga_range_7: '7 days', ga_range_30: '30 days', ga_range_90: '90 days',
+    ga_funnel_title: 'Check-in funnel', ga_funnel_sub: 'How many guests who opened the link completed their check-in',
+    ga_funnel_opened: 'Link opened', ga_funnel_started: 'Started check-in', ga_funnel_completed: 'Completed check-in',
+    ga_recos_title: 'Top recommendations', ga_recos_sub: 'Which of your tips guests actually click',
+    ga_recos_empty: 'No recommendation clicks yet. As guests tap "Open in Maps" on your tips, they\'ll appear here.',
+    ga_timeline_title: 'Daily guest sessions', ga_timeline_sub: 'Unique guest sessions per day',
+    ga_timeline_empty: 'No guest sessions yet in this period.',
+    ga_chat_title: 'Chat & language', ga_chat_sub: 'Messaging volume and what language guests use',
+    ga_chat_total: 'Guest messages', ga_chat_escalated: 'Escalated to host', ga_chat_langs: 'Languages',
+    ga_engagement_title: 'Engagement', ga_engagement_sub: 'Other useful interactions',
+    ga_eng_sessions: 'Sessions', ga_eng_scans: 'Doc scans', ga_eng_lookups: 'Cross-device lookups',
+    ga_eng_reco_clicks: 'Reco clicks', ga_eng_lang_switches: 'Language switches',
+    ga_loading: 'Loading analytics…', ga_no_data: 'No guest activity yet for this property.',
+    ga_info_tip: 'Stats include anonymous guest interactions — no personal data is shown here.',
     t_rules: 'House Rules', s_rules: 'Manage rules shown to guests',
     t_recos: 'Recommendations', s_recos: 'Curate local tips for your guests',
     t_checkins: 'Check-in Data', s_checkins: 'View and manage guest registrations',
@@ -1476,8 +1913,24 @@ const HT = {
     sidebar_dashboard: 'Dashboard', sidebar_property: 'Dettagli Proprietà', sidebar_rules: 'Regole della Casa',
     sidebar_recos: 'Consigli', sidebar_checkins: 'Dati Check-in', sidebar_export: 'Export / Alloggiati',
     sidebar_qr: 'QR Code & Link', sidebar_role: 'Gestore Proprietà',
+    sidebar_guest_analytics: 'Analisi Ospiti',
     t_dashboard: 'Dashboard', s_dashboard: 'Panoramica della proprietà e degli ospiti',
     t_property: 'Dettagli Proprietà', s_property: 'Modifica le informazioni della proprietà',
+    t_guest_analytics: 'Analisi Ospiti', s_guest_analytics: 'Come gli ospiti usano l\'app',
+    ga_range_7: '7 giorni', ga_range_30: '30 giorni', ga_range_90: '90 giorni',
+    ga_funnel_title: 'Funnel di check-in', ga_funnel_sub: 'Quanti ospiti che hanno aperto il link hanno completato il check-in',
+    ga_funnel_opened: 'Link aperto', ga_funnel_started: 'Check-in avviato', ga_funnel_completed: 'Check-in completato',
+    ga_recos_title: 'Consigli più cliccati', ga_recos_sub: 'Quali dei tuoi consigli gli ospiti aprono davvero',
+    ga_recos_empty: 'Ancora nessun click sui consigli. Quando gli ospiti toccheranno "Apri in Maps" sui tuoi suggerimenti, appariranno qui.',
+    ga_timeline_title: 'Sessioni ospiti per giorno', ga_timeline_sub: 'Sessioni uniche al giorno',
+    ga_timeline_empty: 'Nessuna sessione ospite in questo periodo.',
+    ga_chat_title: 'Chat e lingua', ga_chat_sub: 'Volume messaggi e lingua degli ospiti',
+    ga_chat_total: 'Messaggi ospiti', ga_chat_escalated: 'Inoltrati all\'host', ga_chat_langs: 'Lingue',
+    ga_engagement_title: 'Coinvolgimento', ga_engagement_sub: 'Altre interazioni utili',
+    ga_eng_sessions: 'Sessioni', ga_eng_scans: 'Scansioni doc', ga_eng_lookups: 'Lookup cross-device',
+    ga_eng_reco_clicks: 'Click consigli', ga_eng_lang_switches: 'Cambi lingua',
+    ga_loading: 'Caricamento analisi…', ga_no_data: 'Ancora nessuna attività ospite per questa proprietà.',
+    ga_info_tip: 'Le statistiche includono interazioni anonime — qui non vengono mostrati dati personali.',
     t_rules: 'Regole della Casa', s_rules: 'Gestisci le regole mostrate agli ospiti',
     t_recos: 'Consigli', s_recos: 'Cura i consigli locali per i tuoi ospiti',
     t_checkins: 'Dati Check-in', s_checkins: 'Visualizza e gestisci le registrazioni degli ospiti',
@@ -1663,6 +2116,7 @@ const titlesMap = {
   rules: ['t_rules', 's_rules'],
   recos: ['t_recos', 's_recos'],
   checkins: ['t_checkins', 's_checkins'],
+  guestanalytics: ['t_guest_analytics', 's_guest_analytics'],
   export: ['t_export', 's_export'],
   qrlink: ['t_qrlink', 's_qrlink'],
   chat: ['t_chat', 's_chat'],
@@ -1692,6 +2146,7 @@ function showPanel(id, btn) {
   document.getElementById('sidebarOverlay').classList.remove('show');
   if (id === 'qrlink') initQRPanel();
   if (id === 'chat') { loadHostChat(); document.getElementById('chatBadge').style.display = 'none'; requestNotifPermission(); }
+  if (id === 'guestanalytics') loadGuestAnalytics();
   trackPanelSwitch(id);
 }
 

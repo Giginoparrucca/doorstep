@@ -1040,20 +1040,121 @@ let existingCheckins = [];
   }
 });
 
-function getBookingCode() {
+function getUrlParams() {
   const params = new URLSearchParams(window.location.search);
-  const urlCode = params.get('b');
-  const urlProp = params.get('p');
+  return { b: params.get('b'), p: params.get('p') };
+}
+
+function getBookingCode() {
+  const { b: urlCode, p: urlProp } = getUrlParams();
+  // Cache in localStorage for returning visits, but URL is the source of truth.
   if (urlCode) localStorage.setItem('wbnb_booking', urlCode);
   if (urlProp) localStorage.setItem('wbnb_property', urlProp);
-  if (urlCode || urlProp) {
-    window.history.replaceState({}, '', window.location.pathname);
-  }
-  return localStorage.getItem('wbnb_booking') || null;
+  // NOTE: we deliberately do NOT strip the URL — keeping ?b & ?p in the address bar
+  // ensures reloads and shared sessions always use the correct property/booking.
+  return urlCode || localStorage.getItem('wbnb_booking') || null;
 }
 
 function getStoredPropertyId() {
-  return localStorage.getItem('wbnb_property') || null;
+  // URL always wins over localStorage — prevents stale data from shared devices
+  // or previous sessions being used to save check-ins to the wrong property.
+  const { p: urlProp } = getUrlParams();
+  return urlProp || localStorage.getItem('wbnb_property') || null;
+}
+
+/* ══════════════════════════════════════
+   GUEST ANALYTICS — lightweight event tracking
+   All events prefixed with guest_. user_id is always null
+   (guests are anonymous); grouping uses session_id +
+   property_id + booking_code.
+══════════════════════════════════════ */
+const _guestSessionId = `g_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+const _guestSessionStart = Date.now();
+let _guestCheckinStartFired = false;   // one-shot for checkin_started
+let _guestLinkOpenedFired  = false;   // one-shot for link_opened (after propertyId known)
+let _guestLastPage         = null;
+let _guestPageEnterTs      = Date.now();
+const _guestPageTimes      = {};
+
+async function trackGuest(eventType, eventData = {}) {
+  // Noop until propertyId is resolved — guest events are always
+  // scoped to a property. Buffer would complicate things; instead
+  // we just drop events that fire pre-resolution (very few).
+  if (!propertyId) return;
+  try {
+    const row = {
+      event_type: eventType,
+      event_data: { ...eventData, lang },
+      session_id: _guestSessionId,
+      property_id: propertyId,
+    };
+    // Anonymous — user_id / user_email stay null by design.
+    const { error } = await sb.from('analytics_events').insert(row);
+    if (error) console.warn('📊 guest analytics:', error.message);
+    else console.log('📊', eventType, eventData);
+  } catch (e) { console.warn('📊 guest analytics error:', e); }
+}
+
+// Fire a guest event even on page unload (keepalive).
+function trackGuestBeacon(eventType, eventData = {}) {
+  if (!propertyId) return;
+  try {
+    const row = {
+      event_type: eventType,
+      event_data: { ...eventData, lang },
+      session_id: _guestSessionId,
+      property_id: propertyId,
+    };
+    fetch(`${SUPABASE_URL}/rest/v1/analytics_events`, {
+      method: 'POST',
+      keepalive: true,
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify(row),
+    }).catch(()=>{});
+  } catch (e) {}
+}
+
+// End-of-session summary (total time spent, per-page times).
+function sendGuestSessionEnd() {
+  if (!propertyId) return;
+  // flush current page time
+  if (_guestLastPage) {
+    const elapsed = Math.round((Date.now() - _guestPageEnterTs) / 1000);
+    if (elapsed > 0 && elapsed < 1800) {
+      _guestPageTimes[_guestLastPage] = (_guestPageTimes[_guestLastPage] || 0) + elapsed;
+    }
+  }
+  const duration = Math.round((Date.now() - _guestSessionStart) / 1000);
+  if (duration < 2) return; // skip instant bounces
+  trackGuestBeacon('guest_session_end', {
+    duration_seconds: duration,
+    page_times: _guestPageTimes,
+  });
+}
+window.addEventListener('pagehide', sendGuestSessionEnd);
+window.addEventListener('beforeunload', sendGuestSessionEnd);
+
+// Halts the app with a clear error overlay. Used when no valid property can be
+// resolved from URL or localStorage — better than silently loading a random
+// property and misassigning check-ins (which previously caused lost guest data).
+function showLinkErrorAndHalt(msg) {
+  // Clear any prior cached IDs so the next valid link starts clean.
+  localStorage.removeItem('wbnb_property');
+  localStorage.removeItem('wbnb_booking');
+  localStorage.removeItem('wbnb_lookup');
+  const overlay = document.getElementById('loadingOverlay');
+  if (overlay) overlay.remove();
+  document.body.innerHTML = `
+    <div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F5EFE3;color:#2D1810">
+      <div style="font-size:48px;margin-bottom:16px">🔗</div>
+      <h2 style="font-size:22px;margin:0 0 12px">${msg}</h2>
+      <p style="font-size:14px;color:#6B5D4F;max-width:340px">This link may be incomplete or expired. Your host can send you a new one.</p>
+    </div>`;
 }
 let uploadedIdFile = null;
 
@@ -1280,7 +1381,9 @@ const T = {
 };
 
 function setLang(l) {
+  const prev = lang;
   lang = l;
+  if (prev !== l) trackGuest('guest_language_switch', { from: prev, to: l });
   document.querySelectorAll('.lang-opt').forEach(btn => {
     btn.classList.toggle('active', btn.textContent.trim() === l.toUpperCase());
   });
@@ -1323,6 +1426,17 @@ function goTo(page) {
     const pages = ['welcome','checkin','rules','explore','chat'];
     n.classList.toggle('active', pages[i] === page);
   });
+
+  // Analytics: track page view + accumulate time on previous page
+  if (_guestLastPage && _guestLastPage !== page) {
+    const elapsed = Math.round((Date.now() - _guestPageEnterTs) / 1000);
+    if (elapsed > 0 && elapsed < 1800) {
+      _guestPageTimes[_guestLastPage] = (_guestPageTimes[_guestLastPage] || 0) + elapsed;
+    }
+  }
+  _guestLastPage = page;
+  _guestPageEnterTs = Date.now();
+  trackGuest('guest_page_view', { page });
 }
 
 /* ══════════════════════════════════════
@@ -1468,8 +1582,18 @@ async function lookupCheckin() {
     if (!data || data.length === 0) {
       errEl.textContent = T[lang].lookup_not_found;
       errEl.style.display = 'block';
+      // Analytics: failed lookup (privacy-safe — no surname logged)
+      trackGuest('guest_lookup_used', { result: 'not_found' });
       return;
     }
+
+    // Analytics: successful lookup + whether it triggered a cross-device switch
+    const crossDevice = data[0].property_id && data[0].property_id !== propertyId;
+    trackGuest('guest_lookup_used', {
+      result: 'found',
+      matches: data.length,
+      cross_device: !!crossDevice,
+    });
 
     // Found! Switch to the correct property if different
     const foundPropId = data[0].property_id;
@@ -1849,6 +1973,15 @@ async function saveCurrentGuest() {
   btn.innerHTML = T[lang].btn_saving;
   btn.disabled = true;
 
+  // Analytics: one-shot checkin_started on the first submit
+  if (!_guestCheckinStartFired) {
+    _guestCheckinStartFired = true;
+    trackGuest('guest_checkin_started', {
+      total_guests: totalGuests,
+      guest_type: selectedGuestType,
+    });
+  }
+
   if (!propertyId) {
     console.error('❌ No propertyId — cannot save check-in');
     alert(lang === 'it' ? 'Errore: proprietà non trovata. Ricarica la pagina.' : 'Error: property not found. Please reload the page.');
@@ -1901,8 +2034,19 @@ async function saveCurrentGuest() {
       id_photo_path: idPath,
       docs_status: isMainGuest() ? (idPath ? 'complete' : 'pending') : 'not_required',
     };
-    if (propertyId) record.property_id = propertyId;
-    if (bookingCode) record.booking_code = bookingCode;
+    // Canonical property_id / booking_code come from URL (?p/?b) or localStorage.
+    // If either the in-memory or canonical source is missing the property, abort
+    // rather than silently saving the check-in to the wrong property.
+    const canonicalPropId   = getStoredPropertyId() || propertyId;
+    const canonicalBooking  = getBookingCode()     || bookingCode;
+    if (!canonicalPropId) {
+      alert(lang === 'it'
+        ? 'Impossibile completare il check-in: link proprietà mancante. Riapri il link del tuo host.'
+        : 'Cannot complete check-in: property link missing. Please reopen your host\'s link.');
+      throw new Error('No property_id at insert time');
+    }
+    record.property_id = canonicalPropId;
+    if (canonicalBooking) record.booking_code = canonicalBooking;
 
     console.log(`💾 Saving guest ${currentGuestIdx+1}/${totalGuests}:`, JSON.stringify(record));
     const { data, error } = await sb.from('checkins').insert(record);
@@ -1939,6 +2083,13 @@ async function saveCurrentGuest() {
       document.getElementById('checkinBadge').style.display = 'none';
       renderReviewCards();
       console.log(`✅ All ${savedGuests.length} guests checked in!`);
+
+      // Analytics: funnel completion
+      trackGuest('guest_checkin_completed', {
+        num_guests: savedGuests.length,
+        guest_type: selectedGuestType,
+        nights: nights,
+      });
     }
   } catch (err) {
     console.error('Save error:', err);
@@ -2085,6 +2236,11 @@ async function scanDocument(input) {
     const result = await response.json();
     if (result.success && result.data) {
       const d = result.data;
+      // Analytics: document scan success
+      trackGuest('guest_doc_scanned', {
+        doc_type: d.document_type || 'unknown',
+        citizenship: d.citizenship || null,
+      });
       if (d.surname) document.getElementById('surname').value = d.surname;
       if (d.name) document.getElementById('gname').value = d.name;
       if (d.sex) document.getElementById('sex').value = d.sex;
@@ -2262,7 +2418,8 @@ function renderRecos() {
         ${r.address ? `<div style="font-size:0.6rem;color:var(--ink-soft);margin-bottom:4px;display:flex;align-items:center;gap:3px;">📍 ${r.address}</div>` : ''}
         <div class="reco-desc">${r.desc}</div>
         <div class="reco-meta">${r.tags.map(t=>`<span class="reco-tag">${t}</span>`).join('')}</div>
-        <a href="${mapsUrl(r.name, r.address)}" target="_blank" rel="noopener" class="reco-maps-btn">
+        <a href="${mapsUrl(r.name, r.address)}" target="_blank" rel="noopener" class="reco-maps-btn"
+           onclick="trackGuest('guest_reco_clicked', { name: ${JSON.stringify(r.name)}, category: ${JSON.stringify(r.cat)} })">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
           <span data-i18n="open_maps">${T[lang].open_maps || 'Open in Maps'}</span>
         </a>
@@ -2336,6 +2493,12 @@ async function sendChat() {
   if (!msg) return;
   addBubble(msg, 'user');
   saveChatMsg('guest', msg);
+  // Analytics: track message volume. We deliberately do NOT log message
+  // content — only length — to avoid storing private guest text in analytics.
+  trackGuest('guest_chat_message', {
+    length: msg.length,
+    escalated: chatEscalated,
+  });
   input.value = '';
   document.getElementById('chatSuggestions').style.display = 'none';
 
@@ -2519,23 +2682,28 @@ async function init() {
   bookingCode = getBookingCode();
   console.log('🔑 Booking:', bookingCode, 'Property from URL/storage:', getStoredPropertyId());
 
-  // 1. Load property — by ID from URL/localStorage, or first available
+  // 1. Load property — by ID from URL (?p=UUID) or localStorage.
+  //    NEVER fall back to "any property" — doing so assigns check-ins to a
+  //    stranger's property and leaks guest data across hosts. If no valid
+  //    property can be resolved, abort with a clear error.
   const storedPropId = getStoredPropertyId();
+  if (!storedPropId) {
+    console.error('❌ No property in URL or storage — aborting init');
+    showLinkErrorAndHalt(lang === 'it'
+      ? 'Link di check-in non valido. Contatta il tuo host per un nuovo link.'
+      : 'Invalid check-in link. Please ask your host for a fresh link.');
+    return;
+  }
   try {
     let data;
-    if (storedPropId) {
-      const res = await sb.from('properties').select('*').eq('id', storedPropId).single();
-      data = res.data;
-    }
+    const res = await sb.from('properties').select('*').eq('id', storedPropId).single();
+    data = res.data;
     if (!data) {
-      // Fallback: load first property that has an owner (skip blank/unclaimed ones)
-      const res = await sb.from('properties').select('*').not('owner_id', 'is', null).limit(1).single();
-      data = res.data;
-    }
-    if (!data) {
-      // Last resort: any property
-      const res = await sb.from('properties').select('*').limit(1).single();
-      data = res.data;
+      console.error('❌ Property not found:', storedPropId, res.error);
+      showLinkErrorAndHalt(lang === 'it'
+        ? 'Proprietà non trovata. Contatta il tuo host per un nuovo link.'
+        : 'Property not found. Please ask your host for a fresh check-in link.');
+      return;
     }
     if (data) {
       propertyId = data.id;
@@ -2588,7 +2756,13 @@ async function init() {
       T.it.chat_welcome = `Ciao! 🌞 Sono il concierge di ${d.name}. Conosco tutto sull'appartamento, il quartiere, i ristoranti e la zona. Come posso aiutarti oggi?`;
       document.title = `${d.name} · WelcomeBnB`;
     }
-  } catch (e) { console.log('Using fallback property data'); }
+  } catch (e) {
+    console.error('❌ Property load failed:', e);
+    showLinkErrorAndHalt(lang === 'it'
+      ? 'Errore nel caricamento della proprietà. Riprova o contatta il tuo host.'
+      : 'Failed to load property. Please retry or contact your host.');
+    return;
+  }
 
   // 2. Load rules from DB
   if (propertyId) {
@@ -2660,6 +2834,21 @@ async function init() {
   // Hide loading overlay
   const overlay = document.getElementById('loadingOverlay');
   if (overlay) { overlay.style.opacity = '0'; setTimeout(() => overlay.remove(), 400); }
+
+  // Analytics: mark the initial link open + seed the "welcome" page view.
+  // Fires once per session, after propertyId is known so the event is routable.
+  if (!_guestLinkOpenedFired && propertyId) {
+    _guestLinkOpenedFired = true;
+    trackGuest('guest_link_opened', {
+      has_booking_code: !!bookingCode,
+      returning_guest: foundExisting,
+      referrer: document.referrer || null,
+    });
+    // Seed the timer for the first page (welcome) so page_times is accurate.
+    _guestLastPage = 'welcome';
+    _guestPageEnterTs = Date.now();
+    trackGuest('guest_page_view', { page: 'welcome', initial: true });
+  }
 }
 
 init();

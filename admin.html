@@ -383,6 +383,160 @@ function renderView() {
       </div>
     </div>`;
 
+  // ══════════════════════════════════════
+  // GUEST ACTIVITY — aggregated from guest_* events
+  // Always renders when any guest event exists in the current filter.
+  // ══════════════════════════════════════
+  const guestEvents = events.filter(e => e.event_type && e.event_type.startsWith('guest_'));
+  if (guestEvents.length > 0) {
+    // Session-level aggregation for funnel
+    const gSessions = {};
+    for (const e of guestEvents) {
+      const sid = e.session_id || '_nosid_' + e.created_at;
+      if (!gSessions[sid]) gSessions[sid] = { evs: {}, prop: e.property_id, langs: {} };
+      gSessions[sid].evs[e.event_type] = (gSessions[sid].evs[e.event_type] || 0) + 1;
+      const el = e.event_data && e.event_data.lang;
+      if (el) gSessions[sid].langs[el] = (gSessions[sid].langs[el] || 0) + 1;
+    }
+    const gSessList = Object.values(gSessions);
+    const gOpened    = gSessList.filter(s => s.evs['guest_link_opened']).length;
+    const gStarted   = gSessList.filter(s => s.evs['guest_checkin_started']).length;
+    const gCompleted = gSessList.filter(s => s.evs['guest_checkin_completed']).length;
+    const gOpenedShow    = Math.max(gOpened, gStarted, gCompleted, gSessList.length);
+    const gStartedShow   = Math.max(gStarted, gCompleted);
+    const conversionPct  = gOpenedShow > 0 ? Math.round((gCompleted / gOpenedShow) * 100) : 0;
+    const startPct       = gOpenedShow > 0 ? Math.round((gStartedShow / gOpenedShow) * 100) : 0;
+
+    // Per-property rollup
+    const propRoll = {};
+    gSessList.forEach(s => {
+      const pid = s.prop || 'unknown';
+      if (!propRoll[pid]) propRoll[pid] = { opened: 0, started: 0, completed: 0 };
+      propRoll[pid].opened++;
+      if (s.evs['guest_checkin_started'])   propRoll[pid].started++;
+      if (s.evs['guest_checkin_completed']) propRoll[pid].completed++;
+    });
+    const propLookup = {};
+    allProperties.forEach(p => { propLookup[p.id] = p.name; });
+    const propRows = Object.entries(propRoll)
+      .map(([pid, r]) => ({
+        pid, name: propLookup[pid] || pid.slice(0, 8) + '…',
+        opened: r.opened, started: r.started, completed: r.completed,
+        rate: r.opened > 0 ? Math.round((r.completed / r.opened) * 100) : 0,
+      }))
+      .sort((a, b) => b.opened - a.opened);
+
+    // Feature adoption across unique sessions
+    const featureSession = {
+      scanned: new Set(), reco_click: new Set(), chat: new Set(),
+      lookup: new Set(), lang_switch: new Set(),
+    };
+    guestEvents.forEach(e => {
+      const sid = e.session_id; if (!sid) return;
+      if (e.event_type === 'guest_doc_scanned')     featureSession.scanned.add(sid);
+      if (e.event_type === 'guest_reco_clicked')    featureSession.reco_click.add(sid);
+      if (e.event_type === 'guest_chat_message')    featureSession.chat.add(sid);
+      if (e.event_type === 'guest_lookup_used')     featureSession.lookup.add(sid);
+      if (e.event_type === 'guest_language_switch') featureSession.lang_switch.add(sid);
+    });
+    const pctOf = n => gSessList.length > 0 ? Math.round((n / gSessList.length) * 100) : 0;
+    const featureRows = [
+      { label: 'AI document scan',     n: featureSession.scanned.size,     color: 'var(--warm)' },
+      { label: 'Recommendations clicked', n: featureSession.reco_click.size, color: 'var(--blue)' },
+      { label: 'Chat used',            n: featureSession.chat.size,        color: 'var(--green)' },
+      { label: 'Cross-device lookup',  n: featureSession.lookup.size,      color: 'var(--ink-soft)' },
+      { label: 'Language switched',    n: featureSession.lang_switch.size, color: 'var(--ink-soft)' },
+    ];
+    const featMax = Math.max(...featureRows.map(f => f.n), 1);
+
+    // Language split across sessions (dominant lang per session)
+    const langSplit = {};
+    gSessList.forEach(s => {
+      const top = Object.entries(s.langs).sort((a, b) => b[1] - a[1])[0];
+      if (top) langSplit[top[0]] = (langSplit[top[0]] || 0) + 1;
+    });
+    const langTotal = Object.values(langSplit).reduce((a, b) => a + b, 0);
+
+    html += `<div class="section-title">Guest Activity — Cross-property</div>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-label">Guest Sessions</div>
+          <div class="stat-val blue">${gSessList.length}</div>
+          <div class="stat-sub">${Object.keys(propRoll).length} propert${Object.keys(propRoll).length === 1 ? 'y' : 'ies'}</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Check-ins Started</div>
+          <div class="stat-val">${gStartedShow}</div>
+          <div class="stat-sub">${startPct}% of opens</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Check-ins Completed</div>
+          <div class="stat-val green">${gCompleted}</div>
+          <div class="stat-sub">${conversionPct}% conversion</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Chat Messages</div>
+          <div class="stat-val">${guestEvents.filter(e => e.event_type === 'guest_chat_message').length}</div>
+          <div class="stat-sub">${featureSession.chat.size} session${featureSession.chat.size !== 1 ? 's' : ''}</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Reco Clicks</div>
+          <div class="stat-val amber">${guestEvents.filter(e => e.event_type === 'guest_reco_clicked').length}</div>
+          <div class="stat-sub">${featureSession.reco_click.size} session${featureSession.reco_click.size !== 1 ? 's' : ''}</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Languages</div>
+          <div class="stat-val">${Object.keys(langSplit).length}</div>
+          <div class="stat-sub">${Object.entries(langSplit).sort((a,b) => b[1] - a[1]).map(([k, v]) => `${k.toUpperCase()}: ${langTotal > 0 ? Math.round(v / langTotal * 100) : 0}%`).join(' · ')}</div>
+        </div>
+      </div>`;
+
+    // Feature adoption bars
+    html += `<div class="section-title">Guest Feature Adoption</div>
+      <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);">
+        <div class="bar-chart">
+          ${featureRows.map(f => `
+            <div class="bar-row">
+              <div class="bar-label">${f.label}</div>
+              <div class="bar-track">
+                <div class="bar-fill" style="width:${Math.round(f.n / featMax * 100)}%;background:${f.color};"></div>
+                <div class="bar-count">${f.n} · ${pctOf(f.n)}%</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>`;
+
+    // Per-property table
+    if (propRows.length > 0) {
+      html += `<div class="section-title">Per-property Guest Activity</div>
+        <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);">
+          <table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr style="background:var(--cream-2);">
+                <th style="padding:10px 14px;text-align:left;font-size:0.7rem;color:var(--ink-soft);border-bottom:1px solid var(--border);">Property</th>
+                <th style="padding:10px 14px;text-align:right;font-size:0.7rem;color:var(--ink-soft);border-bottom:1px solid var(--border);">Opens</th>
+                <th style="padding:10px 14px;text-align:right;font-size:0.7rem;color:var(--ink-soft);border-bottom:1px solid var(--border);">Started</th>
+                <th style="padding:10px 14px;text-align:right;font-size:0.7rem;color:var(--ink-soft);border-bottom:1px solid var(--border);">Completed</th>
+                <th style="padding:10px 14px;text-align:right;font-size:0.7rem;color:var(--ink-soft);border-bottom:1px solid var(--border);">Conversion</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${propRows.map(r => `
+                <tr>
+                  <td style="padding:10px 14px;font-size:0.82rem;color:var(--ink);border-bottom:1px solid var(--border);">${r.name}</td>
+                  <td style="padding:10px 14px;font-size:0.82rem;color:var(--ink);text-align:right;border-bottom:1px solid var(--border);">${r.opened}</td>
+                  <td style="padding:10px 14px;font-size:0.82rem;color:var(--ink);text-align:right;border-bottom:1px solid var(--border);">${r.started}</td>
+                  <td style="padding:10px 14px;font-size:0.82rem;color:var(--green);font-weight:500;text-align:right;border-bottom:1px solid var(--border);">${r.completed}</td>
+                  <td style="padding:10px 14px;font-size:0.82rem;color:${r.rate >= 70 ? 'var(--green)' : r.rate >= 40 ? 'var(--amber)' : 'var(--red)'};font-weight:500;text-align:right;border-bottom:1px solid var(--border);">${r.rate}%</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    }
+  }
+
   // Daily activity
   if (sortedDays.length > 1) {
     html += `<div class="section-title">Daily Activity</div>

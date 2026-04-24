@@ -468,6 +468,23 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 .ga-range-btn:last-child { border-right:none; }
 .ga-range-btn.active { background:var(--warm); color:#fff; font-weight:500; }
 .ga-range-btn:not(.active):hover { background:rgba(194,113,79,0.06); color:var(--ink); }
+
+/* Refresh controls */
+.ga-refresh-group { display: inline-flex; align-items: center; gap: 10px; }
+.ga-last-updated { font-size: 0.72rem; color: var(--ink-soft); font-style: italic; }
+.ga-refresh-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; font-size: 0.78rem; font-weight: 500;
+  background: var(--white); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--warm); cursor: pointer; font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s;
+}
+.ga-refresh-btn:hover { background: rgba(194,113,79,0.08); border-color: var(--warm); }
+.ga-refresh-btn:active { transform: scale(0.97); }
+.ga-refresh-btn:disabled { opacity: 0.55; cursor: wait; }
+.ga-refresh-icon { display: inline-block; font-size: 0.95rem; line-height: 1; transition: transform 0.4s ease; }
+.ga-refresh-btn.spinning .ga-refresh-icon { animation: ga-spin 0.8s linear infinite; }
+@keyframes ga-spin { to { transform: rotate(360deg); } }
 .ga-grid {
   display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr));
   gap:18px; margin-bottom:18px;
@@ -1108,8 +1125,15 @@ See you soon!</textarea>
           <button class="ga-range-btn active" data-ga-range="30" data-h="ga_range_30" onclick="setGaRange(30)">30 days</button>
           <button class="ga-range-btn" data-ga-range="90" data-h="ga_range_90" onclick="setGaRange(90)">90 days</button>
         </div>
-        <div style="font-size:0.72rem;color:var(--ink-soft);" data-h="ga_info_tip">
-          Stats include anonymous guest interactions — no personal data is shown here.
+        <div class="ga-refresh-group">
+          <span id="gaLastUpdated" class="ga-last-updated" data-h="ga_never_loaded">Not loaded yet</span>
+          <button class="ga-refresh-btn" id="gaRefreshBtn" onclick="loadGuestAnalytics()" data-h="ga_refresh_btn" title="Refresh now">
+            <span class="ga-refresh-icon">↻</span>
+            <span data-h="ga_refresh_label">Refresh</span>
+          </button>
+        </div>
+        <div style="flex-basis:100%;font-size:0.72rem;color:var(--ink-soft);" data-h="ga_info_tip">
+          Stats include anonymous guest interactions — no personal data is shown here. Data is live; refresh to pull the latest.
         </div>
       </div>
 
@@ -1308,9 +1332,12 @@ async function loadGuestAnalytics() {
   const loadingEl = document.getElementById('gaLoading');
   const emptyEl   = document.getElementById('gaEmpty');
   const contentEl = document.getElementById('gaContent');
+  const refreshBtn = document.getElementById('gaRefreshBtn');
+  const lastUpdatedEl = document.getElementById('gaLastUpdated');
   loadingEl.style.display = 'block';
   emptyEl.style.display = 'none';
   contentEl.style.display = 'none';
+  if (refreshBtn) { refreshBtn.disabled = true; refreshBtn.classList.add('spinning'); }
 
   // Sync active range button to current state
   document.querySelectorAll('.ga-range-btn').forEach(b => {
@@ -1333,9 +1360,17 @@ async function loadGuestAnalytics() {
     if (error) throw error;
 
     loadingEl.style.display = 'none';
+    // Stamp "Updated at HH:MM" in the user's locale
+    if (lastUpdatedEl) {
+      const now = new Date();
+      const hhmm = now.toLocaleTimeString(hostLang === 'it' ? 'it-IT' : 'en-GB',
+                                          { hour: '2-digit', minute: '2-digit' });
+      lastUpdatedEl.textContent = (hostLang === 'it' ? 'Aggiornato alle ' : 'Updated at ') + hhmm;
+    }
     if (!data || data.length === 0) {
       emptyEl.style.display = 'block';
       _gaLoading = false;
+      if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.classList.remove('spinning'); }
       return;
     }
 
@@ -1348,6 +1383,7 @@ async function loadGuestAnalytics() {
     emptyEl.style.display = 'block';
   } finally {
     _gaLoading = false;
+    if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.classList.remove('spinning'); }
   }
 }
 
@@ -1757,7 +1793,9 @@ const HT = {
     ga_eng_sessions: 'Sessions', ga_eng_scans: 'Doc scans', ga_eng_lookups: 'Cross-device lookups',
     ga_eng_reco_clicks: 'Reco clicks', ga_eng_lang_switches: 'Language switches',
     ga_loading: 'Loading analytics…', ga_no_data: 'No guest activity yet for this property.',
-    ga_info_tip: 'Stats include anonymous guest interactions — no personal data is shown here.',
+    ga_info_tip: 'Stats include anonymous guest interactions — no personal data is shown here. Data is live; refresh to pull the latest.',
+    ga_refresh_btn: 'Refresh now', ga_refresh_label: 'Refresh',
+    ga_never_loaded: 'Not loaded yet',
     t_rules: 'House Rules', s_rules: 'Manage rules shown to guests',
     t_recos: 'Recommendations', s_recos: 'Curate local tips for your guests',
     t_checkins: 'Check-in Data', s_checkins: 'View and manage guest registrations',
@@ -1920,7 +1958,9 @@ const HT = {
     ga_eng_sessions: 'Sessioni', ga_eng_scans: 'Scansioni doc', ga_eng_lookups: 'Lookup cross-device',
     ga_eng_reco_clicks: 'Click consigli', ga_eng_lang_switches: 'Cambi lingua',
     ga_loading: 'Caricamento analisi…', ga_no_data: 'Ancora nessuna attività ospite per questa proprietà.',
-    ga_info_tip: 'Le statistiche includono interazioni anonime — qui non vengono mostrati dati personali.',
+    ga_info_tip: 'Le statistiche includono interazioni anonime — qui non vengono mostrati dati personali. I dati sono in tempo reale; aggiorna per scaricare gli ultimi.',
+    ga_refresh_btn: 'Aggiorna ora', ga_refresh_label: 'Aggiorna',
+    ga_never_loaded: 'Non ancora caricato',
     t_rules: 'Regole della Casa', s_rules: 'Gestisci le regole mostrate agli ospiti',
     t_recos: 'Consigli', s_recos: 'Cura i consigli locali per i tuoi ospiti',
     t_checkins: 'Dati Check-in', s_checkins: 'Visualizza e gestisci le registrazioni degli ospiti',

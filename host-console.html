@@ -2542,7 +2542,14 @@ const STATE_CODES = {
   // Search by common name (lowercase) → 9-char police code
   'italy':'100000100','italia':'100000100','italian':'100000100','italiana':'100000100','italiano':'100000100',
   'germany':'100000212','germania':'100000212','german':'100000212','tedesca':'100000212','tedesco':'100000212','deutsch':'100000212',
-  'france':'100000217','francia':'100000217','french':'100000217','francese':'100000217',
+  // NOTE (24 Apr 2026): The France code "100000217" was confirmed WRONG by the
+  // Alloggiati portal ("Stato di Nascita Errato" rejection on 2026-04-24 upload).
+  // Entry removed until the official code is sourced from
+  // https://alloggiatiweb.poliziadistato.it → Supporto → Download Tabelle → Stati.
+  // Other entries in this table have NOT been independently verified and may
+  // also be incorrect — the foreign-born warning in exportAlloggiati() prompts
+  // the host to cross-check on the portal before upload.
+  //  'france':'100000217','francia':'100000217','french':'100000217','francese':'100000217',
   'united kingdom':'100000219','uk':'100000219','great britain':'100000219','regno unito':'100000219','british':'100000219','inglese':'100000219',
   'spain':'100000221','spagna':'100000221','spanish':'100000221','spagnola':'100000221','spagnolo':'100000221',
   'portugal':'100000220','portogallo':'100000220','portuguese':'100000220','portoghese':'100000220',
@@ -2622,6 +2629,21 @@ function lookupDocCode(input) {
 
 function pad(str, len) { return (str || '').substring(0, len).padEnd(len); }
 function padNum(n, len) { return String(n || 0).padStart(len, '0').substring(0, len); }
+
+// Alloggiati Web only accepts A–Z and spaces in names. Hyphens, apostrophes,
+// and accented characters will cause "Nome/Cognome con caratteri non validi".
+// We: uppercase → strip diacritics → replace anything non A-Z with a space →
+// collapse multiple spaces. "MARIE-JOSÉ" becomes "MARIE JOSE", "D'ANGELO"
+// becomes "D ANGELO", "MÜLLER" becomes "MULLER".
+function sanitizeAllogName(s) {
+  if (!s) return '';
+  return String(s)
+    .toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 function isItalianCitizenshipCode(code) { return code && code.trim() === '100000100'; }
 function fmtDateIT(isoDate) {
   if (!isoDate) return '          ';
@@ -2820,8 +2842,8 @@ function exportAlloggiati() {
       const tipoAll = GUEST_TYPE_CODES[c.guest_type] || '16';
       const dataArrivo = fmtDateIT(c.arrival_date || c.submitted_at);
       const permanenza = padNum(Math.min(c.nights || 1, 99), 2);
-      const cognome = pad((c.surname || '').toUpperCase(), 50);
-      const nome = pad((c.name || '').toUpperCase(), 30);
+      const cognome = pad(sanitizeAllogName(c.surname), 50);
+      const nome = pad(sanitizeAllogName(c.name), 30);
       const sesso = c.sex === 'F' ? '2' : '1';
       const dataNascita = fmtDateIT(c.date_of_birth);
 
@@ -2846,7 +2868,10 @@ function exportAlloggiati() {
         statoNascita = '100000100';
       } else {
         comuneNascita = '         ';
-        provinciaNascita = '  ';
+        // Alloggiati spec: foreign-born persons use "EE" (Estero) in provincia field,
+        // not spaces. The portal silently accepts blank provincia when stato is also
+        // invalid, but rejects it once stato is correct — so we fix both together.
+        provinciaNascita = 'EE';
         statoNascita = birthCountryCode;
       }
 
@@ -2881,6 +2906,15 @@ function exportAlloggiati() {
 
       if (line.length !== 168) {
         warnings.push(`⚠ Row ${globalIdx}: Line is ${line.length} chars (expected 168). Check data for ${c.name} ${c.surname}.`);
+      }
+      // Foreign-born guest: surface the state code so the host can cross-check
+      // it against the Alloggiati portal dropdown BEFORE upload. Our hardcoded
+      // STATE_CODES table is known to have gaps — the portal is the source of
+      // truth. If a code is rejected, look up the correct one at
+      // https://alloggiatiweb.poliziadistato.it → Supporto → Download Tabelle → Stati
+      if (!bornInItaly) {
+        const country = (c.birth_country || c.citizenship || 'Unknown').trim();
+        warnings.push(`ℹ Row ${globalIdx}: ${c.name} ${c.surname} — foreign-born (${country}) · state code = "${statoNascita.trim() || 'EMPTY'}". Verify on Alloggiati portal if rejected.`);
       }
       lines.push(line);
     });
@@ -2953,8 +2987,10 @@ function exportPayTourist() {
     });
 
     group.forEach((c, idx) => {
-      const name = (c.name || '').trim();
-      const surname = (c.surname || '').trim();
+      // Names sanitized to A-Z + space only — matches Alloggiati rules since
+      // PayTourist forwards the same data to the police portal downstream.
+      const name = sanitizeAllogName(c.name);
+      const surname = sanitizeAllogName(c.surname);
       const checkin = fmtD(c.arrival_date || c.submitted_at);
       const checkout = fmtD(c.departure_date);
       const amount = ''; // Auto-calculated by PayTourist for fixed-rate municipalities
@@ -3253,8 +3289,9 @@ function exportPayTourist() {
       const sendReceipt = '1';
 
       // Build CSV row (no quotes needed unless field contains comma)
+      // Names sanitized to match police portal rules (A-Z + space only).
       const row = [
-        gId, c.name || '', c.surname || '',
+        gId, sanitizeAllogName(c.name), sanitizeAllogName(c.surname),
         checkin, checkout, amount,
         cirCode, sex, dob,
         exemption, reduction,

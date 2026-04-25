@@ -534,6 +534,16 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 .ga-lang-bar { flex:1; height:8px; background:rgba(250,246,240,0.8); border-radius:4px; overflow:hidden; }
 .ga-lang-fill { height:100%; background:var(--warm); }
 .ga-lang-pct { font-size:0.78rem; color:var(--ink-soft); width:50px; text-align:right; font-weight:500; }
+/* Per-guest breakdown */
+.ga-guest-list { display:flex; flex-direction:column; gap:0; }
+.ga-guest-row { display:grid; grid-template-columns:1fr 1fr 80px 80px 80px; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid rgba(74,42,24,0.08); font-size:0.82rem; }
+.ga-guest-row:last-child { border-bottom:none; }
+.ga-guest-head { display:grid; grid-template-columns:1fr 1fr 80px 80px 80px; gap:8px; padding:0 0 6px; border-bottom:2px solid rgba(74,42,24,0.12); margin-bottom:2px; }
+.ga-guest-head-label { font-size:0.62rem; text-transform:uppercase; letter-spacing:0.12em; color:var(--ink-2); font-weight:600; }
+.ga-guest-name { font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ga-guest-code { font-family:monospace; font-size:0.72rem; color:var(--warm); background:rgba(194,113,79,0.08); border-radius:4px; padding:2px 5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ga-guest-num { text-align:right; color:var(--ink-soft); font-size:0.8rem; }
+.ga-guest-num.hi { color:var(--warm); font-weight:600; }
 .ga-info {
   font-size:0.72rem; color:var(--ink-soft); padding:10px 14px;
   background:rgba(250,246,240,0.5); border-radius:8px;
@@ -1133,7 +1143,7 @@ See you soon!</textarea>
           </button>
         </div>
         <div style="flex-basis:100%;font-size:0.72rem;color:var(--ink-soft);" data-h="ga_info_tip">
-          Stats include anonymous guest interactions — no personal data is shown here. Data is live; refresh to pull the latest.
+          Stats include anonymous guest interactions — no personal data is shown here. Where a booking code is known, sessions are attributed to the capofamiglia. Data is live; refresh to pull the latest.
         </div>
       </div>
 
@@ -1193,10 +1203,16 @@ See you soon!</textarea>
             <div class="ga-kpi-row" id="gaEngagement"></div>
           </div>
         </div>
+        <!-- Row 4 — Per-Guest Breakdown -->
+        <div class="ga-grid">
+          <div class="ga-card full">
+            <div class="ga-card-title" data-h="ga_guest_breakdown_title">Per-guest breakdown</div>
+            <div class="ga-card-sub" data-h="ga_guest_breakdown_sub">Sessions attributed by booking code — capofamiglia shown for multi-guest bookings</div>
+            <div id="gaGuestBreakdown" class="ga-guest-list"></div>
+          </div>
+        </div>
       </div>
     </div>
-
-    <!-- ════════════ GUEST CHAT ════════════ -->
     <div class="panel" id="panel-chat">
       <div style="display:flex;flex-direction:column;height:calc(100vh - 160px);min-height:300px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-shrink:0;">
@@ -1350,7 +1366,7 @@ async function loadGuestAnalytics() {
     // 5000 row cap is a safety net — Bari-scale properties won't hit it;
     // if they do the counts will be slightly low but UI still renders.
     const { data, error } = await sb.from('analytics_events')
-      .select('event_type, event_data, session_id, created_at')
+      .select('event_type, event_data, session_id, booking_code, created_at')
       .eq('property_id', propertyId)
       .like('event_type', 'guest_%')
       .gte('created_at', cutoff)
@@ -1443,7 +1459,14 @@ function renderGuestAnalytics(events) {
   // ── Chat & language ──
   const chatEvents = events.filter(e => e.event_type === 'guest_chat_message');
   const chatTotal = chatEvents.length;
-  const chatEscalated = chatEvents.filter(e => e.event_data && e.event_data.escalated).length;
+  // Count distinct sessions (or booking codes) that sent at least one message
+  // while chatEscalated=true — avoids counting every post-escalation message.
+  const escalatedSessions = new Set(
+    chatEvents
+      .filter(e => e.event_data && e.event_data.escalated)
+      .map(e => e.session_id)
+  );
+  const chatEscalated = escalatedSessions.size;
   const langTotals = {};
   // Use session-level language (the dominant lang in that session) to avoid
   // overcounting chatty sessions. Fallback: count raw event langs.
@@ -1463,6 +1486,9 @@ function renderGuestAnalytics(events) {
     { key: 'ga_eng_lang_switches',value: count('guest_language_switch') },
   ];
   renderGaEngagement(engagement);
+
+  // ── Per-guest breakdown ──
+  renderGaGuestBreakdown(events);
 }
 
 function renderGaFunnel(opened, started, completed) {
@@ -1589,6 +1615,112 @@ function renderGaEngagement(items) {
       <div class="ga-kpi-label">${h(i.key)}</div>
       <div class="ga-kpi-value ${i.value >= 1000 ? 'small' : ''}">${i.value}</div>
     </div>`).join('');
+}
+
+async function renderGaGuestBreakdown(events) {
+  const el = document.getElementById('gaGuestBreakdown');
+  if (!el) return;
+  el.innerHTML = `<div class="ga-empty" style="padding:12px 0;font-size:0.8rem;">Loading…</div>`;
+
+  // Group events by booking_code (or session_id for anonymous).
+  // We want: { code → { sessions: Set, events: number } }
+  const groups = {};
+  for (const e of events) {
+    const code = e.booking_code || null;
+    const key  = code || `_anon_${e.session_id}`;
+    if (!groups[key]) groups[key] = { code, sessions: new Set(), eventCount: 0 };
+    if (e.session_id) groups[key].sessions.add(e.session_id);
+    groups[key].eventCount++;
+  }
+
+  // Collect known booking codes to look up capofamiglia names.
+  const knownCodes = Object.values(groups).map(g => g.code).filter(Boolean);
+  const capoMap = {}; // booking_code → "SURNAME NAME"
+  if (knownCodes.length > 0) {
+    try {
+      const { data } = await sb.from('checkins')
+        .select('booking_code, surname, name, guest_type, submitted_at')
+        .in('booking_code', knownCodes)
+        .eq('property_id', propertyId)
+        .order('submitted_at', { ascending: true });
+      if (data) {
+        // For each booking_code: prefer the capofamiglia row (guest_type in
+        // ['single','head','group']), falling back to the first submitted row.
+        for (const row of data) {
+          const bc = row.booking_code;
+          const isHead = ['single', 'head', 'group'].includes(row.guest_type);
+          if (!capoMap[bc] || isHead) {
+            capoMap[bc] = `${row.surname || ''} ${row.name || ''}`.trim().toUpperCase();
+          }
+        }
+      }
+    } catch (e) { console.warn('Guest breakdown lookup failed:', e); }
+  }
+
+  // Build sorted rows: booking sessions descending, anonymous last.
+  const rows = Object.entries(groups).map(([key, g]) => {
+    const isAnon = !g.code;
+    const preCheckin = g.code && !capoMap[g.code]; // code known but no checkin yet
+    let displayLabel;
+    if (isAnon) {
+      displayLabel = h('ga_breakdown_anonymous') || 'Anonymous';
+    } else if (preCheckin) {
+      displayLabel = `${h('ga_breakdown_precheckin') || 'Booking'} ${g.code} (${h('ga_breakdown_precheckin_suffix') || 'pre check-in'})`;
+    } else {
+      displayLabel = capoMap[g.code];
+    }
+    return { label: displayLabel, code: isAnon ? '—' : g.code, sessions: g.sessions.size, events: g.eventCount, isAnon };
+  }).sort((a, b) => {
+    if (a.isAnon && !b.isAnon) return 1;
+    if (!a.isAnon && b.isAnon) return -1;
+    return b.sessions - a.sessions;
+  });
+
+  if (rows.length === 0) {
+    el.innerHTML = `<div class="ga-empty" style="padding:12px 0;font-size:0.8rem;">—</div>`;
+    return;
+  }
+
+  // Merge all anonymous into one row.
+  const namedRows = rows.filter(r => !r.isAnon);
+  const anonRows  = rows.filter(r =>  r.isAnon);
+  const anonSessions = anonRows.reduce((s, r) => s + r.sessions, 0);
+  const anonEvents   = anonRows.reduce((s, r) => s + r.events, 0);
+  const finalRows = [...namedRows];
+  if (anonRows.length > 0) {
+    finalRows.push({
+      label: h('ga_breakdown_anonymous') || 'Anonymous',
+      code: '—', sessions: anonSessions, events: anonEvents, isAnon: true,
+    });
+  }
+
+  const maxSessions = Math.max(1, ...finalRows.map(r => r.sessions));
+  const headLabelName    = h('ga_breakdown_col_guest')  || 'Guest';
+  const headLabelCode    = h('ga_breakdown_col_code')   || 'Booking code';
+  const headLabelSess    = h('ga_breakdown_col_sess')   || 'Sessions';
+  const headLabelEvents  = h('ga_breakdown_col_events') || 'Events';
+  const headLabelShare   = h('ga_breakdown_col_share')  || 'Share';
+
+  el.innerHTML = `
+    <div class="ga-guest-head">
+      <div class="ga-guest-head-label">${headLabelName}</div>
+      <div class="ga-guest-head-label">${headLabelCode}</div>
+      <div class="ga-guest-head-label" style="text-align:right">${headLabelSess}</div>
+      <div class="ga-guest-head-label" style="text-align:right">${headLabelEvents}</div>
+      <div class="ga-guest-head-label" style="text-align:right">${headLabelShare}</div>
+    </div>
+    ${finalRows.map(r => {
+      const pct = Math.round((r.sessions / maxSessions) * 100);
+      const safe = s => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+      return `
+        <div class="ga-guest-row">
+          <div class="ga-guest-name" title="${safe(r.label)}">${safe(r.label)}</div>
+          <div class="ga-guest-code">${safe(r.code)}</div>
+          <div class="ga-guest-num ${r.sessions > 1 ? 'hi' : ''}">${r.sessions}</div>
+          <div class="ga-guest-num">${r.events}</div>
+          <div class="ga-guest-num">${pct}%</div>
+        </div>`;
+    }).join('')}`;
 }
 
 /* ══════════════════════════════════════
@@ -1792,8 +1924,11 @@ const HT = {
     ga_engagement_title: 'Engagement', ga_engagement_sub: 'Other useful interactions',
     ga_eng_sessions: 'Sessions', ga_eng_scans: 'Doc scans', ga_eng_lookups: 'Cross-device lookups',
     ga_eng_reco_clicks: 'Reco clicks', ga_eng_lang_switches: 'Language switches',
+    ga_guest_breakdown_title: 'Per-guest breakdown', ga_guest_breakdown_sub: 'Sessions attributed by booking code — capofamiglia shown for multi-guest bookings',
+    ga_breakdown_anonymous: 'Anonymous', ga_breakdown_precheckin: 'Booking', ga_breakdown_precheckin_suffix: 'pre check-in',
+    ga_breakdown_col_guest: 'Guest', ga_breakdown_col_code: 'Booking code', ga_breakdown_col_sess: 'Sessions', ga_breakdown_col_events: 'Events', ga_breakdown_col_share: 'Share',
     ga_loading: 'Loading analytics…', ga_no_data: 'No guest activity yet for this property.',
-    ga_info_tip: 'Stats include anonymous guest interactions — no personal data is shown here. Data is live; refresh to pull the latest.',
+    ga_info_tip: 'Stats include anonymous guest interactions — no personal data is shown here. Where a booking code is known, sessions are attributed to the capofamiglia. Data is live; refresh to pull the latest.',
     ga_refresh_btn: 'Refresh now', ga_refresh_label: 'Refresh',
     ga_never_loaded: 'Not loaded yet',
     t_rules: 'House Rules', s_rules: 'Manage rules shown to guests',
@@ -1957,8 +2092,11 @@ const HT = {
     ga_engagement_title: 'Coinvolgimento', ga_engagement_sub: 'Altre interazioni utili',
     ga_eng_sessions: 'Sessioni', ga_eng_scans: 'Scansioni doc', ga_eng_lookups: 'Lookup cross-device',
     ga_eng_reco_clicks: 'Click consigli', ga_eng_lang_switches: 'Cambi lingua',
+    ga_guest_breakdown_title: 'Dettaglio per ospite', ga_guest_breakdown_sub: 'Sessioni attribuite per codice prenotazione — mostrato capofamiglia per prenotazioni multi-ospite',
+    ga_breakdown_anonymous: 'Anonimi', ga_breakdown_precheckin: 'Prenotazione', ga_breakdown_precheckin_suffix: 'pre check-in',
+    ga_breakdown_col_guest: 'Ospite', ga_breakdown_col_code: 'Cod. prenotazione', ga_breakdown_col_sess: 'Sessioni', ga_breakdown_col_events: 'Eventi', ga_breakdown_col_share: 'Quota',
     ga_loading: 'Caricamento analisi…', ga_no_data: 'Ancora nessuna attività ospite per questa proprietà.',
-    ga_info_tip: 'Le statistiche includono interazioni anonime — qui non vengono mostrati dati personali. I dati sono in tempo reale; aggiorna per scaricare gli ultimi.',
+    ga_info_tip: 'Le statistiche includono interazioni anonime — qui non vengono mostrati dati personali. Dove noto, il codice prenotazione attribuisce le sessioni al capofamiglia. I dati sono in tempo reale; aggiorna per scaricare gli ultimi.',
     ga_refresh_btn: 'Aggiorna ora', ga_refresh_label: 'Aggiorna',
     ga_never_loaded: 'Non ancora caricato',
     t_rules: 'Regole della Casa', s_rules: 'Gestisci le regole mostrate agli ospiti',

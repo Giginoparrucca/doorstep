@@ -1088,6 +1088,8 @@ async function trackGuest(eventType, eventData = {}) {
       session_id: _guestSessionId,
       property_id: propertyId,
     };
+    // Include booking_code when known so events can be attributed to a guest.
+    if (bookingCode) row.booking_code = bookingCode;
     // Anonymous — user_id / user_email stay null by design.
     const { error } = await sb.from('analytics_events').insert(row);
     if (error) console.warn('📊 guest analytics:', error.message);
@@ -1105,6 +1107,7 @@ function trackGuestBeacon(eventType, eventData = {}) {
       session_id: _guestSessionId,
       property_id: propertyId,
     };
+    if (bookingCode) row.booking_code = bookingCode;
     fetch(`${SUPABASE_URL}/rest/v1/analytics_events`, {
       method: 'POST',
       keepalive: true,
@@ -1625,6 +1628,21 @@ async function lookupCheckin() {
         .order('submitted_at');
       if (fullGroup && fullGroup.length > 0) allGuests = fullGroup;
       localStorage.setItem('wbnb_booking', foundCode);
+
+      // Retroactively stamp booking_code on session events that fired before the lookup
+      // resolved the code (link_opened, early page views). This lets host-console
+      // correctly attribute pre-lookup events to the right guest.
+      if (foundCode !== bookingCode) {
+        bookingCode = foundCode;
+        sb.from('analytics_events')
+          .update({ booking_code: foundCode })
+          .eq('session_id', _guestSessionId)
+          .is('booking_code', null)
+          .then(({ error }) => {
+            if (error) console.warn('📊 retroactive booking_code backfill failed:', error.message);
+            else console.log('📊 retroactive booking_code backfill OK →', foundCode);
+          });
+      }
     } else {
       localStorage.setItem('wbnb_lookup', JSON.stringify({ surname: surname.toUpperCase(), date }));
     }

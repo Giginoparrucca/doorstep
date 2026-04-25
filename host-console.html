@@ -544,6 +544,28 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 .ga-guest-code { font-family:monospace; font-size:0.72rem; color:var(--warm); background:rgba(194,113,79,0.08); border-radius:4px; padding:2px 5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .ga-guest-num { text-align:right; color:var(--ink-soft); font-size:0.8rem; }
 .ga-guest-num.hi { color:var(--warm); font-weight:600; }
+/* Recommendation activity feed */
+.ga-card-title-row { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:10px; }
+.ga-reco-act-summary { font-size:0.72rem; color:var(--ink-soft); font-weight:500; white-space:nowrap; padding-top:4px; }
+.ga-reco-act-wrap { max-height:480px; overflow-y:auto; margin-top:4px; }
+.ga-reco-act-head { display:grid; grid-template-columns:140px 1.2fr 1.4fr 110px; gap:10px; padding:0 4px 6px; border-bottom:2px solid rgba(74,42,24,0.12); position:sticky; top:0; background:var(--white); z-index:1; }
+.ga-reco-act-head-label { font-size:0.62rem; text-transform:uppercase; letter-spacing:0.12em; color:var(--ink-2); font-weight:600; }
+.ga-reco-act-list { display:flex; flex-direction:column; }
+.ga-reco-act-row { display:grid; grid-template-columns:140px 1.2fr 1.4fr 110px; gap:10px; align-items:center; padding:9px 4px; border-bottom:1px solid rgba(74,42,24,0.06); font-size:0.82rem; }
+.ga-reco-act-row:last-child { border-bottom:none; }
+.ga-reco-act-time { color:var(--ink-soft); font-size:0.78rem; white-space:nowrap; }
+.ga-reco-act-guest { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.ga-reco-act-guest-name { font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:0.82rem; }
+.ga-reco-act-guest-code { font-family:monospace; font-size:0.65rem; color:var(--warm); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ga-reco-act-place { color:var(--ink); font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ga-reco-act-cat { font-size:0.68rem; text-transform:uppercase; letter-spacing:0.1em; color:var(--ink-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+@media (max-width: 720px) {
+  .ga-reco-act-head { grid-template-columns:90px 1fr 1fr; }
+  .ga-reco-act-head-label:nth-child(4) { display:none; }
+  .ga-reco-act-row { grid-template-columns:90px 1fr 1fr; }
+  .ga-reco-act-row > .ga-reco-act-cat { display:none; }
+  .ga-reco-act-time { font-size:0.7rem; }
+}
 .ga-info {
   font-size:0.72rem; color:var(--ink-soft); padding:10px 14px;
   background:rgba(250,246,240,0.5); border-radius:8px;
@@ -1211,6 +1233,20 @@ See you soon!</textarea>
             <div id="gaGuestBreakdown" class="ga-guest-list"></div>
           </div>
         </div>
+
+        <!-- Row 5 — Recommendation Activity Feed -->
+        <div class="ga-grid">
+          <div class="ga-card full">
+            <div class="ga-card-title-row">
+              <div>
+                <div class="ga-card-title" data-h="ga_reco_activity_title">Recommendation activity</div>
+                <div class="ga-card-sub" data-h="ga_reco_activity_sub">Who clicked what, and when — useful for understanding which tips drive guest behaviour</div>
+              </div>
+              <div class="ga-reco-act-summary" id="gaRecoActivitySummary"></div>
+            </div>
+            <div id="gaRecoActivity" class="ga-reco-act-wrap"></div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="panel" id="panel-chat">
@@ -1390,7 +1426,7 @@ async function loadGuestAnalytics() {
       return;
     }
 
-    renderGuestAnalytics(data);
+    await renderGuestAnalytics(data);
     contentEl.style.display = 'block';
   } catch (e) {
     console.error('GA load error:', e);
@@ -1404,6 +1440,39 @@ async function loadGuestAnalytics() {
 }
 
 function renderGuestAnalytics(events) {
+  return _renderGuestAnalyticsAsync(events);
+}
+
+// Look up booking_code → "SURNAME NAME" of capofamiglia for all booking codes
+// in the event set. Single query shared by the breakdown card and the reco
+// activity feed so we don't double-fetch.
+async function buildCapoMap(events) {
+  const codes = [...new Set(events.map(e => e.booking_code).filter(Boolean))];
+  if (codes.length === 0) return {};
+  try {
+    const { data } = await sb.from('checkins')
+      .select('booking_code, surname, name, guest_type, submitted_at')
+      .in('booking_code', codes)
+      .eq('property_id', propertyId)
+      .order('submitted_at', { ascending: true });
+    const map = {};
+    if (data) {
+      for (const row of data) {
+        const bc = row.booking_code;
+        const isHead = ['single', 'head', 'group'].includes(row.guest_type);
+        if (!map[bc] || isHead) {
+          map[bc] = `${row.surname || ''} ${row.name || ''}`.trim().toUpperCase();
+        }
+      }
+    }
+    return map;
+  } catch (e) {
+    console.warn('Capo lookup failed:', e);
+    return {};
+  }
+}
+
+async function _renderGuestAnalyticsAsync(events) {
   // ── Aggregate by session_id for funnel (unique session counts) ──
   const sessions = {};
   for (const e of events) {
@@ -1487,8 +1556,10 @@ function renderGuestAnalytics(events) {
   ];
   renderGaEngagement(engagement);
 
-  // ── Per-guest breakdown ──
-  renderGaGuestBreakdown(events);
+  // ── Per-guest breakdown + reco activity (share one capofamiglia lookup) ──
+  const capoMap = await buildCapoMap(events);
+  renderGaGuestBreakdown(events, capoMap);
+  renderGaRecoActivity(events, capoMap);
 }
 
 function renderGaFunnel(opened, started, completed) {
@@ -1617,13 +1688,11 @@ function renderGaEngagement(items) {
     </div>`).join('');
 }
 
-async function renderGaGuestBreakdown(events) {
+function renderGaGuestBreakdown(events, capoMap) {
   const el = document.getElementById('gaGuestBreakdown');
   if (!el) return;
-  el.innerHTML = `<div class="ga-empty" style="padding:12px 0;font-size:0.8rem;">Loading…</div>`;
 
   // Group events by booking_code (or session_id for anonymous).
-  // We want: { code → { sessions: Set, events: number } }
   const groups = {};
   for (const e of events) {
     const code = e.booking_code || null;
@@ -1633,29 +1702,7 @@ async function renderGaGuestBreakdown(events) {
     groups[key].eventCount++;
   }
 
-  // Collect known booking codes to look up capofamiglia names.
-  const knownCodes = Object.values(groups).map(g => g.code).filter(Boolean);
-  const capoMap = {}; // booking_code → "SURNAME NAME"
-  if (knownCodes.length > 0) {
-    try {
-      const { data } = await sb.from('checkins')
-        .select('booking_code, surname, name, guest_type, submitted_at')
-        .in('booking_code', knownCodes)
-        .eq('property_id', propertyId)
-        .order('submitted_at', { ascending: true });
-      if (data) {
-        // For each booking_code: prefer the capofamiglia row (guest_type in
-        // ['single','head','group']), falling back to the first submitted row.
-        for (const row of data) {
-          const bc = row.booking_code;
-          const isHead = ['single', 'head', 'group'].includes(row.guest_type);
-          if (!capoMap[bc] || isHead) {
-            capoMap[bc] = `${row.surname || ''} ${row.name || ''}`.trim().toUpperCase();
-          }
-        }
-      }
-    } catch (e) { console.warn('Guest breakdown lookup failed:', e); }
-  }
+  capoMap = capoMap || {};
 
   // Build sorted rows: booking sessions descending, anonymous last.
   const rows = Object.entries(groups).map(([key, g]) => {
@@ -1721,6 +1768,112 @@ async function renderGaGuestBreakdown(events) {
           <div class="ga-guest-num">${pct}%</div>
         </div>`;
     }).join('')}`;
+}
+
+// Friendly time format used in the reco activity feed.
+// Examples (en): "Today, 14:32", "Yesterday, 09:05", "23 Apr, 14:32", "23 Apr 2025, 14:32"
+function gaFormatActivityTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yest  = new Date(today.getTime() - 86400000);
+  const dDay  = new Date(d.getFullYear(),  d.getMonth(),  d.getDate());
+  const hhmm  = d.toLocaleTimeString(hostLang === 'it' ? 'it-IT' : 'en-GB',
+                                     { hour: '2-digit', minute: '2-digit' });
+  if (dDay.getTime() === today.getTime()) return `${h('ga_time_today') || 'Today'}, ${hhmm}`;
+  if (dDay.getTime() === yest.getTime())  return `${h('ga_time_yesterday') || 'Yesterday'}, ${hhmm}`;
+  const months = hostLang === 'it'
+    ? ['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic']
+    : ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const datePart = `${d.getDate()} ${months[d.getMonth()]}`
+    + (d.getFullYear() !== now.getFullYear() ? ` ${d.getFullYear()}` : '');
+  return `${datePart}, ${hhmm}`;
+}
+
+// Recommendation activity feed — chronological list of every reco click,
+// attributed to the capofamiglia when the booking_code is known. This is the
+// host's view for "who clicked what, and when" — useful for understanding
+// which tips actually drive guest behaviour and (later) for partnership data.
+function renderGaRecoActivity(events, capoMap) {
+  const el = document.getElementById('gaRecoActivity');
+  const summaryEl = document.getElementById('gaRecoActivitySummary');
+  if (!el) return;
+  capoMap = capoMap || {};
+
+  const clicks = events
+    .filter(e => e.event_type === 'guest_reco_clicked')
+    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+
+  if (summaryEl) {
+    if (clicks.length === 0) {
+      summaryEl.textContent = '';
+    } else {
+      const uniqueRecos = new Set(clicks.map(c => (c.event_data && c.event_data.name) || '?')).size;
+      const uniqueGuests = new Set(clicks.map(c => c.booking_code || `_a_${c.session_id}`)).size;
+      const totalLabel    = h('ga_reco_activity_summary_total')   || 'clicks';
+      const recosLabel    = h('ga_reco_activity_summary_recos')   || 'unique places';
+      const guestsLabel   = h('ga_reco_activity_summary_guests')  || 'unique guests';
+      summaryEl.textContent = `${clicks.length} ${totalLabel} · ${uniqueRecos} ${recosLabel} · ${uniqueGuests} ${guestsLabel}`;
+    }
+  }
+
+  if (clicks.length === 0) {
+    el.innerHTML = `<div class="ga-empty" style="padding:14px 0;font-size:0.8rem;">${h('ga_reco_activity_empty') || 'No recommendation clicks yet in this period.'}</div>`;
+    return;
+  }
+
+  const safe = s => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const anonLabel = h('ga_breakdown_anonymous')   || 'Anonymous';
+  const preLabel  = h('ga_breakdown_precheckin')  || 'Booking';
+  const preSuffix = h('ga_breakdown_precheckin_suffix') || 'pre check-in';
+
+  // Render last 100 clicks max (older periods may have many).
+  const rows = clicks.slice(0, 100).map(c => {
+    const d = c.event_data || {};
+    const name = d.name || '—';
+    const cat  = d.category || '';
+    const time = gaFormatActivityTime(c.created_at);
+
+    let guestLabel, guestCode;
+    if (!c.booking_code) {
+      guestLabel = anonLabel;
+      guestCode  = '—';
+    } else if (capoMap[c.booking_code]) {
+      guestLabel = capoMap[c.booking_code];
+      guestCode  = c.booking_code;
+    } else {
+      guestLabel = `${preLabel} ${c.booking_code} (${preSuffix})`;
+      guestCode  = c.booking_code;
+    }
+
+    return `
+      <div class="ga-reco-act-row">
+        <div class="ga-reco-act-time">${safe(time)}</div>
+        <div class="ga-reco-act-guest">
+          <div class="ga-reco-act-guest-name" title="${safe(guestLabel)}">${safe(guestLabel)}</div>
+          ${guestCode !== '—' ? `<div class="ga-reco-act-guest-code">${safe(guestCode)}</div>` : ''}
+        </div>
+        <div class="ga-reco-act-place" title="${safe(name)}">${safe(name)}</div>
+        <div class="ga-reco-act-cat">${cat ? safe(cat) : ''}</div>
+      </div>`;
+  }).join('');
+
+  const truncated = clicks.length > 100
+    ? `<div class="ga-empty" style="padding:10px 0 0;font-size:0.7rem;">${(h('ga_reco_activity_truncated') || 'Showing latest 100 of {n} clicks').replace('{n}', clicks.length)}</div>`
+    : '';
+
+  const hLbl = (k, fb) => h(k) || fb;
+  el.innerHTML = `
+    <div class="ga-reco-act-head">
+      <div class="ga-reco-act-head-label">${hLbl('ga_reco_activity_col_when',  'When')}</div>
+      <div class="ga-reco-act-head-label">${hLbl('ga_reco_activity_col_guest', 'Guest')}</div>
+      <div class="ga-reco-act-head-label">${hLbl('ga_reco_activity_col_place', 'Recommendation')}</div>
+      <div class="ga-reco-act-head-label">${hLbl('ga_reco_activity_col_cat',   'Category')}</div>
+    </div>
+    <div class="ga-reco-act-list">${rows}</div>
+    ${truncated}`;
 }
 
 /* ══════════════════════════════════════
@@ -1927,6 +2080,12 @@ const HT = {
     ga_guest_breakdown_title: 'Per-guest breakdown', ga_guest_breakdown_sub: 'Sessions attributed by booking code — capofamiglia shown for multi-guest bookings',
     ga_breakdown_anonymous: 'Anonymous', ga_breakdown_precheckin: 'Booking', ga_breakdown_precheckin_suffix: 'pre check-in',
     ga_breakdown_col_guest: 'Guest', ga_breakdown_col_code: 'Booking code', ga_breakdown_col_sess: 'Sessions', ga_breakdown_col_events: 'Events', ga_breakdown_col_share: 'Share',
+    ga_reco_activity_title: 'Recommendation activity', ga_reco_activity_sub: 'Who clicked what, and when — useful for understanding which tips drive guest behaviour',
+    ga_reco_activity_empty: 'No recommendation clicks yet in this period.',
+    ga_reco_activity_truncated: 'Showing latest 100 of {n} clicks',
+    ga_reco_activity_summary_total: 'clicks', ga_reco_activity_summary_recos: 'unique places', ga_reco_activity_summary_guests: 'unique guests',
+    ga_reco_activity_col_when: 'When', ga_reco_activity_col_guest: 'Guest', ga_reco_activity_col_place: 'Recommendation', ga_reco_activity_col_cat: 'Category',
+    ga_time_today: 'Today', ga_time_yesterday: 'Yesterday',
     ga_loading: 'Loading analytics…', ga_no_data: 'No guest activity yet for this property.',
     ga_info_tip: 'Stats include anonymous guest interactions — no personal data is shown here. Where a booking code is known, sessions are attributed to the capofamiglia. Data is live; refresh to pull the latest.',
     ga_refresh_btn: 'Refresh now', ga_refresh_label: 'Refresh',
@@ -2095,6 +2254,12 @@ const HT = {
     ga_guest_breakdown_title: 'Dettaglio per ospite', ga_guest_breakdown_sub: 'Sessioni attribuite per codice prenotazione — mostrato capofamiglia per prenotazioni multi-ospite',
     ga_breakdown_anonymous: 'Anonimi', ga_breakdown_precheckin: 'Prenotazione', ga_breakdown_precheckin_suffix: 'pre check-in',
     ga_breakdown_col_guest: 'Ospite', ga_breakdown_col_code: 'Cod. prenotazione', ga_breakdown_col_sess: 'Sessioni', ga_breakdown_col_events: 'Eventi', ga_breakdown_col_share: 'Quota',
+    ga_reco_activity_title: 'Attività sui consigli', ga_reco_activity_sub: 'Chi ha cliccato cosa, e quando — utile per capire quali consigli muovono davvero gli ospiti',
+    ga_reco_activity_empty: 'Ancora nessun click sui consigli in questo periodo.',
+    ga_reco_activity_truncated: 'Mostrati gli ultimi 100 di {n} click',
+    ga_reco_activity_summary_total: 'click', ga_reco_activity_summary_recos: 'luoghi unici', ga_reco_activity_summary_guests: 'ospiti unici',
+    ga_reco_activity_col_when: 'Quando', ga_reco_activity_col_guest: 'Ospite', ga_reco_activity_col_place: 'Consiglio', ga_reco_activity_col_cat: 'Categoria',
+    ga_time_today: 'Oggi', ga_time_yesterday: 'Ieri',
     ga_loading: 'Caricamento analisi…', ga_no_data: 'Ancora nessuna attività ospite per questa proprietà.',
     ga_info_tip: 'Le statistiche includono interazioni anonime — qui non vengono mostrati dati personali. Dove noto, il codice prenotazione attribuisce le sessioni al capofamiglia. I dati sono in tempo reale; aggiorna per scaricare gli ultimi.',
     ga_refresh_btn: 'Aggiorna ora', ga_refresh_label: 'Aggiorna',

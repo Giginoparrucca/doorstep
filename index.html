@@ -2437,7 +2437,7 @@ function renderRecos() {
         <div class="reco-desc">${r.desc}</div>
         <div class="reco-meta">${r.tags.map(t=>`<span class="reco-tag">${t}</span>`).join('')}</div>
         <a href="${mapsUrl(r.name, r.address)}" target="_blank" rel="noopener" class="reco-maps-btn"
-           onclick="trackGuest('guest_reco_clicked', { name: ${JSON.stringify(r.name)}, category: ${JSON.stringify(r.cat)} })">
+           onclick="trackGuestBeacon('guest_reco_clicked', { name: ${JSON.stringify(r.name)}, category: ${JSON.stringify(r.cat)} })">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
           <span data-i18n="open_maps">${T[lang].open_maps || 'Open in Maps'}</span>
         </a>

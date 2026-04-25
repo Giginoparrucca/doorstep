@@ -2428,6 +2428,7 @@ function renderRecos() {
     const q = encodeURIComponent(addr ? `${name}, ${addr}` : name);
     return `https://www.google.com/maps/search/?api=1&query=${q}`;
   };
+  const escAttr = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   document.getElementById('recoContainer').innerHTML = filtered.map(r => `
     <div class="reco-card">
       <div class="reco-body">
@@ -2437,13 +2438,30 @@ function renderRecos() {
         <div class="reco-desc">${r.desc}</div>
         <div class="reco-meta">${r.tags.map(t=>`<span class="reco-tag">${t}</span>`).join('')}</div>
         <a href="${mapsUrl(r.name, r.address)}" target="_blank" rel="noopener" class="reco-maps-btn"
-           onclick="trackGuestBeacon('guest_reco_clicked', { name: ${JSON.stringify(r.name)}, category: ${JSON.stringify(r.cat)} })">
+           data-reco-name="${escAttr(r.name)}" data-reco-cat="${escAttr(r.cat)}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
           <span data-i18n="open_maps">${T[lang].open_maps || 'Open in Maps'}</span>
         </a>
       </div>
     </div>
   `).join('');
+
+  // Bind a single delegated click listener on the container (only once, even
+  // if renderRecos is called multiple times). Using event delegation instead
+  // of inline onclick avoids HTML-attribute escaping bugs with quotes/apos in
+  // recommendation names. trackGuestBeacon uses keepalive:true so the request
+  // survives the navigation to Maps in a new tab/the in-app browser handoff.
+  const container = document.getElementById('recoContainer');
+  if (container && !container._recoClickBound) {
+    container._recoClickBound = true;
+    container.addEventListener('click', (e) => {
+      const btn = e.target.closest('.reco-maps-btn');
+      if (!btn) return;
+      const name = btn.getAttribute('data-reco-name') || '';
+      const cat  = btn.getAttribute('data-reco-cat')  || '';
+      trackGuestBeacon('guest_reco_clicked', { name, category: cat });
+    }, { capture: true });
+  }
 }
 
 /* ══════════════════════════════════════

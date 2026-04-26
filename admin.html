@@ -145,6 +145,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let allEvents = [];
 let allProperties = [];
+let allRecommendations = [];
 
 async function loadData() {
   const days = parseInt(document.getElementById('timeRange').value);
@@ -152,16 +153,18 @@ async function loadData() {
 
   document.getElementById('content').innerHTML = '<div class="loading">Loading analytics…</div>';
 
-  const [eventsRes, propsRes, checkinsRes] = await Promise.all([
+  const [eventsRes, propsRes, checkinsRes, recosRes] = await Promise.all([
     sb.from('analytics_events').select('*').gte('created_at', since).order('created_at', { ascending: false }).limit(10000),
     sb.from('properties').select('*').order('name'),
     sb.from('checkins').select('property_id'),
+    sb.from('recommendations').select('*').order('sort_order'),
   ]);
 
   if (eventsRes.error) { document.getElementById('content').innerHTML = `<div class="loading">Error: ${eventsRes.error.message}</div>`; return; }
 
   allEvents = eventsRes.data || [];
   allProperties = propsRes.data || [];
+  allRecommendations = recosRes.data || [];
 
   // Count check-ins per property
   const checkinCounts = {};
@@ -765,62 +768,119 @@ function renderView() {
         </div>`;
 
       // ══════════════════════════════════════════════════════════════════════
-      // TOP RECOMMENDATIONS — cross-host venue popularity. This is the gold
-      // mine for partnership revenue: which venues are getting mass clicks
-      // across the platform regardless of which host recommended them.
+      // ALL RECOMMENDATIONS REGISTRY — every reco entered by every host,
+      // joined with guest click events. Shows recos with zero clicks too,
+      // so admin can spot dead inventory and high-performing entries alike.
+      // Filterable + sortable + searchable — this is the partnership pipeline.
       // ══════════════════════════════════════════════════════════════════════
+
+      // Build click map: keyed by (property_id|name) so different hosts
+      // recommending the same place name don't get conflated. Matching is
+      // exact-name within property — same way it gets clicked from the app.
+      const clickMap = {}; // "propId|name" → { count, lastClick }
       const recoEvents = guestEvents.filter(e => e.event_type === 'guest_reco_clicked');
-      if (recoEvents.length > 0) {
-        const recoStats = {}; // venue name → { clicks, hosts:Set, cats:Set, lastClick }
-        recoEvents.forEach(e => {
-          const name = (e.event_data && e.event_data.name) || '—';
-          const cat  = (e.event_data && e.event_data.category) || '';
-          const host = propToEmail[e.property_id] || '_anon';
-          if (!recoStats[name]) recoStats[name] = { clicks: 0, hosts: new Set(), cats: new Set(), lastClick: e.created_at };
-          recoStats[name].clicks++;
-          recoStats[name].hosts.add(host);
-          if (cat) recoStats[name].cats.add(cat);
-          if (e.created_at > recoStats[name].lastClick) recoStats[name].lastClick = e.created_at;
-        });
+      recoEvents.forEach(e => {
+        const name = (e.event_data && e.event_data.name) || '';
+        if (!name || !e.property_id) return;
+        const key = e.property_id + '|' + name;
+        if (!clickMap[key]) clickMap[key] = { count: 0, lastClick: e.created_at };
+        clickMap[key].count++;
+        if (e.created_at > clickMap[key].lastClick) clickMap[key].lastClick = e.created_at;
+      });
 
-        const recoRows = Object.entries(recoStats)
-          .map(([name, s]) => ({
-            name, clicks: s.clicks,
-            hosts: s.hosts.size,
-            cats: [...s.cats].join(', '),
-            lastClick: s.lastClick,
-          }))
-          .sort((a, b) => b.clicks - a.clicks)
-          .slice(0, 25);
+      // Cross-host: same name across properties → "also recommended by" count
+      const nameToHosts = {};
+      allRecommendations.forEach(r => {
+        if (!r.name) return;
+        if (!nameToHosts[r.name]) nameToHosts[r.name] = new Set();
+        const email = propToEmail[r.property_id] || '_unknown';
+        nameToHosts[r.name].add(email);
+      });
 
-        html += `<div class="section-title">Top Recommendations (cross-host) · Partnership data</div>
-          <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:10px;">
-            Venues clicked by guests across all hosts — sorted by total clicks. High-click venues with multiple recommending hosts are the strongest candidates for paid partnerships, revenue share, or city-level deals.
-          </div>
-          <div style="overflow-x:auto;margin-bottom:14px;">
-          <table class="data-table" style="width:100%;">
-            <thead><tr>
-              <th>#</th><th>Venue</th><th>Category</th>
-              <th style="text-align:right;">Clicks</th>
-              <th style="text-align:right;">Recommended by</th>
-              <th>Last click</th>
-            </tr></thead>
-            <tbody>
-              ${recoRows.map((r, i) => {
-                const safe = (s) => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
-                const cross = r.hosts > 1 ? `<span style="background:rgba(76,175,125,0.12);color:#2d7a4a;padding:1px 6px;border-radius:4px;font-size:0.68rem;font-weight:600;margin-left:4px;">CROSS-HOST</span>` : '';
-                return `<tr>
-                  <td style="color:var(--ink-soft);font-weight:600;">${i + 1}</td>
-                  <td><strong>${safe(r.name)}</strong>${cross}</td>
-                  <td style="font-size:0.72rem;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.06em;">${safe(r.cats) || '—'}</td>
-                  <td style="text-align:right;font-weight:600;color:var(--warm);">${r.clicks}</td>
-                  <td style="text-align:right;">${r.hosts}</td>
-                  <td style="font-size:0.72rem;color:var(--ink-soft);">${new Date(r.lastClick).toLocaleDateString()}</td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table></div>`;
-      }
+      // Build registry rows from recommendations table (so zero-click recos
+      // appear too), enriched with click data + host attribution.
+      const propLookupName = {};
+      allProperties.forEach(p => { propLookupName[p.id] = p.name || p.id.slice(0, 8); });
+
+      const registryRows = allRecommendations.map(r => {
+        const key = r.property_id + '|' + r.name;
+        const click = clickMap[key] || { count: 0, lastClick: null };
+        const hostEmail = propToEmail[r.property_id] || null;
+        const crossHostCount = (nameToHosts[r.name] && nameToHosts[r.name].size) || 1;
+        return {
+          id: r.id,
+          name: r.name || '—',
+          category: r.category || '',
+          desc: r.desc_en || r.desc_it || '',
+          address: r.address || '',
+          tags: r.tags || '',
+          propertyId: r.property_id,
+          propertyName: propLookupName[r.property_id] || '—',
+          hostEmail,
+          hostShort: hostEmail ? hostEmail.split('@')[0] : null,
+          clicks: click.count,
+          lastClick: click.lastClick,
+          crossHostCount,
+        };
+      });
+
+      const totalRecos = registryRows.length;
+      const recosWithClicks = registryRows.filter(r => r.clicks > 0).length;
+      const totalClicks = registryRows.reduce((s, r) => s + r.clicks, 0);
+      const deadRecos = registryRows.filter(r => r.clicks === 0).length;
+      const uniqueVenues = new Set(registryRows.map(r => r.name.toLowerCase().trim())).size;
+      // Click-through-rate proxy: clicks per recommendation
+      const avgClicks = totalRecos > 0 ? (totalClicks / totalRecos).toFixed(1) : '0';
+
+      // Stash for filter/sort handlers (hoisted to window for inline onchange)
+      window._recoRegistry = registryRows;
+
+      // Build category dropdown options
+      const allCats = [...new Set(registryRows.map(r => r.category).filter(Boolean))].sort();
+      // Build host dropdown options
+      const allHostsInRegistry = [...new Set(registryRows.map(r => r.hostEmail).filter(Boolean))].sort();
+
+      html += `<div class="section-title">All Recommendations Registry (${totalRecos})</div>
+        <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:10px;">
+          Every recommendation entered by every host — joined with guest click data. Zero-click rows are dead inventory; high-click cross-host rows are partnership candidates. Filter, sort, and search to dig in.
+        </div>
+        <div class="stats" style="margin-bottom:14px;">
+          <div class="stat"><div class="stat-label">Total recos</div><div class="stat-val">${totalRecos}</div><div class="stat-sub">${uniqueVenues} unique venues</div></div>
+          <div class="stat"><div class="stat-label">Total clicks</div><div class="stat-val amber">${totalClicks}</div><div class="stat-sub">${avgClicks} avg per reco</div></div>
+          <div class="stat"><div class="stat-label">Recos with clicks</div><div class="stat-val green">${recosWithClicks}</div><div class="stat-sub">${totalRecos > 0 ? Math.round(recosWithClicks / totalRecos * 100) : 0}% of inventory</div></div>
+          <div class="stat"><div class="stat-label">Dead inventory</div><div class="stat-val red">${deadRecos}</div><div class="stat-sub">zero-click recos</div></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
+          <input id="recoSearch" type="text" placeholder="Search venue, description, address…" oninput="renderRecoRegistry()"
+                 style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.85rem;font-family:'DM Sans',sans-serif;">
+          <select id="recoCatFilter" onchange="renderRecoRegistry()" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;font-family:'DM Sans',sans-serif;">
+            <option value="">All categories</option>
+            ${allCats.map(c => `<option value="${c}">${c}</option>`).join('')}
+          </select>
+          <select id="recoHostFilter" onchange="renderRecoRegistry()" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;font-family:'DM Sans',sans-serif;max-width:220px;">
+            <option value="">All hosts</option>
+            ${allHostsInRegistry.map(em => `<option value="${em}">${em.split('@')[0]}</option>`).join('')}
+          </select>
+          <select id="recoClickFilter" onchange="renderRecoRegistry()" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;font-family:'DM Sans',sans-serif;">
+            <option value="">All recos</option>
+            <option value="clicked">Clicked only</option>
+            <option value="dead">Zero clicks</option>
+            <option value="cross">Cross-host (≥2)</option>
+          </select>
+          <select id="recoSort" onchange="renderRecoRegistry()" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;font-family:'DM Sans',sans-serif;">
+            <option value="clicks_desc">Most clicks</option>
+            <option value="clicks_asc">Fewest clicks</option>
+            <option value="cross_desc">Most hosts recommending</option>
+            <option value="recent">Most recently clicked</option>
+            <option value="name">Venue A→Z</option>
+            <option value="host">Host A→Z</option>
+            <option value="category">Category</option>
+          </select>
+          <button class="refresh-btn" onclick="exportRecoRegistry()">📥 Export CSV</button>
+        </div>
+        <div id="recoRegistryBody"></div>`;
+      // Trigger initial render after the DOM update completes
+      setTimeout(renderRecoRegistry, 0);
     }
 
     const hostRowsExisting = allProperties.map(p => {
@@ -890,6 +950,129 @@ function renderView() {
     </div>`;
 
   document.getElementById('content').innerHTML = html;
+}
+
+/* ══════════════════════════════════════
+   RECOMMENDATIONS REGISTRY — render + export
+══════════════════════════════════════ */
+function renderRecoRegistry() {
+  const body = document.getElementById('recoRegistryBody');
+  if (!body || !window._recoRegistry) return;
+  const rows = window._recoRegistry;
+  const search = (document.getElementById('recoSearch')?.value || '').toLowerCase().trim();
+  const cat = document.getElementById('recoCatFilter')?.value || '';
+  const hostFilter = document.getElementById('recoHostFilter')?.value || '';
+  const clickFilter = document.getElementById('recoClickFilter')?.value || '';
+  const sort = document.getElementById('recoSort')?.value || 'clicks_desc';
+
+  let filtered = rows.filter(r => {
+    if (cat && r.category !== cat) return false;
+    if (hostFilter && r.hostEmail !== hostFilter) return false;
+    if (clickFilter === 'clicked' && r.clicks === 0) return false;
+    if (clickFilter === 'dead'    && r.clicks > 0)   return false;
+    if (clickFilter === 'cross'   && r.crossHostCount < 2) return false;
+    if (search) {
+      const hay = (r.name + ' ' + r.desc + ' ' + r.address + ' ' + r.tags + ' ' + (r.hostEmail || '') + ' ' + r.propertyName).toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  // Sort
+  const cmp = {
+    clicks_desc: (a, b) => b.clicks - a.clicks,
+    clicks_asc:  (a, b) => a.clicks - b.clicks,
+    cross_desc:  (a, b) => b.crossHostCount - a.crossHostCount || b.clicks - a.clicks,
+    recent:      (a, b) => (b.lastClick || '').localeCompare(a.lastClick || ''),
+    name:        (a, b) => a.name.localeCompare(b.name),
+    host:        (a, b) => (a.hostShort || 'zz').localeCompare(b.hostShort || 'zz'),
+    category:    (a, b) => (a.category || '').localeCompare(b.category || '') || b.clicks - a.clicks,
+  }[sort] || ((a, b) => b.clicks - a.clicks);
+  filtered = filtered.slice().sort(cmp);
+
+  if (filtered.length === 0) {
+    body.innerHTML = `<div class="loading">No recommendations match your filters.</div>`;
+    return;
+  }
+
+  const safe = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString() : '—';
+
+  // Cap at 200 rows in the table for browser perf; export gets full set.
+  const cap = 200;
+  const display = filtered.slice(0, cap);
+
+  body.innerHTML = `
+    <div style="font-size:0.72rem;color:var(--ink-soft);margin-bottom:6px;">Showing ${display.length} of ${filtered.length} recos${filtered.length > cap ? ' (export to see all)' : ''}</div>
+    <div style="overflow-x:auto;margin-bottom:14px;">
+    <table class="data-table" style="width:100%;min-width:920px;">
+      <thead><tr>
+        <th>#</th>
+        <th>Venue</th>
+        <th>Category</th>
+        <th>Host</th>
+        <th>Property</th>
+        <th style="text-align:right;">Clicks</th>
+        <th style="text-align:right;">Hosts rec.</th>
+        <th>Last click</th>
+        <th>Address</th>
+      </tr></thead>
+      <tbody>
+        ${display.map((r, i) => {
+          const cross = r.crossHostCount > 1
+            ? `<span style="background:rgba(76,175,125,0.12);color:#2d7a4a;padding:1px 6px;border-radius:4px;font-size:0.65rem;font-weight:600;margin-left:5px;white-space:nowrap;">×${r.crossHostCount}</span>`
+            : '';
+          const clickStyle = r.clicks > 0 ? 'color:var(--warm);font-weight:600;' : 'color:var(--ink-soft);opacity:0.5;';
+          const descSnippet = r.desc ? `<div style="font-size:0.68rem;color:var(--ink-soft);margin-top:2px;line-height:1.3;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safe(r.desc)}</div>` : '';
+          return `<tr>
+            <td style="color:var(--ink-soft);font-weight:600;">${i + 1}</td>
+            <td><strong>${safe(r.name)}</strong>${cross}${descSnippet}</td>
+            <td style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-soft);">${safe(r.category) || '—'}</td>
+            <td>${r.hostEmail
+              ? `<button onclick="document.getElementById('userFilter').value='${safe(r.hostEmail)}';renderView();" style="background:none;border:none;padding:0;color:var(--warm);font-size:0.78rem;font-weight:500;cursor:pointer;text-align:left;font-family:inherit;">${safe(r.hostShort)}</button>`
+              : '<span style="color:var(--ink-soft);font-style:italic;">—</span>'}</td>
+            <td style="font-size:0.78rem;">${safe(r.propertyName)}</td>
+            <td style="text-align:right;${clickStyle}">${r.clicks}</td>
+            <td style="text-align:right;">${r.crossHostCount}</td>
+            <td style="font-size:0.72rem;color:var(--ink-soft);">${fmtDate(r.lastClick)}</td>
+            <td style="font-size:0.72rem;color:var(--ink-soft);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safe(r.address) || '—'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table></div>`;
+}
+
+function exportRecoRegistry() {
+  const rows = window._recoRegistry || [];
+  if (rows.length === 0) return;
+  // Apply current filters/sort so export matches what admin is looking at
+  const search = (document.getElementById('recoSearch')?.value || '').toLowerCase().trim();
+  const cat = document.getElementById('recoCatFilter')?.value || '';
+  const hostFilter = document.getElementById('recoHostFilter')?.value || '';
+  const clickFilter = document.getElementById('recoClickFilter')?.value || '';
+
+  let filtered = rows.filter(r => {
+    if (cat && r.category !== cat) return false;
+    if (hostFilter && r.hostEmail !== hostFilter) return false;
+    if (clickFilter === 'clicked' && r.clicks === 0) return false;
+    if (clickFilter === 'dead'    && r.clicks > 0)   return false;
+    if (clickFilter === 'cross'   && r.crossHostCount < 2) return false;
+    if (search) {
+      const hay = (r.name + ' ' + r.desc + ' ' + r.address + ' ' + r.tags + ' ' + (r.hostEmail || '') + ' ' + r.propertyName).toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  const headers = ['venue','category','host_email','property','clicks','hosts_recommending','last_click','address','description','tags'];
+  const csvRows = filtered.map(r => [
+    r.name, r.category, r.hostEmail || '', r.propertyName,
+    r.clicks, r.crossHostCount, r.lastClick || '',
+    r.address, r.desc, r.tags,
+  ].map(v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`).join(','));
+  const csv = '\uFEFF' + [headers.join(','), ...csvRows].join('\n');
+  const date = new Date().toISOString().slice(0, 10);
+  downloadFile(`wbnb_recommendations_${date}.csv`, csv, 'text/csv');
 }
 
 loadData();

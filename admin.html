@@ -867,15 +867,6 @@ function renderView() {
             <option value="dead">Zero clicks</option>
             <option value="cross">Cross-host (≥2)</option>
           </select>
-          <select id="recoSort" onchange="renderRecoRegistry()" style="padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;font-family:'DM Sans',sans-serif;">
-            <option value="clicks_desc">Most clicks</option>
-            <option value="clicks_asc">Fewest clicks</option>
-            <option value="cross_desc">Most hosts recommending</option>
-            <option value="recent">Most recently clicked</option>
-            <option value="name">Venue A→Z</option>
-            <option value="host">Host A→Z</option>
-            <option value="category">Category</option>
-          </select>
           <button class="refresh-btn" onclick="exportRecoRegistry()">📥 Export CSV</button>
         </div>
         <div id="recoRegistryBody"></div>`;
@@ -955,6 +946,54 @@ function renderView() {
 /* ══════════════════════════════════════
    RECOMMENDATIONS REGISTRY — render + export
 ══════════════════════════════════════ */
+
+// Column definitions for the registry table. Numeric/date columns default
+// to descending on first click (most-clicked / most-recent first feels
+// natural). Text columns default to ascending.
+const RECO_COLUMNS = [
+  { key: 'index',      label: '#',          sortable: false, align: 'left'  },
+  { key: 'name',       label: 'Venue',      sortable: true,  align: 'left',  defaultDir: 'asc'  },
+  { key: 'category',   label: 'Category',   sortable: true,  align: 'left',  defaultDir: 'asc'  },
+  { key: 'host',       label: 'Host',       sortable: true,  align: 'left',  defaultDir: 'asc'  },
+  { key: 'property',   label: 'Property',   sortable: true,  align: 'left',  defaultDir: 'asc'  },
+  { key: 'clicks',     label: 'Clicks',     sortable: true,  align: 'right', defaultDir: 'desc' },
+  { key: 'cross',      label: 'Hosts rec.', sortable: true,  align: 'right', defaultDir: 'desc' },
+  { key: 'lastClick',  label: 'Last click', sortable: true,  align: 'left',  defaultDir: 'desc' },
+  { key: 'address',    label: 'Address',    sortable: false, align: 'left'  },
+];
+
+// Column-keyed comparators — pull values out of a row.
+function recoSortComparator(col, dir) {
+  const mul = dir === 'desc' ? -1 : 1;
+  const num = (a, b, get) => (get(a) - get(b)) * mul;
+  const str = (a, b, get) => (get(a) || '').localeCompare(get(b) || '') * mul;
+  switch (col) {
+    case 'name':      return (a, b) => str(a, b, r => r.name);
+    case 'category':  return (a, b) => str(a, b, r => r.category) || (b.clicks - a.clicks);
+    case 'host':      return (a, b) => str(a, b, r => r.hostShort || 'zzz');
+    case 'property':  return (a, b) => str(a, b, r => r.propertyName);
+    case 'clicks':    return (a, b) => num(a, b, r => r.clicks)      || (a.name.localeCompare(b.name));
+    case 'cross':     return (a, b) => num(a, b, r => r.crossHostCount) || (b.clicks - a.clicks);
+    case 'lastClick': return (a, b) => str(a, b, r => r.lastClick || '');
+    default:          return (a, b) => b.clicks - a.clicks;
+  }
+}
+
+// Click handler for column headers — exposed on window for inline onclick.
+window.sortRecoBy = function (colKey) {
+  const col = RECO_COLUMNS.find(c => c.key === colKey);
+  if (!col || !col.sortable) return;
+  const cur = window._recoSort || { col: 'clicks', dir: 'desc' };
+  if (cur.col === colKey) {
+    cur.dir = cur.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    cur.col = colKey;
+    cur.dir = col.defaultDir || 'asc';
+  }
+  window._recoSort = cur;
+  renderRecoRegistry();
+};
+
 function renderRecoRegistry() {
   const body = document.getElementById('recoRegistryBody');
   if (!body || !window._recoRegistry) return;
@@ -963,7 +1002,7 @@ function renderRecoRegistry() {
   const cat = document.getElementById('recoCatFilter')?.value || '';
   const hostFilter = document.getElementById('recoHostFilter')?.value || '';
   const clickFilter = document.getElementById('recoClickFilter')?.value || '';
-  const sort = document.getElementById('recoSort')?.value || 'clicks_desc';
+  const sort = window._recoSort || (window._recoSort = { col: 'clicks', dir: 'desc' });
 
   let filtered = rows.filter(r => {
     if (cat && r.category !== cat) return false;
@@ -978,17 +1017,7 @@ function renderRecoRegistry() {
     return true;
   });
 
-  // Sort
-  const cmp = {
-    clicks_desc: (a, b) => b.clicks - a.clicks,
-    clicks_asc:  (a, b) => a.clicks - b.clicks,
-    cross_desc:  (a, b) => b.crossHostCount - a.crossHostCount || b.clicks - a.clicks,
-    recent:      (a, b) => (b.lastClick || '').localeCompare(a.lastClick || ''),
-    name:        (a, b) => a.name.localeCompare(b.name),
-    host:        (a, b) => (a.hostShort || 'zz').localeCompare(b.hostShort || 'zz'),
-    category:    (a, b) => (a.category || '').localeCompare(b.category || '') || b.clicks - a.clicks,
-  }[sort] || ((a, b) => b.clicks - a.clicks);
-  filtered = filtered.slice().sort(cmp);
+  filtered = filtered.slice().sort(recoSortComparator(sort.col, sort.dir));
 
   if (filtered.length === 0) {
     body.innerHTML = `<div class="loading">No recommendations match your filters.</div>`;
@@ -998,25 +1027,40 @@ function renderRecoRegistry() {
   const safe = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
   const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString() : '—';
 
-  // Cap at 200 rows in the table for browser perf; export gets full set.
-  const cap = 200;
+  // Cap displayed rows for browser perf — export ignores this cap so the
+  // admin can pull the full filtered set as CSV.
+  const cap = 500;
   const display = filtered.slice(0, cap);
 
+  // Build sortable header cells with arrow indicators. Sticky positioning
+  // keeps headers visible during vertical scroll. Background must be opaque
+  // (not rgba <1) or scrolling tbody bleeds through.
+  const arrow = (col) => {
+    if (!col.sortable) return '';
+    if (sort.col !== col.key) return '<span style="opacity:0.25;margin-left:4px;font-size:0.7rem;">⇅</span>';
+    return sort.dir === 'asc'
+      ? '<span style="margin-left:4px;font-size:0.72rem;color:var(--warm);">▲</span>'
+      : '<span style="margin-left:4px;font-size:0.72rem;color:var(--warm);">▼</span>';
+  };
+  const headerCell = (col) => {
+    const sortableStyle = col.sortable ? 'cursor:pointer;user-select:none;' : '';
+    const onclick = col.sortable ? `onclick="sortRecoBy('${col.key}')"` : '';
+    const activeStyle = (col.sortable && sort.col === col.key) ? 'color:var(--ink);' : '';
+    return `<th ${onclick} style="position:sticky;top:0;z-index:2;background:var(--cream-2);text-align:${col.align};${sortableStyle}${activeStyle}white-space:nowrap;">${col.label}${arrow(col)}</th>`;
+  };
+
   body.innerHTML = `
-    <div style="font-size:0.72rem;color:var(--ink-soft);margin-bottom:6px;">Showing ${display.length} of ${filtered.length} recos${filtered.length > cap ? ' (export to see all)' : ''}</div>
-    <div style="overflow-x:auto;margin-bottom:14px;">
-    <table class="data-table" style="width:100%;min-width:920px;">
-      <thead><tr>
-        <th>#</th>
-        <th>Venue</th>
-        <th>Category</th>
-        <th>Host</th>
-        <th>Property</th>
-        <th style="text-align:right;">Clicks</th>
-        <th style="text-align:right;">Hosts rec.</th>
-        <th>Last click</th>
-        <th>Address</th>
-      </tr></thead>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:0.72rem;color:var(--ink-soft);">
+      <span>Showing ${display.length} of ${filtered.length} recos${filtered.length > cap ? ' — export to see all' : ''}</span>
+      <span>Sorted by <strong style="color:var(--ink-2);">${RECO_COLUMNS.find(c => c.key === sort.col)?.label || '—'}</strong> ${sort.dir === 'asc' ? '▲' : '▼'} · Click any column to sort</span>
+    </div>
+    <div id="recoRegistryScroll" style="max-height:560px;overflow:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--white);box-shadow:var(--shadow);margin-bottom:14px;">
+    <table class="data-table" style="width:auto;min-width:1100px;border:none;border-radius:0;box-shadow:none;">
+      <thead>
+        <tr>
+          ${RECO_COLUMNS.map(headerCell).join('')}
+        </tr>
+      </thead>
       <tbody>
         ${display.map((r, i) => {
           const cross = r.crossHostCount > 1
@@ -1027,15 +1071,15 @@ function renderRecoRegistry() {
           return `<tr>
             <td style="color:var(--ink-soft);font-weight:600;">${i + 1}</td>
             <td><strong>${safe(r.name)}</strong>${cross}${descSnippet}</td>
-            <td style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-soft);">${safe(r.category) || '—'}</td>
+            <td style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-soft);white-space:nowrap;">${safe(r.category) || '—'}</td>
             <td>${r.hostEmail
-              ? `<button onclick="document.getElementById('userFilter').value='${safe(r.hostEmail)}';renderView();" style="background:none;border:none;padding:0;color:var(--warm);font-size:0.78rem;font-weight:500;cursor:pointer;text-align:left;font-family:inherit;">${safe(r.hostShort)}</button>`
+              ? `<button onclick="document.getElementById('userFilter').value='${safe(r.hostEmail)}';renderView();" style="background:none;border:none;padding:0;color:var(--warm);font-size:0.78rem;font-weight:500;cursor:pointer;text-align:left;font-family:inherit;white-space:nowrap;">${safe(r.hostShort)}</button>`
               : '<span style="color:var(--ink-soft);font-style:italic;">—</span>'}</td>
-            <td style="font-size:0.78rem;">${safe(r.propertyName)}</td>
+            <td style="font-size:0.78rem;white-space:nowrap;">${safe(r.propertyName)}</td>
             <td style="text-align:right;${clickStyle}">${r.clicks}</td>
             <td style="text-align:right;">${r.crossHostCount}</td>
-            <td style="font-size:0.72rem;color:var(--ink-soft);">${fmtDate(r.lastClick)}</td>
-            <td style="font-size:0.72rem;color:var(--ink-soft);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safe(r.address) || '—'}</td>
+            <td style="font-size:0.72rem;color:var(--ink-soft);white-space:nowrap;">${fmtDate(r.lastClick)}</td>
+            <td style="font-size:0.72rem;color:var(--ink-soft);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safe(r.address) || '—'}</td>
           </tr>`;
         }).join('')}
       </tbody>
@@ -1050,6 +1094,7 @@ function exportRecoRegistry() {
   const cat = document.getElementById('recoCatFilter')?.value || '';
   const hostFilter = document.getElementById('recoHostFilter')?.value || '';
   const clickFilter = document.getElementById('recoClickFilter')?.value || '';
+  const sort = window._recoSort || { col: 'clicks', dir: 'desc' };
 
   let filtered = rows.filter(r => {
     if (cat && r.category !== cat) return false;
@@ -1063,6 +1108,7 @@ function exportRecoRegistry() {
     }
     return true;
   });
+  filtered = filtered.slice().sort(recoSortComparator(sort.col, sort.dir));
 
   const headers = ['venue','category','host_email','property','clicks','hosts_recommending','last_click','address','description','tags'];
   const csvRows = filtered.map(r => [

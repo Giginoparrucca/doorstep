@@ -1535,21 +1535,23 @@ async function _renderGuestAnalyticsAsync(events) {
   // ── Chat & language ──
   const chatEvents = events.filter(e => e.event_type === 'guest_chat_message');
   const chatTotal = chatEvents.length;
-  // Escalations: union the discrete event (modern, fired once per handoff)
-  // with the legacy heuristic (sessions that had any chat msg tagged
-  // escalated:true). Counts distinct sessions so historical data still shows.
-  const escalatedSessions = new Set();
-  events.forEach(e => {
-    if (e.event_type === 'guest_chat_escalated' && e.session_id) {
-      escalatedSessions.add(e.session_id);
-    }
-  });
+  // Escalations = each AI→host handoff. One per ask. A guest who asks for the
+  // host, gets passed back to AI, then asks again later in the same session
+  // counts as 2 escalations. We count discrete `guest_chat_escalated` events
+  // directly. For pre-fix legacy data (no discrete events) we fall back to
+  // counting distinct sessions tagged escalated:true on chat messages.
+  const discreteEscalations = events.filter(e => e.event_type === 'guest_chat_escalated').length;
+  const sessionsWithDiscrete = new Set(
+    events.filter(e => e.event_type === 'guest_chat_escalated')
+          .map(e => e.session_id).filter(Boolean)
+  );
+  const legacyEscalatedSessions = new Set();
   chatEvents.forEach(e => {
-    if (e.event_data && e.event_data.escalated && e.session_id) {
-      escalatedSessions.add(e.session_id);
+    if (e.event_data && e.event_data.escalated && e.session_id && !sessionsWithDiscrete.has(e.session_id)) {
+      legacyEscalatedSessions.add(e.session_id);
     }
   });
-  const chatEscalated = escalatedSessions.size;
+  const chatEscalated = discreteEscalations + legacyEscalatedSessions.size;
   const langTotals = {};
   // Use session-level language (the dominant lang in that session) to avoid
   // overcounting chatty sessions. Fallback: count raw event langs.
@@ -2087,7 +2089,7 @@ const HT = {
     ga_timeline_title: 'Daily guest sessions', ga_timeline_sub: 'Unique guest sessions per day',
     ga_timeline_empty: 'No guest sessions yet in this period.',
     ga_chat_title: 'Chat & language', ga_chat_sub: 'Messaging volume and what language guests use',
-    ga_chat_total: 'Guest messages', ga_chat_escalated: 'Escalated to host', ga_chat_langs: 'Languages',
+    ga_chat_total: 'Guest messages', ga_chat_escalated: 'Help requests to host', ga_chat_langs: 'Languages',
     ga_engagement_title: 'Engagement', ga_engagement_sub: 'Other useful interactions',
     ga_eng_sessions: 'Sessions', ga_eng_scans: 'Doc scans', ga_eng_lookups: 'Cross-device lookups',
     ga_eng_reco_clicks: 'Reco clicks', ga_eng_lang_switches: 'Language switches',
@@ -2263,7 +2265,7 @@ const HT = {
     ga_timeline_title: 'Sessioni ospiti per giorno', ga_timeline_sub: 'Sessioni uniche al giorno',
     ga_timeline_empty: 'Nessuna sessione ospite in questo periodo.',
     ga_chat_title: 'Chat e lingua', ga_chat_sub: 'Volume messaggi e lingua degli ospiti',
-    ga_chat_total: 'Messaggi ospiti', ga_chat_escalated: 'Inoltrati all\'host', ga_chat_langs: 'Lingue',
+    ga_chat_total: 'Messaggi ospiti', ga_chat_escalated: 'Richieste al host', ga_chat_langs: 'Lingue',
     ga_engagement_title: 'Coinvolgimento', ga_engagement_sub: 'Altre interazioni utili',
     ga_eng_sessions: 'Sessioni', ga_eng_scans: 'Scansioni doc', ga_eng_lookups: 'Lookup cross-device',
     ga_eng_reco_clicks: 'Click consigli', ga_eng_lang_switches: 'Cambi lingua',

@@ -1443,12 +1443,11 @@ function renderGuestAnalytics(events) {
   return _renderGuestAnalyticsAsync(events);
 }
 
-// Look up booking_code → "SURNAME NAME" of capofamiglia for all booking codes
-// in the event set. Single query shared by the breakdown card and the reco
-// activity feed so we don't double-fetch.
-async function buildCapoMap(events) {
-  const codes = [...new Set(events.map(e => e.booking_code).filter(Boolean))];
-  if (codes.length === 0) return {};
+// Look up booking_code → "SURNAME NAME" of capofamiglia for a list of codes.
+// Shared by the analytics breakdown, reco activity, and chat panel so we
+// don't duplicate the capo-detection logic.
+async function loadCapoNamesByCode(codes) {
+  if (!codes || codes.length === 0) return {};
   try {
     const { data } = await sb.from('checkins')
       .select('booking_code, surname, name, guest_type, submitted_at')
@@ -1470,6 +1469,14 @@ async function buildCapoMap(events) {
     console.warn('Capo lookup failed:', e);
     return {};
   }
+}
+
+// Look up booking_code → "SURNAME NAME" of capofamiglia for all booking codes
+// in the event set. Single query shared by the breakdown card and the reco
+// activity feed so we don't double-fetch.
+async function buildCapoMap(events) {
+  const codes = [...new Set(events.map(e => e.booking_code).filter(Boolean))];
+  return loadCapoNamesByCode(codes);
 }
 
 async function _renderGuestAnalyticsAsync(events) {
@@ -1528,13 +1535,20 @@ async function _renderGuestAnalyticsAsync(events) {
   // ── Chat & language ──
   const chatEvents = events.filter(e => e.event_type === 'guest_chat_message');
   const chatTotal = chatEvents.length;
-  // Count distinct sessions (or booking codes) that sent at least one message
-  // while chatEscalated=true — avoids counting every post-escalation message.
-  const escalatedSessions = new Set(
-    chatEvents
-      .filter(e => e.event_data && e.event_data.escalated)
-      .map(e => e.session_id)
-  );
+  // Escalations: union the discrete event (modern, fired once per handoff)
+  // with the legacy heuristic (sessions that had any chat msg tagged
+  // escalated:true). Counts distinct sessions so historical data still shows.
+  const escalatedSessions = new Set();
+  events.forEach(e => {
+    if (e.event_type === 'guest_chat_escalated' && e.session_id) {
+      escalatedSessions.add(e.session_id);
+    }
+  });
+  chatEvents.forEach(e => {
+    if (e.event_data && e.event_data.escalated && e.session_id) {
+      escalatedSessions.add(e.session_id);
+    }
+  });
   const chatEscalated = escalatedSessions.size;
   const langTotals = {};
   // Use session-level language (the dominant lang in that session) to avoid
@@ -2102,6 +2116,8 @@ const HT = {
     chat_all_guests: 'All Guests',
     chat_no_messages: 'No messages yet. Guest conversations will appear here.',
     chat_no_booking: 'Guest (no booking code)',
+    chat_with: 'Chat with',
+    chat_guest_pre_checkin: 'Guest (pre check-in)',
     chat_reply_placeholder: 'Type your reply…',
     chat_send: 'Send',
     chat_resolve: '✓ Resolve',
@@ -2275,6 +2291,8 @@ const HT = {
     chat_all_guests: 'Tutti gli Ospiti',
     chat_no_messages: 'Nessun messaggio ancora. Le conversazioni degli ospiti appariranno qui.',
     chat_no_booking: 'Ospite (senza codice prenotazione)',
+    chat_with: 'Chat con',
+    chat_guest_pre_checkin: 'Ospite (pre check-in)',
     chat_reply_placeholder: 'Scrivi la tua risposta…',
     chat_send: 'Invia',
     chat_resolve: '✓ Risolvi',
@@ -3606,12 +3624,24 @@ async function loadHostChat() {
   // Sort by most recent first
   const sortedCodes = Object.keys(conversations).sort((a, b) => conversations[b].lastTime.localeCompare(conversations[a].lastTime));
 
+  // Look up capofamiglia name for each booking code so the host sees real
+  // names instead of opaque TRU-XXXXXX codes.
+  const knownCodes = sortedCodes.filter(c => c !== '_no_code');
+  const nameMap = await loadCapoNamesByCode(knownCodes);
+
   // Populate dropdown — individual conversations only
   const sel = document.getElementById('hostChatFilter');
   const current = sel.value && sortedCodes.includes(sel.value) ? sel.value : sortedCodes[0];
   sel.innerHTML = sortedCodes.map(c => {
     const conv = conversations[c];
-    const label = c === '_no_code' ? h('chat_no_booking') : c;
+    let label;
+    if (c === '_no_code') {
+      label = h('chat_no_booking');
+    } else if (nameMap[c]) {
+      label = `${nameMap[c]} · ${c}`;
+    } else {
+      label = c;
+    }
     const badge = conv.escalationState === 'escalated' ? ' ⚠️' : conv.escalationState === 'resolved' ? ' ✅' : '';
     return `<option value="${c}" ${c===current?'selected':''}>${label} (${conv.msgs.length})${badge}</option>`;
   }).join('');
@@ -3634,7 +3664,27 @@ async function loadHostChat() {
     statusBanner = `<div style="background:rgba(76,175,125,0.08);border:1px solid rgba(76,175,125,0.2);border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:0.85rem;color:var(--green);text-align:center;font-weight:500;">✅ ${h('chat_resolved_status')}</div>`;
   }
 
-  container.innerHTML = statusBanner + selectedMsgs.map(m => {
+  // Name header — shows the capofamiglia for the selected conversation so the
+  // host knows who they're talking to without decoding the booking code.
+  let nameHeader = '';
+  const escHtml = (s) => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  if (selected === '_no_code') {
+    nameHeader = `<div style="padding:10px 14px;margin-bottom:10px;background:var(--cream-2);border-radius:8px;border-left:3px solid var(--ink-soft);">
+      <div style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-2);font-weight:600;">${h('chat_with')}</div>
+      <div style="font-size:1rem;color:var(--ink);font-weight:600;margin-top:2px;">${h('chat_no_booking')}</div>
+    </div>`;
+  } else {
+    const displayName = nameMap[selected];
+    nameHeader = `<div style="padding:10px 14px;margin-bottom:10px;background:var(--cream-2);border-radius:8px;border-left:3px solid var(--warm);">
+      <div style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-2);font-weight:600;">${h('chat_with')}</div>
+      <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:2px;">
+        <div style="font-size:1rem;color:var(--ink);font-weight:600;">${displayName ? escHtml(displayName) : h('chat_guest_pre_checkin')}</div>
+        <div style="font-family:monospace;font-size:0.75rem;color:var(--warm);">${escHtml(selected)}</div>
+      </div>
+    </div>`;
+  }
+
+  container.innerHTML = nameHeader + statusBanner + selectedMsgs.map(m => {
     const time = new Date(m.created_at).toLocaleTimeString(hostLang==='it'?'it-IT':'en-GB', {hour:'2-digit',minute:'2-digit'});
     const date = new Date(m.created_at).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB');
     if (m.sender === 'guest') {

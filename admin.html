@@ -595,13 +595,241 @@ function renderView() {
     const userIdToEmail = {};
     events.forEach(e => { if (e.user_id && e.user_email) userIdToEmail[e.user_id] = e.user_email; });
 
-    const hostRows = allProperties.map(p => {
+    // ══════════════════════════════════════════════════════════════════════
+    // HOST PERFORMANCE — aggregate guest activity per host (across all their
+    // properties) so admin can compare hosts apples-to-apples and surface
+    // upsell / onboarding / partnership opportunities.
+    // ══════════════════════════════════════════════════════════════════════
+
+    // Build property → host email map. Falls back to scanning events for
+    // property_id ↔ user_email co-occurrence so hosts who haven't signed in
+    // recently still resolve.
+    const propToEmail = {};
+    allProperties.forEach(p => {
+      if (p.owner_id && userIdToEmail[p.owner_id]) propToEmail[p.id] = userIdToEmail[p.owner_id];
+    });
+    // Fallback: any event with both property_id and user_email
+    events.forEach(e => {
+      if (e.property_id && e.user_email && !propToEmail[e.property_id]) {
+        propToEmail[e.property_id] = e.user_email;
+      }
+    });
+
+    // Group guest events by host email (host = owner of the property the
+    // guest event happened on). Anonymous guest events without a resolvable
+    // host are bucketed under '_unattributed'.
+    const hostGuestStats = {}; // email → metrics
+    function ensureHost(email) {
+      if (!hostGuestStats[email]) {
+        hostGuestStats[email] = {
+          email, properties: new Set(), sessions: new Set(),
+          opens: 0, started: 0, completed: 0,
+          recoClicks: 0, chatMessages: 0, chatEscalations: 0,
+          docScans: 0, hostReplies: 0, langs: {},
+        };
+      }
+      return hostGuestStats[email];
+    }
+    // Pre-register every host that owns a property (even if no guest activity)
+    Object.values(propToEmail).forEach(email => ensureHost(email));
+
+    guestEvents.forEach(e => {
+      const email = propToEmail[e.property_id] || '_unattributed';
+      const h = ensureHost(email);
+      if (e.property_id) h.properties.add(e.property_id);
+      if (e.session_id)  h.sessions.add(e.session_id);
+      if (e.event_type === 'guest_link_opened')        h.opens++;
+      if (e.event_type === 'guest_checkin_started')    h.started++;
+      if (e.event_type === 'guest_checkin_completed')  h.completed++;
+      if (e.event_type === 'guest_reco_clicked')       h.recoClicks++;
+      if (e.event_type === 'guest_chat_message')       h.chatMessages++;
+      if (e.event_type === 'guest_chat_escalated')     h.chatEscalations++;
+      if (e.event_type === 'guest_doc_scanned')        h.docScans++;
+      const lng = e.event_data && e.event_data.lang;
+      if (lng) h.langs[lng] = (h.langs[lng] || 0) + 1;
+    });
+
+    // Build leaderboard rows. Synthetic "engagement score" = weighted blend
+    // of conversion + reco activity + chat — captures hosts whose guests
+    // actually use the app vs hosts whose guests just open the link.
+    const hostRows = Object.values(hostGuestStats)
+      .filter(h => h.email !== '_unattributed' || h.sessions.size > 0)
+      .map(h => {
+        const sessions = h.sessions.size;
+        const completionRate = h.opens > 0 ? Math.round(h.completed / h.opens * 100) : 0;
+        const recoRate       = sessions > 0 ? Math.round(h.recoClicks / sessions * 100) : 0;
+        const chatRate       = sessions > 0 ? Math.round(h.chatMessages / sessions * 100) : 0;
+        // Engagement score: conversion (50pts) + reco use (25pts) + chat (25pts).
+        // Caps each component so a single chatty session can't dominate.
+        const score = Math.round(
+          (completionRate * 0.5) +
+          Math.min(50, recoRate) * 0.5 +
+          Math.min(50, chatRate) * 0.5
+        );
+        const tier = score >= 60 ? 'gold' : score >= 35 ? 'silver' : score >= 15 ? 'bronze' : 'dormant';
+        const dominantLang = Object.entries(h.langs).sort((a, b) => b[1] - a[1])[0];
+        return {
+          email: h.email,
+          properties: h.properties.size || (h.email !== '_unattributed' ? allProperties.filter(p => propToEmail[p.id] === h.email).length : 0),
+          sessions, completed: h.completed, completionRate,
+          recoClicks: h.recoClicks, recoRate,
+          chatMessages: h.chatMessages, chatEscalations: h.chatEscalations, chatRate,
+          docScans: h.docScans,
+          score, tier,
+          dominantLang: dominantLang ? dominantLang[0].toUpperCase() : '—',
+        };
+      });
+
+    // Sort: engagement score desc; ties → sessions desc.
+    hostRows.sort((a, b) => (b.score - a.score) || (b.sessions - a.sessions));
+
+    if (hostRows.length > 0) {
+      const tierColor = { gold: '#C9A96E', silver: '#8B9DAB', bronze: '#B07A4B', dormant: '#A0978C' };
+      const tierLabel = { gold: '🥇 Gold', silver: '🥈 Silver', bronze: '🥉 Bronze', dormant: '💤 Dormant' };
+
+      html += `<div class="section-title">Host Performance Leaderboard (${hostRows.length})</div>
+        <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:10px;">
+          Engagement score blends check-in completion + recommendation usage + chat activity. Use it to spot top performers, partnership candidates, and hosts who need onboarding help.
+        </div>
+        <div style="overflow-x:auto;margin-bottom:10px;">
+        <table class="data-table" style="width:100%;min-width:880px;">
+          <thead><tr>
+            <th>#</th><th>Host</th><th>Tier</th><th style="text-align:right;">Score</th>
+            <th style="text-align:right;">Props</th><th style="text-align:right;">Sessions</th>
+            <th style="text-align:right;">Compl.</th><th style="text-align:right;">Reco clicks</th>
+            <th style="text-align:right;">Chat msgs</th><th style="text-align:right;">Help reqs</th>
+            <th>Lang</th>
+          </tr></thead>
+          <tbody>
+            ${hostRows.map((r, i) => {
+              const isUnatt = r.email === '_unattributed';
+              const display = isUnatt ? '<em style="color:var(--ink-soft)">Unattributed</em>' : `<strong>${r.email.split('@')[0]}</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">${r.email}</span>`;
+              return `<tr>
+                <td style="font-weight:600;color:var(--ink-soft);">${i + 1}</td>
+                <td>${display}</td>
+                <td><span style="display:inline-block;padding:2px 8px;border-radius:10px;background:${tierColor[r.tier]}22;color:${tierColor[r.tier]};font-size:0.7rem;font-weight:600;white-space:nowrap;">${tierLabel[r.tier]}</span></td>
+                <td style="text-align:right;font-weight:600;font-family:'Playfair Display',serif;font-size:1rem;color:${r.score >= 60 ? 'var(--green)' : r.score >= 35 ? 'var(--amber)' : 'var(--ink-soft)'};">${r.score}</td>
+                <td style="text-align:right;">${r.properties}</td>
+                <td style="text-align:right;">${r.sessions}</td>
+                <td style="text-align:right;">${r.completed} <span style="color:var(--ink-soft);font-size:0.7rem;">(${r.completionRate}%)</span></td>
+                <td style="text-align:right;${r.recoClicks > 0 ? 'color:var(--warm);font-weight:500;' : ''}">${r.recoClicks}</td>
+                <td style="text-align:right;${r.chatMessages > 0 ? 'color:var(--blue);font-weight:500;' : ''}">${r.chatMessages}</td>
+                <td style="text-align:right;${r.chatEscalations > 0 ? 'color:var(--red);font-weight:500;' : ''}">${r.chatEscalations}</td>
+                <td style="font-size:0.72rem;color:var(--ink-soft);">${r.dominantLang}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table></div>`;
+
+      // ══════════════════════════════════════════════════════════════════════
+      // BUSINESS OPPORTUNITIES — derived signals for action
+      // ══════════════════════════════════════════════════════════════════════
+      const namedHosts = hostRows.filter(r => r.email !== '_unattributed');
+      const goldHosts    = namedHosts.filter(r => r.tier === 'gold');
+      const silverHosts  = namedHosts.filter(r => r.tier === 'silver');
+      const dormantHosts = namedHosts.filter(r => r.tier === 'dormant' && r.sessions > 0);
+      // High traffic, low conversion = "leaving money on the table"
+      const leakyHosts = namedHosts.filter(r => r.sessions >= 5 && r.completionRate < 40 && r.completed === 0);
+      // High help-request rate = candidate for managed-concierge upsell
+      const helpHeavyHosts = namedHosts.filter(r => r.sessions >= 3 && (r.chatEscalations / Math.max(1, r.sessions)) >= 0.4);
+      // Setup-incomplete properties (re-use existing setupScore from the table below)
+      const incompleteProps = allProperties.filter(p => {
+        const score = [p.wifi_name, p.host_names, p.host_phone, p.address, p.cir_code].filter(Boolean).length;
+        return score < 4;
+      });
+
+      const oppCard = (icon, title, count, body, color) => `
+        <div style="background:var(--white);border:1px solid var(--border);border-left:3px solid ${color};border-radius:var(--radius);padding:12px 14px;box-shadow:var(--shadow);">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <span style="font-size:1.1rem;">${icon}</span>
+            <span style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;">${title}</span>
+            <span style="margin-left:auto;font-family:'Playfair Display',serif;font-size:1.3rem;color:${color};font-weight:600;line-height:1;">${count}</span>
+          </div>
+          <div style="font-size:0.76rem;color:var(--ink-soft);line-height:1.4;">${body}</div>
+        </div>`;
+
+      html += `<div class="section-title">Business Opportunities</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:10px;">
+          ${oppCard('🥇', 'Top hosts (premium tier)', goldHosts.length,
+            `High-engagement hosts — candidates for "Curator" badge, custom AI voice, featured listings. ${goldHosts.slice(0,3).map(h => h.email.split('@')[0]).join(', ')}${goldHosts.length > 3 ? '…' : ''}`, '#C9A96E')}
+          ${oppCard('💡', 'Leaky funnel', leakyHosts.length,
+            `Traffic but no completed check-ins — listing optimization or photo audit could unlock revenue. ${leakyHosts.slice(0,3).map(h => h.email.split('@')[0]).join(', ')}${leakyHosts.length > 3 ? '…' : ''}`, 'var(--amber)')}
+          ${oppCard('💬', 'Concierge upsell', helpHeavyHosts.length,
+            `Guests frequently asking for human help — ideal for managed-concierge tier (paid human-in-the-loop). ${helpHeavyHosts.slice(0,3).map(h => h.email.split('@')[0]).join(', ')}${helpHeavyHosts.length > 3 ? '…' : ''}`, 'var(--blue)')}
+          ${oppCard('🛠️', 'Onboarding outreach', incompleteProps.length,
+            `Properties with &lt;80% setup completion — automated email or 1:1 onboarding reduces churn risk.`, 'var(--red)')}
+          ${oppCard('💤', 'Re-engagement', dormantHosts.length,
+            `Active hosts whose guests barely engage with the app — needs hands-on help or product education.`, '#A0978C')}
+          ${oppCard('🎯', 'Silver hosts (mid-funnel)', silverHosts.length,
+            `Solid hosts with room to grow — small nudges (more recos, better welcome message) could promote them to Gold.`, '#8B9DAB')}
+        </div>`;
+
+      // ══════════════════════════════════════════════════════════════════════
+      // TOP RECOMMENDATIONS — cross-host venue popularity. This is the gold
+      // mine for partnership revenue: which venues are getting mass clicks
+      // across the platform regardless of which host recommended them.
+      // ══════════════════════════════════════════════════════════════════════
+      const recoEvents = guestEvents.filter(e => e.event_type === 'guest_reco_clicked');
+      if (recoEvents.length > 0) {
+        const recoStats = {}; // venue name → { clicks, hosts:Set, cats:Set, lastClick }
+        recoEvents.forEach(e => {
+          const name = (e.event_data && e.event_data.name) || '—';
+          const cat  = (e.event_data && e.event_data.category) || '';
+          const host = propToEmail[e.property_id] || '_anon';
+          if (!recoStats[name]) recoStats[name] = { clicks: 0, hosts: new Set(), cats: new Set(), lastClick: e.created_at };
+          recoStats[name].clicks++;
+          recoStats[name].hosts.add(host);
+          if (cat) recoStats[name].cats.add(cat);
+          if (e.created_at > recoStats[name].lastClick) recoStats[name].lastClick = e.created_at;
+        });
+
+        const recoRows = Object.entries(recoStats)
+          .map(([name, s]) => ({
+            name, clicks: s.clicks,
+            hosts: s.hosts.size,
+            cats: [...s.cats].join(', '),
+            lastClick: s.lastClick,
+          }))
+          .sort((a, b) => b.clicks - a.clicks)
+          .slice(0, 25);
+
+        html += `<div class="section-title">Top Recommendations (cross-host) · Partnership data</div>
+          <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:10px;">
+            Venues clicked by guests across all hosts — sorted by total clicks. High-click venues with multiple recommending hosts are the strongest candidates for paid partnerships, revenue share, or city-level deals.
+          </div>
+          <div style="overflow-x:auto;margin-bottom:14px;">
+          <table class="data-table" style="width:100%;">
+            <thead><tr>
+              <th>#</th><th>Venue</th><th>Category</th>
+              <th style="text-align:right;">Clicks</th>
+              <th style="text-align:right;">Recommended by</th>
+              <th>Last click</th>
+            </tr></thead>
+            <tbody>
+              ${recoRows.map((r, i) => {
+                const safe = (s) => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+                const cross = r.hosts > 1 ? `<span style="background:rgba(76,175,125,0.12);color:#2d7a4a;padding:1px 6px;border-radius:4px;font-size:0.68rem;font-weight:600;margin-left:4px;">CROSS-HOST</span>` : '';
+                return `<tr>
+                  <td style="color:var(--ink-soft);font-weight:600;">${i + 1}</td>
+                  <td><strong>${safe(r.name)}</strong>${cross}</td>
+                  <td style="font-size:0.72rem;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.06em;">${safe(r.cats) || '—'}</td>
+                  <td style="text-align:right;font-weight:600;color:var(--warm);">${r.clicks}</td>
+                  <td style="text-align:right;">${r.hosts}</td>
+                  <td style="font-size:0.72rem;color:var(--ink-soft);">${new Date(r.lastClick).toLocaleDateString()}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table></div>`;
+      }
+    }
+
+    const hostRowsExisting = allProperties.map(p => {
       const email = p.owner_id ? (userIdToEmail[p.owner_id] || null) : null;
       const stats = email ? (userStats[email] || { sessions: new Set(), events: 0, saves: 0, exports: 0, bookings: 0, firstSeen: null, lastSeen: null }) : { sessions: new Set(), events: 0, saves: 0, exports: 0, bookings: 0, firstSeen: null, lastSeen: null };
       return { ...p, _email: email, _stats: stats };
     });
 
-    const ownedEmails = new Set(hostRows.map(h => h._email).filter(Boolean));
+    const ownedEmails = new Set(hostRowsExisting.map(h => h._email).filter(Boolean));
     const orphanedUsers = Object.entries(userStats).filter(([email]) => !ownedEmails.has(email));
 
     html += `<div class="section-title">Hosts & Properties (${allProperties.length})</div>
@@ -609,7 +837,7 @@ function renderView() {
       <table class="data-table" style="width:100%;">
         <thead><tr><th>Property</th><th>Host</th><th>City</th><th>Guests</th><th>Setup</th><th>Activity</th><th>Last Active</th><th>Actions</th></tr></thead>
         <tbody>
-          ${hostRows.sort((a, b) => (b._stats.lastSeen || '').localeCompare(a._stats.lastSeen || '')).map(p => {
+          ${hostRowsExisting.sort((a, b) => (b._stats.lastSeen || '').localeCompare(a._stats.lastSeen || '')).map(p => {
             const s = p._stats;
             const setupScore = [p.wifi_name, p.host_names, p.host_phone, p.address, p.cir_code].filter(Boolean).length;
             const setupPct = Math.round(setupScore / 5 * 100);

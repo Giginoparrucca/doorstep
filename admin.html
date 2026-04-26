@@ -107,9 +107,82 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
   .event-user{min-width:auto;}
   .data-table th,.data-table td{padding:8px 10px;font-size:0.75rem;}
 }
+
+/* ── Login overlay ── */
+#loginOverlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: linear-gradient(135deg, var(--ink) 0%, #2a1810 100%);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px; transition: opacity 0.3s ease;
+}
+#loginOverlay.hidden { opacity: 0; pointer-events: none; }
+.login-card {
+  background: var(--white); border-radius: 16px; padding: 36px 32px;
+  width: 100%; max-width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+}
+.login-brand { font-family: 'Playfair Display', serif; font-size: 1.6rem; color: var(--ink); margin-bottom: 4px; }
+.login-brand em { color: var(--warm); font-style: normal; }
+.login-badge { display:inline-block; font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--warm); margin-bottom: 24px; font-weight: 600; }
+.login-label { display: block; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; margin-bottom: 6px; margin-top: 12px; }
+.login-input {
+  width: 100%; padding: 11px 14px; border: 1px solid var(--cream-3); border-radius: 8px;
+  font-size: 0.95rem; font-family: inherit; color: var(--ink); background: var(--cream);
+  transition: border-color 0.15s;
+}
+.login-input:focus { outline: none; border-color: var(--warm); background: var(--white); }
+.login-btn {
+  width: 100%; padding: 12px; margin-top: 20px;
+  background: var(--ink); color: #fff; border: none; border-radius: 8px;
+  font-size: 0.92rem; font-weight: 600; cursor: pointer;
+  font-family: inherit; transition: background 0.15s;
+}
+.login-btn:hover:not(:disabled) { background: var(--warm); }
+.login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.login-error {
+  margin-top: 12px; padding: 10px 12px; background: rgba(217,75,75,0.08);
+  border: 1px solid rgba(217,75,75,0.25); border-radius: 6px;
+  color: var(--red); font-size: 0.82rem; display: none;
+}
+.login-error.show { display: block; }
+.login-foot { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--cream-3);
+  font-size: 0.7rem; color: var(--ink-soft); text-align: center; line-height: 1.5; }
+.top-bar-user {
+  font-size: 0.72rem; color: rgba(244,237,224,0.75); margin-right: 4px;
+  display: flex; align-items: center; gap: 6px;
+}
+.top-bar-user-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+.top-bar-signout {
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+  color: #fff; padding: 6px 10px; border-radius: 6px;
+  font-size: 0.72rem; cursor: pointer; font-family: inherit;
+}
+.top-bar-signout:hover { background: rgba(255,255,255,0.18); }
 </style>
 </head>
 <body>
+
+<!-- Login overlay — covers everything until admin signs in -->
+<div id="loginOverlay">
+  <div class="login-card">
+    <div class="login-brand">WelcomeBnB <em>Admin</em></div>
+    <div class="login-badge">Authorised access only</div>
+
+    <label class="login-label" for="loginEmail">Admin Email</label>
+    <input id="loginEmail" type="email" class="login-input" autocomplete="email" placeholder="admin@…">
+
+    <label class="login-label" for="loginPassword">Password</label>
+    <input id="loginPassword" type="password" class="login-input" autocomplete="current-password">
+
+    <button id="loginBtn" class="login-btn" onclick="adminSignIn()">Sign In</button>
+
+    <div id="loginError" class="login-error"></div>
+
+    <div class="login-foot">
+      Admin accounts must be added via the <code style="font-family:monospace;font-size:0.7rem;">admin_users</code> table in Supabase.<br>
+      Forgot password? Reset via Supabase Auth dashboard.
+    </div>
+  </div>
+</div>
 
 <div class="top-bar">
   <div>
@@ -130,6 +203,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
     <button class="refresh-btn" onclick="exportData('csv')" title="Export CSV">📥 CSV</button>
     <button class="refresh-btn" onclick="exportData('json')" title="Export JSON">📥 JSON</button>
     <button class="refresh-btn" onclick="loadData()">↻ Refresh</button>
+    <span class="top-bar-user" id="topBarUser" style="display:none;">
+      <span class="top-bar-user-dot"></span><span id="topBarUserEmail">—</span>
+    </span>
+    <button class="top-bar-signout" id="topBarSignOut" onclick="adminSignOut()" style="display:none;">Sign out</button>
   </div>
 </div>
 
@@ -1121,7 +1198,131 @@ function exportRecoRegistry() {
   downloadFile(`wbnb_recommendations_${date}.csv`, csv, 'text/csv');
 }
 
-loadData();
+/* ══════════════════════════════════════
+   ADMIN AUTH — gates the entire console.
+   Logged-in user must (a) have a valid Supabase session AND (b) appear
+   in the admin_users table. Both checks are client-side — see the README
+   note in the comment above. They filter casual access; for hardened
+   security we'd add an Edge Function with a service-role key.
+══════════════════════════════════════ */
+
+let _adminEmail = null;
+
+async function isAdmin(email) {
+  if (!email) return false;
+  try {
+    const { data, error } = await sb.from('admin_users')
+      .select('email')
+      .eq('email', email.toLowerCase())
+      .maybeSingle();
+    if (error) {
+      console.warn('admin_users lookup error:', error.message);
+      return false;
+    }
+    return !!data;
+  } catch (e) {
+    console.warn('admin_users lookup exception:', e);
+    return false;
+  }
+}
+
+function showLoginError(msg) {
+  const el = document.getElementById('loginError');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+function clearLoginError() {
+  document.getElementById('loginError').classList.remove('show');
+}
+
+async function adminSignIn() {
+  clearLoginError();
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  if (!email || !password) { showLoginError('Email and password are required.'); return; }
+
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) {
+      showLoginError(error.message || 'Sign-in failed.');
+      btn.disabled = false; btn.textContent = 'Sign In';
+      return;
+    }
+
+    const signedInEmail = data?.user?.email;
+    const ok = await isAdmin(signedInEmail);
+    if (!ok) {
+      // Sign them out — they have a valid Supabase user but aren't an admin.
+      await sb.auth.signOut();
+      showLoginError('This account is not authorised for admin access.');
+      btn.disabled = false; btn.textContent = 'Sign In';
+      return;
+    }
+
+    // Clear sensitive fields before showing the console
+    document.getElementById('loginPassword').value = '';
+    enterAdminConsole(signedInEmail);
+  } catch (e) {
+    showLoginError('Connection error. Try again.');
+    btn.disabled = false; btn.textContent = 'Sign In';
+  }
+}
+
+async function adminSignOut() {
+  await sb.auth.signOut();
+  _adminEmail = null;
+  document.getElementById('topBarUser').style.display = 'none';
+  document.getElementById('topBarSignOut').style.display = 'none';
+  document.getElementById('loginOverlay').classList.remove('hidden');
+  document.getElementById('loginEmail').value = '';
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('content').innerHTML = '<div class="loading">Loading analytics…</div>';
+  clearLoginError();
+}
+
+function enterAdminConsole(email) {
+  _adminEmail = email;
+  document.getElementById('topBarUserEmail').textContent = email;
+  document.getElementById('topBarUser').style.display = 'flex';
+  document.getElementById('topBarSignOut').style.display = 'inline-block';
+  document.getElementById('loginOverlay').classList.add('hidden');
+  loadData();
+}
+
+// Boot: check for an existing session. If present and still valid as
+// admin, skip login. Otherwise show the login overlay.
+(async function boot() {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session?.user?.email) {
+      const ok = await isAdmin(session.user.email);
+      if (ok) {
+        enterAdminConsole(session.user.email);
+        return;
+      } else {
+        // Session exists but user is no longer in admin_users — sign out.
+        await sb.auth.signOut();
+      }
+    }
+  } catch (e) {
+    console.warn('Session check failed:', e);
+  }
+  // Show login overlay (it's already visible by default in the DOM).
+})();
+
+// Submit on Enter for both fields
+document.addEventListener('DOMContentLoaded', () => {
+  ['loginEmail', 'loginPassword'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('keydown', e => {
+      if (e.key === 'Enter') adminSignIn();
+    });
+  });
+});
 </script>
 </body>
 </html>

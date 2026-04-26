@@ -2573,6 +2573,11 @@ async function sendChat() {
     saveChatMsg('bot', reply);
     if (data.escalated) {
       chatEscalated = true;
+      // Discrete escalation event — fires once per AI handoff. Counted directly
+      // by the host console so we don't have to infer escalations from the
+      // `escalated:true` tag on subsequent messages (which misses the trigger
+      // message itself and any session that doesn't send follow-ups).
+      trackGuest('guest_chat_escalated', {});
       saveChatMsg('system', 'Guest requested human assistance — escalating to host.');
       showEscalatedBanner();
       startHostChatListener();

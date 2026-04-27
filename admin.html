@@ -157,9 +157,125 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
   font-size: 0.72rem; cursor: pointer; font-family: inherit;
 }
 .top-bar-signout:hover { background: rgba(255,255,255,0.18); }
+
+/* ── Admin row actions ── */
+.admin-actions { display: flex; gap: 4px; flex-wrap: nowrap; align-items: center; }
+.admin-action-btn {
+  background: var(--cream-2); border: 1px solid var(--cream-3); color: var(--ink-2);
+  border-radius: 5px; padding: 3px 7px; font-size: 0.68rem; font-family: inherit;
+  cursor: pointer; line-height: 1; white-space: nowrap; font-weight: 500;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.admin-action-btn:hover { background: var(--cream-3); border-color: var(--warm); }
+.admin-action-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.admin-action-btn.danger { color: var(--red); border-color: rgba(217,75,75,0.25); }
+.admin-action-btn.danger:hover { background: rgba(217,75,75,0.1); border-color: var(--red); }
+.admin-action-btn.warn { color: #B07A4B; border-color: rgba(176,122,75,0.25); }
+.admin-action-btn.warn:hover { background: rgba(176,122,75,0.1); border-color: #B07A4B; }
+.admin-action-btn.success { color: var(--green); border-color: rgba(76,175,125,0.25); }
+.admin-action-btn.success:hover { background: rgba(76,175,125,0.1); border-color: var(--green); }
+
+/* Hidden row markers */
+tr.row-test td, tr.row-deleted td { opacity: 0.65; }
+tr.row-test td:first-child::before {
+  content: '🧪 TEST'; display: inline-block; font-size: 0.55rem; padding: 2px 5px;
+  background: rgba(232,168,64,0.2); color: #8a6024; border-radius: 3px; margin-right: 6px;
+  font-weight: 700; letter-spacing: 0.05em;
+}
+tr.row-deleted td:first-child::before {
+  content: '🗑 DELETED'; display: inline-block; font-size: 0.55rem; padding: 2px 5px;
+  background: rgba(217,75,75,0.2); color: #b03a3a; border-radius: 3px; margin-right: 6px;
+  font-weight: 700; letter-spacing: 0.05em;
+}
+tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED'; }
+
+/* ── Purge confirm modal ── */
+#purgeModal {
+  position: fixed; inset: 0; z-index: 999;
+  background: rgba(30,16,8,0.72); display: none;
+  align-items: center; justify-content: center; padding: 20px;
+}
+#purgeModal.show { display: flex; }
+.purge-card {
+  background: var(--white); border-radius: 12px; padding: 28px 26px;
+  width: 100%; max-width: 460px; box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+}
+.purge-title {
+  font-family: 'Playfair Display', serif; font-size: 1.3rem; color: var(--red);
+  margin-bottom: 6px; display: flex; align-items: center; gap: 8px;
+}
+.purge-warning {
+  background: rgba(217,75,75,0.08); border: 1px solid rgba(217,75,75,0.25);
+  border-radius: 8px; padding: 12px 14px; margin: 14px 0;
+  font-size: 0.83rem; color: var(--ink-2); line-height: 1.5;
+}
+.purge-warning strong { color: var(--red); }
+.purge-detail {
+  font-size: 0.78rem; color: var(--ink-soft); margin-bottom: 10px;
+  background: var(--cream); padding: 10px 12px; border-radius: 6px;
+  font-family: monospace; word-break: break-all;
+}
+.purge-confirm-label {
+  font-size: 0.78rem; color: var(--ink-2); margin-top: 8px; display: block;
+}
+.purge-confirm-label strong { color: var(--red); font-family: monospace; background: var(--cream); padding: 1px 6px; border-radius: 3px; }
+.purge-input {
+  width: 100%; padding: 10px 12px; margin-top: 6px;
+  border: 1px solid var(--cream-3); border-radius: 6px;
+  font-size: 0.95rem; font-family: monospace;
+}
+.purge-input:focus { outline: none; border-color: var(--red); }
+.purge-actions { display: flex; gap: 8px; margin-top: 18px; justify-content: flex-end; }
+.purge-actions button {
+  padding: 9px 16px; border-radius: 6px; font-size: 0.85rem;
+  font-family: inherit; cursor: pointer; font-weight: 500; border: 1px solid;
+}
+.purge-actions .btn-cancel { background: var(--white); border-color: var(--cream-3); color: var(--ink-2); }
+.purge-actions .btn-cancel:hover { background: var(--cream); }
+.purge-actions .btn-confirm { background: var(--red); border-color: var(--red); color: #fff; }
+.purge-actions .btn-confirm:disabled { opacity: 0.45; cursor: not-allowed; background: var(--ink-soft); border-color: var(--ink-soft); }
+.purge-error {
+  margin-top: 8px; padding: 8px 10px; background: rgba(217,75,75,0.1);
+  border-radius: 5px; color: var(--red); font-size: 0.78rem; display: none;
+}
+.purge-error.show { display: block; }
+
+/* Toast */
+#adminToast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--ink); color: #fff; padding: 12px 20px; border-radius: 8px;
+  font-size: 0.88rem; box-shadow: 0 6px 24px rgba(0,0,0,0.3);
+  opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; z-index: 1001;
+  max-width: 90%; text-align: center;
+}
+#adminToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#adminToast.error { background: var(--red); }
+#adminToast.success { background: var(--green); }
 </style>
 </head>
 <body>
+
+<!-- Toast notifier -->
+<div id="adminToast"></div>
+
+<!-- Purge (hard-delete) confirmation modal — typed-confirm gate -->
+<div id="purgeModal" onclick="if(event.target===this)closePurgeModal()">
+  <div class="purge-card">
+    <div class="purge-title">⚠️ Permanent deletion</div>
+    <div style="font-size:0.85rem;color:var(--ink-soft);">This cannot be undone. Foreign keys will cascade.</div>
+    <div class="purge-warning" id="purgeWarning"></div>
+    <div class="purge-detail" id="purgeDetail"></div>
+    <label class="purge-confirm-label">
+      Type <strong id="purgeConfirmText">CONFIRM</strong> to proceed:
+    </label>
+    <input id="purgeInput" class="purge-input" autocomplete="off" oninput="onPurgeInput()">
+    <div class="purge-error" id="purgeError"></div>
+    <div class="purge-actions">
+      <button class="btn-cancel" onclick="closePurgeModal()">Cancel</button>
+      <button class="btn-confirm" id="purgeConfirmBtn" onclick="executePurge()" disabled>Delete permanently</button>
+    </div>
+  </div>
+</div>
 
 <!-- Login overlay — covers everything until admin signs in -->
 <div id="loginOverlay">
@@ -203,6 +319,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
     <button class="refresh-btn" onclick="exportData('csv')" title="Export CSV">📥 CSV</button>
     <button class="refresh-btn" onclick="exportData('json')" title="Export JSON">📥 JSON</button>
     <button class="refresh-btn" onclick="loadData()">↻ Refresh</button>
+    <label id="showHiddenLabel" style="display:flex;align-items:center;gap:6px;font-size:0.72rem;color:rgba(244,237,224,0.85);cursor:pointer;padding:6px 10px;border:1px solid rgba(255,255,255,0.18);border-radius:6px;user-select:none;">
+      <input type="checkbox" id="showHiddenToggle" onchange="toggleShowHidden(this.checked)" style="cursor:pointer;">
+      <span>Show hidden</span>
+    </label>
     <span class="top-bar-user" id="topBarUser" style="display:none;">
       <span class="top-bar-user-dot"></span><span id="topBarUserEmail">—</span>
     </span>
@@ -223,6 +343,197 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let allEvents = [];
 let allProperties = [];
 let allRecommendations = [];
+let allCheckins = [];
+
+// Show-hidden toggle: when on, queries include test+deleted rows so admin
+// can see everything that needs cleanup. When off (default), filtered out.
+let showHidden = false;
+
+/* ══════════════════════════════════════
+   ADMIN ACTIONS — destructive operations on data.
+   Three tiers, in order of severity:
+     🧪 markTest       — flag row as test data; reversible.
+     🗑 softDelete     — hide row everywhere; reversible until purged.
+     💀 purge          — permanent DELETE; gated by typed-confirm modal.
+   Plus: ↩️ restore (clears deleted_at), unmarkTest (clears is_test).
+   Every successful action triggers loadData() to refresh.
+══════════════════════════════════════ */
+
+// Map of editable tables — ensures user input can't pivot to arbitrary
+// table names. Add to this map only when you've audited the table for
+// FK behaviour and confirmed the soft-delete columns exist.
+const ADMIN_TABLES = {
+  analytics_events: { label: 'Event',          identifier: (r) => r.event_type + ' · ' + (r.session_id || '?').slice(0, 8) },
+  checkins:         { label: 'Check-in',       identifier: (r) => `${r.surname || '?'} ${r.name || ''} (${r.booking_code || '—'})`.trim() },
+  chat_messages:    { label: 'Chat message',   identifier: (r) => `${r.sender || '?'}: ${(r.message || '').slice(0, 40)}` },
+  recommendations:  { label: 'Recommendation', identifier: (r) => r.name || '?' },
+  properties:       { label: 'Property',       identifier: (r) => r.name || '?' },
+};
+
+// Toast helper — shown bottom-center for ~2.5s.
+function adminToast(msg, type) {
+  const t = document.getElementById('adminToast');
+  if (!t) return;
+  t.textContent = msg;
+  t.className = type ? type : '';
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// Toggle visibility of test+deleted rows in admin tables.
+function toggleShowHidden(checked) {
+  showHidden = !!checked;
+  loadData();
+}
+
+// Mark a row as test data. is_test flag → row hidden from analytics + apps,
+// but the row itself is preserved. Reversible via unmarkTest.
+async function markTest(table, id) {
+  if (!ADMIN_TABLES[table]) return adminToast('Unknown table', 'error');
+  const { error } = await sb.from(table).update({ is_test: true }).eq('id', id);
+  if (error) return adminToast(`Mark test failed: ${error.message}`, 'error');
+  adminToast(`${ADMIN_TABLES[table].label} marked as test data`, 'success');
+  loadData();
+}
+
+async function unmarkTest(table, id) {
+  if (!ADMIN_TABLES[table]) return adminToast('Unknown table', 'error');
+  const { error } = await sb.from(table).update({ is_test: false }).eq('id', id);
+  if (error) return adminToast(`Unmark failed: ${error.message}`, 'error');
+  adminToast(`${ADMIN_TABLES[table].label} cleared from test data`, 'success');
+  loadData();
+}
+
+// Soft delete — sets deleted_at = now(). Hidden everywhere (incl. host
+// console + guest app). FK cascade does NOT fire (the row is still there).
+async function softDelete(table, id) {
+  if (!ADMIN_TABLES[table]) return adminToast('Unknown table', 'error');
+  const { error } = await sb.from(table).update({ deleted_at: new Date().toISOString() }).eq('id', id);
+  if (error) return adminToast(`Soft delete failed: ${error.message}`, 'error');
+  adminToast(`${ADMIN_TABLES[table].label} soft-deleted (recoverable)`, 'success');
+  loadData();
+}
+
+async function restoreRow(table, id) {
+  if (!ADMIN_TABLES[table]) return adminToast('Unknown table', 'error');
+  const { error } = await sb.from(table).update({ deleted_at: null }).eq('id', id);
+  if (error) return adminToast(`Restore failed: ${error.message}`, 'error');
+  adminToast(`${ADMIN_TABLES[table].label} restored`, 'success');
+  loadData();
+}
+
+// Purge modal — typed-confirm gate. Dangerous; CASCADE will fire so a
+// purged property nukes its checkins/recos/rules/chat_messages.
+let _pendingPurge = null;
+
+function showPurgeModal(table, id, displayLabel) {
+  if (!ADMIN_TABLES[table]) return adminToast('Unknown table', 'error');
+  _pendingPurge = { table, id, displayLabel };
+
+  const tableLabel = ADMIN_TABLES[table].label;
+  let warning = `Permanent <strong>${tableLabel}</strong> deletion. This row will be removed from the database forever.`;
+  if (table === 'properties') {
+    warning += ` <strong>Cascade will also delete</strong> all check-ins, recommendations, rules, and chat messages for this property.`;
+  } else if (table === 'checkins') {
+    warning += ` Removes the check-in record. Linked analytics events stay (no FK).`;
+  }
+
+  document.getElementById('purgeWarning').innerHTML = warning;
+  document.getElementById('purgeDetail').textContent = displayLabel;
+  // The user must type the displayLabel itself to confirm — exact match,
+  // case-sensitive — so it's hard to "muscle-memory" through.
+  const confirmText = displayLabel.length > 60 ? displayLabel.slice(0, 60) + '…' : displayLabel;
+  document.getElementById('purgeConfirmText').textContent = confirmText;
+  document.getElementById('purgeInput').value = '';
+  document.getElementById('purgeConfirmBtn').disabled = true;
+  document.getElementById('purgeError').classList.remove('show');
+  document.getElementById('purgeModal').classList.add('show');
+  setTimeout(() => document.getElementById('purgeInput').focus(), 50);
+}
+
+function closePurgeModal() {
+  document.getElementById('purgeModal').classList.remove('show');
+  _pendingPurge = null;
+}
+
+function onPurgeInput() {
+  if (!_pendingPurge) return;
+  const expected = document.getElementById('purgeConfirmText').textContent;
+  const got = document.getElementById('purgeInput').value;
+  document.getElementById('purgeConfirmBtn').disabled = got !== expected;
+}
+
+async function executePurge() {
+  if (!_pendingPurge) return;
+  const { table, id } = _pendingPurge;
+  const btn = document.getElementById('purgeConfirmBtn');
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+  const { error } = await sb.from(table).delete().eq('id', id);
+  if (error) {
+    document.getElementById('purgeError').textContent = error.message;
+    document.getElementById('purgeError').classList.add('show');
+    btn.textContent = 'Delete permanently';
+    btn.disabled = false;
+    return;
+  }
+  closePurgeModal();
+  adminToast(`${ADMIN_TABLES[table].label} permanently deleted`, 'success');
+  loadData();
+}
+
+// Bulk maintenance: purge any row that's been soft-deleted longer than N days.
+async function bulkPurgeOld(table) {
+  if (!ADMIN_TABLES[table]) return adminToast('Unknown table', 'error');
+  const days = 30;
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString();
+  // Count first so admin sees the impact before confirming.
+  const { count, error: countErr } = await sb.from(table)
+    .select('id', { count: 'exact', head: true })
+    .lt('deleted_at', cutoff);
+  if (countErr) return adminToast(`Count failed: ${countErr.message}`, 'error');
+  if (!count) return adminToast(`No ${ADMIN_TABLES[table].label.toLowerCase()} rows older than ${days} days to purge.`);
+  if (!window.confirm(`Permanently delete ${count} ${ADMIN_TABLES[table].label.toLowerCase()} row(s) that have been soft-deleted for more than ${days} days?\n\nThis CANNOT be undone. Cascades will fire.`)) return;
+  const { error } = await sb.from(table).delete().lt('deleted_at', cutoff);
+  if (error) return adminToast(`Purge failed: ${error.message}`, 'error');
+  adminToast(`Purged ${count} old ${ADMIN_TABLES[table].label.toLowerCase()} row(s)`, 'success');
+  loadData();
+}
+
+// Helper for inline-rendered action button cells. Returns HTML string with
+// 3-4 buttons depending on row state.
+function adminRowActions(table, row) {
+  const id = row.id;
+  if (!id) return '';
+  const tbl = ADMIN_TABLES[table];
+  if (!tbl) return '';
+  const label = (tbl.identifier(row) || '?').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+  const isTest = !!row.is_test;
+  const isDeleted = !!row.deleted_at;
+
+  const parts = [];
+  if (isDeleted) {
+    parts.push(`<button class="admin-action-btn success" onclick="restoreRow('${table}','${id}')" title="Restore (clears deleted_at)">↩️</button>`);
+  } else {
+    if (isTest) {
+      parts.push(`<button class="admin-action-btn" onclick="unmarkTest('${table}','${id}')" title="Unmark as test data">🧪✓</button>`);
+    } else {
+      parts.push(`<button class="admin-action-btn warn" onclick="markTest('${table}','${id}')" title="Mark as test data (hides from analytics)">🧪</button>`);
+    }
+    parts.push(`<button class="admin-action-btn warn" onclick="softDelete('${table}','${id}')" title="Soft delete (recoverable)">🗑</button>`);
+  }
+  parts.push(`<button class="admin-action-btn danger" onclick="showPurgeModal('${table}','${id}','${label}')" title="Permanent delete (cascade)">💀</button>`);
+  return `<div class="admin-actions">${parts.join('')}</div>`;
+}
+
+// Helper for row-state CSS class on <tr>.
+function adminRowClass(row) {
+  const cls = [];
+  if (row.is_test)    cls.push('row-test');
+  if (row.deleted_at) cls.push('row-deleted');
+  return cls.join(' ');
+}
 
 async function loadData() {
   const days = parseInt(document.getElementById('timeRange').value);
@@ -230,11 +541,16 @@ async function loadData() {
 
   document.getElementById('content').innerHTML = '<div class="loading">Loading analytics…</div>';
 
+  // Build hidden-aware query helpers. If `showHidden` is on, no filters are
+  // added — we get everything. Otherwise filter out test + soft-deleted rows.
+  const applyHiddenFilter = (q) =>
+    showHidden ? q : q.eq('is_test', false).is('deleted_at', null);
+
   const [eventsRes, propsRes, checkinsRes, recosRes] = await Promise.all([
-    sb.from('analytics_events').select('*').gte('created_at', since).order('created_at', { ascending: false }).limit(10000),
-    sb.from('properties').select('*').order('name'),
-    sb.from('checkins').select('property_id'),
-    sb.from('recommendations').select('*').order('sort_order'),
+    applyHiddenFilter(sb.from('analytics_events').select('*').gte('created_at', since)).order('created_at', { ascending: false }).limit(10000),
+    applyHiddenFilter(sb.from('properties').select('*')).order('name'),
+    applyHiddenFilter(sb.from('checkins').select('id, property_id, booking_code, surname, name, guest_type, submitted_at, is_test, deleted_at')),
+    applyHiddenFilter(sb.from('recommendations').select('*')).order('sort_order'),
   ]);
 
   if (eventsRes.error) { document.getElementById('content').innerHTML = `<div class="loading">Error: ${eventsRes.error.message}</div>`; return; }
@@ -242,10 +558,11 @@ async function loadData() {
   allEvents = eventsRes.data || [];
   allProperties = propsRes.data || [];
   allRecommendations = recosRes.data || [];
+  allCheckins = checkinsRes.data || [];
 
   // Count check-ins per property
   const checkinCounts = {};
-  (checkinsRes.data || []).forEach(c => { checkinCounts[c.property_id] = (checkinCounts[c.property_id] || 0) + 1; });
+  allCheckins.forEach(c => { checkinCounts[c.property_id] = (checkinCounts[c.property_id] || 0) + 1; });
   allProperties.forEach(p => { p._checkin_count = checkinCounts[p.id] || 0; });
 
   // Populate user dropdown
@@ -898,6 +1215,10 @@ function renderView() {
           clicks: click.count,
           lastClick: click.lastClick,
           crossHostCount,
+          // Pass through state flags so the renderer can show the right
+          // action buttons + apply row styling.
+          is_test:    !!r.is_test,
+          deleted_at: r.deleted_at || null,
         };
       });
 
@@ -970,7 +1291,7 @@ function renderView() {
             const setupScore = [p.wifi_name, p.host_names, p.host_phone, p.address, p.cir_code].filter(Boolean).length;
             const setupPct = Math.round(setupScore / 5 * 100);
             const setupColor = setupPct >= 80 ? 'var(--green)' : setupPct >= 40 ? 'var(--amber)' : 'var(--red)';
-            return `<tr>
+            return `<tr class="${adminRowClass(p)}">
               <td><strong>${p.name || 'Unnamed'}</strong><br><span style="font-size:0.62rem;color:var(--ink-soft);font-family:monospace;">${p.id.substring(0,8)}…</span></td>
               <td>${p._email ? `<strong>${p._email.split('@')[0]}</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">${p._email}</span>` : `${p.host_names || '—'}<br><span style="font-size:0.65rem;color:var(--ink-soft)">${p.host_phone || 'No account'}</span>`}</td>
               <td>${p.city || '—'}${p.region ? '<br><span style="font-size:0.65rem;color:var(--ink-soft)">' + p.region + '</span>' : ''}</td>
@@ -978,10 +1299,11 @@ function renderView() {
               <td style="text-align:center;"><span style="color:${setupColor};font-weight:600;">${setupPct}%</span></td>
               <td style="font-size:0.72rem;">${s.sessions.size || 0} sess · ${s.saves || 0} saves · ${s.exports || 0} exp</td>
               <td style="font-size:0.72rem;color:var(--ink-soft);">${s.lastSeen ? new Date(s.lastSeen).toLocaleDateString() : '—'}</td>
-              <td><div style="display:flex;gap:4px;flex-wrap:wrap;">
+              <td><div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
                 <a href="host-console.html?p=${p.id}" target="_blank" style="padding:4px 8px;background:#C2714F;color:#fff;border-radius:4px;font-size:0.65rem;text-decoration:none;white-space:nowrap;">✏️ Edit</a>
                 <a href="/?p=${p.id}" target="_blank" style="padding:4px 8px;background:#4A2A18;color:#fff;border-radius:4px;font-size:0.65rem;text-decoration:none;white-space:nowrap;">👁 View</a>
                 ${p._email ? `<button onclick="document.getElementById('userFilter').value='${p._email}';renderView();" style="padding:4px 8px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.65rem;cursor:pointer;color:var(--warm);font-weight:500;white-space:nowrap;">📊</button>` : ''}
+                ${adminRowActions('properties', p)}
               </div></td>
             </tr>`;
           }).join('') || '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--ink-soft);">No properties yet.</td></tr>'}
@@ -1001,18 +1323,27 @@ function renderView() {
   const logEvents = events.slice(0, 200);
 
   html += `<div class="section-title">Event Log (${logEvents.length} of ${events.length})</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+      <button class="admin-action-btn warn" style="padding:6px 12px;font-size:0.72rem;" onclick="bulkPurgeOld('analytics_events')" title="Purge analytics events soft-deleted >30 days ago">💀 Purge old events (>30d)</button>
+      <button class="admin-action-btn warn" style="padding:6px 12px;font-size:0.72rem;" onclick="bulkPurgeOld('checkins')" title="Purge checkins soft-deleted >30 days ago">💀 Purge old checkins (>30d)</button>
+      <button class="admin-action-btn warn" style="padding:6px 12px;font-size:0.72rem;" onclick="bulkPurgeOld('chat_messages')" title="Purge chat messages soft-deleted >30 days ago">💀 Purge old chats (>30d)</button>
+      <button class="admin-action-btn warn" style="padding:6px 12px;font-size:0.72rem;" onclick="bulkPurgeOld('recommendations')" title="Purge recommendations soft-deleted >30 days ago">💀 Purge old recos (>30d)</button>
+    </div>
     <div class="event-log">
       ${logEvents.map(e => {
         const cls = e.event_type.includes('login') || e.event_type.includes('signup') || e.event_type.includes('session') ? 'login'
           : e.event_type.includes('export') ? 'export'
           : e.event_type.includes('save') || e.event_type.includes('booking') ? 'save' : '';
         const detail = e.event_data ? Object.entries(e.event_data).map(([k,v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join(' · ') : '';
+        const stateBadge = e.is_test ? '<span style="font-size:0.55rem;padding:1px 5px;background:rgba(232,168,64,0.2);color:#8a6024;border-radius:3px;margin-left:6px;font-weight:600;">TEST</span>' : '';
+        const delBadge   = e.deleted_at ? '<span style="font-size:0.55rem;padding:1px 5px;background:rgba(217,75,75,0.2);color:#b03a3a;border-radius:3px;margin-left:6px;font-weight:600;">DELETED</span>' : '';
         return `
-          <div class="event-row">
+          <div class="event-row" style="${e.is_test || e.deleted_at ? 'opacity:0.65;' : ''}">
             <div class="event-time">${new Date(e.created_at).toLocaleString()}</div>
-            <div class="event-type ${cls}">${e.event_type}</div>
+            <div class="event-type ${cls}">${e.event_type}${stateBadge}${delBadge}</div>
             ${!isUserView ? `<div class="event-user">${e.user_email || '—'}</div>` : ''}
             <div class="event-detail">${detail}</div>
+            <div style="margin-left:auto;">${adminRowActions('analytics_events', e)}</div>
           </div>`;
       }).join('')}
     </div>`;
@@ -1037,6 +1368,7 @@ const RECO_COLUMNS = [
   { key: 'cross',      label: 'Hosts rec.', sortable: true,  align: 'right', defaultDir: 'desc' },
   { key: 'lastClick',  label: 'Last click', sortable: true,  align: 'left',  defaultDir: 'desc' },
   { key: 'address',    label: 'Address',    sortable: false, align: 'left'  },
+  { key: 'actions',    label: 'Actions',    sortable: false, align: 'left'  },
 ];
 
 // Column-keyed comparators — pull values out of a row.
@@ -1132,7 +1464,7 @@ function renderRecoRegistry() {
       <span>Sorted by <strong style="color:var(--ink-2);">${RECO_COLUMNS.find(c => c.key === sort.col)?.label || '—'}</strong> ${sort.dir === 'asc' ? '▲' : '▼'} · Click any column to sort</span>
     </div>
     <div id="recoRegistryScroll" style="max-height:560px;overflow:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--white);box-shadow:var(--shadow);margin-bottom:14px;">
-    <table class="data-table" style="width:auto;min-width:1100px;border:none;border-radius:0;box-shadow:none;">
+    <table class="data-table" style="width:auto;min-width:1240px;border:none;border-radius:0;box-shadow:none;">
       <thead>
         <tr>
           ${RECO_COLUMNS.map(headerCell).join('')}
@@ -1145,7 +1477,7 @@ function renderRecoRegistry() {
             : '';
           const clickStyle = r.clicks > 0 ? 'color:var(--warm);font-weight:600;' : 'color:var(--ink-soft);opacity:0.5;';
           const descSnippet = r.desc ? `<div style="font-size:0.68rem;color:var(--ink-soft);margin-top:2px;line-height:1.3;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safe(r.desc)}</div>` : '';
-          return `<tr>
+          return `<tr class="${adminRowClass(r)}">
             <td style="color:var(--ink-soft);font-weight:600;">${i + 1}</td>
             <td><strong>${safe(r.name)}</strong>${cross}${descSnippet}</td>
             <td style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-soft);white-space:nowrap;">${safe(r.category) || '—'}</td>
@@ -1157,6 +1489,7 @@ function renderRecoRegistry() {
             <td style="text-align:right;">${r.crossHostCount}</td>
             <td style="font-size:0.72rem;color:var(--ink-soft);white-space:nowrap;">${fmtDate(r.lastClick)}</td>
             <td style="font-size:0.72rem;color:var(--ink-soft);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safe(r.address) || '—'}</td>
+            <td>${adminRowActions('recommendations', r)}</td>
           </tr>`;
         }).join('')}
       </tbody>

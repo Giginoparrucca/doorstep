@@ -1404,6 +1404,8 @@ async function loadGuestAnalytics() {
     const { data, error } = await sb.from('analytics_events')
       .select('event_type, event_data, session_id, booking_code, created_at')
       .eq('property_id', propertyId)
+      .eq('is_test', false)
+      .is('deleted_at', null)
       .like('event_type', 'guest_%')
       .gte('created_at', cutoff)
       .order('created_at', { ascending: true })
@@ -1453,6 +1455,8 @@ async function loadCapoNamesByCode(codes) {
       .select('booking_code, surname, name, guest_type, submitted_at')
       .in('booking_code', codes)
       .eq('property_id', propertyId)
+      .eq('is_test', false)
+      .is('deleted_at', null)
       .order('submitted_at', { ascending: true });
     const map = {};
     if (data) {
@@ -3587,6 +3591,8 @@ async function loadHostChat() {
   // Load ALL chat messages for this property
   const { data, error } = await sb.from('chat_messages').select('*')
     .eq('property_id', propertyId)
+    .eq('is_test', false)
+    .is('deleted_at', null)
     .order('created_at', { ascending: true }).limit(500);
 
   if (error || !data || data.length === 0) {
@@ -3725,6 +3731,7 @@ function startHostChatSubscription() {
     if (!localStorage.getItem('wbnb_host_last_chat')) {
       const { data } = await sb.from('chat_messages')
         .select('created_at').eq('property_id', propertyId)
+        .eq('is_test', false).is('deleted_at', null)
         .order('created_at', { ascending: false }).limit(1);
       if (data?.[0]) localStorage.setItem('wbnb_host_last_chat', data[0].created_at);
       console.log('🔔 Chat cursor initialized');
@@ -3738,6 +3745,8 @@ function startHostChatSubscription() {
         .select('id, sender, message, booking_code, created_at')
         .eq('property_id', propertyId)
         .eq('sender', 'guest')
+        .eq('is_test', false)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false })
         .limit(1);
       if (data && data.length > 0) {
@@ -3840,13 +3849,13 @@ async function init() {
     let data;
     if (adminPropId) {
       // Admin mode — load specific property regardless of owner
-      const res = await sb.from('properties').select('*').eq('id', adminPropId).single();
+      const res = await sb.from('properties').select('*').eq('id', adminPropId).is('deleted_at', null).single();
       data = res.data;
       if (data) console.log('🔑 Admin mode — loaded property:', data.name);
     }
     if (!data) {
       // Normal mode — load property owned by this user
-      const res = await sb.from('properties').select('*').eq('owner_id', userId).limit(1).single();
+      const res = await sb.from('properties').select('*').eq('owner_id', userId).is('deleted_at', null).limit(1).single();
       data = res.data;
     }
     if (data) {
@@ -3856,7 +3865,7 @@ async function init() {
       fillPropertyForm(data);
     } else {
       // No property for this user — try legacy (unowned properties) and claim it
-      const { data: unclaimed } = await sb.from('properties').select('*').is('owner_id', null).limit(1).single();
+      const { data: unclaimed } = await sb.from('properties').select('*').is('owner_id', null).is('deleted_at', null).limit(1).single();
       if (unclaimed) {
         await sb.from('properties').update({ owner_id: userId }).eq('id', unclaimed.id);
         propertyId = unclaimed.id;
@@ -3892,15 +3901,27 @@ async function init() {
       if (data) rulesData = data;
     } catch (e) {}
     try {
-      const { data } = await sb.from('recommendations').select('*').eq('property_id', propertyId).order('sort_order');
+      const { data } = await sb.from('recommendations').select('*')
+        .eq('property_id', propertyId)
+        .eq('is_test', false)
+        .is('deleted_at', null)
+        .order('sort_order');
       if (data) recoData = data;
     } catch (e) {}
     try {
-      const { data } = await sb.from('checkins').select('*').eq('property_id', propertyId).order('submitted_at', { ascending: false });
+      const { data } = await sb.from('checkins').select('*')
+        .eq('property_id', propertyId)
+        .eq('is_test', false)
+        .is('deleted_at', null)
+        .order('submitted_at', { ascending: false });
       if (data) allCheckins = data;
     } catch (e) {}
     try {
-      const { data } = await sb.from('chat_messages').select('*').eq('property_id', propertyId).order('created_at', { ascending: false }).limit(50);
+      const { data } = await sb.from('chat_messages').select('*')
+        .eq('property_id', propertyId)
+        .eq('is_test', false)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false }).limit(50);
       if (data) allChats = data;
     } catch (e) {}
   }

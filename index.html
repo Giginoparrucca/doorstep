@@ -1571,10 +1571,13 @@ async function lookupCheckin() {
   document.getElementById('lookupBtn').disabled = true;
 
   try {
-    // Search across ALL properties by surname + arrival_date
+    // Search across ALL properties by surname + arrival_date.
+    // Filter out test/deleted rows so admin clean-ups don't surface stale guests.
     const { data, error } = await sb.from('checkins')
       .select('*')
       .eq('arrival_date', date)
+      .eq('is_test', false)
+      .is('deleted_at', null)
       .ilike('surname', surname.toUpperCase());
 
     loadEl.style.display = 'none';
@@ -1605,7 +1608,7 @@ async function lookupCheckin() {
       localStorage.setItem('wbnb_property', foundPropId);
       propertyId = foundPropId;
       // Reload property data for welcome page
-      const { data: propData } = await sb.from('properties').select('*').eq('id', foundPropId).single();
+      const { data: propData } = await sb.from('properties').select('*').eq('id', foundPropId).is('deleted_at', null).single();
       if (propData) {
         propertyData = propData;
         const el = (id) => document.getElementById(id);
@@ -1625,6 +1628,8 @@ async function lookupCheckin() {
       const { data: fullGroup } = await sb.from('checkins')
         .select('*')
         .eq('booking_code', foundCode)
+        .eq('is_test', false)
+        .is('deleted_at', null)
         .order('submitted_at');
       if (fullGroup && fullGroup.length > 0) allGuests = fullGroup;
       localStorage.setItem('wbnb_booking', foundCode);
@@ -2692,7 +2697,10 @@ function startHostChatListener() {
 async function checkExistingChat() {
   if (!propertyId) return;
   try {
-    let q = sb.from('chat_messages').select('*').eq('property_id', propertyId);
+    let q = sb.from('chat_messages').select('*')
+      .eq('property_id', propertyId)
+      .eq('is_test', false)
+      .is('deleted_at', null);
     if (bookingCode) q = q.eq('booking_code', bookingCode);
     const { data } = await q.order('created_at', { ascending: true }).limit(50);
     if (data && data.length > 0) {
@@ -2737,7 +2745,7 @@ async function init() {
   }
   try {
     let data;
-    const res = await sb.from('properties').select('*').eq('id', storedPropId).single();
+    const res = await sb.from('properties').select('*').eq('id', storedPropId).is('deleted_at', null).single();
     data = res.data;
     if (!data) {
       console.error('❌ Property not found:', storedPropId, res.error);
@@ -2816,7 +2824,11 @@ async function init() {
   // 3. Load recommendations from DB
   if (propertyId) {
     try {
-      const { data } = await sb.from('recommendations').select('*').eq('property_id', propertyId).order('sort_order');
+      const { data } = await sb.from('recommendations').select('*')
+        .eq('property_id', propertyId)
+        .eq('is_test', false)
+        .is('deleted_at', null)
+        .order('sort_order');
       if (data && data.length > 0) { recosFromDB = data; console.log('✅ Recommendations loaded from DB'); }
     } catch (e) {}
   }
@@ -2842,6 +2854,8 @@ async function init() {
         .select('*')
         .eq('booking_code', bookingCode)
         .eq('property_id', propertyId)
+        .eq('is_test', false)
+        .is('deleted_at', null)
         .order('submitted_at');
       if (data && data.length > 0) {
         existingCheckins = data;
@@ -2862,6 +2876,8 @@ async function init() {
           .select('*')
           .eq('property_id', propertyId)
           .eq('arrival_date', date)
+          .eq('is_test', false)
+          .is('deleted_at', null)
           .ilike('surname', surname);
         if (data && data.length > 0) {
           existingCheckins = data;

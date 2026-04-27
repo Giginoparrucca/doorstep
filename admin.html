@@ -391,16 +391,18 @@ function toggleShowHidden(checked) {
 // but the row itself is preserved. Reversible via unmarkTest.
 async function markTest(table, id) {
   if (!ADMIN_TABLES[table]) return adminToast('Unknown table', 'error');
-  const { error } = await sb.from(table).update({ is_test: true }).eq('id', id);
+  const { data, error } = await sb.from(table).update({ is_test: true }).eq('id', id).select();
   if (error) return adminToast(`Mark test failed: ${error.message}`, 'error');
+  if (!data || data.length === 0) return adminToast(`No row updated — RLS may be blocking. Check admin policies.`, 'error');
   adminToast(`${ADMIN_TABLES[table].label} marked as test data`, 'success');
   loadData();
 }
 
 async function unmarkTest(table, id) {
   if (!ADMIN_TABLES[table]) return adminToast('Unknown table', 'error');
-  const { error } = await sb.from(table).update({ is_test: false }).eq('id', id);
+  const { data, error } = await sb.from(table).update({ is_test: false }).eq('id', id).select();
   if (error) return adminToast(`Unmark failed: ${error.message}`, 'error');
+  if (!data || data.length === 0) return adminToast(`No row updated — RLS may be blocking. Check admin policies.`, 'error');
   adminToast(`${ADMIN_TABLES[table].label} cleared from test data`, 'success');
   loadData();
 }
@@ -409,16 +411,18 @@ async function unmarkTest(table, id) {
 // console + guest app). FK cascade does NOT fire (the row is still there).
 async function softDelete(table, id) {
   if (!ADMIN_TABLES[table]) return adminToast('Unknown table', 'error');
-  const { error } = await sb.from(table).update({ deleted_at: new Date().toISOString() }).eq('id', id);
+  const { data, error } = await sb.from(table).update({ deleted_at: new Date().toISOString() }).eq('id', id).select();
   if (error) return adminToast(`Soft delete failed: ${error.message}`, 'error');
+  if (!data || data.length === 0) return adminToast(`No row updated — RLS may be blocking. Check admin policies.`, 'error');
   adminToast(`${ADMIN_TABLES[table].label} soft-deleted (recoverable)`, 'success');
   loadData();
 }
 
 async function restoreRow(table, id) {
   if (!ADMIN_TABLES[table]) return adminToast('Unknown table', 'error');
-  const { error } = await sb.from(table).update({ deleted_at: null }).eq('id', id);
+  const { data, error } = await sb.from(table).update({ deleted_at: null }).eq('id', id).select();
   if (error) return adminToast(`Restore failed: ${error.message}`, 'error');
+  if (!data || data.length === 0) return adminToast(`No row updated — RLS may be blocking. Check admin policies.`, 'error');
   adminToast(`${ADMIN_TABLES[table].label} restored`, 'success');
   loadData();
 }

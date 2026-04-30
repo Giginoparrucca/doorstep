@@ -2169,6 +2169,10 @@ const HT = {
     rules_title_en: 'Title (EN)', rules_title_it: 'Titolo (IT)',
     rules_desc_en: 'Description (EN)', rules_desc_it: 'Descrizione (IT)',
     rules_important: 'Important',
+    rules_confirm_delete:  'Delete this rule?',
+    rules_confirm_delete_named:  'Delete the rule "{name}"?',
+    recos_confirm_delete:  'Delete this recommendation?',
+    recos_confirm_delete_named:  'Delete the recommendation "{name}"?',
     btn_add_rule: '+ Add Custom Rule', btn_save_rules: '💾 Save Rules',
     // Recos
     recos_info: 'These appear in the guest app\'s "Explore" tab. Add your favorite restaurants, bars, sights, beaches, and shops.',
@@ -2340,6 +2344,10 @@ const HT = {
     rules_title_en: 'Title (EN)', rules_title_it: 'Titolo (IT)',
     rules_desc_en: 'Description (EN)', rules_desc_it: 'Descrizione (IT)',
     rules_important: 'Importante',
+    rules_confirm_delete:  'Eliminare questa regola?',
+    rules_confirm_delete_named:  'Eliminare la regola "{name}"?',
+    recos_confirm_delete:  'Eliminare questo consiglio?',
+    recos_confirm_delete_named:  'Eliminare il consiglio "{name}"?',
     btn_add_rule: '+ Aggiungi Regola', btn_save_rules: '💾 Salva Regole',
     recos_info: 'Questi appaiono nella scheda "Esplora" dell\'app ospiti. Aggiungi i tuoi ristoranti, bar, luoghi preferiti.',
     btn_add_reco: '+ Aggiungi Consiglio', btn_save_recos: '💾 Salva',
@@ -2700,14 +2708,40 @@ function addPresetRule(idx) {
 // On drop, the array is reordered (mutated in place) and `rerender()` is
 // called so the DOM reflects the new order. Sort_order is persisted to
 // the DB on save (no auto-save here to avoid surprise writes).
+//
+// Auto-scroll: while dragging, we track pointer Y and run a rAF loop
+// that scrolls the page when the pointer is near the top/bottom edge.
+// Necessary because HTML5 native drag doesn't auto-scroll long pages
+// the way most users expect.
+let _dragScrollState = { y: 0, dragging: false, raf: null };
+
+function _dragScrollLoop() {
+  if (!_dragScrollState.dragging) { _dragScrollState.raf = null; return; }
+  const y = _dragScrollState.y;
+  const vh = window.innerHeight;
+  const edge = 80;             // px from top/bottom that triggers scroll
+  const maxSpeed = 16;         // px per frame at the very edge
+  let delta = 0;
+  if (y < edge)            delta = -Math.ceil((edge - y) / edge * maxSpeed);
+  else if (y > vh - edge)  delta =  Math.ceil((y - (vh - edge)) / edge * maxSpeed);
+  if (delta !== 0) {
+    // Try the most likely scrollable container first, fall back to window.
+    const scroller = document.querySelector('.app, .container, main') || document.scrollingElement || document.documentElement;
+    if (scroller && scroller !== document.documentElement && scroller.scrollHeight > scroller.clientHeight) {
+      scroller.scrollTop += delta;
+    } else {
+      window.scrollBy(0, delta);
+    }
+  }
+  _dragScrollState.raf = requestAnimationFrame(_dragScrollLoop);
+}
+
 function attachDragSort(containerId, dataArr, rerender) {
   const container = document.getElementById(containerId);
   if (!container) return;
   let dragIdx = null;
   let dragEl = null;
 
-  // Use querySelectorAll instead of children to be resilient to wrapper
-  // divs and "empty state" placeholders.
   const rows = container.querySelectorAll('.drag-row');
   rows.forEach((row) => {
     row.addEventListener('dragstart', (e) => {
@@ -2721,17 +2755,20 @@ function attachDragSort(containerId, dataArr, rerender) {
       dragIdx = parseInt(row.getAttribute('data-drag-index'), 10);
       dragEl = row;
       row.classList.add('dragging');
-      // Required for Firefox — without setData the drag won't initiate.
       try { e.dataTransfer.setData('text/plain', String(dragIdx)); } catch (_) {}
       e.dataTransfer.effectAllowed = 'move';
+      // Spin up the auto-scroll loop for the duration of this drag.
+      _dragScrollState.dragging = true;
+      _dragScrollState.y = e.clientY;
+      if (!_dragScrollState.raf) _dragScrollState.raf = requestAnimationFrame(_dragScrollLoop);
     });
 
     row.addEventListener('dragover', (e) => {
-      // Must preventDefault here for the drop event to fire later.
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
+      // Update pointer Y for the auto-scroll loop on every dragover.
+      _dragScrollState.y = e.clientY;
       if (!dragEl || dragEl === row) return;
-      // Visual feedback: highlight insertion target.
       container.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
       row.classList.add('drag-over');
     });
@@ -2745,7 +2782,6 @@ function attachDragSort(containerId, dataArr, rerender) {
       row.classList.remove('drag-over');
       const targetIdx = parseInt(row.getAttribute('data-drag-index'), 10);
       if (isNaN(dragIdx) || isNaN(targetIdx) || dragIdx === targetIdx) return;
-      // Splice the dragged element out and re-insert at target's position.
       const [moved] = dataArr.splice(dragIdx, 1);
       dataArr.splice(targetIdx, 0, moved);
       dragIdx = null;
@@ -2758,8 +2794,37 @@ function attachDragSort(containerId, dataArr, rerender) {
       container.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
       dragIdx = null;
       dragEl = null;
+      // Stop auto-scroll loop.
+      _dragScrollState.dragging = false;
     });
   });
+}
+
+// Delete-confirmation helpers. Use the row's title/name in the prompt
+// when present so the user knows exactly what's about to disappear.
+// Falls back to a generic "this rule"/"this recommendation" prompt when
+// the row hasn't been filled in yet (just-added blank).
+function confirmDeleteRule(idx) {
+  const r = rulesData[idx];
+  const name = (r && (r.title_en || r.title || r.title_it || '').trim()) || '';
+  const msg = name
+    ? h('rules_confirm_delete_named').replace('{name}', name)
+    : h('rules_confirm_delete');
+  if (!window.confirm(msg)) return;
+  rulesData.splice(idx, 1);
+  renderRules();
+  renderPresetRules();
+}
+
+function confirmDeleteReco(globalIdx) {
+  const r = recoData[globalIdx];
+  const name = (r && (r.name || '').trim()) || '';
+  const msg = name
+    ? h('recos_confirm_delete_named').replace('{name}', name)
+    : h('recos_confirm_delete');
+  if (!window.confirm(msg)) return;
+  recoData.splice(globalIdx, 1);
+  renderRecos();
 }
 
 function renderRules() {
@@ -2797,7 +2862,7 @@ function renderRules() {
         </div>
       </div>
       <div class="edit-item-actions" style="align-self:flex-start;padding-top:18px;">
-        <button onclick="rulesData.splice(${i},1);renderRules();renderPresetRules()">🗑</button>
+        <button onclick="confirmDeleteRule(${i})">🗑</button>
       </div>
     </div>
   `).join('');
@@ -2914,7 +2979,7 @@ function renderRecos() {
           </div>
         </div>
         <div class="edit-item-actions" style="align-self:flex-start;padding-top:20px;">
-          <button onclick="recoData.splice(${globalIdx},1);renderRecos()" title="Delete">🗑</button>
+          <button onclick="confirmDeleteReco(${globalIdx})" title="Delete">🗑</button>
         </div>
       </div>`;
     }).join('');

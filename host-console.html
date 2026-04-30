@@ -2711,9 +2711,42 @@ function addPresetRule(idx) {
 //
 // Auto-scroll: while dragging, we track pointer Y and run a rAF loop
 // that scrolls the page when the pointer is near the top/bottom edge.
-// Necessary because HTML5 native drag doesn't auto-scroll long pages
-// the way most users expect.
-let _dragScrollState = { y: 0, dragging: false, raf: null };
+// Necessary because HTML5 native drag doesn't auto-scroll the way most
+// users expect.
+//
+// Finding the right scroller: page layouts vary (some scroll on window,
+// some on a flex child like `.main` with overflow-y:auto). Walking up
+// from the drag container until we find an ancestor whose content
+// overflows is more reliable than guessing class names.
+let _dragScrollState = { y: 0, dragging: false, raf: null, scroller: null };
+
+function _findScrollableAncestor(el) {
+  let node = el && el.parentElement;
+  while (node && node !== document.body) {
+    const style = window.getComputedStyle(node);
+    const overflowY = style.overflowY;
+    const canScroll = (overflowY === 'auto' || overflowY === 'scroll') &&
+                       node.scrollHeight > node.clientHeight + 1;
+    if (canScroll) return node;
+    node = node.parentElement;
+  }
+  // Fall back to whichever root element is actually scrollable on this page.
+  if (document.scrollingElement && document.scrollingElement.scrollHeight > document.scrollingElement.clientHeight) {
+    return document.scrollingElement;
+  }
+  return null;
+}
+
+// Document-level dragover keeps pointer-Y current even when the pointer
+// drifts off a row (over a gap between rows, or over the panel header).
+// Without this, leaving the rows pauses scroll because per-row dragover
+// stops firing.
+document.addEventListener('dragover', (e) => {
+  if (_dragScrollState.dragging) {
+    _dragScrollState.y = e.clientY;
+    e.preventDefault(); // some browsers need this to keep the drag alive
+  }
+});
 
 function _dragScrollLoop() {
   if (!_dragScrollState.dragging) { _dragScrollState.raf = null; return; }
@@ -2724,14 +2757,8 @@ function _dragScrollLoop() {
   let delta = 0;
   if (y < edge)            delta = -Math.ceil((edge - y) / edge * maxSpeed);
   else if (y > vh - edge)  delta =  Math.ceil((y - (vh - edge)) / edge * maxSpeed);
-  if (delta !== 0) {
-    // Try the most likely scrollable container first, fall back to window.
-    const scroller = document.querySelector('.app, .container, main') || document.scrollingElement || document.documentElement;
-    if (scroller && scroller !== document.documentElement && scroller.scrollHeight > scroller.clientHeight) {
-      scroller.scrollTop += delta;
-    } else {
-      window.scrollBy(0, delta);
-    }
+  if (delta !== 0 && _dragScrollState.scroller) {
+    _dragScrollState.scroller.scrollTop += delta;
   }
   _dragScrollState.raf = requestAnimationFrame(_dragScrollLoop);
 }
@@ -2760,6 +2787,7 @@ function attachDragSort(containerId, dataArr, rerender) {
       // Spin up the auto-scroll loop for the duration of this drag.
       _dragScrollState.dragging = true;
       _dragScrollState.y = e.clientY;
+      _dragScrollState.scroller = _findScrollableAncestor(container);
       if (!_dragScrollState.raf) _dragScrollState.raf = requestAnimationFrame(_dragScrollLoop);
     });
 

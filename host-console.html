@@ -233,6 +233,10 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   border-radius: var(--radius-s); padding: 14px;
 }
 .edit-item-drag { color: var(--ink-soft); cursor: grab; margin-top: 2px; font-size: 0.9rem; }
+.edit-item-drag:active { cursor: grabbing; }
+.drag-row { transition: opacity 0.15s, transform 0.15s; }
+.drag-row.dragging { opacity: 0.4; }
+.drag-row.drag-over { border-top: 3px solid var(--warm); }
 .edit-item-body { flex: 1; }
 .edit-item-actions { display: flex; gap: 4px; margin-top: 2px; }
 .edit-item-actions button {
@@ -2688,12 +2692,82 @@ function addPresetRule(idx) {
   renderPresetRules();
 }
 
+// Generic drag-and-drop reordering for in-memory arrays rendered in a
+// container. Each row must have:
+//   - draggable="true" attribute
+//   - data-drag-index="<original array index>" attribute
+//   - class "drag-row"
+// On drop, the array is reordered (mutated in place) and `rerender()` is
+// called so the DOM reflects the new order. Sort_order is persisted to
+// the DB on save (no auto-save here to avoid surprise writes).
+function attachDragSort(containerId, dataArr, rerender) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  let dragIdx = null;
+  let dragEl = null;
+
+  // Use querySelectorAll instead of children to be resilient to wrapper
+  // divs and "empty state" placeholders.
+  const rows = container.querySelectorAll('.drag-row');
+  rows.forEach((row) => {
+    row.addEventListener('dragstart', (e) => {
+      // Don't initiate drag if the user is grabbing an input/textarea —
+      // they're trying to select text, not reorder.
+      const t = e.target;
+      if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'BUTTON') {
+        e.preventDefault();
+        return;
+      }
+      dragIdx = parseInt(row.getAttribute('data-drag-index'), 10);
+      dragEl = row;
+      row.classList.add('dragging');
+      // Required for Firefox — without setData the drag won't initiate.
+      try { e.dataTransfer.setData('text/plain', String(dragIdx)); } catch (_) {}
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    row.addEventListener('dragover', (e) => {
+      // Must preventDefault here for the drop event to fire later.
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (!dragEl || dragEl === row) return;
+      // Visual feedback: highlight insertion target.
+      container.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+      row.classList.add('drag-over');
+    });
+
+    row.addEventListener('dragleave', () => {
+      row.classList.remove('drag-over');
+    });
+
+    row.addEventListener('drop', (e) => {
+      e.preventDefault();
+      row.classList.remove('drag-over');
+      const targetIdx = parseInt(row.getAttribute('data-drag-index'), 10);
+      if (isNaN(dragIdx) || isNaN(targetIdx) || dragIdx === targetIdx) return;
+      // Splice the dragged element out and re-insert at target's position.
+      const [moved] = dataArr.splice(dragIdx, 1);
+      dataArr.splice(targetIdx, 0, moved);
+      dragIdx = null;
+      dragEl = null;
+      rerender();
+    });
+
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      container.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+      dragIdx = null;
+      dragEl = null;
+    });
+  });
+}
+
 function renderRules() {
   document.getElementById('rulesList').innerHTML = rulesData.length === 0
     ? `<div style="text-align:center;padding:20px;color:var(--ink-soft)">${h('rules_no_rules')}</div>`
     : rulesData.map((r, i) => `
-    <div class="edit-item" style="padding:12px;">
-      <div class="edit-item-drag">⠿</div>
+    <div class="edit-item drag-row" data-drag-index="${i}" draggable="true" style="padding:12px;">
+      <div class="edit-item-drag" title="Drag to reorder">⠿</div>
       <div class="edit-item-body" style="flex:1;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
           <input class="form-input" style="width:50px;text-align:center;padding:6px;font-size:1.1rem;" value="${r.icon}" onchange="rulesData[${i}].icon=this.value" title="Emoji">
@@ -2727,6 +2801,7 @@ function renderRules() {
       </div>
     </div>
   `).join('');
+  attachDragSort('rulesList', rulesData, renderRules);
   renderPresetRules();
 }
 
@@ -2807,7 +2882,8 @@ function renderRecos() {
       const globalIdx = recoData.indexOf(r);
       const activeTags = (r.tags || '').split(',').map(t => t.trim()).filter(Boolean);
       return `
-      <div class="edit-item" style="padding:14px;">
+      <div class="edit-item drag-row" data-drag-index="${globalIdx}" draggable="true" style="padding:14px;">
+        <div class="edit-item-drag" title="Drag to reorder">⠿</div>
         <div class="edit-item-body" style="flex:1;">
           <div style="display:flex;gap:8px;margin-bottom:8px;">
             <div style="flex:1;">
@@ -2842,6 +2918,11 @@ function renderRecos() {
         </div>
       </div>`;
     }).join('');
+  // Wire drag-and-drop reordering. Note: when category filter is active,
+  // dragging only reorders within the visible (filtered) subset, but the
+  // helper writes back into the global recoData via the data-drag-index
+  // attribute (which we set to globalIdx, not the filtered index).
+  attachDragSort('recoList', recoData, renderRecos);
 }
 
 function toggleRecoTag(idx, tag, btn) {

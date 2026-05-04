@@ -551,22 +551,33 @@ async function loadData() {
   const applyHiddenFilter = (q) =>
     showHidden ? q : q.eq('is_test', false).is('deleted_at', null);
 
-  const [eventsRes, propsRes, checkinsRes, recosRes, chatRes] = await Promise.all([
-    applyHiddenFilter(sb.from('analytics_events').select('*').gte('created_at', since)).order('created_at', { ascending: false }).limit(10000),
-    applyHiddenFilter(sb.from('properties').select('*')).order('name'),
-    applyHiddenFilter(sb.from('checkins').select('id, property_id, booking_code, surname, name, guest_type, submitted_at, is_test, deleted_at')),
-    applyHiddenFilter(sb.from('recommendations').select('*')).order('sort_order'),
-    // Round 11.2 — chat messages, last `since` window, for question-gap analysis
-    applyHiddenFilter(sb.from('chat_messages').select('id, property_id, booking_code, sender, message, created_at, is_test, deleted_at').gte('created_at', since)).order('created_at', { ascending: false }).limit(5000),
-  ]);
+  let eventsRes, propsRes, checkinsRes, recosRes, chatRes;
+  try {
+    [eventsRes, propsRes, checkinsRes, recosRes, chatRes] = await Promise.all([
+      applyHiddenFilter(sb.from('analytics_events').select('*').gte('created_at', since)).order('created_at', { ascending: false }).limit(10000),
+      applyHiddenFilter(sb.from('properties').select('*')).order('name'),
+      applyHiddenFilter(sb.from('checkins').select('id, property_id, booking_code, surname, name, guest_type, submitted_at, is_test, deleted_at')),
+      applyHiddenFilter(sb.from('recommendations').select('*')).order('sort_order'),
+      // Round 11.2 — chat messages, last `since` window, for question-gap analysis.
+      // Wrapped in catch so a failure here can't block the whole admin view.
+      applyHiddenFilter(sb.from('chat_messages').select('id, property_id, booking_code, sender, message, created_at, is_test, deleted_at').gte('created_at', since)).order('created_at', { ascending: false }).limit(5000).then(r => r, err => ({ data: [], error: err })),
+    ]);
+  } catch (e) {
+    console.error('loadData fatal:', e);
+    document.getElementById('content').innerHTML = `<div class="loading">Error loading analytics: ${e.message || e}. Check browser console for details.</div>`;
+    return;
+  }
 
   if (eventsRes.error) { document.getElementById('content').innerHTML = `<div class="loading">Error: ${eventsRes.error.message}</div>`; return; }
+  if (chatRes && chatRes.error) {
+    console.warn('chat_messages query failed (non-fatal — Question Gaps and Concierge Upsell will be empty):', chatRes.error.message || chatRes.error);
+  }
 
   allEvents = eventsRes.data || [];
   allProperties = propsRes.data || [];
   allRecommendations = recosRes.data || [];
   allCheckins = checkinsRes.data || [];
-  allChatMessages = chatRes && chatRes.data ? chatRes.data : [];
+  allChatMessages = (chatRes && chatRes.data) || [];
 
   // Count check-ins per property
   const checkinCounts = {};
@@ -580,7 +591,12 @@ async function loadData() {
   sel.innerHTML = '<option value="all">All Users (' + users.length + ')</option>' +
     users.map(u => `<option value="${u}" ${u===current?'selected':''}>${u}</option>`).join('');
 
-  renderView();
+  try {
+    renderView();
+  } catch (e) {
+    console.error('renderView crashed:', e);
+    document.getElementById('content').innerHTML = `<div class="loading">Render error: ${e.message || e}. Check browser console for full stack.</div>`;
+  }
 }
 
 function getFilteredEvents() {

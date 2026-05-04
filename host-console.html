@@ -548,6 +548,96 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 .ga-guest-code { font-family:monospace; font-size:0.72rem; color:var(--warm); background:rgba(194,113,79,0.08); border-radius:4px; padding:2px 5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .ga-guest-num { text-align:right; color:var(--ink-soft); font-size:0.8rem; }
 .ga-guest-num.hi { color:var(--warm); font-weight:600; }
+
+/* ── Round 11 — Per-guest action card ── */
+.gpg-card {
+  background: var(--white);
+  border: 1px solid rgba(74,42,24,0.10);
+  border-left: 3px solid rgba(74,42,24,0.18);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.gpg-card:last-child { margin-bottom: 0; }
+.gpg-card:hover { border-color: rgba(194,113,79,0.35); box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+/* Engagement-driven left border accent */
+.gpg-card.gpg-eng-high   { border-left-color: #6DBF82; }
+.gpg-card.gpg-eng-normal { border-left-color: #6BAED6; }
+.gpg-card.gpg-eng-low    { border-left-color: #C9A96E; }
+.gpg-card.gpg-eng-silent { border-left-color: rgba(74,42,24,0.18); opacity: 0.78; }
+
+.gpg-head {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 8px 10px; margin-bottom: 6px;
+}
+.gpg-name {
+  font-weight: 600; color: var(--ink); font-size: 0.92rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 240px;
+}
+.gpg-code {
+  font-family: monospace; font-size: 0.7rem; color: var(--warm);
+  background: rgba(194,113,79,0.08); border-radius: 4px;
+  padding: 2px 6px; white-space: nowrap;
+}
+.gpg-status {
+  font-size: 0.65rem; font-weight: 600; letter-spacing: 0.05em;
+  padding: 3px 8px; border-radius: 999px; white-space: nowrap;
+}
+.gpg-status.status-active   { background: rgba(109,191,130,0.15); color: #2f7a44; }
+.gpg-status.status-today    { background: rgba(232,184,75,0.18);  color: #8a6914; }
+.gpg-status.status-pre      { background: rgba(107,174,214,0.16); color: #29638a; }
+.gpg-status.status-past     { background: rgba(74,42,24,0.07);    color: var(--ink-soft); }
+.gpg-status.status-precheck { background: rgba(201,169,110,0.18); color: #7a5a1f; }
+
+.gpg-engagement {
+  font-size: 0.6rem; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; padding: 2px 7px;
+  border-radius: 4px; margin-left: auto;
+  white-space: nowrap;
+}
+.gpg-eng-high-pill   { background: rgba(109,191,130,0.16); color: #2f7a44; }
+.gpg-eng-normal-pill { background: rgba(107,174,214,0.16); color: #29638a; }
+.gpg-eng-low-pill    { background: rgba(201,169,110,0.18); color: #7a5a1f; }
+.gpg-eng-silent-pill { background: rgba(74,42,24,0.07);    color: var(--ink-soft); }
+
+.gpg-stats-row {
+  display: flex; flex-wrap: wrap; gap: 6px 12px;
+  font-size: 0.78rem; color: var(--ink-soft);
+  margin-bottom: 4px;
+}
+.gpg-stat { white-space: nowrap; }
+.gpg-stat-urgent { color: #c84545; font-weight: 600; }
+
+.gpg-recos {
+  font-size: 0.78rem; color: var(--ink-soft);
+  margin-top: 2px; line-height: 1.4;
+}
+
+.gpg-action {
+  margin-top: 8px;
+  font-size: 0.82rem; font-weight: 500;
+  padding: 7px 10px; border-radius: 6px;
+  line-height: 1.35;
+}
+.gpg-action-urgent      { background: rgba(224,90,90,0.10); color: #b03939; border-left: 2px solid #c84545; }
+.gpg-action-attention   { background: rgba(232,184,75,0.14); color: #7d5e10; border-left: 2px solid #c9a55a; }
+.gpg-action-opportunity { background: rgba(109,191,130,0.13); color: #2f7a44; border-left: 2px solid #6DBF82; }
+.gpg-action-normal      { background: rgba(107,174,214,0.12); color: #29638a; border-left: 2px solid #6BAED6; }
+
+.gpg-anon {
+  font-size: 0.74rem; color: var(--ink-soft);
+  padding: 8px 10px; margin-top: 6px;
+  background: rgba(250,246,240,0.6); border-radius: 6px;
+  border-left: 2px solid rgba(74,42,24,0.18);
+}
+
+@media (max-width: 720px) {
+  .gpg-name { max-width: 160px; font-size: 0.86rem; }
+  .gpg-engagement { margin-left: 0; }
+  .gpg-status { font-size: 0.6rem; }
+}
 /* Recommendation activity feed */
 .ga-card-title-row { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:10px; }
 .ga-reco-act-summary { font-size:0.72rem; color:var(--ink-soft); font-weight:500; white-space:nowrap; padding-top:4px; }
@@ -1229,11 +1319,11 @@ See you soon!</textarea>
             <div class="ga-kpi-row" id="gaEngagement"></div>
           </div>
         </div>
-        <!-- Row 4 — Per-Guest Breakdown -->
+        <!-- Row 4 — Per-Guest Action Board (Round 11) -->
         <div class="ga-grid">
           <div class="ga-card full">
-            <div class="ga-card-title" data-h="ga_guest_breakdown_title">Per-guest breakdown</div>
-            <div class="ga-card-sub" data-h="ga_guest_breakdown_sub">Sessions attributed by booking code — capofamiglia shown for multi-guest bookings</div>
+            <div class="ga-card-title" data-h="ga_guest_breakdown_title">Per-guest action board</div>
+            <div class="ga-card-sub" data-h="ga_guest_breakdown_sub">One row per guest — what to do next, prioritised by urgency</div>
             <div id="gaGuestBreakdown" class="ga-guest-list"></div>
           </div>
         </div>
@@ -1487,6 +1577,59 @@ async function buildCapoMap(events) {
   return loadCapoNamesByCode(codes);
 }
 
+// ── Round 11: richer per-booking summary used by the action card ──
+// Returns { code: { name, arrival_date, departure_date, nights, hasDocs, capofamigliaSubmittedAt } }
+// Pulls more than loadCapoNamesByCode (kept separate so the chat panel /
+// reco activity feed which only need the name don't pay for the extra fields).
+async function loadGuestSummariesByCode(codes) {
+  if (!codes || codes.length === 0) return {};
+  try {
+    const { data } = await sb.from('checkins')
+      .select('booking_code, surname, name, guest_type, submitted_at, arrival_date, departure_date, nights, document_number')
+      .in('booking_code', codes)
+      .eq('property_id', propertyId)
+      .eq('is_test', false)
+      .is('deleted_at', null)
+      .order('submitted_at', { ascending: true });
+    const map = {};
+    if (data) {
+      for (const row of data) {
+        const bc = row.booking_code;
+        const isHead = ['single', 'head', 'group'].includes(row.guest_type);
+        if (!map[bc]) {
+          map[bc] = {
+            name: `${row.surname || ''} ${row.name || ''}`.trim().toUpperCase(),
+            arrival_date: row.arrival_date || null,
+            departure_date: row.departure_date || null,
+            nights: row.nights || null,
+            hasDocs: !!row.document_number,
+            capofamigliaSubmittedAt: row.submitted_at || null,
+          };
+        }
+        // Prefer head's name and stay dates if a head exists.
+        if (isHead) {
+          map[bc].name = `${row.surname || ''} ${row.name || ''}`.trim().toUpperCase();
+          if (row.arrival_date)   map[bc].arrival_date   = row.arrival_date;
+          if (row.departure_date) map[bc].departure_date = row.departure_date;
+          if (row.nights)         map[bc].nights         = row.nights;
+          if (row.document_number) map[bc].hasDocs       = true;
+          map[bc].capofamigliaSubmittedAt = row.submitted_at || map[bc].capofamigliaSubmittedAt;
+        } else {
+          // Fill missing fields from companions if head row had blanks.
+          if (!map[bc].arrival_date && row.arrival_date)     map[bc].arrival_date = row.arrival_date;
+          if (!map[bc].departure_date && row.departure_date) map[bc].departure_date = row.departure_date;
+          if (!map[bc].nights && row.nights)                 map[bc].nights = row.nights;
+          if (!map[bc].hasDocs && row.document_number)       map[bc].hasDocs = true;
+        }
+      }
+    }
+    return map;
+  } catch (e) {
+    console.warn('Guest summary lookup failed:', e);
+    return {};
+  }
+}
+
 async function _renderGuestAnalyticsAsync(events) {
   // ── Aggregate by session_id for funnel (unique session counts) ──
   const sessions = {};
@@ -1580,9 +1723,12 @@ async function _renderGuestAnalyticsAsync(events) {
   ];
   renderGaEngagement(engagement);
 
-  // ── Per-guest breakdown + reco activity (share one capofamiglia lookup) ──
-  const capoMap = await buildCapoMap(events);
-  renderGaGuestBreakdown(events, capoMap);
+  // ── Per-guest action card + reco activity (share one summary lookup) ──
+  const codes = [...new Set(events.map(e => e.booking_code).filter(Boolean))];
+  const summaryMap = await loadGuestSummariesByCode(codes);
+  const capoMap = {};
+  for (const code in summaryMap) capoMap[code] = summaryMap[code].name;
+  renderGaGuestBreakdown(events, summaryMap);
   renderGaRecoActivity(events, capoMap);
 }
 
@@ -1712,86 +1858,234 @@ function renderGaEngagement(items) {
     </div>`).join('');
 }
 
-function renderGaGuestBreakdown(events, capoMap) {
+// ─────────────────────────────────────────────────────────────────────
+// Round 11 — Per-guest action card.
+// Replaces the old Sessions / Events / Quota table with a card-per-guest
+// layout that surfaces ONE decision per row: stay status, engagement
+// bucket, top reco categories, open help requests, and a recommended
+// next action. Built around the question "what should I do about this
+// guest right now?" rather than vanity counts.
+// ─────────────────────────────────────────────────────────────────────
+function _gpgComputeStayStatus(s, today) {
+  // s = summaryMap[code] entry, may be undefined for pre-checkin or anonymous.
+  if (!s || !s.arrival_date) return null;
+  const arr = new Date(s.arrival_date + 'T00:00:00');
+  const dep = s.departure_date ? new Date(s.departure_date + 'T00:00:00') : null;
+  if (isNaN(arr.getTime())) return null;
+  const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const arrDay = Math.round((todayMid - arr) / 86400000);
+  const depDay = dep ? Math.round((todayMid - dep) / 86400000) : null;
+  const nights = s.nights || (dep ? Math.round((dep - arr) / 86400000) : null);
+
+  if (arrDay < 0) {
+    const days = Math.abs(arrDay);
+    const tmpl = days === 1
+      ? (h('ga_status_pre_tomorrow') || 'Arrives tomorrow')
+      : (h('ga_status_pre_days') || 'Arrives in {n}d').replace('{n}', days);
+    return { label: tmpl, tone: 'pre', daysOut: days, dayOfStay: null, nights };
+  }
+  if (depDay !== null && depDay > 0) {
+    const days = depDay;
+    const tmpl = days === 1
+      ? (h('ga_status_post_yesterday') || 'Checked out yesterday')
+      : (h('ga_status_post_days') || 'Checked out {n}d ago').replace('{n}', days);
+    return { label: tmpl, tone: 'past', daysOut: days, dayOfStay: null, nights };
+  }
+  if (depDay === 0) {
+    return { label: h('ga_status_checkout_today') || 'Checks out today', tone: 'today', dayOfStay: nights, nights };
+  }
+  // Currently staying
+  const dayOfStay = arrDay + 1;
+  const label = nights
+    ? (h('ga_status_active_n_of_m') || 'Day {d} of {n}').replace('{d}', dayOfStay).replace('{n}', nights)
+    : (h('ga_status_active_n') || 'Day {d}').replace('{d}', dayOfStay);
+  return { label, tone: 'active', dayOfStay, nights };
+}
+
+function _gpgComputeEngagement(perGuestEvents) {
+  const total = perGuestEvents.length;
+  const recos = perGuestEvents.filter(e => e.event_type === 'guest_reco_clicked').length;
+  const chats = perGuestEvents.filter(e => e.event_type === 'guest_chat_message').length;
+  const escs  = perGuestEvents.filter(e => e.event_type === 'guest_chat_escalated').length;
+  if (total === 0) return { bucket: 'silent', label: h('ga_eng_silent') || 'Silent', recos, chats, escs };
+  if (chats >= 1 || recos >= 3 || escs >= 1) return { bucket: 'high',  label: h('ga_eng_high')   || 'High',   recos, chats, escs };
+  if (total >= 2)                              return { bucket: 'normal', label: h('ga_eng_normal') || 'Normal', recos, chats, escs };
+  return { bucket: 'low', label: h('ga_eng_low') || 'Low', recos, chats, escs };
+}
+
+function _gpgTopRecoCategories(perGuestEvents) {
+  const counts = {};
+  for (const e of perGuestEvents) {
+    if (e.event_type !== 'guest_reco_clicked') continue;
+    const cat = (e.event_data && e.event_data.category) || 'Other';
+    counts[cat] = (counts[cat] || 0) + 1;
+  }
+  return Object.entries(counts)
+    .map(([cat, n]) => ({ cat, n }))
+    .sort((a, b) => b.n - a.n)
+    .slice(0, 3);
+}
+
+// Returns null when there's nothing useful to suggest (already-handled or
+// post-stay with no review opportunity left).
+function _gpgActionPrompt(status, eng, topCats, isPreCheckin, hasDocs) {
+  // Highest priority: open help requests
+  if (eng.escs > 0) {
+    const tmpl = eng.escs === 1
+      ? (h('ga_action_reply_help_one') || 'Reply to help request')
+      : (h('ga_action_reply_help_n')   || 'Reply to {n} help requests').replace('{n}', eng.escs);
+    return { tone: 'urgent', text: tmpl };
+  }
+  // Pre-check-in: docs not yet uploaded
+  if (isPreCheckin && !hasDocs) {
+    return { tone: 'attention', text: h('ga_action_pre_no_docs') || 'Nudge guest to complete check-in' };
+  }
+  if (!status) {
+    // Pre-checkin with code but no checkin yet, or anonymous
+    return null;
+  }
+  // Pre-arrival
+  if (status.tone === 'pre') {
+    return { tone: 'normal', text: h('ga_action_pre_arrival') || 'Send arrival info / parking details' };
+  }
+  // Active stay - silent
+  if (status.tone === 'active' && eng.bucket === 'silent') {
+    return { tone: 'attention', text: h('ga_action_silent') || "Guest hasn't opened the app — share the QR" };
+  }
+  // Active stay - engaged with recos: upsell hook
+  if (status.tone === 'active' && topCats.length > 0) {
+    const cat = (topCats[0].cat || '').toLowerCase();
+    return { tone: 'opportunity', text: (h('ga_action_suggest_cat') || 'Suggest your favorite {cat}').replace('{cat}', cat) };
+  }
+  // Active stay - normal/low engagement, no clear hook
+  if (status.tone === 'active') {
+    return { tone: 'normal', text: h('ga_action_check_in') || 'Check in — ask if they need anything' };
+  }
+  // Checkout day or just-checked-out: review request
+  if (status.tone === 'today' || (status.tone === 'past' && status.daysOut <= 2)) {
+    return { tone: 'normal', text: h('ga_action_review') || 'Send review request' };
+  }
+  return null;
+}
+
+function renderGaGuestBreakdown(events, summaryMap) {
   const el = document.getElementById('gaGuestBreakdown');
   if (!el) return;
+  summaryMap = summaryMap || {};
+  const today = new Date();
 
   // Group events by booking_code (or session_id for anonymous).
   const groups = {};
   for (const e of events) {
     const code = e.booking_code || null;
     const key  = code || `_anon_${e.session_id}`;
-    if (!groups[key]) groups[key] = { code, sessions: new Set(), eventCount: 0 };
+    if (!groups[key]) groups[key] = { code, sessions: new Set(), events: [] };
     if (e.session_id) groups[key].sessions.add(e.session_id);
-    groups[key].eventCount++;
+    groups[key].events.push(e);
   }
 
-  capoMap = capoMap || {};
+  const namedRows = [];
+  let anonSessions = 0, anonEvents = 0;
 
-  // Build sorted rows: booking sessions descending, anonymous last.
-  const rows = Object.entries(groups).map(([key, g]) => {
-    const isAnon = !g.code;
-    const preCheckin = g.code && !capoMap[g.code]; // code known but no checkin yet
-    let displayLabel;
-    if (isAnon) {
-      displayLabel = h('ga_breakdown_anonymous') || 'Anonymous';
-    } else if (preCheckin) {
-      displayLabel = `${h('ga_breakdown_precheckin') || 'Booking'} ${g.code} (${h('ga_breakdown_precheckin_suffix') || 'pre check-in'})`;
-    } else {
-      displayLabel = capoMap[g.code];
+  for (const [key, g] of Object.entries(groups)) {
+    if (!g.code) {
+      anonSessions += g.sessions.size;
+      anonEvents += g.events.length;
+      continue;
     }
-    return { label: displayLabel, code: isAnon ? '—' : g.code, sessions: g.sessions.size, events: g.eventCount, isAnon };
-  }).sort((a, b) => {
-    if (a.isAnon && !b.isAnon) return 1;
-    if (!a.isAnon && b.isAnon) return -1;
+    const summary = summaryMap[g.code] || null;
+    const isPreCheckin = !summary; // code known but no checkin row yet
+    const status = summary ? _gpgComputeStayStatus(summary, today) : null;
+    const eng = _gpgComputeEngagement(g.events);
+    const topCats = _gpgTopRecoCategories(g.events);
+    const action = _gpgActionPrompt(status, eng, topCats, isPreCheckin, summary && summary.hasDocs);
+
+    const displayName = summary
+      ? summary.name
+      : `${h('ga_breakdown_precheckin') || 'Booking'} ${g.code}`;
+
+    namedRows.push({
+      code: g.code, displayName, isPreCheckin,
+      status, eng, topCats, action,
+      sessions: g.sessions.size,
+      eventCount: g.events.length,
+    });
+  }
+
+  // Sort: urgent actions first, then active stays, then pre-arrivals, then past.
+  const tonePriority = { urgent: 0, attention: 1, opportunity: 2, normal: 3 };
+  const stagePriority = (r) => {
+    if (r.isPreCheckin) return 1;
+    if (!r.status) return 4;
+    return { active: 0, today: 0, pre: 2, past: 3 }[r.status.tone] ?? 4;
+  };
+  namedRows.sort((a, b) => {
+    const ap = a.action ? tonePriority[a.action.tone] : 99;
+    const bp = b.action ? tonePriority[b.action.tone] : 99;
+    if (ap !== bp) return ap - bp;
+    const sa = stagePriority(a), sb = stagePriority(b);
+    if (sa !== sb) return sa - sb;
     return b.sessions - a.sessions;
   });
 
-  if (rows.length === 0) {
+  if (namedRows.length === 0 && anonSessions === 0) {
     el.innerHTML = `<div class="ga-empty" style="padding:12px 0;font-size:0.8rem;">—</div>`;
     return;
   }
 
-  // Merge all anonymous into one row.
-  const namedRows = rows.filter(r => !r.isAnon);
-  const anonRows  = rows.filter(r =>  r.isAnon);
-  const anonSessions = anonRows.reduce((s, r) => s + r.sessions, 0);
-  const anonEvents   = anonRows.reduce((s, r) => s + r.events, 0);
-  const finalRows = [...namedRows];
-  if (anonRows.length > 0) {
-    finalRows.push({
-      label: h('ga_breakdown_anonymous') || 'Anonymous',
-      code: '—', sessions: anonSessions, events: anonEvents, isAnon: true,
-    });
-  }
+  const safe = s => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
 
-  const maxSessions = Math.max(1, ...finalRows.map(r => r.sessions));
-  const headLabelName    = h('ga_breakdown_col_guest')  || 'Guest';
-  const headLabelCode    = h('ga_breakdown_col_code')   || 'Booking code';
-  const headLabelSess    = h('ga_breakdown_col_sess')   || 'Sessions';
-  const headLabelEvents  = h('ga_breakdown_col_events') || 'Events';
-  const headLabelShare   = h('ga_breakdown_col_share')  || 'Share';
+  const recoLabel = (cats) => {
+    if (!cats || cats.length === 0) return '';
+    const lblPrefix = h('ga_action_card_asked_about') || 'Asked about:';
+    return `${lblPrefix} ${cats.map(c => `${safe(c.cat)} ×${c.n}`).join(' · ')}`;
+  };
 
-  el.innerHTML = `
-    <div class="ga-guest-head">
-      <div class="ga-guest-head-label">${headLabelName}</div>
-      <div class="ga-guest-head-label">${headLabelCode}</div>
-      <div class="ga-guest-head-label" style="text-align:right">${headLabelSess}</div>
-      <div class="ga-guest-head-label" style="text-align:right">${headLabelEvents}</div>
-      <div class="ga-guest-head-label" style="text-align:right">${headLabelShare}</div>
-    </div>
-    ${finalRows.map(r => {
-      const pct = Math.round((r.sessions / maxSessions) * 100);
-      const safe = s => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
-      return `
-        <div class="ga-guest-row">
-          <div class="ga-guest-name" title="${safe(r.label)}">${safe(r.label)}</div>
-          <div class="ga-guest-code">${safe(r.code)}</div>
-          <div class="ga-guest-num ${r.sessions > 1 ? 'hi' : ''}">${r.sessions}</div>
-          <div class="ga-guest-num">${r.events}</div>
-          <div class="ga-guest-num">${pct}%</div>
-        </div>`;
-    }).join('')}`;
+  const cards = namedRows.map(r => {
+    const statusBadge = r.isPreCheckin
+      ? `<div class="gpg-status status-precheck">${safe(h('ga_status_precheckin') || 'Pre check-in')}</div>`
+      : (r.status
+          ? `<div class="gpg-status status-${r.status.tone}">${safe(r.status.label)}</div>`
+          : '');
+    const statRow = [
+      r.eng.escs > 0
+        ? `<div class="gpg-stat gpg-stat-urgent">💬 ${r.eng.escs} ${safe(r.eng.escs === 1 ? (h('ga_action_card_help_one') || 'help request') : (h('ga_action_card_help_n') || 'help requests'))}</div>`
+        : '',
+      r.eng.recos > 0
+        ? `<div class="gpg-stat">📍 ${r.eng.recos} ${safe(h('ga_action_card_reco_clicks') || 'reco clicks')}</div>`
+        : '',
+      r.eng.chats > 0 && r.eng.escs === 0
+        ? `<div class="gpg-stat">💭 ${r.eng.chats} ${safe(h('ga_action_card_chat_msgs') || 'chat msgs')}</div>`
+        : '',
+    ].filter(Boolean).join('');
+
+    const recoLine = r.topCats.length > 0
+      ? `<div class="gpg-recos">${safe(recoLabel(r.topCats))}</div>`
+      : '';
+
+    const actionLine = r.action
+      ? `<div class="gpg-action gpg-action-${r.action.tone}">▸ ${safe(r.action.text)}</div>`
+      : '';
+
+    return `
+      <div class="gpg-card gpg-eng-${r.eng.bucket}">
+        <div class="gpg-head">
+          <div class="gpg-name" title="${safe(r.displayName)}">${safe(r.displayName)}</div>
+          <div class="gpg-code">${safe(r.code)}</div>
+          ${statusBadge}
+          <div class="gpg-engagement gpg-eng-${r.eng.bucket}-pill">${safe(r.eng.label)}</div>
+        </div>
+        ${statRow ? `<div class="gpg-stats-row">${statRow}</div>` : ''}
+        ${recoLine}
+        ${actionLine}
+      </div>`;
+  }).join('');
+
+  const anonFooter = anonSessions > 0
+    ? `<div class="gpg-anon">${safe(h('ga_action_card_anon') || 'Plus')} <strong>${anonSessions}</strong> ${safe(h('ga_action_card_anon_visits') || 'unidentified visits')} (${anonEvents} ${safe(h('ga_action_card_anon_events') || 'events')})</div>`
+    : '';
+
+  el.innerHTML = cards + anonFooter;
 }
 
 // Friendly time format used in the reco activity feed.
@@ -2101,9 +2395,35 @@ const HT = {
     ga_engagement_title: 'Engagement', ga_engagement_sub: 'Other useful interactions',
     ga_eng_sessions: 'Sessions', ga_eng_scans: 'Doc scans', ga_eng_lookups: 'Cross-device lookups',
     ga_eng_reco_clicks: 'Reco clicks', ga_eng_lang_switches: 'Language switches',
-    ga_guest_breakdown_title: 'Per-guest breakdown', ga_guest_breakdown_sub: 'Sessions attributed by booking code — capofamiglia shown for multi-guest bookings',
+    ga_guest_breakdown_title: 'Per-guest action board', ga_guest_breakdown_sub: 'One row per guest — what to do next, prioritised by urgency',
     ga_breakdown_anonymous: 'Anonymous', ga_breakdown_precheckin: 'Booking', ga_breakdown_precheckin_suffix: 'pre check-in',
     ga_breakdown_col_guest: 'Guest', ga_breakdown_col_code: 'Booking code', ga_breakdown_col_sess: 'Sessions', ga_breakdown_col_events: 'Events', ga_breakdown_col_share: 'Share',
+    // Round 11 — stay status badges
+    ga_status_pre_tomorrow: 'Arrives tomorrow', ga_status_pre_days: 'Arrives in {n}d',
+    ga_status_post_yesterday: 'Checked out yesterday', ga_status_post_days: 'Checked out {n}d ago',
+    ga_status_checkout_today: 'Checks out today',
+    ga_status_active_n_of_m: 'Day {d} of {n}', ga_status_active_n: 'Day {d}',
+    ga_status_precheckin: 'Pre check-in',
+    // Round 11 — engagement labels
+    ga_eng_high: 'High', ga_eng_normal: 'Normal', ga_eng_low: 'Low', ga_eng_silent: 'Silent',
+    // Round 11 — action prompts
+    ga_action_reply_help_one: 'Reply to help request',
+    ga_action_reply_help_n: 'Reply to {n} help requests',
+    ga_action_pre_no_docs: 'Nudge guest to complete check-in',
+    ga_action_pre_arrival: 'Send arrival info / parking details',
+    ga_action_silent: "Guest hasn't opened the app — share the QR",
+    ga_action_suggest_cat: 'Suggest your favorite {cat}',
+    ga_action_check_in: 'Check in — ask if they need anything',
+    ga_action_review: 'Send review request',
+    // Round 11 — card text bits
+    ga_action_card_asked_about: 'Asked about:',
+    ga_action_card_help_one: 'help request',
+    ga_action_card_help_n: 'help requests',
+    ga_action_card_reco_clicks: 'reco clicks',
+    ga_action_card_chat_msgs: 'chat msgs',
+    ga_action_card_anon: 'Plus',
+    ga_action_card_anon_visits: 'unidentified visits',
+    ga_action_card_anon_events: 'events',
     ga_reco_activity_title: 'Recommendation activity', ga_reco_activity_sub: 'Who clicked what, and when — useful for understanding which tips drive guest behaviour',
     ga_reco_activity_empty: 'No recommendation clicks yet in this period.',
     ga_reco_activity_truncated: 'Showing latest 100 of {n} clicks',
@@ -2281,9 +2601,35 @@ const HT = {
     ga_engagement_title: 'Coinvolgimento', ga_engagement_sub: 'Altre interazioni utili',
     ga_eng_sessions: 'Sessioni', ga_eng_scans: 'Scansioni doc', ga_eng_lookups: 'Lookup cross-device',
     ga_eng_reco_clicks: 'Click consigli', ga_eng_lang_switches: 'Cambi lingua',
-    ga_guest_breakdown_title: 'Dettaglio per ospite', ga_guest_breakdown_sub: 'Sessioni attribuite per codice prenotazione — mostrato capofamiglia per prenotazioni multi-ospite',
+    ga_guest_breakdown_title: 'Bacheca azioni per ospite', ga_guest_breakdown_sub: 'Una riga per ospite — cosa fare adesso, ordinato per urgenza',
     ga_breakdown_anonymous: 'Anonimi', ga_breakdown_precheckin: 'Prenotazione', ga_breakdown_precheckin_suffix: 'pre check-in',
     ga_breakdown_col_guest: 'Ospite', ga_breakdown_col_code: 'Cod. prenotazione', ga_breakdown_col_sess: 'Sessioni', ga_breakdown_col_events: 'Eventi', ga_breakdown_col_share: 'Quota',
+    // Round 11 — stati soggiorno
+    ga_status_pre_tomorrow: 'Arriva domani', ga_status_pre_days: 'Arriva tra {n}gg',
+    ga_status_post_yesterday: 'Partito ieri', ga_status_post_days: 'Partito da {n}gg',
+    ga_status_checkout_today: 'Parte oggi',
+    ga_status_active_n_of_m: 'Giorno {d} di {n}', ga_status_active_n: 'Giorno {d}',
+    ga_status_precheckin: 'Pre check-in',
+    // Round 11 — coinvolgimento
+    ga_eng_high: 'Alto', ga_eng_normal: 'Normale', ga_eng_low: 'Basso', ga_eng_silent: 'Silenzioso',
+    // Round 11 — azioni suggerite
+    ga_action_reply_help_one: 'Rispondi alla richiesta di aiuto',
+    ga_action_reply_help_n: 'Rispondi a {n} richieste di aiuto',
+    ga_action_pre_no_docs: "Sollecita l'ospite a completare il check-in",
+    ga_action_pre_arrival: 'Invia info di arrivo / parcheggio',
+    ga_action_silent: "L'ospite non ha aperto l'app — condividi il QR",
+    ga_action_suggest_cat: 'Consiglia il tuo {cat} preferito',
+    ga_action_check_in: 'Scrivigli — chiedi se gli serve qualcosa',
+    ga_action_review: 'Chiedi una recensione',
+    // Round 11 — testi card
+    ga_action_card_asked_about: 'Ha cercato:',
+    ga_action_card_help_one: 'richiesta di aiuto',
+    ga_action_card_help_n: 'richieste di aiuto',
+    ga_action_card_reco_clicks: 'click sui consigli',
+    ga_action_card_chat_msgs: 'messaggi chat',
+    ga_action_card_anon: 'Più',
+    ga_action_card_anon_visits: 'visite non identificate',
+    ga_action_card_anon_events: 'eventi',
     ga_reco_activity_title: 'Attività sui consigli', ga_reco_activity_sub: 'Chi ha cliccato cosa, e quando — utile per capire quali consigli muovono davvero gli ospiti',
     ga_reco_activity_empty: 'Ancora nessun click sui consigli in questo periodo.',
     ga_reco_activity_truncated: 'Mostrati gli ultimi 100 di {n} click',
@@ -3087,13 +3433,33 @@ let _comuniIdx = null;
 function _getComuniIdx() {
   if (_comuniIdx) return _comuniIdx;
   const idx = {};
+  // Italian prepositions and articles that often get dropped or added in
+  // casual usage / OCR scans. "Castellammare di Stabia" → "Castellammare
+  // Stabia", "San Giovanni in Fiore" → "San Giovanni Fiore", etc.
+  // Matched as standalone words (with surrounding spaces) to avoid mangling
+  // names that legitimately contain these letter sequences.
+  const STOPWORDS_RE = /\s+(DI|DEL|DELLA|DELLE|DELLO|DEI|DEGLI|D|DA|IN|SU|SUL|SULLA|SULLE|SULLO|SUI|SUGLI|AL|ALLA|ALLE|ALLO|AI|AGLI|E|CON)\s+/g;
+  // Returns an array of unique key variants for a given normalized name.
+  // The original name always comes first; reduced variants are added only
+  // when they actually differ from what's already in the set.
+  const variants = (name) => {
+    const out = new Set([name]);
+    let reduced = name.replace(STOPWORDS_RE, ' ').replace(/\s+/g, ' ').trim();
+    if (reduced && reduced !== name) out.add(reduced);
+    return [...out];
+  };
+
   for (const entry of ALLOG_COMUNI_COMPACT.split('|')) {
     const [name, code, prov] = entry.split(';');
     if (!name || !code) continue;
+    // Index under both the full name and any preposition-reduced variants.
+    // Province-qualified keys are kept exact (no reduction) since admin
+    // typically only uses the bare name as fallback.
     idx[name + '|' + prov] = code;
-    // First occurrence wins as bare-name fallback; ambiguous names should
-    // be disambiguated via province when possible
-    if (!idx[name]) idx[name] = code;
+    for (const v of variants(name)) {
+      // First occurrence wins for ambiguous names — disambiguate via prov.
+      if (!idx[v]) idx[v] = code;
+    }
   }
   _comuniIdx = idx;
   return idx;
@@ -3185,7 +3551,15 @@ function lookupPoliceCode(cityName, prov) {
   const key = _normKey(cityName);
   const p = (prov || '').toUpperCase().trim().substring(0, 2);
   const idx = _getComuniIdx();
-  return idx[key + '|' + p] || idx[key] || null;
+  // Try, in order: province-qualified exact → bare exact → preposition-
+  // reduced exact. The reduced form catches cases where the document /
+  // user dropped (or added) connector words like "DI", "DEL", "SUL".
+  if (idx[key + '|' + p]) return idx[key + '|' + p];
+  if (idx[key]) return idx[key];
+  const STOPWORDS_RE = /\s+(DI|DEL|DELLA|DELLE|DELLO|DEI|DEGLI|D|DA|IN|SU|SUL|SULLA|SULLE|SULLO|SUI|SUGLI|AL|ALLA|ALLE|ALLO|AI|AGLI|E|CON)\s+/g;
+  const reduced = key.replace(STOPWORDS_RE, ' ').replace(/\s+/g, ' ').trim();
+  if (reduced && reduced !== key && idx[reduced]) return idx[reduced];
+  return null;
 }
 
 function lookupDocCode(input) {

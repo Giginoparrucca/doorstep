@@ -1614,7 +1614,7 @@ function renderView() {
               </div>`;
           }).join('');
 
-      const hostRows = upsell.byHost.length === 0
+      const conciergeHostRows = upsell.byHost.length === 0
         ? ''
         : upsell.byHost.map(h => {
             const shortEmail = h.email.split('@')[0];
@@ -1686,7 +1686,7 @@ function renderView() {
             ${upsell.byHost.length > 0 ? `
             <div>
               <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:6px;">Top hosts by detected demand</div>
-              ${hostRows}
+              ${conciergeHostRows}
             </div>` : ''}
           </div>
 

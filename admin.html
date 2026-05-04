@@ -760,6 +760,174 @@ function _r112BuildFunnel(guestEvents, properties, propToEmail) {
 }
 
 /* ══════════════════════════════════════
+   ROUND 11.3 — Concierge upsell value
+   Detect bookable-intent phrases in guest chat messages, multiply by
+   conservative platform-average prices, surface aggregate revenue
+   opportunity. This is the "investor / pitch deck" number — guests asked
+   about €X,XXX of bookable services, currently captured manually if at all.
+══════════════════════════════════════ */
+
+// Bookable-intent dictionary. Prices are CONSERVATIVE Italy/southern-Italy
+// averages — better to undershoot for credibility. Each intent counts ONCE
+// per guest (booking_code) regardless of how many times they asked.
+const _R113_INTENTS = {
+  airport_transfer: {
+    label: 'Airport transfer', icon: '🚐', price_eur: 45,
+    en: ['airport', 'airport transfer', 'shuttle', 'airport pickup', 'pick up airport', 'taxi to airport', 'taxi airport'],
+    it: ['aeroporto', 'transfer aeroporto', 'navetta', 'taxi aeroporto'],
+  },
+  private_boat: {
+    label: 'Private boat tour', icon: '⛵', price_eur: 350,
+    en: ['private boat', 'rent a boat', 'boat charter', 'yacht', 'private yacht', 'rent boat'],
+    it: ['barca privata', 'noleggio barca', 'noleggiare barca', 'yacht', 'gozzo', 'noleggiare una barca'],
+  },
+  group_boat: {
+    label: 'Group boat tour', icon: '🚤', price_eur: 120,
+    en: ['boat tour', 'boat excursion', 'sea tour', 'boat trip'],
+    it: ['tour in barca', 'escursione in barca', 'gita in barca', 'gita in mare', 'escursione mare'],
+  },
+  restaurant_booking: {
+    label: 'Restaurant booking', icon: '🍽', price_eur: 15,
+    en: ['book a restaurant', 'reserve a restaurant', 'reserve a table', 'restaurant reservation', 'book a table'],
+    it: ['prenotare ristorante', 'prenotare un ristorante', 'prenotare tavolo', 'prenotare un tavolo', 'prenotazione ristorante'],
+  },
+  spa_massage: {
+    label: 'Spa / massage', icon: '💆', price_eur: 90,
+    en: ['spa', 'massage', 'wellness', 'thermal bath', 'thermal'],
+    it: ['spa', 'massaggio', 'centro benessere', 'terme', 'termale'],
+  },
+  bike_rental: {
+    label: 'Bike rental', icon: '🚴', price_eur: 25,
+    en: ['bike rental', 'rent a bike', 'rent bike', 'bicycle rental', 'rent bicycle'],
+    it: ['noleggio bici', 'noleggio bicicletta', 'noleggiare bici', 'noleggiare una bici', 'affittare bici'],
+  },
+  scooter_rental: {
+    label: 'Scooter rental', icon: '🛵', price_eur: 40,
+    en: ['scooter rental', 'rent a scooter', 'rent scooter', 'moped'],
+    it: ['noleggio scooter', 'noleggiare scooter', 'noleggiare uno scooter', 'motorino noleggio'],
+  },
+  car_rental: {
+    label: 'Car rental', icon: '🚗', price_eur: 55,
+    en: ['car rental', 'rent a car', 'rent car', 'hire a car'],
+    it: ['noleggio auto', 'noleggio macchina', 'noleggiare auto', 'noleggiare una macchina', 'autonoleggio'],
+  },
+  wine_tasting: {
+    label: 'Wine tasting', icon: '🍷', price_eur: 90,
+    en: ['wine tasting', 'wine tour', 'winery', 'vineyard tour', 'cantina'],
+    it: ['degustazione vini', 'degustazione vino', 'cantina', 'tour vino', 'tour cantine'],
+  },
+  cooking_class: {
+    label: 'Cooking class', icon: '🍳', price_eur: 160,
+    en: ['cooking class', 'cooking lesson', 'pasta class', 'pasta making', 'cooking experience'],
+    it: ['corso di cucina', 'lezione di cucina', 'corso pasta', 'fare la pasta', 'lezione cucina'],
+  },
+  private_guide: {
+    label: 'Private guide / tour', icon: '🗺', price_eur: 150,
+    en: ['private guide', 'private tour', 'guided tour', 'tour guide', 'walking tour'],
+    it: ['guida privata', 'tour privato', 'visita guidata', 'tour guidato', 'guida turistica'],
+  },
+  day_trip: {
+    label: 'Day trip / excursion', icon: '🚌', price_eur: 120,
+    en: ['day trip', 'excursion to', 'day tour', 'visit matera', 'visit alberobello', 'visit lecce', 'visit polignano', 'visit ostuni'],
+    it: ['gita di un giorno', 'escursione', 'visitare matera', 'visitare alberobello', 'visitare lecce', 'visitare polignano', 'visitare ostuni'],
+  },
+  beach_club: {
+    label: 'Beach club / sun beds', icon: '🏖', price_eur: 40,
+    en: ['beach club', 'sun bed', 'umbrella beach', 'lido', 'private beach'],
+    it: ['stabilimento balneare', 'lido', 'ombrellone', 'spiaggia privata', 'lettino spiaggia'],
+  },
+  taxi_local: {
+    label: 'Taxi / local ride', icon: '🚕', price_eur: 18,
+    en: ['call a taxi', 'book a taxi', 'taxi for', 'need a taxi'],
+    it: ['chiamare taxi', 'chiamare un taxi', 'prenotare taxi', 'taxi per'],
+  },
+  babysitter: {
+    label: 'Babysitter', icon: '🧒', price_eur: 60,
+    en: ['babysitter', 'child care', 'nanny'],
+    it: ['babysitter', 'baby sitter', 'tata'],
+  },
+  flowers_gift: {
+    label: 'Flowers / romantic setup', icon: '💐', price_eur: 60,
+    en: ['flowers', 'bouquet', 'romantic dinner', 'romantic setup', 'anniversary', 'proposal'],
+    it: ['fiori', 'bouquet', 'cena romantica', 'anniversario', 'proposta matrimonio'],
+  },
+};
+
+function _r113NormalizeMsg(text) {
+  return ' ' + text.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]+/g, ' ')
+    .replace(/\s+/g, ' ').trim() + ' ';
+}
+
+function _r113PhraseMatches(normMsg, phrase) {
+  const p = ' ' + phrase + ' ';
+  return normMsg.indexOf(p) !== -1;
+}
+
+function _r113AggregateUpsell(messages, propToEmail) {
+  // Per-guest intent map (deduped by booking_code, OR by ('msg-author' fallback for anon)).
+  const guestKey = (m) => m.booking_code || ('_a_' + (m.id || (m.property_id + '_' + (m.created_at || '').slice(0,10))));
+
+  // bookingKey → { property_id, intents: {intent_id: example_msg} }
+  const guestIntents = {};
+  for (const m of messages) {
+    if (m.sender !== 'guest' || !m.message || m.message.trim().length < 5) continue;
+    const norm = _r113NormalizeMsg(m.message);
+    const key = guestKey(m);
+    if (!guestIntents[key]) guestIntents[key] = { property_id: m.property_id, intents: {} };
+    for (const [intentId, def] of Object.entries(_R113_INTENTS)) {
+      if (guestIntents[key].intents[intentId]) continue; // already counted for this guest
+      const phrases = [...(def.en || []), ...(def.it || [])].map(_r113NormalizeMsg).map(s => s.trim());
+      for (const p of phrases) {
+        if (_r113PhraseMatches(norm, p)) {
+          guestIntents[key].intents[intentId] = m.message;
+          break;
+        }
+      }
+    }
+  }
+
+  let totalValue = 0;
+  const byIntent = {};
+  const byHost = {};
+  const guestsAffected = new Set();
+  const examples = [];
+
+  for (const [gKey, info] of Object.entries(guestIntents)) {
+    if (Object.keys(info.intents).length === 0) continue;
+    guestsAffected.add(gKey);
+    const email = (info.property_id && propToEmail[info.property_id]) || '_unattributed';
+    if (!byHost[email]) byHost[email] = { guests: new Set(), value: 0 };
+    byHost[email].guests.add(gKey);
+    for (const [intentId, exampleMsg] of Object.entries(info.intents)) {
+      const def = _R113_INTENTS[intentId];
+      if (!byIntent[intentId]) byIntent[intentId] = { id: intentId, label: def.label, icon: def.icon, price: def.price_eur, count: 0, value: 0 };
+      byIntent[intentId].count++;
+      byIntent[intentId].value += def.price_eur;
+      totalValue += def.price_eur;
+      byHost[email].value += def.price_eur;
+      if (examples.length < 5 && exampleMsg.length < 200) {
+        examples.push({ msg: exampleMsg, intent: def.label });
+      }
+    }
+  }
+
+  return {
+    totalValue,
+    guestsAffected: guestsAffected.size,
+    hostsAffected: Object.keys(byHost).filter(e => e !== '_unattributed').length,
+    byIntent: Object.values(byIntent).sort((a, b) => b.value - a.value),
+    byHost: Object.entries(byHost)
+      .filter(([e]) => e !== '_unattributed')
+      .map(([email, v]) => ({ email, guests: v.guests.size, value: v.value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8),
+    examples,
+  };
+}
+
+/* ══════════════════════════════════════
    RENDER
 ══════════════════════════════════════ */
 function renderView() {
@@ -1405,6 +1573,116 @@ function renderView() {
             <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;text-align:right;">Done %</div>
           </div>` : ''}
           ${worstHtml}
+        </div>`;
+
+      // ══════════════════════════════════════════════════════════════════════
+      // ROUND 11.3 — CONCIERGE UPSELL VALUE
+      // Detect bookable intents in guest chats, multiply by conservative
+      // platform-average prices. The headline number is "€X of bookable
+      // demand detected" — pitch-deck material.
+      // ══════════════════════════════════════════════════════════════════════
+      const upsell = _r113AggregateUpsell(allChatMessages || [], propToEmail);
+      const fmtEur = (n) => '€' + Math.round(n).toLocaleString('en-US');
+
+      const intentRows = upsell.byIntent.length === 0
+        ? `<div style="font-size:0.78rem;color:var(--ink-soft);padding:12px;background:rgba(250,246,240,0.5);border-radius:6px;">No bookable intents detected in guest chats yet. As volume grows this card will surface concrete revenue opportunities.</div>`
+        : upsell.byIntent.map(it => {
+            const safeLbl = it.label.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+            return `
+              <div style="display:grid;grid-template-columns:30px 1fr 80px 90px 90px;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(74,46,32,0.06);font-size:0.84rem;">
+                <div style="font-size:1.1rem;text-align:center;">${it.icon}</div>
+                <div style="color:var(--ink);font-weight:500;">${safeLbl}</div>
+                <div style="text-align:right;color:var(--ink-soft);">${it.count} ${it.count === 1 ? 'guest' : 'guests'}</div>
+                <div style="text-align:right;color:var(--ink-soft);font-size:0.78rem;">× ${fmtEur(it.price)}</div>
+                <div style="text-align:right;color:var(--ink);font-weight:600;">${fmtEur(it.value)}</div>
+              </div>`;
+          }).join('');
+
+      const hostRows = upsell.byHost.length === 0
+        ? ''
+        : upsell.byHost.map(h => {
+            const shortEmail = h.email.split('@')[0];
+            const safeName = shortEmail.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+            return `
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid rgba(74,46,32,0.06);font-size:0.82rem;">
+                <div style="color:var(--ink);font-weight:500;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${safeName}</div>
+                <div style="color:var(--ink-soft);font-size:0.76rem;flex-shrink:0;">${h.guests} ${h.guests === 1 ? 'guest' : 'guests'} · <strong style="color:var(--ink);">${fmtEur(h.value)}</strong></div>
+              </div>`;
+          }).join('');
+
+      const exampleRows = upsell.examples.length === 0
+        ? ''
+        : upsell.examples.map(ex => {
+            const txt = ex.msg.replace(/\s+/g, ' ').trim();
+            const short = txt.length > 130 ? txt.slice(0, 127) + '…' : txt;
+            const safeMsg = short.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+            const safeIntent = ex.intent.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+            return `
+              <div style="padding:8px 0;border-bottom:1px solid rgba(74,46,32,0.06);">
+                <div style="font-size:0.62rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--blue);font-weight:600;margin-bottom:2px;">→ ${safeIntent}</div>
+                <div style="font-size:0.78rem;color:var(--ink-soft);font-style:italic;line-height:1.4;">"${safeMsg}"</div>
+              </div>`;
+          }).join('');
+
+      // Pitch-deck framing — calculate a 15% concierge commission for context.
+      const commissionPct = 15;
+      const commissionValue = Math.round(upsell.totalValue * commissionPct / 100);
+
+      html += `
+        <div class="section-title">Concierge Upsell Value</div>
+        <div style="background:linear-gradient(135deg,#FAF6F0 0%,#F4ECE0 100%);border:1px solid var(--border);border-left:3px solid var(--warm);border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);margin-bottom:18px;">
+          <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:18px;line-height:1.5;">
+            Bookable services guests asked about in chat, valued at conservative platform-average prices. Each service counts <strong>once per guest</strong>, regardless of repetition. This is unmet demand the platform could capture as commission.
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px;">
+            <div style="background:var(--white);border:1px solid var(--border);border-radius:8px;padding:14px 16px;text-align:center;">
+              <div style="font-family:'Playfair Display',serif;font-size:1.9rem;color:var(--warm);font-weight:600;line-height:1;">${fmtEur(upsell.totalValue)}</div>
+              <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);margin-top:6px;font-weight:600;">Detected demand</div>
+              <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:3px;">last ${(document.getElementById('timeRange') && document.getElementById('timeRange').value) || 30}d</div>
+            </div>
+            <div style="background:var(--white);border:1px solid var(--border);border-radius:8px;padding:14px 16px;text-align:center;">
+              <div style="font-family:'Playfair Display',serif;font-size:1.9rem;color:var(--blue);font-weight:600;line-height:1;">${upsell.guestsAffected}</div>
+              <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);margin-top:6px;font-weight:600;">Guests with intent</div>
+              <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:3px;">${upsell.hostsAffected} ${upsell.hostsAffected === 1 ? 'host' : 'hosts'} affected</div>
+            </div>
+            <div style="background:var(--white);border:1px solid var(--border);border-radius:8px;padding:14px 16px;text-align:center;">
+              <div style="font-family:'Playfair Display',serif;font-size:1.9rem;color:#2f7a44;font-weight:600;line-height:1;">${fmtEur(commissionValue)}</div>
+              <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);margin-top:6px;font-weight:600;">@ ${commissionPct}% commission</div>
+              <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:3px;">platform revenue est.</div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:${upsell.byHost.length > 0 ? '1.4fr 1fr' : '1fr'};gap:24px;align-items:flex-start;">
+            <div>
+              <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:6px;">By service</div>
+              ${upsell.byIntent.length > 0 ? `
+              <div style="display:grid;grid-template-columns:30px 1fr 80px 90px 90px;align-items:center;gap:10px;padding:0 0 6px;border-bottom:2px solid rgba(74,46,32,0.12);">
+                <div></div>
+                <div style="font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;">Service</div>
+                <div style="font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;text-align:right;">Demand</div>
+                <div style="font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;text-align:right;">Avg price</div>
+                <div style="font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;text-align:right;">Value</div>
+              </div>` : ''}
+              ${intentRows}
+            </div>
+
+            ${upsell.byHost.length > 0 ? `
+            <div>
+              <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:6px;">Top hosts by detected demand</div>
+              ${hostRows}
+            </div>` : ''}
+          </div>
+
+          ${exampleRows ? `
+          <div style="margin-top:18px;padding-top:14px;border-top:1px solid rgba(74,46,32,0.08);">
+            <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:6px;">Sample of detected intents</div>
+            ${exampleRows}
+          </div>` : ''}
+
+          <div style="margin-top:14px;font-size:0.68rem;color:var(--ink-soft);font-style:italic;line-height:1.5;">
+            Methodology: phrase-matching against a curated bilingual (EN/IT) dictionary of bookable services. Prices are conservative southern-Italy averages. Each service counts once per guest. Numbers undershoot rather than overstate — actual demand is likely higher (free-form requests, dialect, typos not captured).
+          </div>
         </div>`;
 
       // ══════════════════════════════════════════════════════════════════════

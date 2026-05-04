@@ -1954,7 +1954,7 @@ function _gpgActionPrompt(status, eng, topCats, isPreCheckin, hasDocs) {
   }
   // Active stay - engaged with recos: upsell hook
   if (status.tone === 'active' && topCats.length > 0) {
-    const cat = (topCats[0].cat || '').toLowerCase();
+    const cat = topCats[0].cat || '';
     return { tone: 'opportunity', text: (h('ga_action_suggest_cat') || 'Suggest your favorite {cat}').replace('{cat}', cat) };
   }
   // Active stay - normal/low engagement, no clear hook

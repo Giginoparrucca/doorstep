@@ -344,6 +344,7 @@ let allEvents = [];
 let allProperties = [];
 let allRecommendations = [];
 let allCheckins = [];
+let allChatMessages = []; // Round 11.2 — guest chat texts for question-gap analysis
 
 // Show-hidden toggle: when on, queries include test+deleted rows so admin
 // can see everything that needs cleanup. When off (default), filtered out.
@@ -550,11 +551,13 @@ async function loadData() {
   const applyHiddenFilter = (q) =>
     showHidden ? q : q.eq('is_test', false).is('deleted_at', null);
 
-  const [eventsRes, propsRes, checkinsRes, recosRes] = await Promise.all([
+  const [eventsRes, propsRes, checkinsRes, recosRes, chatRes] = await Promise.all([
     applyHiddenFilter(sb.from('analytics_events').select('*').gte('created_at', since)).order('created_at', { ascending: false }).limit(10000),
     applyHiddenFilter(sb.from('properties').select('*')).order('name'),
     applyHiddenFilter(sb.from('checkins').select('id, property_id, booking_code, surname, name, guest_type, submitted_at, is_test, deleted_at')),
     applyHiddenFilter(sb.from('recommendations').select('*')).order('sort_order'),
+    // Round 11.2 — chat messages, last `since` window, for question-gap analysis
+    applyHiddenFilter(sb.from('chat_messages').select('id, property_id, booking_code, sender, message, created_at, is_test, deleted_at').gte('created_at', since)).order('created_at', { ascending: false }).limit(5000),
   ]);
 
   if (eventsRes.error) { document.getElementById('content').innerHTML = `<div class="loading">Error: ${eventsRes.error.message}</div>`; return; }
@@ -563,6 +566,7 @@ async function loadData() {
   allProperties = propsRes.data || [];
   allRecommendations = recosRes.data || [];
   allCheckins = checkinsRes.data || [];
+  allChatMessages = chatRes && chatRes.data ? chatRes.data : [];
 
   // Count check-ins per property
   const checkinCounts = {};
@@ -622,6 +626,137 @@ function downloadFile(name, content, type) {
   a.download = name;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+/* ══════════════════════════════════════
+   ROUND 11.2 — Strategic admin insights
+   • Question gaps: most frequent topics in guest chat messages, ranked by
+     cross-property recurrence. Highlights content gaps in property setup
+     (e.g., "parking" appearing on 8 properties = template needs a parking
+     field).
+   • Funnel drop-off: where guests bail in the check-in flow, platform-wide
+     and per-property worst offenders.
+══════════════════════════════════════ */
+
+// Bilingual stop words. Keep tight — we want to KEEP short topic words like
+// "wifi", "key", "spa", "bar" so we use a min-length of 3 chars only.
+const _R112_STOP = new Set([
+  // EN articles, prepositions, pronouns, common verbs
+  'the','and','but','for','are','you','was','were','have','has','had','will','would','could','should','can','may','might','must','that','this','these','those','they','them','their','there','here','what','when','where','which','while','with','from','your','our','his','her','its','about','into','out','off','over','under','upon','some','any','each','every','all','one','two','also','just','very','more','most','many','much','only','own','same','than','then','through','until','still','yet','not','nor','too','don','doesn','didn','isn','aren','wasn','weren','hasn','haven','hadn','shouldn','wouldn','couldn','please','thanks','thank','hello','hi','hey','ok','okay','yes','yep','yeah','no','nope','sure','fine','good','great','bad','well',
+  // EN questions / wh
+  'how','why','who','whose',
+  // IT articoli, preposizioni, pronomi
+  'il','lo','la','gli','le','un','una','uno',
+  'di','del','dello','della','dei','degli','delle','da','dal','dallo','dalla','dai','dagli','dalle',
+  'in','nel','nello','nella','nei','negli','nelle',
+  'su','sul','sullo','sulla','sui','sugli','sulle',
+  'con','col','coi','per','tra','fra','dove','quando','come','perche','perché','cosa','chi','che','quale','quali','quanto','quanti','quanta','quante','molto','poco','troppo','tanto','grazie','prego','ciao','salve','salute','buongiorno','buonasera','buonanotte',
+  'mi','ti','si','ci','vi','io','tu','egli','lui','lei','noi','voi','loro','mio','tuo','suo','nostro','vostro',
+  'sono','sei','siamo','siete','era','erano','ero','eri','eravamo','eravate','sara','saranno','sarà','essere','stato','stata','stati','state',
+  'ho','hai','abbiamo','avete','hanno','aveva','avevo','avevamo','avevate','avevano','avere','avuto','avuta','avuti','avute',
+  'non','si','no','poi','allora','quindi','adesso','ora','oggi','ieri','domani','sempre','mai',
+  'questo','questa','questi','queste','quel','quella','quelli','quelle','quello',
+  'piu','più','meno','molto','tutto','tutta','tutti','tutte','niente','nessuno','qualcosa','qualcuno','altro','altra','altri','altre',
+  'fare','fatto','faccio','fai','fa','facciamo','fate','fanno','vorrei','potrei','dovrei','vorremmo',
+  'lì','là','qui','qua',
+]);
+
+function _r112ExtractKeywords(text) {
+  if (!text) return [];
+  // Lowercase, normalize curly quotes & strip diacritics.
+  const norm = text.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]+/g, ' ');
+  const tokens = norm.split(/\s+/).filter(t =>
+    t.length >= 3 && !_R112_STOP.has(t) && !/^\d+$/.test(t)
+  );
+  // Dedup within message (a guest repeating "parking parking parking" still counts as 1 message).
+  return [...new Set(tokens)];
+}
+
+function _r112BuildQuestionGaps(messages) {
+  // Filter to guest senders only, drop tiny/null messages.
+  const guestMsgs = messages.filter(m =>
+    m.sender === 'guest' && m.message && m.message.trim().length >= 5
+  );
+
+  // keyword → { count, props: Set<propId>, examples: [{ msg, propId, when }] }
+  const wordMap = {};
+  for (const m of guestMsgs) {
+    const tokens = _r112ExtractKeywords(m.message);
+    for (const t of tokens) {
+      if (!wordMap[t]) wordMap[t] = { count: 0, props: new Set(), examples: [] };
+      wordMap[t].count++;
+      if (m.property_id) wordMap[t].props.add(m.property_id);
+      if (wordMap[t].examples.length < 3) {
+        wordMap[t].examples.push({ msg: m.message, propId: m.property_id, when: m.created_at });
+      }
+    }
+  }
+
+  // Score: msg_count + 3 * (cross-property bonus). One-property keyword stays
+  // valuable but cross-host keywords float to the top.
+  return Object.entries(wordMap)
+    .map(([word, v]) => ({
+      word,
+      count: v.count,
+      properties: v.props.size,
+      score: v.count + 3 * Math.max(0, v.props.size - 1),
+      example: v.examples[0],
+    }))
+    .filter(r => r.count >= 2) // need at least 2 occurrences to be a "gap"
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 15);
+}
+
+function _r112BuildFunnel(guestEvents, properties, propToEmail) {
+  // Aggregate per session_id.
+  const sess = {};
+  for (const e of guestEvents) {
+    const sid = e.session_id;
+    if (!sid) continue;
+    if (!sess[sid]) sess[sid] = { propId: e.property_id || null, opened: false, started: false, completed: false };
+    if (e.property_id && !sess[sid].propId) sess[sid].propId = e.property_id;
+    if (e.event_type === 'guest_link_opened')       sess[sid].opened = true;
+    if (e.event_type === 'guest_checkin_started')   sess[sid].started = true;
+    if (e.event_type === 'guest_checkin_completed') sess[sid].completed = true;
+  }
+  const sessions = Object.values(sess);
+  // Treat any session that fired started or completed as opened (legacy data).
+  for (const s of sessions) if (s.started || s.completed) s.opened = true;
+  for (const s of sessions) if (s.completed) s.started = true;
+
+  const opened    = sessions.filter(s => s.opened).length;
+  const started   = sessions.filter(s => s.started).length;
+  const completed = sessions.filter(s => s.completed).length;
+
+  // Per-property funnel (only properties with enough sessions to be meaningful).
+  const perProp = {};
+  for (const s of sessions) {
+    if (!s.propId) continue;
+    if (!perProp[s.propId]) perProp[s.propId] = { opened: 0, started: 0, completed: 0 };
+    if (s.opened)    perProp[s.propId].opened++;
+    if (s.started)   perProp[s.propId].started++;
+    if (s.completed) perProp[s.propId].completed++;
+  }
+  const propRows = Object.entries(perProp).map(([propId, p]) => {
+    const property = properties.find(pp => pp.id === propId);
+    return {
+      propId,
+      name: property ? (property.name || propId.slice(0, 8)) : propId.slice(0, 8),
+      hostShort: propToEmail[propId] ? propToEmail[propId].split('@')[0] : '—',
+      opened: p.opened, started: p.started, completed: p.completed,
+      startRate: p.opened > 0 ? Math.round(p.started / p.opened * 100) : 0,
+      doneRate:  p.opened > 0 ? Math.round(p.completed / p.opened * 100) : 0,
+    };
+  });
+  // Worst offenders: enough volume + low completion. ≥5 opens.
+  const worst = propRows
+    .filter(p => p.opened >= 5)
+    .sort((a, b) => a.doneRate - b.doneRate)
+    .slice(0, 5);
+
+  return { opened, started, completed, propRows, worst };
 }
 
 /* ══════════════════════════════════════
@@ -1163,6 +1298,113 @@ function renderView() {
             `Active hosts whose guests barely engage with the app — needs hands-on help or product education.`, '#A0978C')}
           ${oppCard('🎯', 'Silver hosts (mid-funnel)', silverHosts.length,
             `Solid hosts with room to grow — small nudges (more recos, better welcome message) could promote them to Gold.`, '#8B9DAB')}
+        </div>`;
+
+      // ══════════════════════════════════════════════════════════════════════
+      // ROUND 11.2 — QUESTION GAPS + FUNNEL DROP-OFF
+      // Strategic, product-level insights. The host card answers "what should
+      // I do today?"; these answer "what should I fix in the product?"
+      // ══════════════════════════════════════════════════════════════════════
+
+      // ── Question Gaps ──
+      const gaps = _r112BuildQuestionGaps(allChatMessages || []);
+      const totalGuestMsgs = (allChatMessages || []).filter(m => m.sender === 'guest').length;
+      const propsWithGuestChats = new Set((allChatMessages || []).filter(m => m.sender === 'guest' && m.property_id).map(m => m.property_id)).size;
+
+      const gapsBody = gaps.length === 0
+        ? `<div style="font-size:0.82rem;color:var(--ink-soft);padding:12px;background:rgba(250,246,240,0.5);border-radius:6px;">${totalGuestMsgs === 0 ? 'No guest chat messages yet in this period.' : 'Not enough recurring topics to surface gaps yet.'}</div>`
+        : gaps.map((g, i) => {
+            const exTxt = g.example && g.example.msg ? g.example.msg.replace(/\s+/g, ' ').trim() : '';
+            const exShort = exTxt.length > 110 ? exTxt.slice(0, 107) + '…' : exTxt;
+            const safeWord = g.word.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+            const safeEx = exShort.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+            const crossHost = g.properties >= 2;
+            return `
+              <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid rgba(74,46,32,0.06);">
+                <div style="font-size:0.7rem;color:var(--ink-2);font-weight:600;width:18px;flex-shrink:0;text-align:right;">${i + 1}</div>
+                <div style="flex:1;min-width:0;">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap;">
+                    <span style="font-weight:600;color:var(--ink);font-size:0.92rem;">${safeWord}</span>
+                    ${crossHost ? `<span style="font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;color:#b03939;font-weight:600;background:rgba(224,90,90,0.1);padding:2px 6px;border-radius:3px;">cross-host</span>` : ''}
+                    <span style="font-size:0.7rem;color:var(--ink-soft);">${g.count} msgs · ${g.properties} ${g.properties === 1 ? 'property' : 'properties'}</span>
+                  </div>
+                  ${exShort ? `<div style="font-size:0.76rem;color:var(--ink-soft);font-style:italic;line-height:1.4;">"${safeEx}"</div>` : ''}
+                </div>
+              </div>`;
+          }).join('');
+
+      html += `
+        <div class="section-title">Question Gaps</div>
+        <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:18px 22px;box-shadow:var(--shadow);margin-bottom:18px;">
+          <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:14px;line-height:1.5;">
+            Most-mentioned topics in guest chat messages. Topics appearing across multiple properties (<span style="color:#b03939;font-weight:600;">cross-host</span>) are platform-level content gaps — fix once, every host benefits.
+            Sample: <strong>${totalGuestMsgs}</strong> guest messages from <strong>${propsWithGuestChats}</strong> ${propsWithGuestChats === 1 ? 'property' : 'properties'}.
+          </div>
+          ${gapsBody}
+        </div>`;
+
+      // ── Funnel Drop-off ──
+      const propToEmailFunnel = propToEmail; // already built above
+      const funnel = _r112BuildFunnel(guestEvents, allProperties, propToEmailFunnel);
+      const platformOpened    = Math.max(funnel.opened, funnel.started, funnel.completed);
+      const startedRate       = platformOpened > 0 ? Math.round(funnel.started / platformOpened * 100) : 0;
+      const completedRate     = platformOpened > 0 ? Math.round(funnel.completed / platformOpened * 100) : 0;
+      const startedDrop       = platformOpened - funnel.started;
+      const completedDrop     = funnel.started - funnel.completed;
+      const startedDropPct    = platformOpened > 0 ? Math.round(startedDrop / platformOpened * 100) : 0;
+      const completedDropPct  = funnel.started > 0 ? Math.round(completedDrop / funnel.started * 100) : 0;
+
+      const funnelBar = (label, count, total, dropCount, dropPct) => {
+        const pct = total > 0 ? Math.round(count / total * 100) : 0;
+        return `
+          <div style="display:grid;grid-template-columns:140px 1fr 100px;align-items:center;gap:12px;padding:8px 0;">
+            <div style="font-size:0.82rem;color:var(--ink);font-weight:500;">${label}</div>
+            <div style="background:rgba(74,46,32,0.06);border-radius:4px;height:22px;position:relative;overflow:hidden;">
+              <div style="background:linear-gradient(90deg,#C2714F,#D4876A);height:100%;width:${Math.max(pct, 4)}%;border-radius:4px;display:flex;align-items:center;padding:0 8px;color:#fff;font-size:0.72rem;font-weight:600;">${pct >= 15 ? pct + '%' : ''}</div>
+            </div>
+            <div style="text-align:right;font-size:0.82rem;color:var(--ink-soft);">
+              ${count}${dropCount !== null ? ` <span style="color:#b03939;font-weight:600;">−${dropCount} (${dropPct}%)</span>` : ''}
+            </div>
+          </div>`;
+      };
+
+      const worstHtml = funnel.worst.length === 0
+        ? `<div style="font-size:0.78rem;color:var(--ink-soft);padding:8px;">Need ≥5 sessions per property for meaningful comparison. Not enough data yet.</div>`
+        : funnel.worst.map(p => {
+            const safeName = p.name.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+            const tone = p.doneRate < 30 ? '#b03939' : p.doneRate < 50 ? '#8a6914' : 'var(--ink-soft)';
+            return `
+              <div style="display:grid;grid-template-columns:1fr 70px 80px 80px;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(74,46,32,0.06);font-size:0.82rem;">
+                <div style="min-width:0;">
+                  <div style="font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${safeName}</div>
+                  <div style="font-size:0.68rem;color:var(--ink-soft);">${p.hostShort}</div>
+                </div>
+                <div style="text-align:right;color:var(--ink-soft);">${p.opened} opens</div>
+                <div style="text-align:right;color:var(--ink-soft);">${p.started} starts</div>
+                <div style="text-align:right;color:${tone};font-weight:600;">${p.doneRate}%</div>
+              </div>`;
+          }).join('');
+
+      html += `
+        <div class="section-title">Funnel Drop-off</div>
+        <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:18px 22px;box-shadow:var(--shadow);margin-bottom:18px;">
+          <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:14px;line-height:1.5;">
+            Where guests drop off in the check-in flow. Big drops between steps signal UX or trust issues — investigate the highest-drop step first.
+          </div>
+          <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:6px;">Platform-wide</div>
+          ${funnelBar('Link opened',     funnel.opened,    platformOpened, null, null)}
+          ${funnelBar('Check-in started', funnel.started,  platformOpened, startedDrop, startedDropPct)}
+          ${funnelBar('Check-in completed', funnel.completed, platformOpened, completedDrop, completedDropPct)}
+
+          <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin:18px 0 8px;">Worst-converting properties (≥5 opens)</div>
+          ${funnel.worst.length > 0 ? `
+          <div style="display:grid;grid-template-columns:1fr 70px 80px 80px;align-items:center;gap:10px;padding:0 0 6px;border-bottom:2px solid rgba(74,46,32,0.12);">
+            <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;">Property</div>
+            <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;text-align:right;">Opens</div>
+            <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;text-align:right;">Starts</div>
+            <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;text-align:right;">Done %</div>
+          </div>` : ''}
+          ${worstHtml}
         </div>`;
 
       // ══════════════════════════════════════════════════════════════════════

@@ -1345,12 +1345,23 @@ See you soon!</textarea>
     </div>
     <div class="panel" id="panel-chat">
       <div style="display:flex;flex-direction:column;height:calc(100vh - 160px);min-height:300px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-shrink:0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-shrink:0;flex-wrap:wrap;gap:8px;">
           <div>
             <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-soft);" data-h="chat_active_convos">Active Conversations</div>
           </div>
-          <select id="hostChatFilter" onchange="loadHostChat()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;font-family:'DM Sans',sans-serif;color:var(--ink);">
-          </select>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:var(--ink-soft);cursor:pointer;user-select:none;">
+              <input type="checkbox" id="hostChatActiveOnly" checked onchange="onHostChatFilterChange()" style="cursor:pointer;">
+              <span data-h="chat_active_only">Active stays only</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:var(--ink-soft);cursor:pointer;user-select:none;">
+              <input type="checkbox" id="hostChatViewArchived" onchange="onHostChatFilterChange()" style="cursor:pointer;">
+              <span data-h="chat_view_archived">View archived</span>
+            </label>
+            <select id="hostChatFilter" onchange="loadHostChat()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;font-family:'DM Sans',sans-serif;color:var(--ink);max-width:280px;">
+            </select>
+            <button id="hostChatArchiveBtn" onclick="archiveCurrentChat()" title="Archive this conversation" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--white);color:var(--ink-soft);font-size:0.78rem;cursor:pointer;font-family:'DM Sans',sans-serif;" data-h="chat_archive">📁 Archive</button>
+          </div>
         </div>
         <div id="hostChatMessages" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:10px;background:var(--white);padding:14px;display:flex;flex-direction:column;gap:8px;min-height:0;">
           <div style="text-align:center;color:var(--ink-soft);padding:30px;font-size:0.85rem;" data-h="chat_no_messages">No messages yet. Guest conversations will appear here.</div>
@@ -2454,6 +2465,16 @@ const HT = {
     chat_resolved_status: 'Conversation resolved — guest returned to AI concierge',
     chat_escalated: '⚠️ Guest requested human assistance',
     chat_you: 'You',
+    // Round 11.4 — chat archive + active filter
+    chat_active_only: 'Active stays only',
+    chat_archive: '📁 Archive',
+    chat_no_active: 'No active conversations',
+    chat_no_active_msg: 'No active stays right now. Uncheck "Active stays only" to see all conversations.',
+    // Round 12 — read-only archived view + retention countdown
+    chat_view_archived: 'View archived',
+    chat_no_archived: 'No archived conversations',
+    chat_archived_readonly: 'Archived conversation — read only',
+    chat_archived_countdown: 'Archived {date} · {n} days until permanent deletion',
     // Dashboard
     stat_checkins: 'Total Check-ins', stat_pending: 'Pending Documents', stat_filed: 'Alloggiati Filed',
     stat_chat: 'Chat Messages', stat_alltime: 'All time', stat_attention: 'Needs attention',
@@ -2659,6 +2680,16 @@ const HT = {
     chat_resolved_status: 'Conversazione risolta — l\'ospite è tornato al concierge AI',
     chat_escalated: '⚠️ L\'ospite ha richiesto assistenza umana',
     chat_you: 'Tu',
+    // Round 11.4 — archivio chat + filtro soggiorni attivi
+    chat_active_only: 'Solo soggiorni attivi',
+    chat_archive: '📁 Archivia',
+    chat_no_active: 'Nessuna conversazione attiva',
+    chat_no_active_msg: 'Nessun soggiorno attivo al momento. Deseleziona "Solo soggiorni attivi" per vedere tutte le conversazioni.',
+    // Round 12 — vista archivio in sola lettura + countdown ritenzione
+    chat_view_archived: 'Vedi archivio',
+    chat_no_archived: 'Nessuna conversazione archiviata',
+    chat_archived_readonly: 'Conversazione archiviata — sola lettura',
+    chat_archived_countdown: 'Archiviata il {date} · {n} giorni alla cancellazione definitiva',
     stat_checkins: 'Check-in Totali', stat_pending: 'Documenti in Attesa', stat_filed: 'Alloggiati Inviati',
     stat_chat: 'Messaggi Chat', stat_alltime: 'Totale', stat_attention: 'Richiede attenzione',
     stat_complete: 'Tutti completi', stat_done: '% fatto', stat_no_guests: 'Nessun ospite ancora',
@@ -2809,6 +2840,13 @@ function setHostLang(l) {
   renderCheckins();
   renderRules();
   renderRecos();
+  // Round 11.4: action board cards are built from h() — re-render them too,
+  // but ONLY if the analytics panel is currently visible (otherwise we'd
+  // trigger an unnecessary Supabase fetch).
+  const gaPanel = document.getElementById('panel-guestanalytics');
+  if (gaPanel && gaPanel.classList.contains('active') && typeof loadGuestAnalytics === 'function') {
+    loadGuestAnalytics();
+  }
   // Update current panel title
   const activePanel = document.querySelector('.panel.active')?.id?.replace('panel-','');
   if (activePanel && titles[activePanel]) {
@@ -4135,16 +4173,24 @@ async function loadHostChat() {
   if (!propertyId) return;
   const filter = document.getElementById('hostChatFilter').value;
   const container = document.getElementById('hostChatMessages');
+  // Round 12 — read-only "View archived" mode. When on, query archived
+  // (deleted_at IS NOT NULL) rows and hide the reply/archive UI.
+  const viewArchived = document.getElementById('hostChatViewArchived')?.checked ?? false;
+  _setHostChatComposerEnabled(!viewArchived);
 
-  // Load ALL chat messages for this property
-  const { data, error } = await sb.from('chat_messages').select('*')
+  // Load chat messages — live by default, archived when toggle is on.
+  let q = sb.from('chat_messages').select('*')
     .eq('property_id', propertyId)
-    .eq('is_test', false)
-    .is('deleted_at', null)
-    .order('created_at', { ascending: true }).limit(500);
+    .eq('is_test', false);
+  if (viewArchived) {
+    q = q.not('deleted_at', 'is', null);
+  } else {
+    q = q.is('deleted_at', null);
+  }
+  const { data, error } = await q.order('created_at', { ascending: true }).limit(500);
 
   if (error || !data || data.length === 0) {
-    container.innerHTML = `<div style="text-align:center;color:var(--ink-soft);padding:30px;font-size:0.85rem;">${h('chat_no_messages')}</div>`;
+    container.innerHTML = `<div style="text-align:center;color:var(--ink-soft);padding:30px;font-size:0.85rem;">${viewArchived ? (h('chat_no_archived') || 'No archived conversations') : h('chat_no_messages')}</div>`;
     document.getElementById('hostChatFilter').innerHTML = '';
     return;
   }
@@ -4156,7 +4202,7 @@ async function loadHostChat() {
   );
 
   if (chatMsgs.length === 0) {
-    container.innerHTML = `<div style="text-align:center;color:var(--ink-soft);padding:30px;font-size:0.85rem;">${h('chat_no_messages')}</div>`;
+    container.innerHTML = `<div style="text-align:center;color:var(--ink-soft);padding:30px;font-size:0.85rem;">${viewArchived ? (h('chat_no_archived') || 'No archived conversations') : h('chat_no_messages')}</div>`;
     document.getElementById('hostChatFilter').innerHTML = '';
     return;
   }
@@ -4185,10 +4231,43 @@ async function loadHostChat() {
   const knownCodes = sortedCodes.filter(c => c !== '_no_code');
   const nameMap = await loadCapoNamesByCode(knownCodes);
 
+  // Round 11.4 — "Active stays only" filter. Pull arrival/departure dates so
+  // we can hide past tenants without making the host archive them manually.
+  // Round 12 — when viewing archived, the filter is irrelevant (archives
+  // are by definition past); always show all archived conversations.
+  const activeOnly = !viewArchived && (document.getElementById('hostChatActiveOnly')?.checked ?? true);
+  let summaryMap = {};
+  if (activeOnly && knownCodes.length > 0) {
+    summaryMap = await loadGuestSummariesByCode(knownCodes);
+  }
+  const isActiveStay = (code) => {
+    if (code === '_no_code') return true; // pre-checkin / anonymous always shown
+    const s = summaryMap[code];
+    if (!s) return true; // no checkin yet (pre-arrival) → still relevant
+    if (!s.arrival_date) return true; // no dates known → don't hide
+    const today = new Date();
+    const todayMid = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const arr = new Date(s.arrival_date + 'T00:00:00');
+    const dep = s.departure_date ? new Date(s.departure_date + 'T00:00:00') : null;
+    if (isNaN(arr.getTime())) return true;
+    // Active = today is on or before checkout day. Pre-arrival also counts.
+    if (!dep) return true;
+    return todayMid <= dep;
+  };
+
+  const filteredCodes = activeOnly ? sortedCodes.filter(isActiveStay) : sortedCodes;
+
   // Populate dropdown — individual conversations only
   const sel = document.getElementById('hostChatFilter');
-  const current = sel.value && sortedCodes.includes(sel.value) ? sel.value : sortedCodes[0];
-  sel.innerHTML = sortedCodes.map(c => {
+  const previous = sel.value;
+  // Keep prior selection if still in the visible list, else fall back to first.
+  const current = filteredCodes.includes(previous) ? previous : filteredCodes[0];
+  if (filteredCodes.length === 0) {
+    sel.innerHTML = `<option value="">${h('chat_no_active') || 'No active conversations'}</option>`;
+    container.innerHTML = `<div style="text-align:center;color:var(--ink-soft);padding:30px;font-size:0.85rem;">${h('chat_no_active_msg') || 'No active stays right now. Uncheck "Active stays only" to see all conversations.'}</div>`;
+    return;
+  }
+  sel.innerHTML = filteredCodes.map(c => {
     const conv = conversations[c];
     let label;
     if (c === '_no_code') {
@@ -4240,7 +4319,30 @@ async function loadHostChat() {
     </div>`;
   }
 
-  container.innerHTML = nameHeader + statusBanner + selectedMsgs.map(m => {
+  // Round 12 — archived mode: show a read-only retention banner so the
+  // host knows the chat is archived AND when it'll be permanently deleted.
+  let archivedBanner = '';
+  if (viewArchived && selectedMsgs.length > 0) {
+    // Use the most recent deleted_at among the messages as the archive
+    // anchor. Retention rule for archived chats = 30 days.
+    const archivedAt = selectedMsgs
+      .map(m => m.deleted_at).filter(Boolean)
+      .sort().pop();
+    let countdownTxt = '';
+    if (archivedAt) {
+      const archDate = new Date(archivedAt);
+      const purgeDate = new Date(archDate.getTime() + 30 * 86400000);
+      const daysLeft = Math.max(0, Math.ceil((purgeDate - Date.now()) / 86400000));
+      const archStr = archDate.toLocaleDateString(hostLang === 'it' ? 'it-IT' : 'en-GB');
+      countdownTxt = (h('chat_archived_countdown') || 'Archived {date} · {n} days until permanent deletion')
+        .replace('{date}', archStr).replace('{n}', daysLeft);
+    }
+    archivedBanner = `<div style="background:rgba(74,46,32,0.06);border:1px solid rgba(74,46,32,0.12);border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:0.82rem;color:var(--ink-soft);text-align:center;">
+      📁 <strong>${h('chat_archived_readonly') || 'Archived conversation — read only'}</strong>${countdownTxt ? '<br><span style="font-size:0.74rem;">' + countdownTxt + '</span>' : ''}
+    </div>`;
+  }
+
+  container.innerHTML = archivedBanner + nameHeader + statusBanner + selectedMsgs.map(m => {
     const time = new Date(m.created_at).toLocaleTimeString(hostLang==='it'?'it-IT':'en-GB', {hour:'2-digit',minute:'2-digit'});
     const date = new Date(m.created_at).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB');
     if (m.sender === 'guest') {
@@ -4357,6 +4459,90 @@ async function resolveChat() {
   loadHostChat();
   toast(hostLang === 'it' ? '✅ Conversazione risolta' : '✅ Conversation resolved');
   track('chat_resolved', { booking_code: code });
+}
+
+// Round 11.4 — chat dropdown filter handler. Just re-fetches; the filter
+// state is read inside loadHostChat itself.
+function onHostChatFilterChange() {
+  loadHostChat();
+}
+
+// Round 12 — disable the reply composer + archive button when the host
+// is viewing archived chats (read-only mode). Also greys "Active stays
+// only" since it's irrelevant in archived view.
+function _setHostChatComposerEnabled(enabled) {
+  const input  = document.getElementById('hostChatInput');
+  const send   = input?.parentElement?.querySelector('.btn-primary');
+  const resolve = input?.parentElement?.querySelector('.btn-secondary');
+  const archive = document.getElementById('hostChatArchiveBtn');
+  const activeOnly = document.getElementById('hostChatActiveOnly');
+  [input, send, resolve, archive].forEach(el => {
+    if (!el) return;
+    el.disabled = !enabled;
+    el.style.opacity = enabled ? '' : '0.45';
+    el.style.pointerEvents = enabled ? '' : 'none';
+  });
+  if (activeOnly) {
+    activeOnly.disabled = !enabled;
+    activeOnly.parentElement.style.opacity = enabled ? '' : '0.45';
+  }
+}
+
+// Round 11.4 — archive an entire conversation. Soft-deletes every message
+// for the selected booking_code by setting deleted_at = now(). The existing
+// queries already filter `deleted_at IS NULL`, so archived chats vanish
+// from the dropdown automatically. Admin can still see them with the
+// "Show hidden" toggle in admin.html if needed.
+async function archiveCurrentChat() {
+  if (!propertyId) return;
+  const code = document.getElementById('hostChatFilter').value;
+  if (!code) {
+    toast(hostLang === 'it' ? 'Nessuna conversazione selezionata' : 'No conversation selected');
+    return;
+  }
+
+  // Identify the conversation in the prompt — name + code if known.
+  let label = code;
+  if (code !== '_no_code') {
+    try {
+      const m = await loadCapoNamesByCode([code]);
+      if (m[code]) label = `${m[code]} · ${code}`;
+    } catch (_) { /* ignore */ }
+  } else {
+    label = h('chat_no_booking') || 'Pre check-in';
+  }
+
+  const confirmMsg = hostLang === 'it'
+    ? `Archiviare la conversazione con ${label}?\n\nI messaggi spariranno dalla lista. Potranno essere recuperati dall'amministratore se necessario.`
+    : `Archive the conversation with ${label}?\n\nMessages will disappear from the list. They can be recovered by the admin if needed.`;
+  if (!confirm(confirmMsg)) return;
+
+  // Soft-delete every chat row for this property + booking_code.
+  // Note: Supabase's .is() filter handles _no_code (= booking_code IS NULL)
+  // differently from a string code — we branch.
+  let q = sb.from('chat_messages').update({ deleted_at: new Date().toISOString() })
+    .eq('property_id', propertyId)
+    .is('deleted_at', null); // don't re-archive already-archived rows
+  if (code === '_no_code') {
+    q = q.is('booking_code', null);
+  } else {
+    q = q.eq('booking_code', code);
+  }
+
+  const { data, error } = await q.select('id');
+  if (error) {
+    console.error('Archive failed:', error);
+    toast(hostLang === 'it' ? '⚠ Archiviazione fallita' : '⚠ Archive failed');
+    return;
+  }
+  const n = (data || []).length;
+  toast(hostLang === 'it'
+    ? `📁 Archiviati ${n} messaggi`
+    : `📁 Archived ${n} message${n === 1 ? '' : 's'}`);
+  track('chat_archived', { booking_code: code, message_count: n });
+
+  // Refresh — selection will reset to the next available conversation.
+  await loadHostChat();
 }
 
 function viewGuest(id) {

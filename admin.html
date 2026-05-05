@@ -506,6 +506,192 @@ async function bulkPurgeOld(table) {
   loadData();
 }
 
+// ────────────────────────────────────────────────────────────────────────
+// ROUND 12 — Data retention helpers
+// purge_old_data_admin() is a SECURITY DEFINER fn that returns the new
+// data_purge_log row directly; we call it via supabase-js .rpc().
+// ────────────────────────────────────────────────────────────────────────
+async function runRetentionPreview() {
+  const btn = document.getElementById('retentionPreviewBtn');
+  const out = document.getElementById('retentionPreviewResult');
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.textContent = '⏳ Running…'; }
+  try {
+    const { data, error } = await sb.rpc('purge_old_data_admin', { p_dry_run: true });
+    if (error) {
+      out.innerHTML = `<div style="background:rgba(224,90,90,0.08);border:1px solid rgba(224,90,90,0.25);border-radius:6px;padding:10px 12px;font-size:0.78rem;color:#b03939;">⚠ Preview failed: ${(error.message || error).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</div>`;
+      return;
+    }
+    const r = Array.isArray(data) ? data[0] : data;
+    if (!r) { out.innerHTML = `<div style="font-size:0.78rem;color:var(--ink-soft);">No result returned.</div>`; return; }
+    const total = (r.chat_resolved_purged|0) + (r.chat_archived_purged|0) + (r.analytics_purged|0) + (r.test_rows_purged|0) + (r.soft_deleted_purged|0);
+    const cells = [
+      { label: 'Resolved chats',  n: r.chat_resolved_purged|0, color: '#6BAED6' },
+      { label: 'Archived chats',  n: r.chat_archived_purged|0, color: '#8B9DAB' },
+      { label: 'Analytics events',n: r.analytics_purged|0,     color: '#C9A96E' },
+      { label: 'Test rows',       n: r.test_rows_purged|0,     color: '#E8B84B' },
+      { label: 'Soft-deleted',    n: r.soft_deleted_purged|0,  color: '#A0978C' },
+    ];
+    out.innerHTML = `
+      <div style="background:rgba(109,191,130,0.08);border:1px solid rgba(109,191,130,0.25);border-radius:8px;padding:14px 16px;margin:8px 0 0;">
+        <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:10px;">
+          <strong style="color:#2f7a44;">Preview only — nothing was deleted.</strong> If the cron ran right now, it would remove <strong>${total.toLocaleString()}</strong> row${total === 1 ? '' : 's'} and aggregate <strong>${r.analytics_aggregated|0}</strong> property-month${(r.analytics_aggregated|0) === 1 ? '' : 's'} of analytics first.
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">
+          ${cells.map(c => `
+            <div style="background:var(--white);border:1px solid var(--border);border-radius:6px;padding:8px 10px;">
+              <div style="font-family:'Playfair Display',serif;font-size:1.4rem;color:${c.color};font-weight:600;line-height:1;">${c.n.toLocaleString()}</div>
+              <div style="font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-top:4px;">${c.label}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>`;
+    // Also refresh the log so the new dry-run row appears
+    loadRetentionLog();
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.textContent = '🔍 Run preview'; }
+  }
+}
+
+// Round 12 — soft-launch status. Reads purge_settings to figure out
+// whether we're still in the 7-day dry-run window or already live.
+async function loadRetentionLaunchStatus() {
+  const el = document.getElementById('retentionLaunchStatus');
+  if (!el) return;
+  try {
+    const { data, error } = await sb.from('purge_settings').select('*').eq('id', 1).maybeSingle();
+    if (error) {
+      el.innerHTML = `<div style="font-size:0.74rem;color:#b03939;padding:10px 12px;background:rgba(224,90,90,0.08);border:1px solid rgba(224,90,90,0.2);border-radius:6px;">⚠ Couldn't read launch status: ${error.message}. Has migration_round12_retention.sql been applied?</div>`;
+      return;
+    }
+    if (!data) {
+      el.innerHTML = `<div style="font-size:0.74rem;color:#8a6914;padding:10px 12px;background:rgba(232,184,75,0.12);border:1px solid rgba(232,184,75,0.3);border-radius:6px;">⚠ No purge_settings row found. Migration may have partially applied.</div>`;
+      return;
+    }
+    const liveAfter = new Date(data.live_after);
+    const now = Date.now();
+    const isLive = now >= liveAfter.getTime();
+    const msUntilLive = liveAfter.getTime() - now;
+    const daysUntilLive = Math.ceil(msUntilLive / 86400000);
+    const liveAfterStr = liveAfter.toLocaleString();
+
+    if (isLive) {
+      el.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:rgba(224,90,90,0.06);border:1px solid rgba(224,90,90,0.2);border-radius:8px;padding:10px 14px;">
+          <div style="font-size:0.82rem;color:var(--ink);">
+            <strong style="color:#b03939;">🔴 Live mode</strong> — the cron is permanently deleting eligible rows nightly. Live since ${liveAfterStr}.
+          </div>
+          <button onclick="extendSoftLaunch()" style="padding:6px 12px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:0.74rem;cursor:pointer;color:var(--ink-soft);font-family:inherit;">↻ Pause for 7 more days</button>
+        </div>`;
+    } else {
+      el.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:rgba(107,174,214,0.10);border:1px solid rgba(107,174,214,0.3);border-radius:8px;padding:10px 14px;">
+          <div style="font-size:0.82rem;color:var(--ink);">
+            <strong style="color:#29638a;">🛡 Soft-launch (dry-run)</strong> — the cron logs what it WOULD delete but isn't deleting yet. Live mode begins ${liveAfterStr} (${daysUntilLive} day${daysUntilLive === 1 ? '' : 's'}).
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button onclick="goLiveNow()" style="padding:6px 12px;background:#b03939;color:#fff;border:none;border-radius:6px;font-size:0.74rem;cursor:pointer;font-family:inherit;">Go live now</button>
+            <button onclick="extendSoftLaunch()" style="padding:6px 12px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:0.74rem;cursor:pointer;color:var(--ink-soft);font-family:inherit;">+ 7 days</button>
+          </div>
+        </div>`;
+    }
+  } catch (e) {
+    el.innerHTML = `<div style="font-size:0.74rem;color:#b03939;padding:10px 12px;background:rgba(224,90,90,0.08);border:1px solid rgba(224,90,90,0.2);border-radius:6px;">⚠ Error: ${e.message || e}</div>`;
+  }
+}
+
+async function goLiveNow() {
+  const ok = confirm(
+    'Switch to LIVE mode?\n\n' +
+    'From the next nightly run, the cron will permanently delete rows older than the retention thresholds. ' +
+    'Make sure you\'ve reviewed at least one preview run first.\n\n' +
+    'You can switch back to soft-launch with the "+7 days" button at any time.'
+  );
+  if (!ok) return;
+  try {
+    const { error } = await sb.rpc('set_purge_live_after', { p_when: null });
+    if (error) {
+      adminToast('Failed: ' + error.message, 'error');
+      return;
+    }
+    adminToast('🔴 Live mode active — next cron run will delete eligible rows', 'success');
+    loadRetentionLaunchStatus();
+  } catch (e) {
+    adminToast('Error: ' + (e.message || e), 'error');
+  }
+}
+
+async function extendSoftLaunch() {
+  try {
+    const future = new Date(Date.now() + 7 * 86400000).toISOString();
+    const { error } = await sb.rpc('set_purge_live_after', { p_when: future });
+    if (error) {
+      adminToast('Failed: ' + error.message, 'error');
+      return;
+    }
+    adminToast('🛡 Cron paused — dry-run only for the next 7 days', 'success');
+    loadRetentionLaunchStatus();
+  } catch (e) {
+    adminToast('Error: ' + (e.message || e), 'error');
+  }
+}
+
+async function loadRetentionLog() {
+  const el = document.getElementById('retentionLogTable');
+  if (!el) return;
+  try {
+    const { data, error } = await sb.from('data_purge_log')
+      .select('*')
+      .order('run_at', { ascending: false })
+      .limit(20);
+    if (error) {
+      el.innerHTML = `<div style="font-size:0.78rem;color:#b03939;">Failed to load purge log: ${error.message}</div>`;
+      return;
+    }
+    if (!data || data.length === 0) {
+      el.innerHTML = `<div style="font-size:0.78rem;color:var(--ink-soft);padding:8px;font-style:italic;">No purge runs yet. The first nightly cron run will appear here.</div>`;
+      return;
+    }
+    el.innerHTML = `
+      <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+        <thead>
+          <tr style="border-bottom:2px solid rgba(74,46,32,0.12);">
+            <th style="text-align:left;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">When</th>
+            <th style="text-align:left;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Trigger</th>
+            <th style="text-align:left;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Mode</th>
+            <th style="text-align:right;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Resolved</th>
+            <th style="text-align:right;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Archived</th>
+            <th style="text-align:right;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Analytics</th>
+            <th style="text-align:right;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Test</th>
+            <th style="text-align:right;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Soft-del</th>
+          </tr>
+        </thead>
+        <tbody>
+        ${data.map(row => {
+          const when = new Date(row.run_at).toLocaleString();
+          const trigger = (row.triggered_by || 'cron').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+          const mode = row.dry_run
+            ? `<span style="background:rgba(107,174,214,0.15);color:#29638a;padding:2px 8px;border-radius:3px;font-size:0.68rem;font-weight:600;">Preview</span>`
+            : `<span style="background:rgba(224,90,90,0.12);color:#b03939;padding:2px 8px;border-radius:3px;font-size:0.68rem;font-weight:600;">Live</span>`;
+          return `
+            <tr style="border-bottom:1px solid rgba(74,46,32,0.06);">
+              <td style="padding:6px 10px;color:var(--ink);white-space:nowrap;">${when}</td>
+              <td style="padding:6px 10px;color:var(--ink-soft);font-size:0.74rem;">${trigger}</td>
+              <td style="padding:6px 10px;">${mode}</td>
+              <td style="padding:6px 10px;text-align:right;color:var(--ink);">${(row.chat_resolved_purged|0).toLocaleString()}</td>
+              <td style="padding:6px 10px;text-align:right;color:var(--ink);">${(row.chat_archived_purged|0).toLocaleString()}</td>
+              <td style="padding:6px 10px;text-align:right;color:var(--ink);">${(row.analytics_purged|0).toLocaleString()}</td>
+              <td style="padding:6px 10px;text-align:right;color:var(--ink);">${(row.test_rows_purged|0).toLocaleString()}</td>
+              <td style="padding:6px 10px;text-align:right;color:var(--ink);">${(row.soft_deleted_purged|0).toLocaleString()}</td>
+            </tr>`;
+        }).join('')}
+        </tbody>
+      </table></div>`;
+  } catch (e) {
+    el.innerHTML = `<div style="font-size:0.78rem;color:#b03939;">Error: ${e.message || e}</div>`;
+  }
+}
+
 // Helper for inline-rendered action button cells. Returns HTML string with
 // 3-4 buttons depending on row state.
 function adminRowActions(table, row) {
@@ -1857,6 +2043,61 @@ function renderView() {
           </tr>`).join('')}
         </tbody>
       </table></div>`;
+
+    // ════════════════════════════════════════════════════════════════════
+    // ROUND 12 — DATA RETENTION
+    // Shows the policy, recent purge log, and a "Run preview" button so
+    // admin can see what the cron WOULD delete before the next nightly
+    // run. Live purge runs automatically at 02:00 UTC daily.
+    // ════════════════════════════════════════════════════════════════════
+    html += `
+      <div class="section-title">Data Retention</div>
+      <div id="retentionContainer" style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:18px 22px;box-shadow:var(--shadow);margin-bottom:18px;">
+        <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:14px;line-height:1.6;">
+          Automatic daily cleanup at 03:00 Europe/Rome. Personal data is deleted on a tiered schedule; aggregated analytics are preserved indefinitely for year-over-year analysis.
+        </div>
+
+        <div id="retentionLaunchStatus" style="margin-bottom:14px;">
+          <div style="font-size:0.74rem;color:var(--ink-soft);padding:8px;">Loading launch status…</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:18px;">
+          ${[
+            { icon: '💬', label: 'Resolved chats',    days: 90, note: 'after the AI handoff back' },
+            { icon: '📁', label: 'Archived chats',    days: 30, note: 'after the host archives' },
+            { icon: '📊', label: 'Analytics events',  days: 180, note: 'aggregated to monthly totals first' },
+            { icon: '🧪', label: 'Test rows',         days: 30, note: 'across all tables' },
+            { icon: '🗑',  label: 'Soft-deleted rows', days: 30, note: 'across all tables' },
+            { icon: '🛂', label: 'Check-ins (Alloggiati)', days: '5 yr', note: 'Italian fiscal requirement — never auto-purged' },
+          ].map(p => `
+            <div style="background:rgba(250,246,240,0.6);border:1px solid rgba(74,46,32,0.06);border-radius:8px;padding:10px 12px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
+                <span style="font-size:1.05rem;">${p.icon}</span>
+                <span style="font-weight:600;color:var(--ink);font-size:0.85rem;">${p.label}</span>
+              </div>
+              <div style="font-family:'Playfair Display',serif;font-size:1.3rem;color:var(--warm);font-weight:600;line-height:1;">${typeof p.days === 'number' ? p.days + 'd' : p.days}</div>
+              <div style="font-size:0.7rem;color:var(--ink-soft);margin-top:3px;line-height:1.4;">${p.note}</div>
+            </div>
+          `).join('')}
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+          <button onclick="runRetentionPreview()" id="retentionPreviewBtn" style="padding:8px 14px;background:var(--warm);color:#fff;border:none;border-radius:6px;font-size:0.82rem;cursor:pointer;font-family:inherit;">🔍 Run preview</button>
+          <button onclick="loadRetentionLog()" style="padding:8px 14px;background:var(--white);color:var(--ink-soft);border:1px solid var(--border);border-radius:6px;font-size:0.82rem;cursor:pointer;font-family:inherit;">↻ Refresh log</button>
+          <span style="font-size:0.72rem;color:var(--ink-soft);">Preview = dry run; nothing is deleted. The nightly cron's mode is shown above.</span>
+        </div>
+
+        <div id="retentionPreviewResult"></div>
+
+        <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin:18px 0 6px;">Recent purge runs</div>
+        <div id="retentionLogTable">
+          <div style="font-size:0.78rem;color:var(--ink-soft);padding:8px;">Loading…</div>
+        </div>
+      </div>`;
+
+    // Trigger log + launch-status fetch after innerHTML lands
+    setTimeout(loadRetentionLog, 0);
+    setTimeout(loadRetentionLaunchStatus, 0);
   }
 
   // Event log

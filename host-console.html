@@ -988,6 +988,19 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <input class="form-input" placeholder="e.g., 072006-APP-00123" id="cirCode">
             <div class="form-hint" data-h="prop_cir_hint">Required for Puglia DMS reporting</div>
           </div>
+          <div class="form-group">
+            <label class="form-label" data-h="prop_type">Property type</label>
+            <select class="form-select" id="propType">
+              <option value="apartment">Apartment</option>
+              <option value="villa">Villa</option>
+              <option value="bnb">B&amp;B</option>
+              <option value="trullo">Trullo</option>
+              <option value="studio">Studio</option>
+              <option value="room">Single room</option>
+              <option value="other">Other</option>
+            </select>
+            <div class="form-hint" data-h="prop_type_hint">Helps with platform analytics and audience-aware suggestions.</div>
+          </div>
         </div>
       </div>
 
@@ -2467,6 +2480,8 @@ const HT = {
     chat_you: 'You',
     // Round 11.4 — chat archive + active filter
     chat_active_only: 'Active stays only',
+    // Round 13.1 — privacy modal
+    privacy_link: 'Privacy', privacy_title: 'Privacy & Data Retention', privacy_close: 'Close',
     chat_archive: '📁 Archive',
     chat_no_active: 'No active conversations',
     chat_no_active_msg: 'No active stays right now. Uncheck "Active stays only" to see all conversations.',
@@ -2490,6 +2505,7 @@ const HT = {
     prop_basic: 'Basic Information', prop_basic_desc: 'This information will appear on the guest welcome screen.',
     prop_name: 'Property Name', prop_type: 'Property Type', prop_address: 'Street Address', prop_maps_link: 'Google Maps Link', prop_maps_hint: 'Open Google Maps, find your property, tap Share → Copy link, paste here',
     prop_city: 'City', prop_zip: 'ZIP / CAP', prop_region: 'Region', prop_cir: 'CIR Code (Regional ID)', prop_cir_hint: 'Required for Puglia DMS reporting',
+    prop_type: 'Property type', prop_type_hint: 'Helps with platform analytics and audience-aware suggestions.',
     prop_times: 'Check-in / Check-out', prop_times_desc: 'Times and access instructions for your guests.',
     prop_checkin_time: 'Check-in Time', prop_checkout_time: 'Check-out Time',
     prop_access: 'Access Method', prop_keybox: 'Keybox Code', prop_keybox_hint: 'Sent to guest before arrival (not shown in app)',
@@ -2682,6 +2698,8 @@ const HT = {
     chat_you: 'Tu',
     // Round 11.4 — archivio chat + filtro soggiorni attivi
     chat_active_only: 'Solo soggiorni attivi',
+    // Round 13.1 — privacy modal
+    privacy_link: 'Privacy', privacy_title: 'Privacy e conservazione dati', privacy_close: 'Chiudi',
     chat_archive: '📁 Archivia',
     chat_no_active: 'Nessuna conversazione attiva',
     chat_no_active_msg: 'Nessun soggiorno attivo al momento. Deseleziona "Solo soggiorni attivi" per vedere tutte le conversazioni.',
@@ -2703,6 +2721,7 @@ const HT = {
     prop_basic: 'Informazioni Base', prop_basic_desc: 'Queste informazioni appariranno nella schermata di benvenuto.',
     prop_name: 'Nome Proprietà', prop_type: 'Tipo Proprietà', prop_address: 'Indirizzo', prop_maps_link: 'Link Google Maps', prop_maps_hint: 'Apri Google Maps, trova la tua proprietà, tocca Condividi → Copia link, incolla qui',
     prop_city: 'Città', prop_zip: 'CAP', prop_region: 'Regione', prop_cir: 'Codice CIR (ID Regionale)', prop_cir_hint: 'Richiesto per la segnalazione Puglia DMS',
+    prop_type: 'Tipo di immobile', prop_type_hint: 'Aiuta con le statistiche di piattaforma e i suggerimenti mirati al pubblico.',
     prop_times: 'Check-in / Check-out', prop_times_desc: 'Orari e istruzioni di accesso per gli ospiti.',
     prop_checkin_time: 'Orario Check-in', prop_checkout_time: 'Orario Check-out',
     prop_access: 'Metodo di Accesso', prop_keybox: 'Codice Lockbox', prop_keybox_hint: 'Inviato all\'ospite prima dell\'arrivo',
@@ -3027,6 +3046,7 @@ async function saveProperty() {
     zip: document.getElementById('propZip').value,
     region: document.getElementById('propRegion').value,
     cir_code: document.getElementById('cirCode').value,
+    property_type: document.getElementById('propType')?.value || null,
     checkin_time: document.getElementById('propCheckinFrom').value + '-' + document.getElementById('propCheckinTo').value,
     checkout_time: document.getElementById('propCheckoutFrom').value + '-' + document.getElementById('propCheckoutTo').value,
     access_method: document.getElementById('propAccess').value,
@@ -4685,6 +4705,7 @@ function fillPropertyForm(data) {
   if (el('propCity')) el('propCity').value = data.city || '';
   if (el('propZip')) el('propZip').value = data.zip || '';
   if (el('propRegion')) el('propRegion').value = data.region || '';
+  if (el('propType') && data.property_type) el('propType').value = data.property_type;
   if (el('cirCode')) el('cirCode').value = data.cir_code || '';
   // Check-in time: stored as "15:00-20:00" or legacy "15:00"
   const ciParts = (data.checkin_time || '15:00-20:00').split('-');
@@ -4718,5 +4739,92 @@ function fillPropertyForm(data) {
 init();
 setTimeout(() => setHostLang('it'), 200);
 </script>
+<!-- ── Round 13.1 — Privacy notice modal (host) ──────────────────────── -->
+<div id="privacyLink" onclick="openPrivacyModal()" style="position:fixed;bottom:14px;left:14px;z-index:50;background:rgba(255,255,255,0.92);backdrop-filter:blur(8px);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:0.72rem;color:var(--ink-soft);cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 1px 3px rgba(0,0,0,0.08);user-select:none;" data-h="privacy_link">Privacy</div>
+
+<div id="privacyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;" onclick="if(event.target===this)closePrivacyModal()">
+  <div style="background:var(--white);max-width:760px;width:100%;border-radius:14px;padding:28px 32px 24px;box-shadow:0 12px 48px rgba(0,0,0,0.25);max-height:calc(100vh - 60px);overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <h2 style="font-family:'Playfair Display',serif;font-weight:600;font-size:1.5rem;color:var(--ink);margin:0;" data-h="privacy_title">Privacy &amp; Data Retention</h2>
+      <button onclick="closePrivacyModal()" style="background:none;border:none;font-size:1.5rem;color:var(--ink-soft);cursor:pointer;padding:4px 8px;line-height:1;">×</button>
+    </div>
+
+    <!-- EN content -->
+    <div id="privacyEN" style="font-size:0.86rem;color:var(--ink);line-height:1.6;">
+      <p style="margin:0 0 14px;font-size:0.78rem;color:var(--ink-soft);">
+        <strong>Data controller:</strong> WelcomeBnB · <strong>Contact:</strong> info@welcomebnb.it · Last updated: ${new Date().toISOString().slice(0,10)}
+      </p>
+
+      <h3 style="font-size:1rem;color:var(--ink);margin:18px 0 6px;">Retention periods</h3>
+      <p style="margin:0 0 10px;">We keep personal data only as long as necessary:</p>
+      <ul style="margin:0 0 14px 22px;padding:0;">
+        <li style="margin:4px 0;"><strong>Chat with the AI assistant or guests</strong> — deleted 90 days after the conversation is resolved, or 30 days after you archive it.</li>
+        <li style="margin:4px 0;"><strong>App usage data</strong> (which pages were opened, which recommendations were tapped) — kept for 180 days, then anonymized into monthly totals before deletion.</li>
+        <li style="margin:4px 0;"><strong>Guest check-in documents</strong> (passport, ID) — kept for 5 years per Italian law (TULPS art. 109; Alloggiati Web).</li>
+        <li style="margin:4px 0;"><strong>Property setup data</strong> (rules, recommendations, welcome message) — kept while your account is active.</li>
+      </ul>
+
+      <h3 style="font-size:1rem;color:var(--ink);margin:18px 0 6px;">Anonymized service improvement data</h3>
+      <p style="margin:0 0 14px;">
+        To improve our concierge AI, we extract anonymized question-and-answer pairs from resolved guest conversations on your property. Before this data leaves the operational chat, all personal identifiers — guest names, booking codes, exact dates, phone numbers, email addresses, document numbers — are stripped programmatically. The resulting dataset retains only the topic, the type of answer (AI / host / both), the property region, property type, season, stay length range, and group composition range. This dataset is used to train models, identify content gaps, and generate cross-property insights, and is retained indefinitely. Legal basis: Art. 6(1)(f) GDPR (legitimate interest in service improvement).
+      </p>
+
+      <h3 style="font-size:1rem;color:var(--ink);margin:18px 0 6px;">Your rights</h3>
+      <p style="margin:0 0 14px;">
+        Under Articles 15–22 GDPR you can access, rectify, or request deletion of your personal data, and obtain a copy in a portable format. To exercise any of these rights, email <a href="mailto:info@welcomebnb.it" style="color:var(--warm);">info@welcomebnb.it</a>. We respond within 30 days. If you believe your data has been mishandled, you can lodge a complaint with the Italian Garante per la Protezione dei Dati Personali (<a href="https://www.garanteprivacy.it" target="_blank" rel="noopener" style="color:var(--warm);">www.garanteprivacy.it</a>).
+      </p>
+    </div>
+
+    <!-- IT content -->
+    <div id="privacyIT" style="display:none;font-size:0.86rem;color:var(--ink);line-height:1.6;">
+      <p style="margin:0 0 14px;font-size:0.78rem;color:var(--ink-soft);">
+        <strong>Titolare del trattamento:</strong> WelcomeBnB · <strong>Contatti:</strong> info@welcomebnb.it · Ultimo aggiornamento: ${new Date().toISOString().slice(0,10)}
+      </p>
+
+      <h3 style="font-size:1rem;color:var(--ink);margin:18px 0 6px;">Periodi di conservazione</h3>
+      <p style="margin:0 0 10px;">Conserviamo i dati personali solo per il tempo necessario:</p>
+      <ul style="margin:0 0 14px 22px;padding:0;">
+        <li style="margin:4px 0;"><strong>Chat con l'assistente AI o con gli ospiti</strong> — cancellate 90 giorni dopo la chiusura della conversazione, o 30 giorni dopo che le hai archiviate.</li>
+        <li style="margin:4px 0;"><strong>Dati di utilizzo dell'app</strong> (pagine aperte, consigli cliccati) — conservati per 180 giorni, poi anonimizzati in totali mensili prima della cancellazione.</li>
+        <li style="margin:4px 0;"><strong>Documenti di check-in degli ospiti</strong> (passaporto, carta d'identità) — conservati per 5 anni come previsto dalla normativa italiana (TULPS art. 109; Alloggiati Web).</li>
+        <li style="margin:4px 0;"><strong>Dati di setup dell'immobile</strong> (regole, consigli, messaggio di benvenuto) — conservati finché il tuo account è attivo.</li>
+      </ul>
+
+      <h3 style="font-size:1rem;color:var(--ink);margin:18px 0 6px;">Dati anonimizzati per il miglioramento del servizio</h3>
+      <p style="margin:0 0 14px;">
+        Per migliorare il nostro concierge AI, estraiamo coppie domanda-risposta anonimizzate dalle conversazioni risolte degli ospiti del tuo immobile. Prima che i dati lascino la chat operativa, tutti gli identificatori personali — nomi degli ospiti, codici di prenotazione, date esatte, numeri di telefono, indirizzi email, numeri di documento — vengono rimossi automaticamente. Il dataset risultante conserva solo l'argomento, il tipo di risposta (AI / host / entrambi), la regione dell'immobile, il tipo di immobile, la stagione, la fascia di durata del soggiorno e la fascia di numero di ospiti. Il dataset viene utilizzato per addestrare modelli, identificare lacune nei contenuti e generare analisi tra le diverse strutture, ed è conservato a tempo indeterminato. Base giuridica: art. 6(1)(f) GDPR (interesse legittimo al miglioramento del servizio).
+      </p>
+
+      <h3 style="font-size:1rem;color:var(--ink);margin:18px 0 6px;">I tuoi diritti</h3>
+      <p style="margin:0 0 14px;">
+        Ai sensi degli articoli 15–22 GDPR puoi accedere, rettificare o richiedere la cancellazione dei tuoi dati personali, e ottenerne una copia in formato portabile. Per esercitare questi diritti, scrivi a <a href="mailto:info@welcomebnb.it" style="color:var(--warm);">info@welcomebnb.it</a>. Rispondiamo entro 30 giorni. Se ritieni che i tuoi dati siano stati gestiti in modo improprio, puoi presentare reclamo al Garante per la Protezione dei Dati Personali (<a href="https://www.garanteprivacy.it" target="_blank" rel="noopener" style="color:var(--warm);">www.garanteprivacy.it</a>).
+      </p>
+    </div>
+
+    <button onclick="closePrivacyModal()" style="margin-top:8px;padding:10px 22px;background:var(--warm);color:#fff;border:none;border-radius:6px;font-size:0.86rem;cursor:pointer;font-family:'DM Sans',sans-serif;" data-h="privacy_close">Close</button>
+  </div>
+</div>
+
+<script>
+function openPrivacyModal() {
+  // Show the right language's content based on hostLang
+  const isIT = (typeof hostLang !== 'undefined' && hostLang === 'it');
+  document.getElementById('privacyEN').style.display = isIT ? 'none' : 'block';
+  document.getElementById('privacyIT').style.display = isIT ? 'block' : 'none';
+  document.getElementById('privacyModal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function closePrivacyModal() {
+  document.getElementById('privacyModal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+// Close on Escape
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('privacyModal').style.display === 'flex') {
+    closePrivacyModal();
+  }
+});
+</script>
+
 </body>
 </html>

@@ -4536,6 +4536,16 @@ async function archiveCurrentChat() {
     return;
   }
   const n = (data || []).length;
+  // RLS gotcha: if the host doesn't have UPDATE permission on chat_messages,
+  // Supabase returns no error but 0 rows updated. Surface a clearer message
+  // pointing to the migration that fixes it.
+  if (n === 0) {
+    console.warn('Archive returned 0 rows. If this conversation has messages, the host UPDATE policy on chat_messages is likely missing. Apply migration_round11_4_1_chat_update_policy.sql.');
+    toast(hostLang === 'it'
+      ? '⚠ Nessun messaggio archiviato — potrebbe essere un problema di permessi (vedi console)'
+      : '⚠ No messages archived — may be a permissions issue (see console)');
+    return;
+  }
   toast(hostLang === 'it'
     ? `📁 Archiviati ${n} messaggi`
     : `📁 Archived ${n} message${n === 1 ? '' : 's'}`);

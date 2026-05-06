@@ -864,7 +864,10 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="sidebar-user-role" data-h="sidebar_role">Property Manager</div>
       </div>
     </div>
-    <button onclick="signOut()" style="width:100%;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:none;color:rgba(244,237,224,0.6);font-size:0.72rem;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.color='#fff';this.style.borderColor='rgba(255,255,255,0.3)'" onmouseout="this.style.color='rgba(244,237,224,0.6)';this.style.borderColor='rgba(255,255,255,0.15)'">Sign Out</button>
+    <div style="display:flex;gap:6px;width:100%;">
+      <button onclick="signOut()" style="flex:1;padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:none;color:rgba(244,237,224,0.6);font-size:0.72rem;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.color='#fff';this.style.borderColor='rgba(255,255,255,0.3)'" onmouseout="this.style.color='rgba(244,237,224,0.6)';this.style.borderColor='rgba(255,255,255,0.15)'">Sign Out</button>
+      <button onclick="openPrivacyModal()" title="Privacy &amp; data" style="padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:none;color:rgba(244,237,224,0.5);font-size:0.7rem;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.color='#fff';this.style.borderColor='rgba(255,255,255,0.3)'" onmouseout="this.style.color='rgba(244,237,224,0.5)';this.style.borderColor='rgba(255,255,255,0.15)'" data-h="privacy_link">Privacy</button>
+    </div>
   </div>
 </aside>
 
@@ -4740,8 +4743,6 @@ init();
 setTimeout(() => setHostLang('it'), 200);
 </script>
 <!-- ── Round 13.1 — Privacy notice modal (host) ──────────────────────── -->
-<div id="privacyLink" onclick="openPrivacyModal()" style="position:fixed;bottom:14px;left:14px;z-index:50;background:rgba(255,255,255,0.92);backdrop-filter:blur(8px);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:0.72rem;color:var(--ink-soft);cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 1px 3px rgba(0,0,0,0.08);user-select:none;" data-h="privacy_link">Privacy</div>
-
 <div id="privacyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;" onclick="if(event.target===this)closePrivacyModal()">
   <div style="background:var(--white);max-width:760px;width:100%;border-radius:14px;padding:28px 32px 24px;box-shadow:0 12px 48px rgba(0,0,0,0.25);max-height:calc(100vh - 60px);overflow-y:auto;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">

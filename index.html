@@ -3393,5 +3393,88 @@ async function init() {
 
 init();
 </script>
+<!-- ── Round 13.1 — Privacy notice modal (guest) ─────────────────────── -->
+<div id="privacyLink" onclick="openPrivacyModal()" style="position:fixed;bottom:74px;right:12px;z-index:1100;background:rgba(255,255,255,0.94);backdrop-filter:blur(8px);border:1px solid rgba(30,16,8,0.1);border-radius:6px;padding:5px 11px;font-size:0.7rem;color:var(--ink);cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 1px 3px rgba(0,0,0,0.08);user-select:none;opacity:0.85;">Privacy</div>
+
+<div id="privacyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:flex-start;justify-content:center;padding:24px 12px;overflow-y:auto;" onclick="if(event.target===this)closePrivacyModal()">
+  <div style="background:var(--cream);max-width:680px;width:100%;border-radius:14px;padding:24px 26px 20px;box-shadow:0 12px 48px rgba(0,0,0,0.3);max-height:calc(100vh - 48px);overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <h2 id="privacyModalTitle" style="font-family:'Playfair Display',serif;font-weight:600;font-size:1.35rem;color:var(--ink);margin:0;">Privacy &amp; Data</h2>
+      <button onclick="closePrivacyModal()" style="background:none;border:none;font-size:1.5rem;color:var(--ink);opacity:0.55;cursor:pointer;padding:2px 8px;line-height:1;">×</button>
+    </div>
+
+    <div id="privacyContentEN" style="font-size:0.84rem;color:var(--ink);line-height:1.55;">
+      <p style="margin:0 0 12px;font-size:0.74rem;color:rgba(30,16,8,0.65);">
+        <strong>Operated by:</strong> WelcomeBnB · <strong>Contact:</strong> info@welcomebnb.it
+      </p>
+
+      <h3 style="font-size:0.95rem;color:var(--ink);margin:14px 0 5px;font-weight:600;">How long we keep your data</h3>
+      <ul style="margin:0 0 12px 20px;padding:0;">
+        <li style="margin:3px 0;"><strong>Conversations</strong> with the AI assistant or your host: kept for up to 90 days after the conversation ends, then permanently deleted.</li>
+        <li style="margin:3px 0;"><strong>Your check-in documents</strong> (passport, ID): kept for 5 years as required by Italian public-security law (Alloggiati Web).</li>
+        <li style="margin:3px 0;"><strong>App usage</strong> (which pages you opened, which recommendations you tapped): kept for 180 days, then anonymized into monthly totals.</li>
+      </ul>
+
+      <h3 style="font-size:0.95rem;color:var(--ink);margin:14px 0 5px;font-weight:600;">Improving our service</h3>
+      <p style="margin:0 0 12px;">
+        After your conversation ends, we may use it in <strong>anonymized form</strong> to improve the service. Your name, booking code, exact dates, phone, email, and document numbers are programmatically removed before the anonymized version is kept. Only the question topic, the answer, and broad context (region, season, length-of-stay range) remain. Legal basis: legitimate interest in service improvement (Art. 6(1)(f) GDPR).
+      </p>
+
+      <h3 style="font-size:0.95rem;color:var(--ink);margin:14px 0 5px;font-weight:600;">Your rights</h3>
+      <p style="margin:0 0 12px;">
+        You can ask to access, correct, or delete your data, or to receive a copy, by emailing <a href="mailto:info@welcomebnb.it" style="color:var(--warm);">info@welcomebnb.it</a>. You can also object to your conversations being used in the anonymized dataset — let us know before the end of your stay. We respond within 30 days. To complain about how your data was handled, contact the Italian Garante (<a href="https://www.garanteprivacy.it" target="_blank" rel="noopener" style="color:var(--warm);">www.garanteprivacy.it</a>).
+      </p>
+    </div>
+
+    <div id="privacyContentIT" style="display:none;font-size:0.84rem;color:var(--ink);line-height:1.55;">
+      <p style="margin:0 0 12px;font-size:0.74rem;color:rgba(30,16,8,0.65);">
+        <strong>Gestito da:</strong> WelcomeBnB · <strong>Contatti:</strong> info@welcomebnb.it
+      </p>
+
+      <h3 style="font-size:0.95rem;color:var(--ink);margin:14px 0 5px;font-weight:600;">Per quanto tempo conserviamo i tuoi dati</h3>
+      <ul style="margin:0 0 12px 20px;padding:0;">
+        <li style="margin:3px 0;"><strong>Conversazioni</strong> con l'assistente AI o con l'host: conservate fino a 90 giorni dalla fine della conversazione, poi eliminate definitivamente.</li>
+        <li style="margin:3px 0;"><strong>Documenti di check-in</strong> (passaporto, carta d'identità): conservati per 5 anni come richiesto dalla normativa di pubblica sicurezza italiana (Alloggiati Web).</li>
+        <li style="margin:3px 0;"><strong>Utilizzo dell'app</strong> (pagine aperte, consigli cliccati): conservato per 180 giorni, poi anonimizzato in totali mensili.</li>
+      </ul>
+
+      <h3 style="font-size:0.95rem;color:var(--ink);margin:14px 0 5px;font-weight:600;">Miglioramento del servizio</h3>
+      <p style="margin:0 0 12px;">
+        Dopo la fine della tua conversazione, potremmo utilizzarla in <strong>forma anonimizzata</strong> per migliorare il servizio. Il tuo nome, codice di prenotazione, date esatte, telefono, email e numeri di documento vengono rimossi automaticamente prima che la versione anonimizzata venga conservata. Rimangono solo l'argomento della domanda, la risposta e il contesto generale (regione, stagione, fascia di durata del soggiorno). Base giuridica: interesse legittimo al miglioramento del servizio (art. 6(1)(f) GDPR).
+      </p>
+
+      <h3 style="font-size:0.95rem;color:var(--ink);margin:14px 0 5px;font-weight:600;">I tuoi diritti</h3>
+      <p style="margin:0 0 12px;">
+        Puoi richiedere l'accesso, la rettifica o la cancellazione dei tuoi dati, o riceverne una copia, scrivendo a <a href="mailto:info@welcomebnb.it" style="color:var(--warm);">info@welcomebnb.it</a>. Puoi anche opporti all'uso delle tue conversazioni nel dataset anonimizzato — comunicacelo prima della fine del soggiorno. Rispondiamo entro 30 giorni. Per reclami sulla gestione dei tuoi dati, puoi rivolgerti al Garante per la Protezione dei Dati Personali (<a href="https://www.garanteprivacy.it" target="_blank" rel="noopener" style="color:var(--warm);">www.garanteprivacy.it</a>).
+      </p>
+    </div>
+
+    <button onclick="closePrivacyModal()" id="privacyModalClose" style="margin-top:6px;padding:9px 20px;background:var(--warm);color:#fff;border:none;border-radius:6px;font-size:0.84rem;cursor:pointer;font-family:'DM Sans',sans-serif;">Close</button>
+  </div>
+</div>
+
+<script>
+function openPrivacyModal() {
+  // lang variable lives in the main script's scope
+  const isIT = (typeof lang !== 'undefined' && lang === 'it');
+  document.getElementById('privacyContentEN').style.display = isIT ? 'none' : 'block';
+  document.getElementById('privacyContentIT').style.display = isIT ? 'block' : 'none';
+  document.getElementById('privacyModalTitle').textContent = isIT ? 'Privacy e dati' : 'Privacy & Data';
+  document.getElementById('privacyModalClose').textContent = isIT ? 'Chiudi' : 'Close';
+  document.getElementById('privacyLink').textContent = 'Privacy';
+  document.getElementById('privacyModal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+function closePrivacyModal() {
+  document.getElementById('privacyModal').style.display = 'none';
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('privacyModal').style.display === 'flex') {
+    closePrivacyModal();
+  }
+});
+</script>
+
 </body>
 </html>

@@ -694,6 +694,112 @@ async function loadRetentionLog() {
   }
 }
 
+// ────────────────────────────────────────────────────────────────────────
+// ROUND 14.2 — GDPR objection handlers
+// record_qa_exclusion is a SECURITY DEFINER fn that requires is_admin().
+// ────────────────────────────────────────────────────────────────────────
+async function recordGdprExclusion() {
+  const codeEl = document.getElementById('gdprBookingCode');
+  const reasonEl = document.getElementById('gdprReason');
+  const contactEl = document.getElementById('gdprContact');
+  const btn = document.getElementById('gdprRecordBtn');
+  const code = (codeEl?.value || '').trim().toUpperCase();
+  const reason = (reasonEl?.value || '').trim() || null;
+  const contact = (contactEl?.value || '').trim() || null;
+
+  if (!code) {
+    adminToast('Booking code is required', 'error');
+    codeEl?.focus();
+    return;
+  }
+  if (!confirm(
+    `Record GDPR objection for ${code}?\n\n` +
+    `• The booking code will be added to the exclusion list\n` +
+    `• Future capture cron runs will skip this booking\n` +
+    `• Any chat Q&A pairs already captured for this booking will be permanently deleted\n\n` +
+    `This satisfies the guest's right-to-object (Art. 21 GDPR).`
+  )) return;
+
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.textContent = '⏳ Recording…'; }
+  try {
+    const { data, error } = await sb.rpc('record_qa_exclusion', {
+      p_booking_code: code, p_reason: reason, p_contact_email: contact,
+    });
+    if (error) {
+      adminToast('Failed: ' + error.message, 'error');
+      return;
+    }
+    const deletedCount = (typeof data === 'number') ? data : (Array.isArray(data) ? data[0] : 0);
+    adminToast(`⛔ ${code} excluded — ${deletedCount} existing Q&A row${deletedCount === 1 ? '' : 's'} deleted`, 'success');
+    if (codeEl) codeEl.value = '';
+    if (reasonEl) reasonEl.value = '';
+    if (contactEl) contactEl.value = '';
+    loadGdprExclusions();
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.textContent = '⛔ Record objection'; }
+  }
+}
+
+async function removeGdprExclusion(code) {
+  if (!confirm(`Remove ${code} from the exclusion list?\n\nThe capture cron will start including this booking again on the next run. Already-deleted Q&A rows are NOT restored — they're gone permanently.`)) return;
+  try {
+    const { error } = await sb.rpc('remove_qa_exclusion', { p_booking_code: code });
+    if (error) {
+      adminToast('Failed: ' + error.message, 'error');
+      return;
+    }
+    adminToast(`Removed ${code} from exclusion list`, 'success');
+    loadGdprExclusions();
+  } catch (e) {
+    adminToast('Error: ' + (e.message || e), 'error');
+  }
+}
+
+async function loadGdprExclusions() {
+  const el = document.getElementById('gdprExclusionsTable');
+  if (!el) return;
+  try {
+    const { data, error } = await sb.from('excluded_booking_codes')
+      .select('*').order('excluded_at', { ascending: false }).limit(50);
+    if (error) {
+      el.innerHTML = `<div style="font-size:0.78rem;color:#b03939;">Failed to load exclusions: ${error.message}</div>`;
+      return;
+    }
+    if (!data || data.length === 0) {
+      el.innerHTML = `<div style="font-size:0.78rem;color:var(--ink-soft);padding:8px;font-style:italic;">No objections recorded.</div>`;
+      return;
+    }
+    const safe = s => (s || '').toString().replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+    el.innerHTML = `
+      <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+        <thead><tr style="border-bottom:2px solid rgba(74,46,32,0.12);">
+          <th style="text-align:left;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Booking</th>
+          <th style="text-align:left;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">When</th>
+          <th style="text-align:left;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Reason</th>
+          <th style="text-align:left;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Contact</th>
+          <th style="text-align:left;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Recorded by</th>
+          <th></th>
+        </tr></thead>
+        <tbody>
+          ${data.map(r => `
+            <tr style="border-bottom:1px solid rgba(74,46,32,0.06);">
+              <td style="padding:6px 10px;font-family:monospace;color:var(--ink);">${safe(r.booking_code)}</td>
+              <td style="padding:6px 10px;color:var(--ink-soft);white-space:nowrap;">${new Date(r.excluded_at).toLocaleDateString()}</td>
+              <td style="padding:6px 10px;color:var(--ink-soft);">${safe(r.reason) || '—'}</td>
+              <td style="padding:6px 10px;color:var(--ink-soft);">${safe(r.contact_email) || '—'}</td>
+              <td style="padding:6px 10px;color:var(--ink-soft);font-size:0.72rem;">${safe(r.recorded_by) || '—'}</td>
+              <td style="padding:6px 10px;text-align:right;">
+                <button onclick="removeGdprExclusion('${safe(r.booking_code).replace(/'/g, "\\'")}')" style="padding:3px 8px;background:none;border:1px solid var(--border);border-radius:4px;font-size:0.68rem;color:var(--ink-soft);cursor:pointer;">↩️ Undo</button>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table></div>`;
+  } catch (e) {
+    el.innerHTML = `<div style="font-size:0.78rem;color:#b03939;">Error: ${e.message || e}</div>`;
+  }
+}
+
 // Helper for inline-rendered action button cells. Returns HTML string with
 // 3-4 buttons depending on row state.
 function adminRowActions(table, row) {
@@ -744,7 +850,7 @@ async function loadData() {
     [eventsRes, propsRes, checkinsRes, recosRes, chatRes] = await Promise.all([
       applyHiddenFilter(sb.from('analytics_events').select('*').gte('created_at', since)).order('created_at', { ascending: false }).limit(10000),
       applyHiddenFilter(sb.from('properties').select('*')).order('name'),
-      applyHiddenFilter(sb.from('checkins').select('id, property_id, booking_code, surname, name, guest_type, submitted_at, is_test, deleted_at')),
+      applyHiddenFilter(sb.from('checkins').select('id, property_id, booking_code, surname, name, guest_type, submitted_at, arrival_date, departure_date, nights, is_test, deleted_at')),
       applyHiddenFilter(sb.from('recommendations').select('*')).order('sort_order'),
       // Round 11.2 — chat messages, last `since` window, for question-gap analysis.
       // Wrapped in catch so a failure here can't block the whole admin view.
@@ -1286,6 +1392,123 @@ function _r113AggregateUpsell(messages, propToEmail) {
 /* ══════════════════════════════════════
    RENDER
 ══════════════════════════════════════ */
+/* ══════════════════════════════════════
+   ROUND 14 — Silent guest rate + per-property engagement
+   "Silent" = a guest whose booking has a check-in row (so they arrived)
+   but zero analytics_events tied to their booking_code from arrival_date
+   onwards. Pre-arrival activity (doc uploads, browsing the welcome flow)
+   doesn't count — silence is specifically about the stay window.
+
+   Engagement bucket per booking (mirrors host-console Round 11):
+     • silent  — 0 events during stay
+     • low     — 1 event during stay
+     • normal  — 2-4 events
+     • high    — 5+ events OR any chat OR any escalation OR 3+ reco clicks
+====================================== */
+function _r14BuildEngagement(events, checkins, properties, propToEmail) {
+  // Index head-of-family checkins by (property_id, booking_code) — one
+  // row per booking. Companions (guest_type='companion') are skipped to
+  // avoid double-counting bookings.
+  const bookings = {};  // key = "<propId>::<bookingCode>" → booking record
+  for (const c of checkins) {
+    if (!c.booking_code) continue;
+    if (c.is_test || c.deleted_at) continue;
+    const isHead = ['single', 'head', 'group'].includes(c.guest_type);
+    const key = c.property_id + '::' + c.booking_code;
+    // Take the head row if available; otherwise the first companion's
+    // dates as a fallback.
+    if (!bookings[key] || isHead) {
+      bookings[key] = {
+        property_id: c.property_id,
+        booking_code: c.booking_code,
+        guest_name: ((c.surname || '') + ' ' + (c.name || '')).trim().toUpperCase() || c.booking_code,
+        arrival_date: c.arrival_date || null,
+        departure_date: c.departure_date || null,
+        nights: c.nights || null,
+        events_during_stay: 0,
+        chat_msgs: 0,
+        escalations: 0,
+        reco_clicks: 0,
+      };
+    }
+  }
+
+  // Tally events per booking. Filter to events that fall on or after
+  // arrival_date (or anytime if arrival is unknown). Use simple date
+  // comparison — events store created_at as ISO timestamp.
+  for (const e of events) {
+    if (!e.booking_code) continue;
+    const key = e.property_id + '::' + e.booking_code;
+    const b = bookings[key];
+    if (!b) continue; // event from a booking we don't have a checkin for
+    // If we know the arrival_date, only count events on/after it
+    if (b.arrival_date) {
+      const eventDate = (e.created_at || '').slice(0, 10);
+      if (eventDate < b.arrival_date) continue;
+    }
+    b.events_during_stay++;
+    if (e.event_type === 'guest_chat_message')      b.chat_msgs++;
+    if (e.event_type === 'guest_chat_escalated')    b.escalations++;
+    if (e.event_type === 'guest_reco_clicked')      b.reco_clicks++;
+  }
+
+  // Bucket each booking
+  const bucketOf = (b) => {
+    if (b.events_during_stay === 0) return 'silent';
+    if (b.chat_msgs > 0 || b.escalations > 0 || b.reco_clicks >= 3 || b.events_during_stay >= 5) return 'high';
+    if (b.events_during_stay >= 2) return 'normal';
+    return 'low';
+  };
+  const allBookings = Object.values(bookings).map(b => ({ ...b, bucket: bucketOf(b) }));
+
+  // Roll up per property
+  const perProp = {};
+  for (const b of allBookings) {
+    if (!perProp[b.property_id]) {
+      perProp[b.property_id] = { total: 0, silent: 0, low: 0, normal: 0, high: 0, silentBookings: [] };
+    }
+    const p = perProp[b.property_id];
+    p.total++;
+    p[b.bucket]++;
+    if (b.bucket === 'silent') p.silentBookings.push(b);
+  }
+
+  const propRows = Object.entries(perProp).map(([propId, s]) => {
+    const property = properties.find(pp => pp.id === propId);
+    return {
+      propId,
+      name: property ? (property.name || propId.slice(0, 8)) : propId.slice(0, 8),
+      hostShort: propToEmail[propId] ? propToEmail[propId].split('@')[0] : '—',
+      hostEmail: propToEmail[propId] || '—',
+      total: s.total,
+      silent: s.silent, low: s.low, normal: s.normal, high: s.high,
+      silentRate: s.total > 0 ? Math.round(s.silent / s.total * 100) : 0,
+      highRate:   s.total > 0 ? Math.round(s.high   / s.total * 100) : 0,
+      silentBookings: s.silentBookings,
+    };
+  });
+
+  // Platform totals
+  const platform = {
+    total: allBookings.length,
+    silent: allBookings.filter(b => b.bucket === 'silent').length,
+    low:    allBookings.filter(b => b.bucket === 'low').length,
+    normal: allBookings.filter(b => b.bucket === 'normal').length,
+    high:   allBookings.filter(b => b.bucket === 'high').length,
+  };
+  platform.silentRate = platform.total > 0 ? Math.round(platform.silent / platform.total * 100) : 0;
+  platform.highRate   = platform.total > 0 ? Math.round(platform.high   / platform.total * 100) : 0;
+
+  // Top 8 silent guests across the platform — "guests to call" list.
+  // Sorted by most recent arrival_date first (recent = more actionable).
+  const silentList = allBookings
+    .filter(b => b.bucket === 'silent')
+    .sort((a, b) => (b.arrival_date || '').localeCompare(a.arrival_date || ''))
+    .slice(0, 12);
+
+  return { platform, propRows, silentList };
+}
+
 function renderView() {
   const events = getFilteredEvents();
   const selectedUser = document.getElementById('userFilter').value;
@@ -1932,6 +2155,164 @@ function renderView() {
         </div>`;
 
       // ══════════════════════════════════════════════════════════════════════
+      // ROUND 14 — SILENT GUEST RATE + PER-PROPERTY ENGAGEMENT
+      // The "which hosts to coach" view. Maps every booking with a check-in
+      // to an engagement bucket (silent/low/normal/high) and surfaces the
+      // platform-level silent rate, per-property breakdown, and a list of
+      // current silent guests worth calling.
+      // ══════════════════════════════════════════════════════════════════════
+      const eng = _r14BuildEngagement(allEvents, allCheckins, allProperties, propToEmail);
+
+      // Platform headline tile
+      const platHi = eng.platform;
+      const silentToneColor = platHi.silentRate >= 40 ? '#b03939' : platHi.silentRate >= 25 ? '#8a6914' : '#2f7a44';
+      const distBar = (label, n, total, color) => {
+        const pct = total > 0 ? Math.round(n / total * 100) : 0;
+        return `<div style="display:flex;align-items:center;gap:8px;font-size:0.78rem;">
+          <span style="width:60px;color:var(--ink-soft);">${label}</span>
+          <div style="flex:1;background:rgba(74,46,32,0.06);border-radius:3px;height:14px;overflow:hidden;">
+            <div style="background:${color};height:100%;width:${Math.max(pct, 1)}%;"></div>
+          </div>
+          <span style="width:64px;text-align:right;color:var(--ink);font-weight:500;">${n} (${pct}%)</span>
+        </div>`;
+      };
+
+      // Per-property table — sorted by silent rate descending so worst
+      // offenders surface first. Only properties with ≥3 bookings (smaller
+      // samples are statistical noise).
+      const sortedProps = eng.propRows
+        .filter(p => p.total >= 3)
+        .sort((a, b) => b.silentRate - a.silentRate);
+
+      const propTable = sortedProps.length === 0
+        ? `<div style="font-size:0.78rem;color:var(--ink-soft);padding:8px;font-style:italic;">Need ≥3 bookings per property for meaningful comparison.</div>`
+        : `<div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:0.78rem;min-width:560px;">
+              <thead>
+                <tr style="border-bottom:2px solid rgba(74,46,32,0.12);">
+                  <th style="text-align:left;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Property</th>
+                  <th style="text-align:right;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Bookings</th>
+                  <th style="text-align:right;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);" title="High engagement: chat used, multiple recos clicked, or 5+ events">High</th>
+                  <th style="text-align:right;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Normal</th>
+                  <th style="text-align:right;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Low</th>
+                  <th style="text-align:right;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Silent</th>
+                  <th style="text-align:right;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);" title="Silent guests as % of total bookings — high values mean the host should share the QR more aggressively or improve onboarding">Silent %</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${sortedProps.map(p => {
+                  const safeName = p.name.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+                  const tone = p.silentRate >= 50 ? '#b03939' : p.silentRate >= 30 ? '#8a6914' : 'var(--ink-soft)';
+                  return `
+                  <tr style="border-bottom:1px solid rgba(74,46,32,0.06);">
+                    <td style="padding:7px 10px;color:var(--ink);">
+                      <div style="font-weight:500;">${safeName}</div>
+                      <div style="font-size:0.66rem;color:var(--ink-soft);">${p.hostShort}</div>
+                    </td>
+                    <td style="padding:7px 10px;text-align:right;color:var(--ink);">${p.total}</td>
+                    <td style="padding:7px 10px;text-align:right;color:#2f7a44;">${p.high}</td>
+                    <td style="padding:7px 10px;text-align:right;color:var(--ink);">${p.normal}</td>
+                    <td style="padding:7px 10px;text-align:right;color:var(--ink-soft);">${p.low}</td>
+                    <td style="padding:7px 10px;text-align:right;color:${tone};">${p.silent}</td>
+                    <td style="padding:7px 10px;text-align:right;color:${tone};font-weight:600;">${p.silentRate}%</td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>`;
+
+      // Silent guest list — concrete actionable rows
+      const silentRows = eng.silentList.length === 0
+        ? `<div style="font-size:0.78rem;color:#2f7a44;padding:8px;font-style:italic;">🎉 No silent guests right now — every checked-in guest used the app.</div>`
+        : eng.silentList.map(g => {
+            const property = allProperties.find(pp => pp.id === g.property_id);
+            const propName = property ? (property.name || g.property_id.slice(0,8)) : g.property_id.slice(0,8);
+            const hostShort = propToEmail[g.property_id] ? propToEmail[g.property_id].split('@')[0] : '—';
+            const safeGuest = g.guest_name.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+            const safeProp  = propName.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+            const arrStr = g.arrival_date ? new Date(g.arrival_date + 'T00:00:00').toLocaleDateString('en-GB') : '—';
+            const today = new Date(); today.setHours(0,0,0,0);
+            const dep = g.departure_date ? new Date(g.departure_date + 'T00:00:00') : null;
+            let stayStatus = 'Pre-arrival';
+            if (g.arrival_date) {
+              const arr = new Date(g.arrival_date + 'T00:00:00');
+              if (arr <= today && dep && today <= dep) stayStatus = '🟢 In stay';
+              else if (dep && today > dep) stayStatus = 'Past stay';
+              else if (arr > today) stayStatus = 'Pre-arrival';
+            }
+            return `
+              <div style="display:grid;grid-template-columns:1.4fr 1.1fr 90px 100px 90px;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(74,46,32,0.06);font-size:0.8rem;">
+                <div style="min-width:0;">
+                  <div style="font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${safeGuest}</div>
+                  <div style="font-size:0.66rem;color:var(--ink-soft);font-family:monospace;">${g.booking_code}</div>
+                </div>
+                <div style="min-width:0;">
+                  <div style="color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${safeProp}</div>
+                  <div style="font-size:0.66rem;color:var(--ink-soft);">${hostShort}</div>
+                </div>
+                <div style="text-align:right;color:var(--ink-soft);font-size:0.74rem;">${arrStr}</div>
+                <div style="text-align:right;font-size:0.74rem;">${stayStatus}</div>
+                <div style="text-align:right;color:var(--ink-soft);font-size:0.74rem;">${g.nights ? g.nights + 'n' : '—'}</div>
+              </div>`;
+          }).join('');
+
+      html += `
+        <div class="section-title">Engagement & Silent Guests</div>
+        <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:18px 22px;box-shadow:var(--shadow);margin-bottom:18px;">
+          <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:14px;line-height:1.5;">
+            How engaged are guests during their stay? A "silent" guest checked in but never opened the app — usually a sign the QR code wasn't shared, the welcome message didn't mention it, or the property setup needs work. Coachable per host.
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:18px;">
+            <div style="background:var(--white);border:1px solid var(--border);border-radius:8px;padding:14px 16px;text-align:center;">
+              <div style="font-family:'Playfair Display',serif;font-size:1.9rem;color:${silentToneColor};font-weight:600;line-height:1;">${platHi.silentRate}%</div>
+              <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);margin-top:6px;font-weight:600;">Silent rate</div>
+              <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:3px;">${platHi.silent} of ${platHi.total} bookings</div>
+            </div>
+            <div style="background:var(--white);border:1px solid var(--border);border-radius:8px;padding:14px 16px;text-align:center;">
+              <div style="font-family:'Playfair Display',serif;font-size:1.9rem;color:#2f7a44;font-weight:600;line-height:1;">${platHi.highRate}%</div>
+              <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);margin-top:6px;font-weight:600;">High engagement</div>
+              <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:3px;">${platHi.high} bookings used chat or multiple recos</div>
+            </div>
+            <div style="background:var(--white);border:1px solid var(--border);border-radius:8px;padding:14px 16px;text-align:center;">
+              <div style="font-family:'Playfair Display',serif;font-size:1.9rem;color:var(--warm);font-weight:600;line-height:1;">${platHi.total}</div>
+              <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);margin-top:6px;font-weight:600;">Bookings analyzed</div>
+              <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:3px;">across ${eng.propRows.length} ${eng.propRows.length === 1 ? 'property' : 'properties'}</div>
+            </div>
+          </div>
+
+          <div style="margin-bottom:18px;">
+            <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:8px;">Platform engagement distribution</div>
+            <div style="display:flex;flex-direction:column;gap:5px;">
+              ${distBar('High',   platHi.high,   platHi.total, '#6DBF82')}
+              ${distBar('Normal', platHi.normal, platHi.total, '#6BAED6')}
+              ${distBar('Low',    platHi.low,    platHi.total, '#C9A96E')}
+              ${distBar('Silent', platHi.silent, platHi.total, '#A0978C')}
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:${eng.silentList.length > 0 ? '1.3fr 1fr' : '1fr'};gap:24px;align-items:flex-start;">
+            <div>
+              <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:6px;">By property (≥3 bookings, sorted by silent rate)</div>
+              ${propTable}
+            </div>
+
+            ${eng.silentList.length > 0 ? `
+            <div>
+              <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:6px;">Silent guests — coaching list</div>
+              <div style="display:grid;grid-template-columns:1.4fr 1.1fr 90px 100px 90px;align-items:center;gap:10px;padding:0 0 6px;border-bottom:2px solid rgba(74,46,32,0.12);">
+                <div style="font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;">Guest</div>
+                <div style="font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;">Property</div>
+                <div style="font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;text-align:right;">Arrival</div>
+                <div style="font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;text-align:right;">Status</div>
+                <div style="font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;text-align:right;">Stay</div>
+              </div>
+              ${silentRows}
+            </div>` : ''}
+          </div>
+        </div>`;
+
+      // ══════════════════════════════════════════════════════════════════════
       // ROUND 11.3 — CONCIERGE UPSELL VALUE
       // Detect bookable intents in guest chats, multiply by conservative
       // platform-average prices. The headline number is "€X of bookable
@@ -2252,6 +2633,43 @@ function renderView() {
     // Trigger log + launch-status fetch after innerHTML lands
     setTimeout(loadRetentionLog, 0);
     setTimeout(loadRetentionLaunchStatus, 0);
+
+    // ══════════════════════════════════════════════════════════════════════
+    // ROUND 14.2 — GDPR objections (chat Q&A capture)
+    // Compact card for recording right-to-object requests. The capture
+    // cron skips listed booking codes; existing rows for those codes are
+    // hard-deleted at record time.
+    // ══════════════════════════════════════════════════════════════════════
+    html += `
+      <div class="section-title">GDPR Objections (Chat Q&amp;A)</div>
+      <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:18px 22px;box-shadow:var(--shadow);margin-bottom:18px;">
+        <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:14px;line-height:1.5;">
+          When a guest emails <strong>info@welcomebnb.it</strong> objecting to anonymized chat capture (GDPR Art. 21), record their booking code here. The capture cron will skip it on future runs, and any rows already in the dataset for that booking will be deleted immediately.
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;">
+          <div style="flex:1;min-width:160px;">
+            <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:4px;">Booking code</div>
+            <input id="gdprBookingCode" placeholder="TRU-XXXXXX" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.86rem;font-family:monospace;">
+          </div>
+          <div style="flex:1.5;min-width:180px;">
+            <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:4px;">Reason / note</div>
+            <input id="gdprReason" placeholder="GDPR objection email 2026-05-15" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;">
+          </div>
+          <div style="flex:1.2;min-width:160px;">
+            <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:4px;">Contact email (optional)</div>
+            <input id="gdprContact" placeholder="guest@example.com" type="email" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;">
+          </div>
+          <button id="gdprRecordBtn" onclick="recordGdprExclusion()" style="padding:8px 16px;background:#b03939;color:#fff;border:none;border-radius:6px;font-size:0.82rem;cursor:pointer;font-family:inherit;white-space:nowrap;">⛔ Record objection</button>
+        </div>
+
+        <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin:14px 0 6px;">Recorded objections</div>
+        <div id="gdprExclusionsTable">
+          <div style="font-size:0.78rem;color:var(--ink-soft);padding:8px;font-style:italic;">Loading…</div>
+        </div>
+      </div>`;
+
+    setTimeout(loadGdprExclusions, 0);
   }
 
   // Event log

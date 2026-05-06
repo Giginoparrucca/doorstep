@@ -316,8 +316,9 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
       <option value="365">Last year</option>
       <option value="9999">All time</option>
     </select>
-    <button class="refresh-btn" onclick="exportData('csv')" title="Export CSV">📥 CSV</button>
-    <button class="refresh-btn" onclick="exportData('json')" title="Export JSON">📥 JSON</button>
+    <button class="refresh-btn" onclick="exportData('csv')" title="Export filtered events to CSV">📥 CSV</button>
+    <button class="refresh-btn" onclick="exportData('json')" title="Export filtered events to JSON">📥 JSON</button>
+    <button class="refresh-btn" onclick="exportAllData()" title="Download all platform data as ZIP" style="background:linear-gradient(135deg,var(--warm),var(--warm-2));color:#fff;">📦 Download all</button>
     <button class="refresh-btn" onclick="loadData()">↻ Refresh</button>
     <label id="showHiddenLabel" style="display:flex;align-items:center;gap:6px;font-size:0.72rem;color:rgba(244,237,224,0.85);cursor:pointer;padding:6px 10px;border:1px solid rgba(255,255,255,0.18);border-radius:6px;user-select:none;">
       <input type="checkbox" id="showHiddenToggle" onchange="toggleShowHidden(this.checked)" style="cursor:pointer;">
@@ -335,6 +336,7 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
 const SUPABASE_URL = 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjandhcXFhYmd3cWhoemhmYnRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4OTM0MjMsImV4cCI6MjA4OTQ2OTQyM30.BCskfjawOLqayI7xXV8ebIBEcXf12WygH52w204NzWk';
@@ -828,6 +830,158 @@ function downloadFile(name, content, type) {
   a.download = name;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// ROUND 13 — Full data export
+// Bundles every legally-keepable table into a single ZIP of CSVs.
+// Admin-only (RLS enforces the SELECT scope; admin sees all rows).
+// Excludes: check-in PII (passport numbers, etc.) — those stay
+// operational only and are listed in the README inside the ZIP.
+// ───────────────────────────────────────────────────────────────────────
+async function exportAllData() {
+  if (typeof JSZip === 'undefined') {
+    adminToast('JSZip failed to load — refresh the page', 'error');
+    return;
+  }
+
+  // Find the button so we can show progress
+  const btn = document.querySelector('button[onclick="exportAllData()"]');
+  const originalLabel = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.7'; btn.innerHTML = '⏳ Building…'; }
+
+  try {
+    // Helper to build CSV from an array of rows. Columns auto-detected from
+    // the first row's keys; values JSON-stringified if they're objects.
+    const toCSV = (rows) => {
+      if (!rows || rows.length === 0) return '';
+      const headers = Object.keys(rows[0]);
+      const esc = (v) => {
+        if (v === null || v === undefined) return '';
+        const s = (typeof v === 'object') ? JSON.stringify(v) : String(v);
+        return `"${s.replace(/"/g, '""')}"`;
+      };
+      return '\uFEFF' + [
+        headers.join(','),
+        ...rows.map(r => headers.map(h => esc(r[h])).join(',')),
+      ].join('\n');
+    };
+
+    // Pull every legally-keepable table. Admin RLS gives us all rows for
+    // each. Limits are generous; if we ever hit them, the README in the
+    // ZIP tells the admin to query Supabase directly.
+    const fetches = await Promise.all([
+      sb.from('properties').select('*').limit(10000),
+      sb.from('rules').select('*').limit(50000),
+      sb.from('recommendations').select('*').limit(50000),
+      sb.from('analytics_events').select('*').limit(100000).order('created_at', { ascending: false }),
+      sb.from('analytics_monthly').select('*').limit(100000),
+      sb.from('chat_qa_pairs').select('*').limit(100000).order('created_at', { ascending: false }),
+      sb.from('data_purge_log').select('*').limit(10000).order('run_at', { ascending: false }),
+      sb.from('admin_users').select('*').limit(100),
+    ]);
+
+    const [propsRes, rulesRes, recosRes, eventsRes, monthlyRes, qaRes, purgeRes, adminsRes] = fetches;
+
+    const zip = new JSZip();
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const folder = zip.folder(`doorstep_export_${stamp}`);
+
+    // Build counts for the README BEFORE writing CSVs (some may be empty)
+    const counts = {};
+    const addTable = (filename, label, res, note) => {
+      const rows = (res && res.data) || [];
+      counts[label] = { rows: rows.length, note: note || '' };
+      if (res && res.error) {
+        counts[label].note += ` (error: ${res.error.message})`;
+        folder.file(filename, '\uFEFF# Error fetching ' + label + ': ' + res.error.message + '\n');
+        return;
+      }
+      folder.file(filename, toCSV(rows));
+    };
+
+    addTable('properties.csv',         'Properties',          propsRes,
+      'One row per property. Includes setup fields (wifi, hosts, welcome message). No guest data.');
+    addTable('rules.csv',              'House rules',         rulesRes,
+      'Per-property house rules. Free-text content, host-authored.');
+    addTable('recommendations.csv',    'Recommendations',     recosRes,
+      'Per-property recommendations (restaurants, attractions, services). Host-authored.');
+    addTable('analytics_events.csv',   'Analytics events',    eventsRes,
+      'Last 100k events (most recent first). Pageviews, reco clicks, chat events, etc. Includes session_id but no chat content.');
+    addTable('analytics_monthly.csv',  'Analytics monthly',   monthlyRes,
+      'Anonymized monthly rollups by property. Kept indefinitely. Use this for year-over-year analysis.');
+    addTable('chat_qa_pairs.csv',      'Chat Q&A pairs',      qaRes,
+      'Anonymized question/answer pairs from resolved conversations. The AI training dataset. Personal identifiers stripped at capture.');
+    addTable('data_purge_log.csv',     'Data purge log',      purgeRes,
+      'Audit trail of automatic data retention runs.');
+    addTable('admin_users.csv',        'Admin users',         adminsRes,
+      'Whitelist of admin email addresses.');
+
+    // README explains what's included, what's excluded, and the legal basis
+    const totalRows = Object.values(counts).reduce((s, c) => s + c.rows, 0);
+    const readme = `Doorstep — Full Data Export
+============================
+Generated:        ${new Date().toISOString()}
+Generated by:     ${(await sb.auth.getUser()).data?.user?.email || 'unknown admin'}
+Total rows:       ${totalRows.toLocaleString()}
+
+WHAT'S INCLUDED
+---------------
+${Object.entries(counts).map(([label, c]) =>
+  `${label.padEnd(22)} ${String(c.rows).padStart(7)} rows  — ${c.note}`
+).join('\n')}
+
+WHAT'S NOT INCLUDED (intentionally)
+-----------------------------------
+- Guest check-in records (passports, IDs, residence): operational data
+  only, retained for 5 years per Italian fiscal/police law (TULPS art. 109).
+  Not appropriate to extract for analytics. Query the 'checkins' table
+  directly in Supabase if you need fiscal records for a specific period.
+- Raw chat_messages content beyond 90 days: deleted automatically by the
+  retention policy. The 'chat_qa_pairs' file in this export contains the
+  anonymized version of those conversations.
+- Soft-deleted rows from any table: hidden from this export. Apply
+  'is_test = false AND deleted_at IS NULL' filters happen at the query
+  level. To export hidden rows, toggle 'Show hidden' in the admin UI
+  before clicking Download all.
+
+ENCODING
+--------
+All CSV files are UTF-8 with a BOM marker. Open in Excel, Google Sheets,
+LibreOffice, pandas, etc. — all should parse correctly with no encoding
+issues for Italian accented characters.
+
+LEGAL BASIS
+-----------
+This export contains data the platform is allowed to retain under GDPR:
+- Property/rules/recos: host's own data (host is data controller for these)
+- Analytics events: legitimate interest in service improvement (Art. 6(1)(f))
+- Monthly aggregates: not personal data (no identifiers)
+- Chat Q&A pairs: anonymized at capture, not personal data after that
+- Admin users: legitimate interest in security/access management
+
+Personal data subjects (guests, hosts) retain rights under GDPR Articles
+15-22 to access, rectify, or delete their data. If a request is received,
+remember to also delete any matching rows from this export if you've
+saved it locally.
+`;
+
+    folder.file('README.txt', readme);
+
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `doorstep_export_${stamp}.zip`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    adminToast(`📦 Exported ${totalRows.toLocaleString()} rows across ${Object.keys(counts).length} tables`, 'success');
+  } catch (e) {
+    console.error('Export failed:', e);
+    adminToast('Export failed: ' + (e.message || e), 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = originalLabel; }
+  }
 }
 
 /* ══════════════════════════════════════

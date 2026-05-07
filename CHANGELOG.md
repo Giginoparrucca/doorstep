@@ -55,6 +55,18 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 15.2 — Document photo retention (30 days post-departure) _(2026-05-07)_
+- Document photos now auto-deleted from the `documents` storage bucket 30 days after the guest's `departure_date`
+- New `purge_old_id_photos(p_dry_run, p_days)` function deletes from `storage.objects` where bucket_id='documents' AND name matches paths in eligible checkin rows, then NULLs `id_photo_path` on those rows so the host UI shows "no photo" instead of broken-link refs
+- The 5-year check-in **data** retention (TULPS art. 109 / Alloggiati Web) is unchanged — only the **image** is deleted at 30 days
+- Added `photos_purged INTEGER` column to `data_purge_log`; preview + log table in admin updated to surface the count
+- Daily cron (Round 12) calls `purge_old_id_photos` as part of the standard run; photos deleted only when `purge_old_data` runs in live mode (soft-launch dry-runs preview but don't delete)
+- Privacy modals updated in both apps (host + guest, EN + IT) — splits the existing 5-year line into "Check-in data: 5 years" + "Document photos: 30 days post-departure". Notes Italian Garante guidance ("la legge richiede i dati, non l'immagine")
+- Admin Data Retention card: new 📷 "Document photos / 30d / after guest departure (Garante guidance)" tile, renamed 🛂 tile to "Check-in data" for clarity
+- Legal reasoning: TULPS art. 109 requires retention of guest data, not the document image itself. The Garante has flagged disproportionate retention of document scans in inspections. 30-day post-stay window covers the 24-hour Alloggiati filing requirement, typical 3-7 day stays, and a buffer for late filings or disputes.
+- **Migration**: `migration_round15_2_photo_retention.sql`
+- **Files**: `host-console.html`, `index.html`, `admin.html`
+
 ### Round 15.1 — Guest detail modal _(2026-05-07)_
 - "View" button on Check-in Data rows now opens a proper modal instead of a truncated bottom-right toast
 - Five sections: Stay (booking code, dates, nights), Personal details (name, sex, DOB, place/country of birth, citizenship), Document (type, number, place of issue, status), Document photo (signed URL from `documents` bucket, 5-minute expiry, click to enlarge in new tab), System (submitted at, internal id)

@@ -517,7 +517,7 @@ body {
 .pb-safe { padding-bottom: 24px; }
 .hidden { display: none !important; }
 
-/* ── POWERED BY DOORSTEP FOOTER ── */
+/* ── POWERED BY WELCOMEBNB FOOTER ── */
 .powered-by {
   position: fixed; bottom: 64px; left: 0; right: 0; z-index: 999;
   display: flex; align-items: center; justify-content: center; gap: 6px;
@@ -1030,13 +1030,15 @@ let propertyData = null;
 let bookingCode = null;
 let existingCheckins = [];
 
-// Extract booking code from URL (?b=CODE) or localStorage
-// Migrate old localStorage keys (doorstep → wbnb)
+// One-time migration of legacy localStorage keys from the old `doorstep_*`
+// prefix to the current `wbnb_*` prefix. Kept so returning users with
+// stale keys don't lose their state. Console message still references
+// the legacy name on purpose — that's literally what's being moved.
 ['booking', 'property', 'lookup', 'chat_seen'].forEach(k => {
   const old = localStorage.getItem('doorstep_' + k);
   if (old && !localStorage.getItem('wbnb_' + k)) {
     localStorage.setItem('wbnb_' + k, old);
-    console.log(`🔄 Migrated doorstep_${k} → wbnb_${k}`);
+    console.log(`🔄 Migrated legacy key doorstep_${k} → wbnb_${k}`);
   }
 });
 

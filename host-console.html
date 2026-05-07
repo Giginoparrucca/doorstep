@@ -4695,8 +4695,162 @@ async function archiveCurrentChat() {
 
 function viewGuest(id) {
   const c = allCheckins.find(g => g.id === id);
-  if (c) toast(`${c.name} ${c.surname} — ${c.citizenship} — ${c.document_type} ${c.document_number}`);
+  if (!c) { toast('Guest not found'); return; }
+
+  const it = hostLang === 'it';
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString(it ? 'it-IT' : 'en-GB') : '—';
+  const fmtDT = (d) => d ? new Date(d).toLocaleString(it ? 'it-IT' : 'en-GB') : '—';
+  const safe = s => s == null || s === '' ? '—' : String(s).replace(/[<>&"]/g, ch => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[ch]));
+
+  // Resolve sex display
+  const sexLabel = c.sex === 'M' ? (it ? 'Maschio' : 'Male')
+                 : c.sex === 'F' ? (it ? 'Femmina' : 'Female')
+                 : '—';
+
+  // Guest type human label
+  const guestTypeLabel = (() => {
+    const map = {
+      single:       it ? 'Ospite singolo' : 'Single guest',
+      head:         it ? 'Capofamiglia'    : 'Head of family',
+      group:        it ? 'Capogruppo'      : 'Group leader',
+      member:       it ? 'Familiare'       : 'Family member',
+      group_member: it ? 'Membro gruppo'   : 'Group member',
+    };
+    return map[c.guest_type] || c.guest_type || '—';
+  })();
+
+  // Doc-status human label
+  const docStatusLabel = (() => {
+    const map = {
+      complete:     it ? '✓ Completo'       : '✓ Complete',
+      partial:      it ? '⏳ Parziale'       : '⏳ Partial',
+      pending:      it ? '⏳ In attesa'      : '⏳ Pending',
+      not_required: it ? '— Non richiesto'  : '— Not required',
+      missing:      it ? '✗ Mancante'        : '✗ Missing',
+    };
+    return map[c.docs_status] || c.docs_status || '—';
+  })();
+
+  // Helper to render a labelled field row
+  const field = (label, value, opts = {}) => {
+    if (opts.skip) return '';
+    return `
+      <div style="display:grid;grid-template-columns:160px 1fr;gap:12px;padding:6px 0;border-bottom:1px solid rgba(74,42,24,0.05);align-items:start;">
+        <div style="font-size:0.7rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);font-weight:500;">${safe(label)}</div>
+        <div style="font-size:0.86rem;color:var(--ink);${opts.mono ? "font-family:monospace;font-size:0.78rem;" : ''}">${value}</div>
+      </div>`;
+  };
+
+  const sectionTitle = (txt) => `
+    <div style="font-family:'Playfair Display',serif;font-size:0.95rem;font-weight:600;color:var(--ink);margin:18px 0 8px;padding-bottom:6px;border-bottom:1.5px solid rgba(74,42,24,0.12);">${safe(txt)}</div>`;
+
+  // Body sections
+  const bookingSection = `
+    ${sectionTitle(it ? 'Soggiorno' : 'Stay')}
+    ${field(it ? 'Codice prenotazione' : 'Booking code', `<strong>${safe(c.booking_code) || '—'}</strong>`, { mono: true })}
+    ${field(it ? 'Tipo ospite' : 'Guest type', safe(guestTypeLabel))}
+    ${field(it ? 'Data arrivo' : 'Arrival date', safe(fmtDate(c.arrival_date)))}
+    ${field(it ? 'Data partenza' : 'Departure date', safe(fmtDate(c.departure_date)))}
+    ${field(it ? 'Notti' : 'Nights', safe(c.nights))}
+  `;
+
+  const personalSection = `
+    ${sectionTitle(it ? 'Dati personali' : 'Personal details')}
+    ${field(it ? 'Cognome' : 'Surname', `<strong>${safe(c.surname)}</strong>`)}
+    ${field(it ? 'Nome' : 'Name', `<strong>${safe(c.name)}</strong>`)}
+    ${field(it ? 'Sesso' : 'Sex', safe(sexLabel))}
+    ${field(it ? 'Data di nascita' : 'Date of birth', safe(fmtDate(c.date_of_birth)))}
+    ${field(it ? 'Luogo di nascita' : 'Place of birth',
+        safe(c.place_of_birth) + (c.birth_province && c.birth_province !== 'EE' ? ` <span style="color:var(--ink-soft);font-size:0.78rem;">(${safe(c.birth_province)})</span>` : ''))}
+    ${field(it ? 'Paese di nascita' : 'Country of birth', safe(c.birth_country))}
+    ${field(it ? 'Cittadinanza' : 'Citizenship', safe(c.citizenship))}
+  `;
+
+  const docSection = (c.document_type || c.document_number || c.doc_issue_place) ? `
+    ${sectionTitle(it ? 'Documento' : 'Document')}
+    ${field(it ? 'Tipo documento' : 'Document type', safe(c.document_type))}
+    ${field(it ? 'Numero documento' : 'Document number', safe(c.document_number), { mono: true })}
+    ${field(it ? 'Luogo di rilascio' : 'Place of issue', safe(c.doc_issue_place))}
+    ${field(it ? 'Stato documenti' : 'Documents status', safe(docStatusLabel))}
+  ` : `
+    ${sectionTitle(it ? 'Documento' : 'Document')}
+    <div style="font-size:0.82rem;color:var(--ink-soft);font-style:italic;padding:10px;background:rgba(250,246,240,0.6);border-radius:6px;">
+      ${it ? 'Documento non richiesto per questo tipo di ospite.' : 'Document not required for this guest type.'}
+    </div>
+  `;
+
+  const photoSection = c.id_photo_path ? `
+    ${sectionTitle(it ? 'Foto documento' : 'Document photo')}
+    <div id="guestModalPhotoBox" style="background:rgba(74,42,24,0.04);border-radius:8px;padding:12px;text-align:center;">
+      <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:8px;">${it ? 'Caricamento immagine…' : 'Loading image…'}</div>
+    </div>
+  ` : '';
+
+  const metaSection = `
+    ${sectionTitle(it ? 'Sistema' : 'System')}
+    ${field(it ? 'Inviato il' : 'Submitted at', safe(fmtDT(c.submitted_at)))}
+    ${field('ID', safe(c.id), { mono: true })}
+  `;
+
+  // Build modal — uses the same overlay/modal pattern as the privacy modal
+  const existing = document.getElementById('guestDetailModal');
+  if (existing) existing.remove();
+  const modalHTML = `
+    <div id="guestDetailModal" style="display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;" onclick="if(event.target===this)closeGuestDetailModal()">
+      <div style="background:var(--white);max-width:680px;width:100%;border-radius:14px;padding:24px 28px 22px;box-shadow:0 12px 48px rgba(0,0,0,0.25);max-height:calc(100vh - 60px);overflow-y:auto;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <div>
+            <h2 style="font-family:'Playfair Display',serif;font-weight:600;font-size:1.45rem;color:var(--ink);margin:0;">${safe(c.surname)} ${safe(c.name)}</h2>
+            ${c.booking_code ? `<div style="font-size:0.74rem;color:var(--warm);font-family:monospace;margin-top:3px;">${safe(c.booking_code)}</div>` : ''}
+          </div>
+          <button onclick="closeGuestDetailModal()" style="background:none;border:none;font-size:1.5rem;color:var(--ink-soft);cursor:pointer;padding:4px 10px;line-height:1;">×</button>
+        </div>
+        ${bookingSection}
+        ${personalSection}
+        ${docSection}
+        ${photoSection}
+        ${metaSection}
+        <div style="margin-top:18px;display:flex;justify-content:flex-end;">
+          <button onclick="closeGuestDetailModal()" style="padding:10px 22px;background:var(--warm);color:#fff;border:none;border-radius:6px;font-size:0.86rem;cursor:pointer;font-family:inherit;">${it ? 'Chiudi' : 'Close'}</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', modalHTML);
+  document.body.style.overflow = 'hidden';
+
+  // Asynchronously fetch a signed URL for the ID photo (private bucket)
+  if (c.id_photo_path) {
+    sb.storage.from('documents').createSignedUrl(c.id_photo_path, 300).then(({ data, error }) => {
+      const box = document.getElementById('guestModalPhotoBox');
+      if (!box) return; // modal closed before resolution
+      if (error || !data?.signedUrl) {
+        box.innerHTML = `<div style="font-size:0.78rem;color:#b03939;padding:8px;">${it ? '⚠ Impossibile caricare la foto del documento' : '⚠ Could not load document photo'}</div>`;
+        return;
+      }
+      box.innerHTML = `
+        <a href="${data.signedUrl}" target="_blank" rel="noopener" style="display:block;">
+          <img src="${data.signedUrl}" alt="ID document" style="max-width:100%;max-height:340px;border-radius:6px;box-shadow:0 2px 12px rgba(0,0,0,0.15);cursor:zoom-in;">
+        </a>
+        <div style="font-size:0.7rem;color:var(--ink-soft);margin-top:6px;">${it ? 'Clicca per ingrandire (link valido 5 min)' : 'Click to enlarge (link valid 5 min)'}</div>`;
+    }).catch(() => {
+      const box = document.getElementById('guestModalPhotoBox');
+      if (box) box.innerHTML = `<div style="font-size:0.78rem;color:#b03939;padding:8px;">${it ? '⚠ Errore caricamento foto' : '⚠ Photo load error'}</div>`;
+    });
+  }
 }
+
+function closeGuestDetailModal() {
+  const m = document.getElementById('guestDetailModal');
+  if (m) m.remove();
+  document.body.style.overflow = '';
+}
+
+// Close on Escape
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('guestDetailModal')) {
+    closeGuestDetailModal();
+  }
+});
 
 /* ══════════════════════════════════════
    INIT — Load everything from Supabase

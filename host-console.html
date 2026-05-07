@@ -833,7 +833,6 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     <button class="sidebar-item" onclick="showPanel('checkins', this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
       <span data-h="sidebar_checkins">Check-in Data</span>
-      <span class="badge-count" id="checkinCount">0</span>
     </button>
     <button class="sidebar-item" onclick="showPanel('guestanalytics', this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="M7 15l4-6 4 3 5-8"/></svg>
@@ -2407,7 +2406,13 @@ const HT = {
     sidebar_qr: 'QR Code & Link', sidebar_role: 'Property Manager',
     sidebar_guest_analytics: 'Guest Analytics',
     // Panel titles
-    t_dashboard: 'Dashboard', s_dashboard: 'Overview of your property and guests',
+    t_dashboard: 'Dashboard', s_dashboard: 'What needs your attention right now',
+    // Round 15 — action-board dashboard
+    dash_loading: 'Loading…',
+    dash_needs_attention: 'Needs your attention',
+    dash_currently_staying: 'Currently staying',
+    dash_all_caught_up: "You're all caught up",
+    dash_nothing_pending: 'No urgent items, no guests currently staying.',
     t_property: 'Property Details', s_property: 'Edit your property information',
     t_guest_analytics: 'Guest Analytics', s_guest_analytics: 'How your guests use the app',
     ga_range_7: '7 days', ga_range_30: '30 days', ga_range_90: '90 days',
@@ -2626,7 +2631,13 @@ const HT = {
     sidebar_recos: 'Consigli', sidebar_checkins: 'Dati Check-in', sidebar_export: 'Export & Conformità',
     sidebar_qr: 'QR Code & Link', sidebar_role: 'Gestore Proprietà',
     sidebar_guest_analytics: 'Analisi Ospiti',
-    t_dashboard: 'Dashboard', s_dashboard: 'Panoramica della proprietà e degli ospiti',
+    t_dashboard: 'Dashboard', s_dashboard: 'Cosa richiede la tua attenzione adesso',
+    // Round 15 — bacheca azioni
+    dash_loading: 'Caricamento…',
+    dash_needs_attention: 'Richiede la tua attenzione',
+    dash_currently_staying: 'Soggiornano adesso',
+    dash_all_caught_up: 'Tutto in ordine',
+    dash_nothing_pending: 'Nessuna urgenza, nessun ospite presente.',
     t_property: 'Dettagli Proprietà', s_property: 'Modifica le informazioni della proprietà',
     t_guest_analytics: 'Analisi Ospiti', s_guest_analytics: 'Come gli ospiti usano l\'app',
     ga_range_7: '7 giorni', ga_range_30: '30 giorni', ga_range_90: '90 giorni',
@@ -2923,56 +2934,159 @@ function showPanel(id, btn) {
 /* ══════════════════════════════════════
    DASHBOARD — live stats
 ══════════════════════════════════════ */
-function renderDashboard() {
-  const total = allCheckins.length;
-  const pending = allCheckins.filter(c => c.docs_status === 'pending').length;
-  const filed = allCheckins.filter(c => c.alloggiati_status === 'filed').length;
+async function renderDashboard() {
+  const el = document.getElementById('panel-dashboard');
+  if (!el) return;
+  if (!propertyId) {
+    el.innerHTML = `<div style="text-align:center;padding:40px;color:var(--ink-soft);">${h('dashboard_loading') || 'Loading…'}</div>`;
+    return;
+  }
 
-  document.getElementById('panel-dashboard').innerHTML = `
-    <div class="stat-grid">
-      <div class="stat-card">
-        <div class="stat-label">${h('stat_checkins')}</div>
-        <div class="stat-value">${total}</div>
-        <div class="stat-change up">${h('stat_alltime')}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">${h('stat_pending')}</div>
-        <div class="stat-value" style="color:${pending>0?'var(--amber)':'var(--green)'}">${pending}</div>
-        <div class="stat-change ${pending>0?'down':'up'}">${pending>0?h('stat_attention'):h('stat_complete')}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">${h('stat_filed')}</div>
-        <div class="stat-value" style="color:var(--green)">${filed}</div>
-        <div class="stat-change up">${total>0?Math.round(filed/total*100)+h('stat_done'):h('stat_no_guests')}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">${h('stat_chat')}</div>
-        <div class="stat-value">${allChats.length}</div>
-        <div class="stat-change up">${allChats.filter(c=>c.sender==='guest').length} ${h('stat_from_guests')}</div>
-      </div>
-    </div>
+  // Fetch the last 60 days of events for this property — wide enough
+  // to catch any guest currently staying or recently active. We use the
+  // existing summary map (built from allCheckins) to enrich per-booking.
+  const cutoff = new Date(Date.now() - 60 * 86400000).toISOString();
+  let events = [];
+  try {
+    const { data } = await sb.from('analytics_events')
+      .select('event_type, event_data, session_id, booking_code, created_at')
+      .eq('property_id', propertyId)
+      .eq('is_test', false)
+      .is('deleted_at', null)
+      .gte('created_at', cutoff)
+      .order('created_at', { ascending: false })
+      .limit(2000);
+    events = data || [];
+  } catch (_) { events = []; }
 
-    <div class="table-wrap">
-      <div class="table-header">
-        <div class="table-title">${h('recent_checkins')}</div>
-        <button class="btn btn-secondary btn-sm" onclick="showPanel('checkins', document.querySelector('[onclick*=checkins]'))">${h('view_all')}</button>
+  // Build summary map (booking_code → { name, arrival, departure, ... })
+  // Reuse the same helper Guest Analytics uses, so labels stay consistent.
+  const codes = [...new Set([
+    ...events.map(e => e.booking_code).filter(Boolean),
+    ...allCheckins.map(c => c.booking_code).filter(Boolean),
+  ])];
+  const summaryMap = await loadGuestSummariesByCode(codes);
+
+  // Compute per-booking action rows (mirrors renderGaGuestBreakdown)
+  const today = new Date();
+  const groups = {};
+  for (const e of events) {
+    const code = e.booking_code || null;
+    if (!code) continue;  // dashboard only cares about identified bookings
+    if (!groups[code]) groups[code] = { code, events: [] };
+    groups[code].events.push(e);
+  }
+  // Also include checkins that have no events yet (e.g., guests who
+  // pre-checked-in but haven't opened the app since arrival)
+  for (const code in summaryMap) {
+    if (!groups[code]) groups[code] = { code, events: [] };
+  }
+
+  const rows = [];
+  for (const [code, g] of Object.entries(groups)) {
+    const summary = summaryMap[code] || null;
+    if (!summary) continue;  // skip anonymous / unknown bookings
+    const isPreCheckin = false;  // dashboard treats anyone with a checkin row as checked-in
+    const status = _gpgComputeStayStatus(summary, today);
+    const eng = _gpgComputeEngagement(g.events);
+    const topCats = _gpgTopRecoCategories(g.events);
+    const action = _gpgActionPrompt(status, eng, topCats, isPreCheckin, summary.hasDocs);
+    rows.push({ code, summary, status, eng, topCats, action });
+  }
+
+  // Split into urgent + currently-staying. A row may appear in both if
+  // the guest has an open help request AND is currently staying — but
+  // we de-dup so urgent wins (it's the higher-priority view).
+  const urgent = rows.filter(r => r.action && (r.action.tone === 'urgent' || r.action.tone === 'attention'));
+  const urgentCodes = new Set(urgent.map(r => r.code));
+  const staying = rows.filter(r =>
+    r.status && (r.status.tone === 'active' || r.status.tone === 'today')
+    && !urgentCodes.has(r.code)
+  );
+
+  // Sort
+  urgent.sort((a, b) => {
+    const tonePriority = { urgent: 0, attention: 1 };
+    const ap = tonePriority[a.action.tone] ?? 9;
+    const bp = tonePriority[b.action.tone] ?? 9;
+    if (ap !== bp) return ap - bp;
+    return (a.summary.arrival_date || '').localeCompare(b.summary.arrival_date || '');
+  });
+  staying.sort((a, b) => {
+    // Checkout-today first, then by day-of-stay descending (further into stay = needs attention sooner)
+    if (a.status.tone === 'today' && b.status.tone !== 'today') return -1;
+    if (b.status.tone === 'today' && a.status.tone !== 'today') return 1;
+    return (b.status.dayOfStay || 0) - (a.status.dayOfStay || 0);
+  });
+
+  // ── Render ──────────────────────────────────────────────────────────
+  const safe = s => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+
+  const renderRow = (r, paneTone) => {
+    const eng = r.eng;
+    const statRow = [
+      eng.escs > 0 ? `<span style="color:#c84545;font-weight:600;">💬 ${eng.escs} ${safe(eng.escs === 1 ? (h('ga_action_card_help_one') || 'help request') : (h('ga_action_card_help_n') || 'help requests'))}</span>` : '',
+      eng.recos > 0 ? `<span>📍 ${eng.recos} ${safe(h('ga_action_card_reco_clicks') || 'reco clicks')}</span>` : '',
+      (eng.chats > 0 && eng.escs === 0) ? `<span>💭 ${eng.chats} ${safe(h('ga_action_card_chat_msgs') || 'chat msgs')}</span>` : '',
+    ].filter(Boolean).join(' · ');
+
+    const recoLine = r.topCats.length > 0
+      ? `<div style="font-size:0.74rem;color:var(--ink-soft);margin-top:4px;">${safe(h('ga_action_card_asked_about') || 'Asked about:')} ${r.topCats.map(c => safe(c.cat) + ' ×' + c.n).join(' · ')}</div>`
+      : '';
+
+    const statusBadge = r.status
+      ? `<span style="font-size:0.62rem;font-weight:600;letter-spacing:0.05em;padding:2px 7px;border-radius:999px;background:${r.status.tone === 'today' ? 'rgba(232,184,75,0.18)' : 'rgba(109,191,130,0.15)'};color:${r.status.tone === 'today' ? '#8a6914' : '#2f7a44'};white-space:nowrap;">${safe(r.status.label)}</span>`
+      : '';
+
+    const actionBox = r.action
+      ? `<div style="margin-top:6px;font-size:0.78rem;font-weight:500;padding:6px 9px;border-radius:5px;line-height:1.3;background:${r.action.tone === 'urgent' ? 'rgba(224,90,90,0.10)' : r.action.tone === 'attention' ? 'rgba(232,184,75,0.14)' : r.action.tone === 'opportunity' ? 'rgba(109,191,130,0.13)' : 'rgba(107,174,214,0.12)'};color:${r.action.tone === 'urgent' ? '#b03939' : r.action.tone === 'attention' ? '#7d5e10' : r.action.tone === 'opportunity' ? '#2f7a44' : '#29638a'};border-left:2px solid ${r.action.tone === 'urgent' ? '#c84545' : r.action.tone === 'attention' ? '#c9a55a' : r.action.tone === 'opportunity' ? '#6DBF82' : '#6BAED6'};">▸ ${safe(r.action.text)}</div>`
+      : '';
+
+    return `
+      <div style="background:var(--white);border:1px solid rgba(74,42,24,0.08);border-left:3px solid ${paneTone === 'urgent' ? '#c84545' : '#6DBF82'};border-radius:8px;padding:10px 14px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+          <span style="font-weight:600;color:var(--ink);font-size:0.92rem;">${safe(r.summary.name)}</span>
+          <span style="font-family:monospace;font-size:0.66rem;color:var(--warm);background:rgba(194,113,79,0.08);border-radius:3px;padding:1px 6px;">${safe(r.code)}</span>
+          ${statusBadge}
+        </div>
+        ${statRow ? `<div style="font-size:0.78rem;color:var(--ink-soft);margin-top:3px;">${statRow}</div>` : ''}
+        ${recoLine}
+        ${actionBox}
+      </div>`;
+  };
+
+  const urgentPanel = urgent.length === 0 ? '' : `
+    <div style="margin-bottom:18px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="font-size:1rem;">🔴</span>
+        <h3 style="margin:0;font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--ink);font-weight:600;">${h('dash_needs_attention') || 'Needs your attention'}</h3>
+        <span style="font-size:0.78rem;color:var(--ink-soft);">(${urgent.length})</span>
       </div>
-      <table>
-        <thead><tr><th>${h('th_guest')}</th><th>${h('th_type')}</th><th>${h('th_arrival')}</th><th>${h('th_departure')}</th><th>${h('th_citizenship')}</th><th>${h('th_document')}</th><th>${h('th_docs')}</th></tr></thead>
-        <tbody>
-          ${allCheckins.slice(0,5).map(c => `
-            <tr>
-              <td data-label=""><strong>${c.surname} ${c.name}</strong></td>
-              <td data-label="${h('th_type')}">${c.guest_type}</td>
-              <td data-label="${h('th_arrival')}">${c.arrival_date ? new Date(c.arrival_date).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB') : '—'}</td>
-              <td data-label="${h('th_departure')}">${c.departure_date ? new Date(c.departure_date).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB') : '—'}</td>
-              <td data-label="${h('th_citizenship')}">${c.citizenship}</td>
-              <td data-label="${h('th_document')}">${c.document_type} <span style="font-size:0.72rem;color:var(--ink-soft)">${c.document_number}</span></td>
-              <td data-label="${h('th_docs')}"><span class="status-badge ${c.docs_status==='complete'?'complete':c.docs_status==='partial'?'pending':'missing'}">${c.docs_status==='complete'?h('doc_complete'):c.docs_status==='partial'?h('doc_partial'):h('doc_missing')}</span></td>
-            </tr>
-          `).join('') || `<tr><td colspan="7" style="text-align:center;color:var(--ink-soft);padding:24px;">${h('no_checkins')}</td></tr>`}
-        </tbody>
-      </table>
+      ${urgent.map(r => renderRow(r, 'urgent')).join('')}
+    </div>`;
+
+  const stayingPanel = staying.length === 0 ? '' : `
+    <div style="margin-bottom:18px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="font-size:1rem;">🟢</span>
+        <h3 style="margin:0;font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--ink);font-weight:600;">${h('dash_currently_staying') || 'Currently staying'}</h3>
+        <span style="font-size:0.78rem;color:var(--ink-soft);">(${staying.length})</span>
+      </div>
+      ${staying.map(r => renderRow(r, 'staying')).join('')}
+    </div>`;
+
+  const allCaughtUp = (urgent.length === 0 && staying.length === 0) ? `
+    <div style="text-align:center;padding:48px 20px;background:var(--white);border:1px solid var(--border);border-radius:10px;">
+      <div style="font-size:2.4rem;margin-bottom:12px;">✨</div>
+      <h3 style="margin:0 0 6px;font-family:'Playfair Display',serif;font-size:1.3rem;color:var(--ink);font-weight:600;">${h('dash_all_caught_up') || "You're all caught up"}</h3>
+      <p style="margin:0;font-size:0.86rem;color:var(--ink-soft);">${h('dash_nothing_pending') || 'No urgent items, no guests currently staying.'}</p>
+    </div>` : '';
+
+  el.innerHTML = `
+    <div style="max-width:920px;">
+      ${urgentPanel}
+      ${stayingPanel}
+      ${allCaughtUp}
     </div>
   `;
 }
@@ -3002,7 +3116,8 @@ function renderCheckins() {
     </tr>
   `).join('') || `<tr><td colspan="10" style="text-align:center;color:var(--ink-soft);padding:24px;">${h('no_checkins')}</td></tr>`;
 
-  document.getElementById('checkinCount').textContent = allCheckins.length;
+  const cc = document.getElementById('checkinCount');
+  if (cc) cc.textContent = allCheckins.length;
 }
 
 async function deleteCheckin(id, name) {

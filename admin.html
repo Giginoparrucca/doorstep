@@ -525,13 +525,14 @@ async function runRetentionPreview() {
     }
     const r = Array.isArray(data) ? data[0] : data;
     if (!r) { out.innerHTML = `<div style="font-size:0.78rem;color:var(--ink-soft);">No result returned.</div>`; return; }
-    const total = (r.chat_resolved_purged|0) + (r.chat_archived_purged|0) + (r.analytics_purged|0) + (r.test_rows_purged|0) + (r.soft_deleted_purged|0);
+    const total = (r.chat_resolved_purged|0) + (r.chat_archived_purged|0) + (r.analytics_purged|0) + (r.test_rows_purged|0) + (r.soft_deleted_purged|0) + (r.photos_purged|0);
     const cells = [
       { label: 'Resolved chats',  n: r.chat_resolved_purged|0, color: '#6BAED6' },
       { label: 'Archived chats',  n: r.chat_archived_purged|0, color: '#8B9DAB' },
       { label: 'Analytics events',n: r.analytics_purged|0,     color: '#C9A96E' },
       { label: 'Test rows',       n: r.test_rows_purged|0,     color: '#E8B84B' },
       { label: 'Soft-deleted',    n: r.soft_deleted_purged|0,  color: '#A0978C' },
+      { label: 'ID photos',       n: r.photos_purged|0,        color: '#C2714F' },
     ];
     out.innerHTML = `
       <div style="background:rgba(109,191,130,0.08);border:1px solid rgba(109,191,130,0.25);border-radius:8px;padding:14px 16px;margin:8px 0 0;">
@@ -666,6 +667,7 @@ async function loadRetentionLog() {
             <th style="text-align:right;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Analytics</th>
             <th style="text-align:right;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Test</th>
             <th style="text-align:right;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Soft-del</th>
+            <th style="text-align:right;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Photos</th>
           </tr>
         </thead>
         <tbody>
@@ -685,6 +687,7 @@ async function loadRetentionLog() {
               <td style="padding:6px 10px;text-align:right;color:var(--ink);">${(row.analytics_purged|0).toLocaleString()}</td>
               <td style="padding:6px 10px;text-align:right;color:var(--ink);">${(row.test_rows_purged|0).toLocaleString()}</td>
               <td style="padding:6px 10px;text-align:right;color:var(--ink);">${(row.soft_deleted_purged|0).toLocaleString()}</td>
+              <td style="padding:6px 10px;text-align:right;color:var(--ink);">${(row.photos_purged|0).toLocaleString()}</td>
             </tr>`;
         }).join('')}
         </tbody>
@@ -2603,7 +2606,8 @@ function renderView() {
             { icon: '📊', label: 'Analytics events',  days: 180, note: 'aggregated to monthly totals first' },
             { icon: '🧪', label: 'Test rows',         days: 30, note: 'across all tables' },
             { icon: '🗑',  label: 'Soft-deleted rows', days: 30, note: 'across all tables' },
-            { icon: '🛂', label: 'Check-ins (Alloggiati)', days: '5 yr', note: 'Italian fiscal requirement — never auto-purged' },
+            { icon: '📷', label: 'Document photos',   days: 30, note: 'after guest departure (Garante guidance)' },
+            { icon: '🛂', label: 'Check-in data',     days: '5 yr', note: 'Italian fiscal requirement — never auto-purged' },
           ].map(p => `
             <div style="background:rgba(250,246,240,0.6);border:1px solid rgba(74,46,32,0.06);border-radius:8px;padding:10px 12px;">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">

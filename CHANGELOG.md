@@ -55,6 +55,14 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 15.1 — Guest detail modal _(2026-05-07)_
+- "View" button on Check-in Data rows now opens a proper modal instead of a truncated bottom-right toast
+- Five sections: Stay (booking code, dates, nights), Personal details (name, sex, DOB, place/country of birth, citizenship), Document (type, number, place of issue, status), Document photo (signed URL from `documents` bucket, 5-minute expiry, click to enlarge in new tab), System (submitted at, internal id)
+- Bilingual EN/IT, follows host language toggle
+- Document photo loads asynchronously after modal opens — error states surface clearly if the signed URL can't be generated
+- Close on click-outside, on × button, or Escape key
+- **Files**: `host-console.html`
+
 ### Round 15 — Dashboard redesign as action board _(2026-05-07)_
 - Replaced the host dashboard's vanity stat tiles + redundant recent-checkins table with a decision-driven action-board layout
 - Two panels: 🔴 "Needs your attention" (urgent + attention-tone actions) and 🟢 "Currently staying" (active stays not already in urgent panel)

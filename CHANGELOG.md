@@ -23,6 +23,8 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 ### Medium value, build when triggered
 - **Year-over-year analytics view** using `analytics_monthly`
   The aggregate table is being populated; nothing currently *reads* it in the admin UI. Build a comparison view (Apr 2026 vs Apr 2025 etc.) once you have at least two seasons of data.
+- **Channel manager / OTA calendar sync (Airbnb, Booking.com)**
+  Surfaced during Round 15 dashboard redesign. App currently only knows about future arrivals if the guest has already started pre-checkin — biased view, not useful for "arriving this week" panel. iCal (`.ics`) integration is the right fix: parse external calendars, drop bookings into a new `bookings` table, populate a real upcoming-arrivals panel. ~4-6 hours for the first platform; long tail for handling deletions/changes/conflicts/per-host credentials. **Trigger**: first paying host who asks for it. Don't build speculatively.
 - **Tracking consent flag for guests**
   Currently the guest privacy modal discloses analytics but offers no opt-out. If a guest writes asking to opt out, you'd manually skip their booking. Add a `tracking_consent` column on first session if/when this becomes a recurring request.
 - **`property_type` filter in admin**
@@ -52,6 +54,17 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 ---
 
 ## 📋 Done / Shipped
+
+### Round 15 — Dashboard redesign as action board _(2026-05-07)_
+- Replaced the host dashboard's vanity stat tiles + redundant recent-checkins table with a decision-driven action-board layout
+- Two panels: 🔴 "Needs your attention" (urgent + attention-tone actions) and 🟢 "Currently staying" (active stays not already in urgent panel)
+- Each panel hides if empty; if both empty, shows ✨ "You're all caught up" state
+- Each row is one decision: guest name, booking code, status badge, top reco categories, action prompt — same logic as Round 11.1 Per-Guest Action Board
+- Removed misleading "Alloggiati inviati" stat — the app has no signal whether the host actually filed with the police portal
+- Removed misleading "22" badge from sidebar Check-in Data link (was total-ever count, not actionable)
+- Dashboard subtitle changed from "Overview of your property and guests" → "What needs your attention right now"
+- Decision: cut "Arriving in 7 days" panel before building it. The app only sees future arrivals via pre-checkin completion, which is structurally biased toward already-engaged guests. Fixing this requires Airbnb/Booking.com iCal integration — added to roadmap as deferred.
+- **Files**: `host-console.html`
 
 ### Round 14.3 — Brand rename Doorstep → WelcomeBnB _(2026-05-06 → 2026-05-07)_
 - **Day 1 (drafting)**: renamed all user-visible surfaces — CSS comments, admin export ZIP/README/filename, CHANGELOG, privacy notices. Drafted `migration_round14_3_rename_cron_jobs.sql` for the live cron rename.

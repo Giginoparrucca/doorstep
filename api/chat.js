@@ -57,8 +57,26 @@ export default async function handler(req, res) {
     }
   }
 
-  // ── System prompt ─────────────────────────────────────────────────
-  const systemPrompt = `You are the AI concierge for a vacation rental in Italy. Your name is Sofia. You're warm, observant, and you actually know the place — not the kind of bland AI that reads off a brochure. You give concrete recommendations the way a well-traveled local friend would: opinionated, specific, brief.
+  // ── Fetch today's weather for the property location ──────────────
+  // Uses open-meteo.com — free, no API key, no rate limits at our scale.
+  // We pass coords from the property (if available), otherwise skip.
+  // Cached server-side via the global `globalThis.__wbnb_weather_cache`
+  // for 30 minutes per coord, so we don't hammer the API on every chat.
+  let weatherCtx = '';
+  try {
+    const coords = extractCoordsFromContext(propertyContext);
+    if (coords) {
+      const fc = await getCachedWeather(coords.lat, coords.lng, isIT);
+      if (fc) weatherCtx = `\n\nTODAY'S WEATHER (${fc.label_en}, ${new Date().toLocaleDateString('en-GB')}):\n${fc.summary_en}`;
+    }
+  } catch (e) { /* weather is decorative — never block the chat */ }
+
+  // ── System prompt — TWO BLOCKS for prompt caching ─────────────────
+  // Block 1 is stable across all guests and changes rarely → cached.
+  // Block 2 contains the per-guest variables → not cached.
+  // Sonnet 4.5's cache minimum is ~1024 tokens; block 1 is comfortably above.
+
+  const stableSystemBlock = `You are the AI concierge for a vacation rental in Italy. Your name is Sofia. You're warm, observant, and you actually know the place — not the kind of bland AI that reads off a brochure. You give concrete recommendations the way a well-traveled local friend would: opinionated, specific, brief.
 
 CORE TONE
 - Warm but not saccharine. No "Hello dear guest!" energy.
@@ -69,11 +87,8 @@ CORE TONE
 - Match the guest's energy. Casual question → casual reply. Practical urgent question → precise reply.
 
 LANGUAGE
-- Always reply in ${langLabel}. If the guest writes in a different language mid-conversation, switch fluidly.
-- Use the Italian conventions for time (24h is fine, but "8 di sera" reads more natural than "20:00" in casual replies), distances (km), currency (€).
-
-PROPERTY INFORMATION
-${propertyContext || 'No property data available.'}${stayCtx}
+- Always reply in the guest's preferred language (specified in the variable section below). If the guest writes in a different language mid-conversation, switch fluidly.
+- Use Italian conventions for time (24h is fine, but "8 di sera" reads more natural than "20:00" in casual replies), distances (km), currency (€).
 
 HOW THIS APP WORKS (for guiding guests through the app itself)
 - This is the WelcomeBnB guest app. 5 tabs at the bottom: Home, Check-in, Rules, Explore, Chat.
@@ -83,6 +98,10 @@ HOW THIS APP WORKS (for guiding guests through the app itself)
 - **Explore tab**: Host's hand-picked recommendations. Each has "Open in Maps" for Google Maps directions.
 - **Chat tab**: This conversation with you. Guests can also ask to speak with the host from here.
 - Language: EN/IT toggle top-right of every screen.
+
+USING TODAY'S WEATHER (when provided in the variable section)
+- Weave it in naturally for relevant questions ("the beach today?" → reference temperature/wind; "is it a good day for a walk?" → reference rain chance). Don't recite the forecast at the guest unprompted.
+- If they ask about an outdoor activity and the weather is bad, mention it kindly and suggest an alternative.
 
 WHEN TO ESCALATE TO THE HOST
 You should respond with the marker [ESCALATE] at the very start of your message in these cases:
@@ -100,13 +119,18 @@ RESPONSE FORMAT
 You must respond in this exact structure, no other text outside it:
 
 <reply>
-Your reply to the guest, in ${langLabel}. Use **bold** sparingly for key facts.
+Your reply to the guest in the guest's chosen language. Use **bold** sparingly for key facts.
 </reply>
 <followups>
-Three short follow-up questions the guest is likely to ask next, in ${langLabel}, one per line. Each under 7 words. No numbering, no bullets, just the questions on their own lines. These appear as tappable suggestions below your reply. Make them concrete and natural — what would this specific guest, given everything above, actually ask next? If the conversation is winding down or no good followups exist, leave this section empty.
+Three short follow-up questions the guest is likely to ask next, in the guest's chosen language, one per line. Each under 7 words. No numbering, no bullets, just the questions on their own lines. These appear as tappable suggestions below your reply. Make them concrete and natural — what would this specific guest, given everything in the variable section, actually ask next? If the conversation is winding down or no good followups exist, leave this section empty.
 </followups>
 
 Never put any text outside these two tags. The structure is parsed by the app.`;
+
+  const variableSystemBlock = `GUEST'S CHOSEN LANGUAGE: ${langLabel}
+
+PROPERTY INFORMATION
+${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}`;
 
   // ── Build the messages array, possibly adding image to the last user msg ──
   let apiMessages = messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
@@ -131,10 +155,16 @@ Never put any text outside these two tags. The structure is parsed by the app.`;
     }
   }
 
+  // Multi-block system with cache_control on the stable block. Anthropic
+  // will cache it (cost = 10% of normal input after first hit) and serve
+  // it from cache across all guests/properties for 5 minutes per cache key.
   const requestBody = {
     model: 'claude-sonnet-4-5',
     max_tokens: 1024,
-    system: systemPrompt,
+    system: [
+      { type: 'text', text: stableSystemBlock, cache_control: { type: 'ephemeral' } },
+      { type: 'text', text: variableSystemBlock },
+    ],
     messages: apiMessages,
     stream: !!useStream,
   };
@@ -314,4 +344,92 @@ async function notifyTelegram(messages) {
   } catch (e) {
     console.warn('Telegram notification failed:', e);
   }
+}
+
+// ─── Weather support (Round 17) ────────────────────────────────────
+// Extract lat/lng from the property context. The host console builds
+// the context with a "Google Maps: <url>" line; we parse coords out of
+// that URL if present. Falls back to scanning for a "@lat,lng" pattern.
+function extractCoordsFromContext(ctx) {
+  if (!ctx || typeof ctx !== 'string') return null;
+  // Pattern 1: Google Maps URL with @lat,lng (the most common form)
+  const m1 = ctx.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (m1) return { lat: parseFloat(m1[1]), lng: parseFloat(m1[2]) };
+  // Pattern 2: explicit "lat,lng" decimal pair
+  const m2 = ctx.match(/(-?\d{1,2}\.\d{4,}),\s*(-?\d{1,3}\.\d{4,})/);
+  if (m2) return { lat: parseFloat(m2[1]), lng: parseFloat(m2[2]) };
+  return null;
+}
+
+// Server-side weather cache keyed by rounded coords. Survives between
+// requests on the same warm Vercel instance. 30-minute TTL.
+function getCachedWeather(lat, lng, isIT) {
+  const key = `${lat.toFixed(2)},${lng.toFixed(2)}`;
+  const now = Date.now();
+  globalThis.__wbnb_weather_cache = globalThis.__wbnb_weather_cache || {};
+  const cached = globalThis.__wbnb_weather_cache[key];
+  if (cached && (now - cached.fetchedAt) < 30 * 60 * 1000) {
+    return Promise.resolve(cached.forecast);
+  }
+  return fetchOpenMeteo(lat, lng).then(forecast => {
+    if (forecast) {
+      globalThis.__wbnb_weather_cache[key] = { fetchedAt: now, forecast };
+    }
+    return forecast;
+  }).catch(() => null);
+}
+
+async function fetchOpenMeteo(lat, lng) {
+  // open-meteo.com — no API key, no rate limits at our scale.
+  // We pull current conditions + today's high/low/precip.
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
+              `&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m` +
+              `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code` +
+              `&timezone=auto&forecast_days=1`;
+  const resp = await fetch(url, { signal: AbortSignal.timeout(2500) });
+  if (!resp.ok) return null;
+  const data = await resp.json();
+  if (!data.current || !data.daily) return null;
+  const c = data.current;
+  const d = data.daily;
+  const desc = describeWeatherCode(d.weather_code?.[0]);
+  return {
+    label_en: 'Live forecast',
+    summary_en: [
+      `Conditions: ${desc.en}`,
+      `Now: ${Math.round(c.temperature_2m)}°C, ${Math.round(c.relative_humidity_2m)}% humidity, wind ${Math.round(c.wind_speed_10m)} km/h`,
+      `Today: high ${Math.round(d.temperature_2m_max[0])}°C, low ${Math.round(d.temperature_2m_min[0])}°C, rain chance ${d.precipitation_probability_max?.[0] ?? 0}%`,
+    ].join('. '),
+  };
+}
+
+// WMO weather code → short EN/IT description. Used for the natural-
+// language summary that goes into the system prompt.
+function describeWeatherCode(code) {
+  const t = (en, it) => ({ en, it });
+  const map = {
+    0:  t('clear sky', 'cielo sereno'),
+    1:  t('mainly clear', 'prevalentemente sereno'),
+    2:  t('partly cloudy', 'parzialmente nuvoloso'),
+    3:  t('overcast', 'coperto'),
+    45: t('foggy', 'nebbia'),
+    48: t('foggy', 'nebbia'),
+    51: t('light drizzle', 'pioggerella leggera'),
+    53: t('drizzle', 'pioggerella'),
+    55: t('heavy drizzle', 'pioggerella intensa'),
+    61: t('light rain', 'pioggia leggera'),
+    63: t('rain', 'pioggia'),
+    65: t('heavy rain', 'pioggia forte'),
+    71: t('light snow', 'neve leggera'),
+    73: t('snow', 'neve'),
+    75: t('heavy snow', 'neve abbondante'),
+    77: t('snow grains', 'neve granulare'),
+    80: t('rain showers', 'rovesci di pioggia'),
+    81: t('rain showers', 'rovesci di pioggia'),
+    82: t('heavy rain showers', 'forti rovesci di pioggia'),
+    95: t('thunderstorm', 'temporale'),
+    96: t('thunderstorm with hail', 'temporale con grandine'),
+    99: t('severe thunderstorm', 'temporale violento'),
+  };
+  return map[code] || t('unsettled', 'variabile');
 }

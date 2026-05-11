@@ -55,6 +55,29 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 17 — Cache, voice, weather _(2026-05-07)_
+**Three chat improvements that compound: roughly halves cost, adds two new input/context modes, no breaking changes.**
+
+- **Prompt caching** (cost reduction). System prompt split into two blocks: a stable block (persona, app instructions, response format — ~1.5K tokens) and a variable block (property context, stay context, weather, language). The stable block gets `cache_control: { type: 'ephemeral' }` so Anthropic caches it; subsequent requests within 5 minutes hit the cache at 10% of normal input cost. Expected savings: ~50% on input tokens at current scale.
+- **Voice input** (UX). Mic button in chat input bar (between 📎 and ↗). Tap to start listening, tap to stop. Live transcript appears in the input field as the guest speaks; auto-sends when the speech recognizer detects end-of-phrase. Pulsing red indicator while listening. Language follows the EN/IT toggle (`it-IT` or `en-US`). Uses native Web Speech API — free, no third-party transcription costs. Falls back gracefully on unsupported browsers (button greyed out with a tooltip explaining). Privacy note: Chrome/Edge transcribe via Google's servers; Safari transcribes locally. No audio is stored.
+- **Today's weather context**. Server fetches current conditions for the property's coordinates (parsed from the Google Maps URL in property context) via open-meteo.com (free, no API key, no rate limits at this scale). Weather is injected into the variable system block as a single line. 30-minute server-side cache per coord avoids hammering the API. Sofia uses it naturally when relevant ("the rain chance is 60% today, you might want to swap the beach for the basilica"). Doesn't recite forecasts at the guest unprompted.
+- **Cost projection**: 10-host realistic scenario was $4/month baseline. With caching: ~$2/month. Weather adds <$0.50/month. Voice input is free. Total: roughly half the cost with more capability.
+- **Backward compat**: no breaking changes. The frontend's request shape is identical to Round 16; weather flows through automatically when the property context contains parseable coords.
+- **Files**: `api/chat.js`, `index.html`
+
+### Round 16 — Best-in-class guest chat _(2026-05-07)_
+- **Model upgraded** from `claude-sonnet-4-20250514` to `claude-sonnet-4-5` (significant intelligence jump)
+- **System prompt rewritten** with a persona ("Sofia"), warmth + opinion calibration, structured tone instructions, language-switch detection, and proactive escalation triggers (frustration, urgency, out-of-scope). Existing app-usage section preserved (genuinely useful — guests ask "where's the WiFi password?")
+- **Stay context awareness** — `/api/chat` accepts a new optional `stayContext` field (guest name, country, group size, arrival/departure dates, total nights, day-of-stay). Frontend builds this from `wbnb_lookup` localStorage. Sofia weaves it in naturally ("Since you're on day 3 already…") instead of reciting like a database
+- **Streaming responses** — typewriter effect via Server-Sent Events. Server detects/forwards only the text inside `<reply>` tags; tags themselves never reach the browser. Animated cursor (▍) blinks while streaming
+- **Photo input (vision)** — paperclip 📎 button next to the input, file picker prefers camera (`capture="environment"` on mobile), 8MB cap, preview row above the input with remove button. Image sent as base64 content block alongside text. Photo accompanies one message — not retained in conversation history (keeps payload bounded)
+- **Contextual followups** — system prompt now requires `<followups>` structured output with 3 suggestions in the guest's language; server parses + returns them; frontend renders as tappable chips. Empty when conversation is winding down
+- **max_tokens** bumped 512 → 1024 — earlier limit was truncating good answers
+- **HEIC fallback** — iOS HEIC images that fail browser canvas decoding fall back to `image/jpeg` media type for the API call
+- **Backward compat**: old `{messages, propertyContext, lang}` shape still works (no `stream`, no `imageData`, no `stayContext`). Non-streaming JSON response also still returns `followups` array
+- Telegram escalation notification preserved; works for image messages (shows "[image + text]" placeholder)
+- **Files**: `api/chat.js`, `index.html`
+
 ### Round 15.2 — Document photo retention (30 days post-departure) _(2026-05-07)_
 - Document photos now auto-deleted from the `documents` storage bucket 30 days after the guest's `departure_date`
 - New `purge_old_id_photos(p_dry_run, p_days)` function deletes from `storage.objects` where bucket_id='documents' AND name matches paths in eligible checkin rows, then NULLs `id_photo_path` on those rows so the host UI shows "no photo" instead of broken-link refs

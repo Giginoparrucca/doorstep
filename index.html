@@ -505,7 +505,7 @@ body {
 }
 .chat-input:focus { outline: none; border-color: var(--warm); }
 .chat-input::placeholder { color: rgba(122,90,72,0.35); }
-.chat-send, .chat-photo {
+.chat-send, .chat-photo, .chat-mic {
   width: 42px; height: 42px; border-radius: 50%;
   border: none;
   display: flex; align-items: center; justify-content: center;
@@ -517,6 +517,16 @@ body {
 .chat-photo { background: var(--cream); border: 1px solid rgba(194,113,79,0.18); }
 .chat-photo:hover { background: rgba(194,113,79,0.08); }
 .chat-photo svg { stroke: var(--warm); width: 18px; height: 18px; }
+.chat-mic { background: var(--cream); border: 1px solid rgba(194,113,79,0.18); }
+.chat-mic:hover { background: rgba(194,113,79,0.08); }
+.chat-mic svg { stroke: var(--warm); width: 18px; height: 18px; }
+.chat-mic.listening { background: var(--warm); border-color: var(--warm); animation: mic-pulse 1.2s ease-in-out infinite; }
+.chat-mic.listening svg { stroke: #fff; }
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(194,113,79,0.5); }
+  50%      { box-shadow: 0 0 0 8px rgba(194,113,79,0); }
+}
+.chat-mic.unsupported { opacity: 0.35; cursor: not-allowed; }
 .chat-image-preview {
   display: none; padding: 8px 16px; background: var(--white);
   border-top: 1px solid rgba(194,113,79,0.1);
@@ -1014,6 +1024,9 @@ body {
       <input type="file" id="chatPhotoInput" accept="image/*" capture="environment" style="display:none;" onchange="onChatPhotoPicked(event)">
       <button class="chat-photo" onclick="document.getElementById('chatPhotoInput').click()" title="Attach photo" aria-label="Attach photo">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+      </button>
+      <button class="chat-mic" id="chatMicBtn" onclick="toggleVoiceInput()" title="Voice input" aria-label="Voice input">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0014 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
       </button>
       <input class="chat-input" id="chatInput" data-i18n-placeholder="chat_placeholder" placeholder="Ask anything…" onkeydown="if(event.key==='Enter')sendChat()">
       <button class="chat-send" onclick="sendChat()">
@@ -3062,6 +3075,91 @@ function onChatPhotoPicked(event) {
 function clearPendingImage() {
   pendingImage = null;
   document.getElementById('chatImagePreview').classList.remove('show');
+}
+
+// ── Round 17 — Voice input via Web Speech API ────────────────────────
+// Available on Chrome/Edge/Safari with HTTPS; not available on Firefox.
+// On Chrome/Edge, audio is sent to Google servers for transcription.
+// On Safari, transcription is local. We don't store the audio anywhere.
+let voiceRecognition = null;
+let voiceListening = false;
+
+function initVoiceRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    const btn = document.getElementById('chatMicBtn');
+    if (btn) {
+      btn.classList.add('unsupported');
+      btn.title = lang === 'it'
+        ? 'Voce non supportata su questo browser'
+        : 'Voice input not supported in this browser';
+    }
+    return null;
+  }
+  const r = new SR();
+  r.continuous = false;       // stop at end of phrase
+  r.interimResults = true;    // show live transcript
+  r.lang = lang === 'it' ? 'it-IT' : 'en-US';
+
+  let finalTranscript = '';
+  r.onstart = () => {
+    voiceListening = true;
+    document.getElementById('chatMicBtn').classList.add('listening');
+    finalTranscript = '';
+  };
+  r.onresult = (event) => {
+    let interim = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const t = event.results[i][0].transcript;
+      if (event.results[i].isFinal) finalTranscript += t;
+      else interim += t;
+    }
+    document.getElementById('chatInput').value = (finalTranscript + interim).trim();
+  };
+  r.onerror = (event) => {
+    console.warn('Speech recognition error:', event.error);
+    if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+      addBubble(lang === 'it'
+        ? '🎤 Permesso microfono negato. Abilitalo dalle impostazioni del browser.'
+        : '🎤 Microphone permission denied. Enable it in your browser settings.', 'system');
+    }
+    stopVoiceInput();
+  };
+  r.onend = () => {
+    stopVoiceInput();
+    // Auto-send if user said something — natural flow on mobile
+    const text = document.getElementById('chatInput').value.trim();
+    if (text && finalTranscript.trim()) {
+      sendChat();
+    }
+  };
+  return r;
+}
+
+function toggleVoiceInput() {
+  if (voiceListening) {
+    stopVoiceInput();
+    return;
+  }
+  if (!voiceRecognition) {
+    voiceRecognition = initVoiceRecognition();
+    if (!voiceRecognition) return;
+  }
+  // Update lang in case the user toggled EN/IT since init
+  voiceRecognition.lang = lang === 'it' ? 'it-IT' : 'en-US';
+  try {
+    voiceRecognition.start();
+  } catch (e) {
+    // start() throws if already started — recover silently
+    console.warn('voiceRecognition.start failed:', e);
+    stopVoiceInput();
+  }
+}
+
+function stopVoiceInput() {
+  voiceListening = false;
+  document.getElementById('chatMicBtn')?.classList.remove('listening');
+  try { voiceRecognition?.stop(); } catch (_) {}
 }
 
 function buildStayContext() {

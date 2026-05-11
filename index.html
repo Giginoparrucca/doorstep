@@ -494,6 +494,7 @@ body {
   display: flex; gap: 8px; padding: 10px 16px 14px;
   border-top: 1px solid rgba(194,113,79,0.1);
   background: var(--white); flex-shrink: 0;
+  align-items: center;
 }
 .chat-input {
   flex: 1; padding: 10px 14px;
@@ -504,14 +505,45 @@ body {
 }
 .chat-input:focus { outline: none; border-color: var(--warm); }
 .chat-input::placeholder { color: rgba(122,90,72,0.35); }
-.chat-send {
+.chat-send, .chat-photo {
   width: 42px; height: 42px; border-radius: 50%;
-  background: var(--warm); border: none;
+  border: none;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; flex-shrink: 0; transition: background 0.2s;
 }
+.chat-send { background: var(--warm); }
 .chat-send:hover { background: var(--warm-d); }
 .chat-send svg { stroke: #fff; width: 18px; height: 18px; }
+.chat-photo { background: var(--cream); border: 1px solid rgba(194,113,79,0.18); }
+.chat-photo:hover { background: rgba(194,113,79,0.08); }
+.chat-photo svg { stroke: var(--warm); width: 18px; height: 18px; }
+.chat-image-preview {
+  display: none; padding: 8px 16px; background: var(--white);
+  border-top: 1px solid rgba(194,113,79,0.1);
+  align-items: center; gap: 10px;
+}
+.chat-image-preview.show { display: flex; }
+.chat-image-preview img {
+  height: 56px; width: 56px; border-radius: 8px;
+  object-fit: cover; border: 1px solid rgba(194,113,79,0.2);
+}
+.chat-image-preview-text {
+  flex: 1; font-size: 0.74rem; color: var(--ink-soft);
+}
+.chat-image-preview-remove {
+  background: none; border: none; cursor: pointer;
+  color: var(--ink-soft); font-size: 1.1rem; padding: 4px 8px;
+}
+.chat-image-preview-remove:hover { color: var(--warm); }
+.chat-bubble.bot img.attached, .chat-bubble.user img.attached {
+  max-width: 220px; max-height: 220px; border-radius: 8px;
+  display: block; margin-bottom: 6px;
+}
+.chat-bubble.streaming::after {
+  content: '▍'; opacity: 0.4; animation: blink-cursor 0.9s infinite;
+  margin-left: 2px;
+}
+@keyframes blink-cursor { 0%,100%{opacity:0.4} 50%{opacity:0} }
 
 /* ── UTILITIES ── */
 .pb-safe { padding-bottom: 24px; }
@@ -972,7 +1004,17 @@ body {
       <button onclick="endEscalation()" style="padding:6px 12px;border-radius:6px;border:1px solid var(--warm);background:rgba(194,113,79,0.06);color:var(--warm);font-size:0.72rem;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;white-space:nowrap;" id="backToAiBtn">🤖 Back to AI</button>
     </div>
 
+    <div class="chat-image-preview" id="chatImagePreview">
+      <img id="chatImagePreviewImg" alt="">
+      <div class="chat-image-preview-text" id="chatImagePreviewText">Photo attached</div>
+      <button class="chat-image-preview-remove" onclick="clearPendingImage()" title="Remove">✕</button>
+    </div>
+
     <div class="chat-input-bar">
+      <input type="file" id="chatPhotoInput" accept="image/*" capture="environment" style="display:none;" onchange="onChatPhotoPicked(event)">
+      <button class="chat-photo" onclick="document.getElementById('chatPhotoInput').click()" title="Attach photo" aria-label="Attach photo">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+      </button>
       <input class="chat-input" id="chatInput" data-i18n-placeholder="chat_placeholder" placeholder="Ask anything…" onkeydown="if(event.key==='Enter')sendChat()">
       <button class="chat-send" onclick="sendChat()">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg>
@@ -2983,21 +3025,129 @@ async function saveChatMsg(sender, message) {
   else console.log('💬 Chat saved OK');
 }
 
+// Round 16 — pending image attachment + stay context helpers
+let pendingImage = null;  // { mediaType, data, previewUrl }
+
+function onChatPhotoPicked(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    addBubble(lang === 'it' ? 'Per favore allega un\'immagine.' : 'Please attach an image.', 'system');
+    return;
+  }
+  if (file.size > 8 * 1024 * 1024) {
+    addBubble(lang === 'it' ? 'Immagine troppo grande (max 8 MB).' : 'Image too large (max 8 MB).', 'system');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const dataUrl = e.target.result;
+    const commaIdx = dataUrl.indexOf(',');
+    const base64 = dataUrl.slice(commaIdx + 1);
+    // Normalize media type — Anthropic accepts jpeg/png/gif/webp
+    let mediaType = file.type;
+    if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(mediaType)) {
+      mediaType = 'image/jpeg'; // best-effort fallback for HEIC etc.
+    }
+    pendingImage = { mediaType, data: base64, previewUrl: dataUrl };
+    document.getElementById('chatImagePreviewImg').src = dataUrl;
+    document.getElementById('chatImagePreviewText').textContent =
+      lang === 'it' ? '📎 Foto allegata' : '📎 Photo attached';
+    document.getElementById('chatImagePreview').classList.add('show');
+  };
+  reader.readAsDataURL(file);
+  event.target.value = ''; // reset so picking the same file again works
+}
+
+function clearPendingImage() {
+  pendingImage = null;
+  document.getElementById('chatImagePreview').classList.remove('show');
+}
+
+function buildStayContext() {
+  // Pull stay context from the lookup result stored in localStorage.
+  // Returns null if we don't have enough info to be useful.
+  try {
+    const lookupRaw = localStorage.getItem('wbnb_lookup');
+    if (!lookupRaw) return null;
+    const lookup = JSON.parse(lookupRaw);
+    const ctx = {};
+    if (lookup.firstName && lookup.lastName) {
+      ctx.guestName = lookup.firstName + ' ' + lookup.lastName;
+    }
+    if (lookup.arrivalDate) ctx.arrivalDate = lookup.arrivalDate;
+    if (lookup.departureDate) ctx.departureDate = lookup.departureDate;
+    if (lookup.nights) ctx.totalNights = lookup.nights;
+    if (lookup.guestCount) ctx.groupSize = lookup.guestCount;
+    if (lookup.citizenship) ctx.guestCountry = lookup.citizenship;
+    // Compute day-of-stay if we have arrival_date
+    if (ctx.arrivalDate) {
+      const arr = new Date(ctx.arrivalDate + 'T00:00:00');
+      const today = new Date(); today.setHours(0,0,0,0);
+      const diff = Math.floor((today - arr) / 86400000) + 1;
+      if (diff >= 1 && (!ctx.totalNights || diff <= ctx.totalNights)) {
+        ctx.dayOfStay = diff;
+      }
+    }
+    return Object.keys(ctx).length > 0 ? ctx : null;
+  } catch (_) { return null; }
+}
+
+function renderFollowups(followups) {
+  const sugContainer = document.getElementById('chatSuggestions');
+  if (!followups || followups.length === 0) {
+    sugContainer.style.display = 'none';
+    sugContainer.innerHTML = '';
+    return;
+  }
+  sugContainer.innerHTML = followups.map(f => {
+    const safe = String(f).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+    return `<button class="chat-sug" onclick="sendSuggestion(this.textContent)">${safe}</button>`;
+  }).join('');
+  sugContainer.style.display = 'flex';
+}
+
 async function sendChat() {
   const input = document.getElementById('chatInput');
   const msg = input.value.trim();
-  if (!msg) return;
-  addBubble(msg, 'user');
-  saveChatMsg('guest', msg);
-  // Analytics: track message volume. We deliberately do NOT log message
-  // content — only length — to avoid storing private guest text in analytics.
+  const hasImage = !!pendingImage;
+  if (!msg && !hasImage) return;
+
+  // Render user bubble — include image preview if attached
+  const userBubble = document.createElement('div');
+  userBubble.className = 'chat-bubble user';
+  if (hasImage) {
+    const img = document.createElement('img');
+    img.className = 'attached';
+    img.src = pendingImage.previewUrl;
+    userBubble.appendChild(img);
+  }
+  if (msg) {
+    const txt = document.createElement('div');
+    txt.innerHTML = msg.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    userBubble.appendChild(txt);
+  }
+  document.getElementById('chatMessages').appendChild(userBubble);
+  document.getElementById('chatMessages').scrollTop = 99999;
+
+  // Save guest message — for image-only message, save a placeholder
+  const savedText = msg || (hasImage ? '[📎 photo]' : '');
+  saveChatMsg('guest', savedText);
+
+  // Analytics — content stays private; we only log length + image flag
   trackGuest('guest_chat_message', {
     length: msg.length,
+    has_image: hasImage,
     escalated: chatEscalated,
   });
+
+  // Snapshot the image for the request, then clear preview immediately
+  const imageData = pendingImage ? { mediaType: pendingImage.mediaType, data: pendingImage.data } : null;
+  clearPendingImage();
   input.value = '';
   document.getElementById('chatSuggestions').style.display = 'none';
 
+  // Escalated mode: just route to host, no AI call
   if (chatEscalated) {
     addBubble(lang === 'it'
       ? '📨 Messaggio inviato al tuo host. Risponderà al più presto.'
@@ -3005,15 +3155,19 @@ async function sendChat() {
     return;
   }
 
-  const typing = document.createElement('div');
-  typing.className = 'chat-bubble bot';
-  typing.id = 'typingIndicator';
-  typing.innerHTML = '<span style="opacity:0.5;">…</span>';
-  document.getElementById('chatMessages').appendChild(typing);
+  // Push user message to local history (text only — image is sent out-of-band
+  // in this request and not re-sent on subsequent requests since we don't
+  // store it in chatHistory; this keeps the history payload small)
+  chatHistory.push({ role: 'user', content: msg || '[photo attached]' });
+
+  // Create the streaming bot bubble
+  const botBubble = document.createElement('div');
+  botBubble.className = 'chat-bubble bot streaming';
+  botBubble.textContent = '';
+  document.getElementById('chatMessages').appendChild(botBubble);
   document.getElementById('chatMessages').scrollTop = 99999;
 
-  chatHistory.push({ role: 'user', content: msg });
-
+  let fullReply = '';
   try {
     const response = await fetch('/api/chat', {
       method: 'POST',
@@ -3021,34 +3175,77 @@ async function sendChat() {
       body: JSON.stringify({
         messages: chatHistory,
         propertyContext: buildPropertyContext(),
+        stayContext: buildStayContext(),
+        imageData: imageData,
         lang: lang,
+        stream: true,
       }),
     });
-    document.getElementById('typingIndicator')?.remove();
-    if (!response.ok) throw new Error('API error');
-    const data = await response.json();
-    const reply = data.reply || (lang === 'it' ? 'Scusa, riprova.' : 'Sorry, please try again.');
-    chatHistory.push({ role: 'assistant', content: reply });
-    addBubble(reply, 'bot');
-    saveChatMsg('bot', reply);
-    if (data.escalated) {
+    if (!response.ok || !response.body) throw new Error('API error ' + response.status);
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let escalated = false;
+    let followups = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // Parse SSE events: blocks separated by \n\n
+      let idx;
+      while ((idx = buffer.indexOf('\n\n')) !== -1) {
+        const eventBlock = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
+        const dataLine = eventBlock.split('\n').find(l => l.startsWith('data: '));
+        if (!dataLine) continue;
+        try {
+          const payload = JSON.parse(dataLine.slice(6));
+          if (payload.type === 'text' && payload.text) {
+            fullReply += payload.text;
+            // Render with bold markdown support
+            botBubble.innerHTML = fullReply.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            document.getElementById('chatMessages').scrollTop = 99999;
+          } else if (payload.type === 'done') {
+            escalated = !!payload.escalated;
+            followups = Array.isArray(payload.followups) ? payload.followups : [];
+          } else if (payload.type === 'error') {
+            throw new Error(payload.message || 'stream error');
+          }
+        } catch (e) { /* ignore individual chunk parse errors */ }
+      }
+    }
+
+    botBubble.classList.remove('streaming');
+
+    // If escalated, strip the marker from the displayed text
+    if (escalated && fullReply.startsWith('[ESCALATE]')) {
+      fullReply = fullReply.replace('[ESCALATE]', '').trim();
+      botBubble.innerHTML = fullReply.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    }
+
+    chatHistory.push({ role: 'assistant', content: fullReply });
+    saveChatMsg('bot', fullReply);
+
+    if (escalated) {
       chatEscalated = true;
-      // Discrete escalation event — fires once per AI handoff. Counted directly
-      // by the host console so we don't have to infer escalations from the
-      // `escalated:true` tag on subsequent messages (which misses the trigger
-      // message itself and any session that doesn't send follow-ups).
       trackGuest('guest_chat_escalated', {});
       saveChatMsg('system', 'Guest requested human assistance — escalating to host.');
       showEscalatedBanner();
       startHostChatListener();
+      renderFollowups([]);
+    } else {
+      renderFollowups(followups);
     }
   } catch (err) {
-    document.getElementById('typingIndicator')?.remove();
+    botBubble.classList.remove('streaming');
     console.error('Chat error:', err);
     const fallback = lang === 'it'
       ? 'Mi dispiace, ho un problema tecnico. Prova a dire "parla con una persona" per contattare il tuo host.'
       : 'Sorry, I\'m having a technical issue. Try saying "talk to a human" to reach your host directly.';
-    addBubble(fallback, 'bot');
+    botBubble.textContent = fallback;
   }
 }
 

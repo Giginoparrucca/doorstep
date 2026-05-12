@@ -55,6 +55,15 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 17.1 — Chat input bar polish (mobile) _(2026-05-07)_
+- Mobile chat had 5 stacked UI rows in 200px (input controls + Powered by + Privacy floating + bottom nav). Sofia's send button was visually colliding with the Privacy badge, photo/mic buttons were too big, input field was getting squeezed.
+- **Pill input layout**: 📎 and 🎤 buttons now sit *inside* the rounded input field on the left (smaller, 32px, no border, hover state). Field grows to fill horizontal space. Send button stays outside as the visual anchor on the right.
+- **"Powered by WelcomeBnB" watermark hidden on chat tab** — kept on Home/Check-in/Rules/Explore where there's vertical room. Body class `tab-chat` toggles via `goTo()`. Smooth fade transition.
+- **Privacy floating button hidden on chat tab** — was overlapping the send button. Still accessible from every other tab.
+- Input bar padding tightened (10/16 → 8/12); send button shrunk slightly (42 → 38) to feel proportional with the smaller inline icons.
+- No JS logic changes — purely structural/CSS. Voice and photo features work identically.
+- **Files**: `index.html`
+
 ### Round 17 — Cache, voice, weather _(2026-05-07)_
 **Three chat improvements that compound: roughly halves cost, adds two new input/context modes, no breaking changes.**
 

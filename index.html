@@ -581,9 +581,26 @@ body {
   pointer-events: none;
   transition: opacity 0.2s, transform 0.2s;
 }
-/* Hide on chat tab — chat input + suggestions already occupy this strip */
-body.tab-chat .powered-by { opacity: 0; transform: translateY(20px); pointer-events: none; }
-body.tab-chat #privacyLink { opacity: 0; pointer-events: none; }
+/* Hide on chat tab — chat input + suggestions already occupy this strip.
+   !important is intentional: the Privacy link has inline styles
+   (opacity, etc.) that would otherwise win specificity. */
+/* Hide watermark + Privacy badge whenever the chat page is the active
+   one. Uses :has() to detect the active state without relying on a JS
+   body class — avoids race conditions during init / URL-deep-link flows.
+   :has() is supported by Safari 15.4+, Chrome 105+, modern Edge — all
+   current mobile browsers. Falls back to JS toggle below for older. */
+body:has(#page-chat.active) .powered-by,
+body.tab-chat .powered-by {
+  opacity: 0 !important;
+  transform: translateY(20px);
+  pointer-events: none !important;
+}
+body:has(#page-chat.active) #privacyLink,
+body.tab-chat #privacyLink {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
 .powered-by a {
   pointer-events: all;
   display: flex; align-items: center; gap: 5px;

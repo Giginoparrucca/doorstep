@@ -3633,6 +3633,76 @@ async function init() {
   if (document.getElementById('arrivalDate')) document.getElementById('arrivalDate').value = today;
   if (document.getElementById('departureDate')) document.getElementById('departureDate').value = tomorrow;
 
+  // ── Round 18: Cache validation against database ─────────────────────
+  // Scenario: host deletes a guest's check-in (e.g., wrong guest type,
+  // need to reset). The DB row is gone, but the guest's browser still
+  // has cached identity in localStorage (wbnb_lookup, plus the booking-
+  // code-based welcome-back flow re-uses URL params). Without this
+  // validation, the guest re-opens the app and still sees themselves as
+  // the head guest — confusing and broken.
+  //
+  // We do a tiny indexed query: "for this booking_code (or surname+date
+  // from the cache), are there any non-deleted, non-test head-guest
+  // rows?". If zero, we know the host has reset this guest, so we clear
+  // the local cache, show a friendly toast, and let init proceed as if
+  // it were a fresh visit.
+  //
+  // Costs one extra DB roundtrip per app open (~30-80ms). Acceptable
+  // at our scale; eliminates a real bug class.
+  if (propertyId) {
+    try {
+      let validationCount = null;
+
+      if (bookingCode) {
+        // Path A: validate via booking_code (most reliable signal)
+        const { count } = await sb.from('checkins')
+          .select('id', { count: 'exact', head: true })
+          .eq('booking_code', bookingCode)
+          .eq('property_id', propertyId)
+          .eq('is_test', false)
+          .is('deleted_at', null);
+        validationCount = count;
+      } else {
+        // Path B: validate via cached surname + arrival_date (no URL ?b=)
+        const lookupStr = localStorage.getItem('wbnb_lookup');
+        if (lookupStr) {
+          try {
+            const { surname, date } = JSON.parse(lookupStr);
+            if (surname && date) {
+              const { count } = await sb.from('checkins')
+                .select('id', { count: 'exact', head: true })
+                .eq('property_id', propertyId)
+                .eq('arrival_date', date)
+                .eq('is_test', false)
+                .is('deleted_at', null)
+                .ilike('surname', surname);
+              validationCount = count;
+            }
+          } catch (_) { /* malformed cache — treat as zero */ validationCount = 0; }
+        }
+      }
+
+      // If we ran a validation query AND it came back empty, clear cache.
+      // We only clear when validationCount === 0 (explicitly zero).
+      // null means we had nothing to validate against — leave cache alone.
+      if (validationCount === 0) {
+        const hadCache =
+          localStorage.getItem('wbnb_lookup') ||
+          localStorage.getItem('wbnb_booking');
+        if (hadCache) {
+          console.log('🔄 Cache validation: no matching DB rows, clearing local cache');
+          localStorage.removeItem('wbnb_lookup');
+          localStorage.removeItem('wbnb_booking');
+          // Show a friendly toast once init finishes
+          window._wbnb_show_reset_toast = true;
+        }
+      }
+    } catch (e) {
+      // Validation is best-effort; don't block app init on network errors
+      console.warn('Cache validation skipped:', e);
+    }
+  }
+
   // 5. Check booking code & load existing check-ins
   let foundExisting = false;
 
@@ -3724,6 +3794,43 @@ async function init() {
     // we don't gate this field on validation (see checkinNext).
     attachComuneAutocomplete(docissueInput, null);
   }
+
+  // Round 18: if cache was cleared due to host-side delete, surface a
+  // friendly message so the guest understands why the app reset itself.
+  if (window._wbnb_show_reset_toast) {
+    window._wbnb_show_reset_toast = false;
+    setTimeout(() => {
+      const msg = lang === 'it'
+        ? 'La tua prenotazione è stata aggiornata. Per favore, completa di nuovo il check-in.'
+        : 'Your booking has been updated. Please check in again.';
+      // Top-of-screen toast — visible from any tab
+      showResetToast(msg);
+      // Also drop a message in the chat bubble feed if the chat element exists
+      try { if (typeof addBubble === 'function') addBubble(msg, 'system'); } catch (_) {}
+    }, 700);
+  }
+}
+
+// Round 18: top-of-screen toast for booking-reset notification.
+// Uses its own element so it doesn't collide with any other UI.
+function showResetToast(msg) {
+  let el = document.getElementById('resetToast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'resetToast';
+    el.style.cssText = 'position:fixed;top:16px;left:16px;right:16px;z-index:9999;background:var(--ink);color:#fff;padding:14px 18px;border-radius:10px;font-size:0.86rem;line-height:1.4;box-shadow:0 6px 24px rgba(0,0,0,0.25);opacity:0;transform:translateY(-12px);transition:all 0.3s ease;text-align:center;max-width:520px;margin:0 auto;';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  requestAnimationFrame(() => {
+    el.style.opacity = '1';
+    el.style.transform = 'translateY(0)';
+  });
+  setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(-12px)';
+    setTimeout(() => el.remove(), 350);
+  }, 6000);
 }
 
 init();

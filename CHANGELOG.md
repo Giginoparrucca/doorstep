@@ -55,6 +55,18 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 18 — Guest cache validation against DB _(2026-05-07)_
+- **Real scenario**: a guest checked in as solo traveller but was actually a group of 9. Host deleted her checkin row in the console, but on refresh she still saw herself as the main guest. Cause: her browser had cached identity in `wbnb_lookup` localStorage, and the deletion (hard or soft) wasn't being detected client-side.
+- **Fix**: on every app open, run a tiny indexed query against the DB before trusting any cache:
+  - If guest has `?b=CODE` in URL → query `checkins` count where `booking_code = CODE AND property_id = X AND is_test = FALSE AND deleted_at IS NULL`
+  - Else if guest has cached `wbnb_lookup` (surname + arrival_date) → query the same predicate via surname + date
+  - If the count is explicitly 0 → host has reset this guest; clear `wbnb_lookup` and `wbnb_booking` from localStorage and flag `_wbnb_show_reset_toast = true`
+- **UX**: at end of init, if the reset flag is set, show a top-of-screen toast ("Your booking has been updated. Please check in again." / IT equivalent) plus drop a system message into the chat feed. 6-second auto-dismiss.
+- **Cost**: one extra Supabase query per app open, ~30-80ms. Free at our scale; eliminates a real bug class for hosts (no more "send guest a new link" workaround).
+- Validation is best-effort: network errors during validation don't block the app, just log a warning.
+- Works for both hard delete (`.delete()`) and soft delete (`.deleted_at`) since we filter on both `is_test = false` AND `deleted_at IS NULL`.
+- **Files**: `index.html`
+
 ### Round 17.1 — Chat input bar polish (mobile) _(2026-05-07)_
 - Mobile chat had 5 stacked UI rows in 200px (input controls + Powered by + Privacy floating + bottom nav). Sofia's send button was visually colliding with the Privacy badge, photo/mic buttons were too big, input field was getting squeezed.
 - **Pill input layout**: 📎 and 🎤 buttons now sit *inside* the rounded input field on the left (smaller, 32px, no border, hover state). Field grows to fill horizontal space. Send button stays outside as the visual anchor on the right.

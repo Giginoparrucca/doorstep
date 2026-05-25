@@ -55,6 +55,15 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 18.2 — Fix comune validation firing for foreign guests _(2026-05-07)_
+- **Bug** (spotted on a real French-passport check-in): place-of-birth "PARIS" showed a red "pick a city from the list" error, and place-of-issue got auto-matched to "San Francesco al Campo (TO)" — a random Italian comune fuzzy-matched against foreign text. Italian comune validation was firing for a guest born in France.
+- **Root cause**: `showStatus()` (autocomplete hint) and `refreshComuneValidation()` resolved every value against the Italian comune list unconditionally, with no check on whether the guest was born in Italy.
+- **Fix**: new helper `_comuneValidationApplies()` reads the birth-country field; comune validation is suppressed entirely when the guest is foreign-born. Place-of-birth and place-of-issue become free text for foreign guests (Paris, Zurich, "Préfecture de Lyon" all valid).
+- `onBirthCountryChange()` no longer copies a foreign `birthplace` into `docissue` (a foreign passport isn't issued in the holder's birth city). Auto-fill from birthplace only happens when born in Italy.
+- `onBirthCountryChange()` now also re-runs comune validation on both fields when the born-in-Italy status changes, so stale red/green hints clear correctly.
+- The submit gate (`checkinNext`) was already correct — it only enforced comune validation for Italian-born guests — so foreign guests were never actually blocked from submitting; the bug was a confusing cosmetic error only.
+- **Files**: `index.html`
+
 ### Round 18.1 — PDF support for check-in document scan _(2026-05-07)_
 - Guests can now upload a **PDF** of their passport/ID for check-in scanning, not just images. Common because agencies email documents as PDF and some government portals only export PDF.
 - Gallery/file picker `accept` widened to `image/*,application/pdf` (camera input stays image-only — a camera can't produce a PDF)
@@ -311,6 +320,9 @@ In our case: HTML/docs renamed cleanly; cron jobnames left as `doorstep_*` until
 
 ### Anonymization regex is never "done"
 Each new pattern of false-positives (over-anonymization) gets patched as it surfaces. The security-relevant patterns (emails, phones, codes, IDs) are the priority; over-zealous name matching is a quality issue, not a privacy issue. Run sanity-check queries weekly during early operation.
+
+### Validation that should be conditional often isn't
+Twice now (Round 13.0.1 anonymizer, Round 18.2 comune validation) a validation/transformation ran unconditionally when it should have checked context first. The comune autocomplete fuzzy-matched foreign cities against the Italian municipality list and "found" wrong matches. Pattern to watch: any fuzzy matcher or validator that runs on every input should first ask "does this validation even apply to this case?" — gate it on the relevant context flag (born-in-Italy, language, guest type) before doing the work.
 
 ### Mobile camera UX
 Single `capture="environment"` file input forces camera. Splitting into two inputs (camera vs gallery) with a bottom sheet overlay gives users explicit control.

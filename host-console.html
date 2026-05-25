@@ -991,6 +991,11 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <div class="form-hint" data-h="prop_cir_hint">Required for Puglia DMS reporting</div>
           </div>
           <div class="form-group">
+            <label class="form-label" data-h="prop_paytourist">PayTourist portal</label>
+            <input class="form-input" placeholder="e.g., bari  (or bari.paytourist.com)" id="paytouristUrl" oninput="refreshPayTouristLink()">
+            <div class="form-hint" data-h="prop_paytourist_hint">Your municipality's PayTourist subdomain. Leave empty if your comune doesn't use PayTourist.</div>
+          </div>
+          <div class="form-group">
             <label class="form-label" data-h="prop_type">Property type</label>
             <select class="form-select" id="propType">
               <option value="apartment">Apartment</option>
@@ -1171,9 +1176,12 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           <h3 data-h="export_paytourist">💰 PayTourist (Tourist Tax)</h3>
           <p data-h="export_paytourist_desc"></p>
           <button class="btn btn-primary" onclick="exportPayTourist()" data-h="btn_gen_paytourist">📥 Generate PayTourist CSV</button>
-          <a href="https://bari.paytourist.com/admin/ps/import" target="_blank" rel="noopener" class="export-portal-link">
+          <a href="#" id="paytouristPortalLink" target="_blank" rel="noopener" class="export-portal-link" style="display:none">
             🔗 <span data-h="link_paytourist">Open PayTourist Import</span> ↗
           </a>
+          <div id="paytouristPortalHint" class="form-hint" style="display:none" data-h="paytourist_not_set">
+            ℹ️ Set your PayTourist portal in property settings to show a direct link here.
+          </div>
         </div>
 
         <div class="export-card">
@@ -2513,6 +2521,7 @@ const HT = {
     prop_basic: 'Basic Information', prop_basic_desc: 'This information will appear on the guest welcome screen.',
     prop_name: 'Property Name', prop_type: 'Property Type', prop_address: 'Street Address', prop_maps_link: 'Google Maps Link', prop_maps_hint: 'Open Google Maps, find your property, tap Share → Copy link, paste here',
     prop_city: 'City', prop_zip: 'ZIP / CAP', prop_region: 'Region', prop_cir: 'CIR Code (Regional ID)', prop_cir_hint: 'Required for Puglia DMS reporting',
+    prop_paytourist: 'PayTourist portal', prop_paytourist_hint: "Your municipality's PayTourist subdomain. Leave empty if your comune doesn't use PayTourist.", paytourist_not_set: 'ℹ️ Set your PayTourist portal in property settings to show a direct link here.',
     prop_type: 'Property type', prop_type_hint: 'Helps with platform analytics and audience-aware suggestions.',
     prop_times: 'Check-in / Check-out', prop_times_desc: 'Times and access instructions for your guests.',
     prop_checkin_time: 'Check-in Time', prop_checkout_time: 'Check-out Time',
@@ -2735,6 +2744,7 @@ const HT = {
     prop_basic: 'Informazioni Base', prop_basic_desc: 'Queste informazioni appariranno nella schermata di benvenuto.',
     prop_name: 'Nome Proprietà', prop_type: 'Tipo Proprietà', prop_address: 'Indirizzo', prop_maps_link: 'Link Google Maps', prop_maps_hint: 'Apri Google Maps, trova la tua proprietà, tocca Condividi → Copia link, incolla qui',
     prop_city: 'Città', prop_zip: 'CAP', prop_region: 'Regione', prop_cir: 'Codice CIR (ID Regionale)', prop_cir_hint: 'Richiesto per la segnalazione Puglia DMS',
+    prop_paytourist: 'Portale PayTourist', prop_paytourist_hint: 'Il sottodominio PayTourist del tuo comune. Lascia vuoto se il tuo comune non usa PayTourist.', paytourist_not_set: 'ℹ️ Imposta il portale PayTourist nei dettagli proprietà per mostrare qui un link diretto.',
     prop_type: 'Tipo di immobile', prop_type_hint: 'Aiuta con le statistiche di piattaforma e i suggerimenti mirati al pubblico.',
     prop_times: 'Check-in / Check-out', prop_times_desc: 'Orari e istruzioni di accesso per gli ospiti.',
     prop_checkin_time: 'Orario Check-in', prop_checkout_time: 'Orario Check-out',
@@ -3164,6 +3174,7 @@ async function saveProperty() {
     zip: document.getElementById('propZip').value,
     region: document.getElementById('propRegion').value,
     cir_code: document.getElementById('cirCode').value,
+    paytourist_url: document.getElementById('paytouristUrl')?.value || null,
     property_type: document.getElementById('propType')?.value || null,
     checkin_time: document.getElementById('propCheckinFrom').value + '-' + document.getElementById('propCheckinTo').value,
     checkout_time: document.getElementById('propCheckoutFrom').value + '-' + document.getElementById('propCheckoutTo').value,
@@ -4060,6 +4071,58 @@ function exportISTAT() {
    Format: Group,Name,Surname,CheckIn,CheckOut,Amount,CIR,Sex,DOB,Exemption,Reduction,
            Nationality,BirthCity,ResCountry,ResCity,Citizenship,Email,PortalID,SendReceipt
 ══════════════════════════════════════ */
+// Round 18.4 — build the PayTourist portal link from the property's
+// configured subdomain. PayTourist runs one subdomain per comune
+// (bari.paytourist.com, lecce.paytourist.com, ...). The host may type any
+// of: a bare subdomain ("bari"), a hostname ("bari.paytourist.com"), or a
+// full URL ("https://bari.paytourist.com/admin/ps/import"). We normalize
+// all three to a usable link. Empty → hide the link, show a hint instead.
+function normalizePayTouristUrl(raw) {
+  if (!raw) return null;
+  let v = String(raw).trim();
+  if (!v) return null;
+  // Strip any scheme the host may have typed
+  v = v.replace(/^https?:\/\//i, '');
+  // If it already contains a path, keep host+path; else assume the import path
+  let host, path;
+  const slash = v.indexOf('/');
+  if (slash !== -1) {
+    host = v.slice(0, slash);
+    path = v.slice(slash); // includes leading slash
+  } else {
+    host = v;
+    path = '/admin/ps/import';
+  }
+  // If the host is a bare token (no dot), treat it as a subdomain
+  if (host && !host.includes('.')) {
+    host = host.toLowerCase() + '.paytourist.com';
+  }
+  // Basic sanity: host must look like a domain
+  if (!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(host)) return null;
+  return 'https://' + host + path;
+}
+
+function refreshPayTouristLink() {
+  const link = document.getElementById('paytouristPortalLink');
+  const hint = document.getElementById('paytouristPortalHint');
+  if (!link || !hint) return;
+  // Prefer the live form field (reflects unsaved edits); fall back to
+  // the loaded propertyData.
+  const fieldVal = document.getElementById('paytouristUrl')?.value;
+  const raw = (fieldVal && fieldVal.trim())
+    ? fieldVal
+    : (propertyData?.paytourist_url || '');
+  const url = normalizePayTouristUrl(raw);
+  if (url) {
+    link.href = url;
+    link.style.display = '';
+    hint.style.display = 'none';
+  } else {
+    link.style.display = 'none';
+    hint.style.display = '';
+  }
+}
+
 function exportPayTourist() {
   if (allCheckins.length === 0) { toast('No check-in data to export!'); return; }
 
@@ -5034,6 +5097,10 @@ function fillPropertyForm(data) {
   if (el('propRegion')) el('propRegion').value = data.region || '';
   if (el('propType') && data.property_type) el('propType').value = data.property_type;
   if (el('cirCode')) el('cirCode').value = data.cir_code || '';
+  if (el('paytouristUrl')) el('paytouristUrl').value = data.paytourist_url || '';
+  // Round 18.4: build the PayTourist portal link from the property's
+  // configured subdomain (or hide it if none is set).
+  refreshPayTouristLink();
   // Check-in time: stored as "15:00-20:00" or legacy "15:00"
   const ciParts = (data.checkin_time || '15:00-20:00').split('-');
   if (el('propCheckinFrom')) el('propCheckinFrom').value = ciParts[0] || '15:00';

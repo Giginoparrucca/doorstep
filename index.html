@@ -841,7 +841,7 @@ body.tab-chat #privacyLink {
         </button>
       </div>
       <input type="file" id="scanInputCamera" accept="image/*" capture="environment" style="display:none" onchange="scanDocument(this)">
-      <input type="file" id="scanInputGallery" accept="image/*" style="display:none" onchange="scanDocument(this)">
+      <input type="file" id="scanInputGallery" accept="image/*,application/pdf" style="display:none" onchange="scanDocument(this)">
       <div class="upload-hint" id="scanHint" data-i18n="scan_hint" style="text-align:center;font-size:0.58rem;color:var(--ink-soft);margin-top:4px;">Faster than typing · Works with passports, ID cards & driving licenses</div>
       <div id="scanStatus" style="display:none;margin-top:8px;text-align:center;"></div>
       <div id="scanResult" style="display:none;margin-top:10px;padding:10px 14px;background:var(--green-bg);border-radius:8px;border:1px solid rgba(76,175,125,0.2);">
@@ -2781,12 +2781,17 @@ async function scanDocument(input) {
   scanError.style.display = 'none';
 
   try {
+    const isPDF = file.type === 'application/pdf' ||
+                  (file.name && file.name.toLowerCase().endsWith('.pdf'));
     const base64 = await fileToBase64(file);
-    const mediaType = file.type || 'image/jpeg';
+    // For images, fileToBase64 always re-encodes as JPEG. For PDFs we
+    // keep the real media type. The server uses is_pdf to decide whether
+    // to build an image block or a document block for the API call.
+    const mediaType = isPDF ? 'application/pdf' : 'image/jpeg';
     const response = await fetch('/api/scan-document', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image_base64: base64, media_type: mediaType }),
+      body: JSON.stringify({ image_base64: base64, media_type: mediaType, is_pdf: isPDF }),
     });
     const result = await response.json();
     if (result.success && result.data) {
@@ -2871,7 +2876,28 @@ async function scanDocument(input) {
   }
 }
 
+// Convert a file to base64. Images get resized via canvas (saves
+// bandwidth + API cost). PDFs are read raw — they can't go through an
+// <img> element, and Anthropic reads PDF documents natively.
 function fileToBase64(file) {
+  const isPDF = file.type === 'application/pdf' ||
+                (file.name && file.name.toLowerCase().endsWith('.pdf'));
+
+  if (isPDF) {
+    // Raw base64 read — no resize, no canvas
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        const commaIdx = result.indexOf(',');
+        resolve(result.slice(commaIdx + 1));
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Image path — resize through canvas to cap at 1200px wide
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {

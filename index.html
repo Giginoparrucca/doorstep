@@ -1811,14 +1811,24 @@ function onBirthCountryChange() {
   const val = document.getElementById('birthCountry').value;
   const bornInItaly = isItalianCountry(val);
   document.getElementById('provinceGroup').style.display = bornInItaly ? 'block' : 'none';
-  // Auto-fill doc issue place from birthplace if empty
+  // Auto-fill doc issue place from birthplace ONLY when born in Italy.
+  // For a foreign guest, birthplace is a foreign city (Paris, Zurich) and
+  // copying it into "place of issue" is wrong — a foreign passport isn't
+  // issued in the holder's birth city. Leave docissue for the scan's
+  // issuing_country value or manual entry.
   const docIssue = document.getElementById('docissue');
   const birthplace = document.getElementById('birthplace').value;
-  if (docIssue && !docIssue.value && birthplace) {
+  if (bornInItaly && docIssue && !docIssue.value && birthplace) {
     docIssue.value = birthplace;
   }
   // Try to auto-detect province if born in Italy
   if (bornInItaly) autoDetectProvince();
+  // Round 18.2: when born-in-Italy status changes, refresh the comune
+  // validation on both fields so stale red/green hints clear correctly.
+  const _bp = document.getElementById('birthplace');
+  const _di = document.getElementById('docissue');
+  if (_bp && typeof refreshComuneValidation === 'function') refreshComuneValidation(_bp, null);
+  if (_di && typeof refreshComuneValidation === 'function') refreshComuneValidation(_di, null);
 }
 
 /* ══════════════════════════════════════
@@ -2040,6 +2050,20 @@ function _clearComuneValidated(input) {
 // twice is safe (the second call is a no-op via _comuneAutoBound flag).
 // Optional onSelect callback fires when the user picks an entry, useful
 // for auto-filling the birth-province dropdown.
+// Round 18.2: comune (Italian municipality) validation should only fire
+// when the guest was BORN IN ITALY. For a foreign-born guest, place of
+// birth and place of issue are free text. This helper reads the current
+// birth-country field and returns whether comune validation is in scope.
+// Used by both attachComuneAutocomplete's status display and the
+// refreshComuneValidation helper.
+function _comuneValidationApplies() {
+  const bcEl = document.getElementById('birthCountry');
+  if (!bcEl) return true; // no field → default to validating (safe for IT-only forms)
+  const val = (bcEl.value || '').trim();
+  if (!val) return true;  // not yet filled → don't suppress; let normal flow run
+  return isItalianCountry(val);
+}
+
 function attachComuneAutocomplete(input, onSelect) {
   if (!input || input._comuneAutoBound) return;
   input._comuneAutoBound = true;
@@ -2089,6 +2113,15 @@ function attachComuneAutocomplete(input, onSelect) {
   };
 
   const showStatus = () => {
+    // Round 18.2: comune validation only applies to guests BORN IN ITALY.
+    // For a foreign-born guest, place-of-birth and place-of-issue are free
+    // text — Paris, Zurich, "Préfecture de Lyon" are all valid and none
+    // are in the Italian comune list. Suppress all validation UI for them.
+    if (!_comuneValidationApplies()) {
+      hint.textContent = '';
+      _clearComuneValidated(input);
+      return;
+    }
     if (input.dataset.comuneValidated === 'true') {
       const arr = _getComuniArr();
       const entry = arr.find(c => c.code === input.dataset.comuneCode);
@@ -2177,6 +2210,12 @@ function attachComuneAutocomplete(input, onSelect) {
 function refreshComuneValidation(input, onSelect) {
   if (!input) return;
   _clearComuneValidated(input);
+  // Round 18.2: skip comune resolution entirely for foreign-born guests.
+  // Their place-of-birth / place-of-issue are free text.
+  if (!_comuneValidationApplies()) {
+    input.dispatchEvent(new Event('input'));
+    return;
+  }
   if (input.value.trim()) {
     const entry = _resolveComuneEntry(input.value);
     if (entry) {

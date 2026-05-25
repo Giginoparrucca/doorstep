@@ -55,6 +55,15 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 18.1 — PDF support for check-in document scan _(2026-05-07)_
+- Guests can now upload a **PDF** of their passport/ID for check-in scanning, not just images. Common because agencies email documents as PDF and some government portals only export PDF.
+- Gallery/file picker `accept` widened to `image/*,application/pdf` (camera input stays image-only — a camera can't produce a PDF)
+- `fileToBase64()` is now PDF-aware: images still get canvas-resized to 1200px wide; PDFs are read raw as base64 (can't go through an `<img>` element, and Anthropic reads PDFs natively)
+- `scanDocument()` detects PDF by mime type / `.pdf` extension and sends `is_pdf: true` + `media_type: 'application/pdf'`
+- `/api/scan-document` builds a `document` content block for PDFs (vs `image` block for images) — Claude renders + OCRs PDF pages natively, no client-side conversion needed. Extraction prompt unchanged + one line added for multi-page docs
+- Model on the scan endpoint bumped `claude-sonnet-4-20250514` → `claude-sonnet-4-5` (was still on the old string)
+- **Files**: `api/scan-document.js`, `index.html`
+
 ### Round 18 — Guest cache validation against DB _(2026-05-07)_
 - **Real scenario**: a guest checked in as solo traveller but was actually a group of 9. Host deleted her checkin row in the console, but on refresh she still saw herself as the main guest. Cause: her browser had cached identity in `wbnb_lookup` localStorage, and the deletion (hard or soft) wasn't being detected client-side.
 - **Fix**: on every app open, run a tiny indexed query against the DB before trusting any cache:

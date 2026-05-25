@@ -55,6 +55,17 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 18.3 — Fix Alloggiati country-code resolution for missing countries _(2026-05-07)_
+- **Bug** (spotted on a real Mauritius-passport group of 3): Alloggiati export warned "couldn't resolve birth country 'Mauritius' to a 9-digit code" for every guest from Mauritius.
+- **Root cause**: country resolution is a two-step lookup — `COUNTRY_ALIASES` (English name → official Italian name), then `ALLOG_STATI` (Italian name → 9-digit code). Mauritius IS in `ALLOG_STATI`, but under its Italian name "MAURIZIO" (code 100000438). `COUNTRY_ALIASES` had no `'MAURITIUS'` entry, so the English name never got translated and the second lookup missed.
+- **Fix**: added ~70 country entries to `COUNTRY_ALIASES`, covering Africa, South/Southeast Asia, Middle East, Latin America, the Balkans, and the Caucasus — the map previously stopped at major Western countries, so any guest from a smaller country hit the same wall.
+- **Also caught 3 pre-existing silent failures** via a validation script that checks every alias target exists as a real `ALLOG_STATI` key:
+  - `'SOUTH AFRICA'` mapped to `'SUD AFRICA'` (two words) but `ALLOG_STATI` has `'SUDAFRICA'` (one word) → South African guests were failing
+  - `'RUSSIA'` mapped to `'RUSSIA'` but `ALLOG_STATI` key is `'FEDERAZIONE RUSSA'` → Russian guests were failing
+  - `'SLOVAKIA'` mapped to `'SLOVACCHIA'` but `ALLOG_STATI` key is `'REPUBBLICA SLOVACCA'` → Slovak guests were failing
+- All 195 alias entries now validated to resolve to a real 9-digit code. End-to-end tested: Mauritius → 100000438, South Africa → 100000454, Russia → 100000245, Slovakia → 100000255.
+- **Files**: `host-console.html`
+
 ### Round 18.2 — Fix comune validation firing for foreign guests _(2026-05-07)_
 - **Bug** (spotted on a real French-passport check-in): place-of-birth "PARIS" showed a red "pick a city from the list" error, and place-of-issue got auto-matched to "San Francesco al Campo (TO)" — a random Italian comune fuzzy-matched against foreign text. Italian comune validation was firing for a guest born in France.
 - **Root cause**: `showStatus()` (hint), `refreshComuneValidation()`, and `renderResults()` (the dropdown panel) all resolved every value against the Italian comune list unconditionally, with no check on whether the guest was born in Italy.
@@ -323,6 +334,9 @@ Each new pattern of false-positives (over-anonymization) gets patched as it surf
 
 ### Validation that should be conditional often isn't
 Twice now (Round 13.0.1 anonymizer, Round 18.2 comune validation) a validation/transformation ran unconditionally when it should have checked context first. The comune autocomplete fuzzy-matched foreign cities against the Italian municipality list and "found" wrong matches. Pattern to watch: any fuzzy matcher or validator that runs on every input should first ask "does this validation even apply to this case?" — gate it on the relevant context flag (born-in-Italy, language, guest type) before doing the work.
+
+### Two-step lookup tables silently fail when the link breaks
+Round 18.3: country resolution chains two maps (English→Italian name, then Italian name→code). If an entry is missing from the first map, or the first map's output doesn't EXACTLY match a key in the second, the lookup silently returns nothing — no error, just a warning at export time. Three countries (South Africa, Russia, Slovakia) had been broken this way for an unknown period because the alias value didn't match the official `ALLOG_STATI` key spelling ("SUD AFRICA" vs "SUDAFRICA", "RUSSIA" vs "FEDERAZIONE RUSSA"). Lesson: whenever two lookup tables are chained, write a validation script that confirms every value produced by the first table is a real key in the second. Run it after any edit to either table. The script lives inline in the Round 18.3 dev notes — it parses both objects out of the HTML and cross-checks all 195 entries.
 
 ### Mobile camera UX
 Single `capture="environment"` file input forces camera. Splitting into two inputs (camera vs gallery) with a bottom sheet overlay gives users explicit control.

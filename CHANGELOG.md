@@ -57,11 +57,11 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ### Round 18.2 — Fix comune validation firing for foreign guests _(2026-05-07)_
 - **Bug** (spotted on a real French-passport check-in): place-of-birth "PARIS" showed a red "pick a city from the list" error, and place-of-issue got auto-matched to "San Francesco al Campo (TO)" — a random Italian comune fuzzy-matched against foreign text. Italian comune validation was firing for a guest born in France.
-- **Root cause**: `showStatus()` (autocomplete hint) and `refreshComuneValidation()` resolved every value against the Italian comune list unconditionally, with no check on whether the guest was born in Italy.
-- **Fix**: new helper `_comuneValidationApplies()` reads the birth-country field; comune validation is suppressed entirely when the guest is foreign-born. Place-of-birth and place-of-issue become free text for foreign guests (Paris, Zurich, "Préfecture de Lyon" all valid).
-- `onBirthCountryChange()` no longer copies a foreign `birthplace` into `docissue` (a foreign passport isn't issued in the holder's birth city). Auto-fill from birthplace only happens when born in Italy.
-- `onBirthCountryChange()` now also re-runs comune validation on both fields when the born-in-Italy status changes, so stale red/green hints clear correctly.
-- The submit gate (`checkinNext`) was already correct — it only enforced comune validation for Italian-born guests — so foreign guests were never actually blocked from submitting; the bug was a confusing cosmetic error only.
+- **Root cause**: `showStatus()` (hint), `refreshComuneValidation()`, and `renderResults()` (the dropdown panel) all resolved every value against the Italian comune list unconditionally, with no check on whether the guest was born in Italy.
+- **Fix**: new helper `_comuneValidationApplies()` reads the birth-country field; comune validation is suppressed entirely when the guest is foreign-born. Guarded all three functions: hint text, fuzzy resolution, and the dropdown panel. Foreign guests see place-of-birth and place-of-issue as plain free-text fields.
+- **18.2.1 follow-up**: the dropdown *panel* was still rendering ("No match" + stale comune rows) even after the hint text was fixed — `renderResults()` wasn't guarded, and a panel rendered mid-scan (before birth country was set) lingered. Fixed by guarding `renderResults()` and having `refreshComuneValidation()` force-close all `.comune-autocomplete-panel` elements when validation doesn't apply.
+- `onBirthCountryChange()` no longer copies a foreign `birthplace` into `docissue`; auto-fill from birthplace only happens when born in Italy. It also re-runs comune validation on both fields when born-in-Italy status changes, so stale hints/panels clear.
+- The submit gate (`checkinNext`) was already correct — only enforced comune validation for Italian-born guests — so foreign guests were never blocked from submitting; the bug was cosmetic only.
 - **Files**: `index.html`
 
 ### Round 18.1 — PDF support for check-in document scan _(2026-05-07)_

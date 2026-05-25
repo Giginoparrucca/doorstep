@@ -2097,6 +2097,13 @@ function attachComuneAutocomplete(input, onSelect) {
   wrapper.appendChild(hint);
 
   const renderResults = (query) => {
+    // Round 18.2.1: for foreign-born guests the comune dropdown should
+    // never appear at all — place of birth / issue are free text.
+    if (!_comuneValidationApplies()) {
+      panel.style.display = 'none';
+      panel.innerHTML = '';
+      return;
+    }
     const results = _filterComuni(query, 12);
     if (results.length === 0) {
       panel.innerHTML = `<div style="padding:10px 12px; color:var(--ink-soft); font-size:0.78rem;">${T[lang]?.comune_no_match || 'No match — please check spelling'}</div>`;
@@ -2213,6 +2220,13 @@ function refreshComuneValidation(input, onSelect) {
   // Round 18.2: skip comune resolution entirely for foreign-born guests.
   // Their place-of-birth / place-of-issue are free text.
   if (!_comuneValidationApplies()) {
+    // Round 18.2.1: also force-close any open comune dropdown panels —
+    // a stale panel may have been rendered before the birth country was
+    // known (e.g. during doc scan, fields fill in sequence).
+    document.querySelectorAll('.comune-autocomplete-panel').forEach(p => {
+      p.style.display = 'none';
+      p.innerHTML = '';
+    });
     input.dispatchEvent(new Event('input'));
     return;
   }

@@ -55,6 +55,16 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 18.4 — Per-property PayTourist portal URL _(2026-05-07)_
+- **Problem**: the PayTourist export card hardcoded `https://bari.paytourist.com/admin/ps/import`. PayTourist runs one subdomain per comune (bari, lecce, matera, …), so the link was wrong for any property outside Bari. (Note: the 403 the host saw was a PayTourist-side WAF block, not a WelcomeBnB bug — but it surfaced the real hardcoding issue.)
+- **Fix**: new optional `paytourist_url` column on `properties`. New "PayTourist portal" field in property settings — the host enters their municipality's subdomain.
+- `normalizePayTouristUrl()` accepts any of: bare subdomain (`bari`), hostname (`bari.paytourist.com`), or full URL — normalizes all to `https://{sub}.paytourist.com/admin/ps/import`. Rejects garbage input.
+- Export card link is now built dynamically and refreshes live as the host types. When no portal is configured, the link is hidden and a hint tells the host to set it in property settings — better than a link to the wrong municipality.
+- The PayTourist CSV export itself is unchanged — it always worked regardless of the portal URL; this only drives the convenience link.
+- Bilingual EN/IT for the new field, hint, and "not set" message.
+- **Migration**: `migration_round18_4_paytourist_url.sql`
+- **Files**: `host-console.html`
+
 ### Round 18.3 — Fix Alloggiati country-code resolution for missing countries _(2026-05-07)_
 - **Bug** (spotted on a real Mauritius-passport group of 3): Alloggiati export warned "couldn't resolve birth country 'Mauritius' to a 9-digit code" for every guest from Mauritius.
 - **Root cause**: country resolution is a two-step lookup — `COUNTRY_ALIASES` (English name → official Italian name), then `ALLOG_STATI` (Italian name → 9-digit code). Mauritius IS in `ALLOG_STATI`, but under its Italian name "MAURIZIO" (code 100000438). `COUNTRY_ALIASES` had no `'MAURITIUS'` entry, so the English name never got translated and the second lookup missed.

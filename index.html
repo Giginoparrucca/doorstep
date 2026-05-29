@@ -182,6 +182,76 @@ body {
 .home-card-row {
   display: flex; align-items: flex-start; gap: 12px;
 }
+
+/* Round 19.2 — packed row variant: icon + body + trailing element
+   (CTA or chip) all on the same horizontal line. Trailing element
+   takes intrinsic width; body grows to fill. On very narrow screens
+   the trailing element wraps below the body, which is desired. */
+.home-card-row-split {
+  flex-wrap: wrap;
+  align-items: center;
+}
+.home-card-row-split > .home-card-body {
+  min-width: 140px; /* keeps body readable; below this it wraps */
+}
+
+/* Inline CTA (e.g. "Directions" button sitting next to address) */
+.home-card-inline-cta {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  background: var(--warm); color: #fff;
+  border-radius: 8px; font-size: 0.74rem; font-weight: 500;
+  text-decoration: none; text-align: center;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.home-card-inline-cta:hover { background: var(--warm-d, #a8593a); }
+
+/* Inline lockbox chip (sits at the right of the check-in card row) */
+.home-card-lockbox-inline {
+  flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 2px; padding: 8px 14px;
+  background: rgba(194,113,79,0.07);
+  border: 1px dashed rgba(194,113,79,0.3);
+  border-radius: 10px;
+  min-width: 90px;
+}
+.home-card-lockbox-inline .home-card-lockbox-label {
+  font-size: 0.56rem; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-soft); font-weight: 500;
+}
+.home-card-lockbox-inline .home-card-lockbox-code {
+  font-family: 'Courier New', monospace;
+  font-size: 1.05rem; font-weight: 600; letter-spacing: 0.12em;
+  color: var(--warm);
+  user-select: all;
+}
+
+/* Two-column card grid (e.g. WiFi + Emergency side-by-side in Staying) */
+.home-card-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px; margin: 0 16px 10px;
+}
+.home-card-grid .home-card {
+  margin: 0; /* grid handles spacing now */
+}
+.home-card-compact {
+  padding: 12px 14px;
+}
+.home-card-compact .home-card-value {
+  font-size: 0.9rem;
+}
+.home-card-compact .home-card-sub {
+  font-size: 0.68rem;
+  /* Long WiFi passwords need to wrap rather than overflow */
+  word-break: break-all;
+}
+
+/* Round 19.2 — Host message card placement (above sections, not inside one) */
+.home-card-host {
+  margin-top: 18px; /* breathing room below hero */
+}
 .home-card-icon {
   font-size: 1.25rem; flex-shrink: 0; width: 28px;
   text-align: center; line-height: 1.2;
@@ -719,10 +789,26 @@ body.tab-chat #privacyLink {
   </div>
 
   <!-- ════════════════════════════════════════════════════════
+       Host welcome message — sits ABOVE the sections so the
+       first thing the guest reads is the host saying hello.
+       Practical info follows below.
+  ════════════════════════════════════════════════════════ -->
+  <div class="home-card home-card-host" id="hostMessageCard">
+    <div class="home-card-row">
+      <div class="host-avatar" id="hostAvatar">&nbsp;</div>
+      <div class="home-card-body">
+        <div class="host-name" id="hostName">&nbsp;</div>
+        <div class="host-role" data-i18n="host_role">Your hosts</div>
+      </div>
+    </div>
+    <div class="home-card-text" id="hostMsg" data-i18n="host_msg">&nbsp;</div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
        SECTION 1 — ARRIVING
-       Everything a guest needs to get to the property and inside.
-       Address + map, check-in time + instructions + lockbox,
-       and the host's welcome message live here.
+       Address (with inline Directions button) + check-in
+       (with inline lockbox chip). Packed horizontally where
+       it makes sense to reduce vertical scrolling.
   ════════════════════════════════════════════════════════ -->
   <div class="home-section">
     <div class="home-section-header">
@@ -730,53 +816,41 @@ body.tab-chat #privacyLink {
       <span class="home-section-title" data-i18n="section_arriving">Arriving</span>
     </div>
 
-    <!-- Address card (always shown if we have an address) -->
+    <!-- Address card: text on the left, Directions button on the right -->
     <div class="home-card" id="addressCard">
-      <div class="home-card-row">
+      <div class="home-card-row home-card-row-split">
         <div class="home-card-icon">📍</div>
         <div class="home-card-body">
           <div class="home-card-label" data-i18n="address_label">Address</div>
           <div class="home-card-value" id="propAddress">&nbsp;</div>
           <div class="home-card-sub" id="propCityZip">&nbsp;</div>
         </div>
+        <a id="mapsBtn" href="#" target="_blank" rel="noopener" class="home-card-inline-cta" style="display:none" data-i18n="maps_btn_short">Directions</a>
       </div>
-      <a id="mapsBtn" href="#" target="_blank" rel="noopener" class="home-card-cta" style="display:none" data-i18n="maps_btn">📍 Get Directions</a>
     </div>
 
-    <!-- Check-in card: time + instructions + lockbox (merged) -->
+    <!-- Check-in card: time on the left, lockbox chip on the right -->
     <div class="home-card" id="checkinCard">
-      <div class="home-card-row">
+      <div class="home-card-row home-card-row-split">
         <div class="home-card-icon">🕐</div>
         <div class="home-card-body">
           <div class="home-card-label" data-i18n="checkin_time_label">Check-in time</div>
           <div class="home-card-value" id="checkinTime">&nbsp;</div>
           <div class="home-card-sub" id="accessMethod">&nbsp;</div>
         </div>
-      </div>
-      <div class="home-card-lockbox" id="lockboxCodeRow" style="display:none">
-        <span class="home-card-lockbox-label" data-i18n="lockbox_label">Lockbox code</span>
-        <span class="home-card-lockbox-code" id="lockboxCodeValue">—</span>
-      </div>
-      <div class="home-card-text" id="checkinInstructionsText" style="display:none"></div>
-    </div>
-
-    <!-- Host welcome message — feels like part of arriving because it's
-         the first contact moment between host and guest -->
-    <div class="home-card" id="hostMessageCard">
-      <div class="home-card-row">
-        <div class="host-avatar" id="hostAvatar">&nbsp;</div>
-        <div class="home-card-body">
-          <div class="host-name" id="hostName">&nbsp;</div>
-          <div class="host-role" data-i18n="host_role">Your hosts</div>
+        <div class="home-card-lockbox-inline" id="lockboxCodeRow" style="display:none">
+          <span class="home-card-lockbox-label" data-i18n="lockbox_label">Code</span>
+          <span class="home-card-lockbox-code" id="lockboxCodeValue">—</span>
         </div>
       </div>
-      <div class="home-card-text" id="hostMsg" data-i18n="host_msg">&nbsp;</div>
+      <div class="home-card-text" id="checkinInstructionsText" style="display:none"></div>
     </div>
   </div>
 
   <!-- ════════════════════════════════════════════════════════
        SECTION 2 — STAYING
-       Practical info needed during the stay: WiFi, emergency.
+       WiFi + Emergency in a 2-column grid: both fit easily
+       at mobile widths and stacking them wastes space.
   ════════════════════════════════════════════════════════ -->
   <div class="home-section">
     <div class="home-section-header">
@@ -784,25 +858,25 @@ body.tab-chat #privacyLink {
       <span class="home-section-title" data-i18n="section_staying">Staying</span>
     </div>
 
-    <!-- WiFi card -->
-    <div class="home-card">
-      <div class="home-card-row">
-        <div class="home-card-icon">📶</div>
-        <div class="home-card-body">
-          <div class="home-card-label" data-i18n="wifi_label">WiFi</div>
-          <div class="home-card-value" id="wifiName">&nbsp;</div>
-          <div class="home-card-sub" id="wifiPass" data-i18n="wifi_pass">&nbsp;</div>
+    <div class="home-card-grid">
+      <div class="home-card home-card-compact">
+        <div class="home-card-row">
+          <div class="home-card-icon">📶</div>
+          <div class="home-card-body">
+            <div class="home-card-label" data-i18n="wifi_label">WiFi</div>
+            <div class="home-card-value" id="wifiName">&nbsp;</div>
+            <div class="home-card-sub" id="wifiPass" data-i18n="wifi_pass">&nbsp;</div>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Emergency card -->
-    <div class="home-card home-card-emergency">
-      <div class="home-card-row">
-        <div class="home-card-icon">🚨</div>
-        <div class="home-card-body">
-          <div class="home-card-label" data-i18n="emergency_label">Emergency</div>
-          <div class="home-card-value" id="emergencyNum" style="font-size:0.85rem">&nbsp;</div>
+      <div class="home-card home-card-compact home-card-emergency">
+        <div class="home-card-row">
+          <div class="home-card-icon">🚨</div>
+          <div class="home-card-body">
+            <div class="home-card-label" data-i18n="emergency_label">Emergency</div>
+            <div class="home-card-value" id="emergencyNum">&nbsp;</div>
+          </div>
         </div>
       </div>
     </div>
@@ -810,7 +884,7 @@ body.tab-chat #privacyLink {
 
   <!-- ════════════════════════════════════════════════════════
        SECTION 3 — LEAVING
-       Check-out time + departure instructions, merged.
+       Check-out time + optional departure instructions.
   ════════════════════════════════════════════════════════ -->
   <div class="home-section">
     <div class="home-section-header">
@@ -1389,7 +1463,7 @@ const T = {
     welcome_title: 'Welcome to<br><em>Your Stay</em>',
     welcome_sub: 'Your home in the heart of the old city',
     wifi_pass: 'Password: sole2025!',
-    address_label: 'Address', maps_btn: '📍 Get Directions',
+    address_label: 'Address', maps_btn: '📍 Get Directions', maps_btn_short: 'Directions',
     checkin_sub: 'Self check-in · Keybox',
     checkout_sub: 'Leave keys in the box',
     host_role: 'Your hosts',
@@ -1397,7 +1471,7 @@ const T = {
     emergency_label: 'Emergency',
     checkin_instructions_title: 'How to find us',
     checkout_instructions_title: 'When you leave',
-    lockbox_label: 'Lockbox code',
+    lockbox_label: 'Code',
     // Round 19.1 — Home sections + card labels
     section_arriving: 'Arriving',
     section_staying: 'Staying',
@@ -1513,7 +1587,7 @@ const T = {
     welcome_title: 'Benvenuti a<br><em>Il Vostro Soggiorno</em>',
     welcome_sub: 'La vostra casa nel cuore della città vecchia',
     wifi_pass: 'Password: sole2025!',
-    address_label: 'Indirizzo', maps_btn: '📍 Indicazioni Stradali',
+    address_label: 'Indirizzo', maps_btn: '📍 Indicazioni Stradali', maps_btn_short: 'Indicazioni',
     checkin_sub: 'Self check-in · Keybox',
     checkout_sub: 'Lasciare le chiavi nella cassetta',
     host_role: 'I vostri host',
@@ -1521,7 +1595,7 @@ const T = {
     emergency_label: 'Emergenza',
     checkin_instructions_title: 'Come trovarci',
     checkout_instructions_title: 'Quando parti',
-    lockbox_label: 'Codice lockbox',
+    lockbox_label: 'Codice',
     // Round 19.1 — Home sections + card labels
     section_arriving: 'Arrivo',
     section_staying: 'Soggiorno',

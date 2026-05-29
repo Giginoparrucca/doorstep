@@ -61,6 +61,20 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 19.1 — Home page restructure: three sections _(2026-05-29)_
+**Feedback from Round 19**: the new instruction cards just added another piece of info to the page rather than being thoughtfully integrated. "How to find us" was separate from the address card and the check-in time card despite being conceptually the same thing. Same for departure info.
+
+- **New structure**: three semantic sections — **🛬 Arriving**, **🏡 Staying**, **👋 Leaving** — each with a small uppercase header above its cards. Cards related to the same activity now sit together visually and conceptually.
+  - **Arriving** = Address (with map link) + Check-in (time, access method, lockbox code, instructions all in one card) + Host welcome message
+  - **Staying** = WiFi + Emergency
+  - **Leaving** = Check-out (time + instructions in one card)
+- **Removed redundancy**: instructions are no longer their own cards. They're appended inside the relevant check-in or check-out card, separated by a thin divider. The lockbox code is a tinted chip inside the check-in card.
+- **New unified CSS system**: `.home-section` + `.home-section-header` + `.home-card` with consistent row layout (icon + label + value + sub + optional CTA). Replaces the old mix of `.quick-grid` / `.quick-card` / `.host-message` / `.instruction-card` / `.emergency-card`. Visual rhythm is more consistent.
+- **Hero preserved** as you asked.
+- All existing IDs retained (`#wifiName`, `#checkinTime`, `#lockboxCodeRow`, etc.) so the property loader and `refreshLockboxDisplay()` work unchanged. The two old wrapper IDs (`#checkinInstructionsCard`, `#checkoutInstructionsCard`) no longer exist; the loader and refresh helper were updated accordingly.
+- Bilingual EN/IT for the three section titles and the new card labels.
+- **Files**: `index.html`
+
 ### Round 19 — Check-in/out instructions + per-guest lockbox codes _(2026-05-29)_
 **Two host-requested capabilities. The lockbox toggle is opt-in to keep existing behavior unchanged.**
 

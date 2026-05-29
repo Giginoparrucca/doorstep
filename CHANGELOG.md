@@ -61,6 +61,18 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 19.2 — Home page density pass _(2026-05-29)_
+**Feedback on Round 19.1**: too much vertical scrolling; host message buried; could pack info side-by-side. All correct.
+
+- **Host welcome message moved above the sections** — sits directly under the hero. First thing the guest reads is "hello from your host", before any practical info.
+- **Address row packed horizontally**: address text on the left, "Directions" button on the right of the same row. Was previously stacked (button below). Button label shortened from "📍 Get Directions" → "Directions" for the inline context. New `maps_btn_short` i18n key (EN + IT).
+- **Check-in row packed horizontally**: time + access method on the left, lockbox code chip on the right of the same row. The chip is compact (label + monospace code stacked vertically inside a tinted box). Was previously a full-width row below the time. Lockbox label shortened "Lockbox code" → "Code" since the context (chip with monospace code) makes the meaning obvious.
+- **WiFi + Emergency in a two-column grid** inside Staying. Both cards are small content (label + value) so stacking wasted space. New `.home-card-grid` (2-col) + `.home-card-compact` modifier. Wifi password gets `word-break: break-all` so a long password wraps inside its column rather than overflowing.
+- New `.home-card-row-split` modifier handles wrap-on-narrow: at standard mobile widths (≥360px) everything fits horizontally; on very narrow viewports the trailing element (CTA or chip) wraps below cleanly via `flex-wrap`.
+- **No collapsibles** — density was the right lever. Collapsibles trade scrolling for taps, and mobile guests are more likely to miss collapsed content than to mind a small amount of scroll.
+- All existing IDs retained — JS unchanged. Pure markup + CSS restructure.
+- **Files**: `index.html`
+
 ### Round 19.1 — Home page restructure: three sections _(2026-05-29)_
 **Feedback from Round 19**: the new instruction cards just added another piece of info to the page rather than being thoughtfully integrated. "How to find us" was separate from the address card and the check-in time card despite being conceptually the same thing. Same for departure info.
 

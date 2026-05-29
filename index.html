@@ -194,6 +194,43 @@ body {
   font-weight: 300;
 }
 
+/* Round 19: arrival / departure instruction cards */
+.instruction-card {
+  margin: 0 16px 16px; padding: 14px 16px;
+  background: var(--white); border-radius: var(--radius);
+  border: 1px solid rgba(194,113,79,0.1);
+  box-shadow: var(--shadow-s);
+}
+.instruction-card-header {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+}
+.instruction-card-icon { font-size: 1.1rem; }
+.instruction-card-title {
+  font-weight: 600; font-size: 0.84rem; color: var(--ink);
+}
+.instruction-card-text {
+  font-size: 0.8rem; color: var(--ink-2); line-height: 1.55;
+  font-weight: 300; white-space: pre-wrap;
+  /* pre-wrap so host's line breaks are preserved */
+}
+.instruction-card-lockbox {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 10px 12px; margin: 0 0 12px;
+  background: rgba(194,113,79,0.07);
+  border: 1px dashed rgba(194,113,79,0.3);
+  border-radius: 10px;
+}
+.instruction-card-lockbox-label {
+  font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--ink-soft); font-weight: 500;
+}
+.instruction-card-lockbox-code {
+  font-family: 'Courier New', monospace;
+  font-size: 1.1rem; font-weight: 600; letter-spacing: 0.12em;
+  color: var(--warm);
+  user-select: all;
+}
+
 /* Emergency card */
 .emergency-card {
   margin: 0 16px 16px; padding: 14px 16px;
@@ -696,6 +733,28 @@ body.tab-chat #privacyLink {
       </div>
     </div>
     <div class="host-msg-text" id="hostMsg" data-i18n="host_msg">&nbsp;</div>
+  </div>
+
+  <!-- Round 19: arrival instructions card (hidden if empty) -->
+  <div class="instruction-card" id="checkinInstructionsCard" style="display:none;">
+    <div class="instruction-card-header">
+      <span class="instruction-card-icon">📍</span>
+      <div class="instruction-card-title" data-i18n="checkin_instructions_title">How to find us</div>
+    </div>
+    <div class="instruction-card-lockbox" id="lockboxCodeRow" style="display:none;">
+      <span class="instruction-card-lockbox-label" data-i18n="lockbox_label">Lockbox code</span>
+      <span class="instruction-card-lockbox-code" id="lockboxCodeValue">—</span>
+    </div>
+    <div class="instruction-card-text" id="checkinInstructionsText"></div>
+  </div>
+
+  <!-- Round 19: departure instructions card (hidden if empty) -->
+  <div class="instruction-card" id="checkoutInstructionsCard" style="display:none;">
+    <div class="instruction-card-header">
+      <span class="instruction-card-icon">🚪</span>
+      <div class="instruction-card-title" data-i18n="checkout_instructions_title">When you leave</div>
+    </div>
+    <div class="instruction-card-text" id="checkoutInstructionsText"></div>
   </div>
 
   <div class="emergency-card">
@@ -1271,6 +1330,9 @@ const T = {
     host_role: 'Your hosts',
     host_msg: '',
     emergency_label: 'Emergency',
+    checkin_instructions_title: 'How to find us',
+    checkout_instructions_title: 'When you leave',
+    lockbox_label: 'Lockbox code',
     // Check-in
     checkin_title: 'Online Check-in',
     checkin_h2: 'Complete Your Check-in',
@@ -1385,6 +1447,9 @@ const T = {
     host_role: 'I vostri host',
     host_msg: '',
     emergency_label: 'Emergenza',
+    checkin_instructions_title: 'Come trovarci',
+    checkout_instructions_title: 'Quando parti',
+    lockbox_label: 'Codice lockbox',
     checkin_title: 'Check-in Online',
     checkin_h2: 'Completa il Check-in',
     checkin_p: 'La legge italiana richiede la registrazione di tutti gli ospiti. Ci vogliono circa 2 minuti per ospite.',
@@ -1757,6 +1822,7 @@ async function lookupCheckin() {
 
     existingCheckins = allGuests;
     showWelcomeBackState(allGuests);
+    refreshLockboxDisplay();
 
   } catch (e) {
     console.error('Lookup error:', e);
@@ -3657,6 +3723,23 @@ async function init() {
       if (el('hostMsg') && d.welcome_message) el('hostMsg').textContent = d.welcome_message;
       if (el('emergencyNum')) el('emergencyNum').textContent = `112 · ${d.host_names || 'Host'}: ${d.host_phone || ''}`;
 
+      // ── Round 19: Check-in/out instructions + lockbox code ──────────
+      // Each card is hidden by default and only shown when its content
+      // exists. The lockbox row inside the check-in card resolves the
+      // per-guest code (if the property opted in and the head-of-family
+      // checkin has a non-null keybox_code), falling back to the
+      // property default. If neither, the row stays hidden.
+      const ciInst = (d.checkin_instructions || '').trim();
+      const coInst = (d.checkout_instructions || '').trim();
+      const lockboxCode = _resolveLockboxCode(d);
+      if (el('checkinInstructionsText')) el('checkinInstructionsText').textContent = ciInst;
+      if (el('checkoutInstructionsText')) el('checkoutInstructionsText').textContent = coInst;
+      if (el('lockboxCodeValue')) el('lockboxCodeValue').textContent = lockboxCode || '—';
+      if (el('lockboxCodeRow')) el('lockboxCodeRow').style.display = lockboxCode ? 'flex' : 'none';
+      // Show the check-in card if there are either instructions or a code to show
+      if (el('checkinInstructionsCard')) el('checkinInstructionsCard').style.display = (ciInst || lockboxCode) ? 'block' : 'none';
+      if (el('checkoutInstructionsCard')) el('checkoutInstructionsCard').style.display = coInst ? 'block' : 'none';
+
       // Update i18n translations with DB data
       T.en.welcome_title = `Welcome to<br><em>${d.name}</em>`;
       T.it.welcome_title = `Benvenuti a<br><em>${d.name}</em>`;
@@ -3712,7 +3795,6 @@ async function init() {
   if (document.getElementById('arrivalDate')) document.getElementById('arrivalDate').value = today;
   if (document.getElementById('departureDate')) document.getElementById('departureDate').value = tomorrow;
 
-  // ── Round 18: Cache validation against database ─────────────────────
   // Scenario: host deletes a guest's check-in (e.g., wrong guest type,
   // need to reset). The DB row is gone, but the guest's browser still
   // has cached identity in localStorage (wbnb_lookup, plus the booking-
@@ -3799,6 +3881,7 @@ async function init() {
         foundExisting = true;
         console.log(`✅ Found ${data.length} existing check-ins for booking ${bookingCode}`);
         showWelcomeBackState(data);
+        refreshLockboxDisplay();
       }
     } catch (e) { console.log('No existing check-ins found'); }
   }
@@ -3820,6 +3903,7 @@ async function init() {
           existingCheckins = data;
           foundExisting = true;
           showWelcomeBackState(data);
+          refreshLockboxDisplay();
         }
       } catch (e) {}
     }
@@ -3910,6 +3994,44 @@ function showResetToast(msg) {
     el.style.transform = 'translateY(-12px)';
     setTimeout(() => el.remove(), 350);
   }, 6000);
+}
+
+// Round 19: pick the lockbox code to show this guest. If the property
+// opted into per-guest codes, prefer the head-of-family's keybox_code.
+// Otherwise (or if the head row has none), fall back to the property's
+// default keybox_code. Returns '' if nothing is configured.
+function _resolveLockboxCode(propData) {
+  if (!propData) return '';
+  const usePerGuest = propData.use_per_guest_lockbox === true;
+  if (usePerGuest && Array.isArray(existingCheckins) && existingCheckins.length > 0) {
+    const head = existingCheckins.find(c =>
+      c.guest_type === 'single' || c.guest_type === 'head' || c.guest_type === 'group'
+    ) || existingCheckins[0];
+    if (head && head.keybox_code && head.keybox_code.trim()) {
+      return head.keybox_code.trim();
+    }
+  }
+  return (propData.keybox_code || '').trim();
+}
+
+// Refresh the home-tab lockbox row + card visibility after existingCheckins
+// changes (welcome-back lookup completes, surname lookup completes, etc.).
+// Called from multiple places so the per-guest code shows up as soon as we
+// know who the guest is.
+function refreshLockboxDisplay() {
+  if (!propertyData) return;
+  const code = _resolveLockboxCode(propertyData);
+  const row = document.getElementById('lockboxCodeRow');
+  const val = document.getElementById('lockboxCodeValue');
+  const card = document.getElementById('checkinInstructionsCard');
+  if (val) val.textContent = code || '—';
+  if (row) row.style.display = code ? 'flex' : 'none';
+  // Card may have been hidden if instructions were empty AND code was empty;
+  // re-evaluate now that we may have a code.
+  if (card) {
+    const hasText = (propertyData.checkin_instructions || '').trim().length > 0;
+    card.style.display = (hasText || code) ? 'block' : 'none';
+  }
 }
 
 init();

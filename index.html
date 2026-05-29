@@ -152,95 +152,117 @@ body {
 }
 
 /* Quick info cards */
-.quick-grid {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 10px; padding: 16px;
+/* ──────────────────────────────────────────────────────────
+   ROUND 19.1 — Restructured Home page
+   Three sections (Arriving / Staying / Leaving), each with
+   coherent cards underneath. Replaces the old scattered
+   quick-grid + instruction-card + emergency-card layout.
+────────────────────────────────────────────────────────── */
+.home-section {
+  margin: 18px 0 4px;
 }
-.quick-card {
-  background: var(--white); border-radius: var(--radius-s);
-  padding: 14px; border: 1px solid rgba(194,113,79,0.08);
+.home-section-header {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 16px 10px;
+  font-family: 'DM Sans', sans-serif;
+}
+.home-section-icon { font-size: 0.9rem; opacity: 0.65; }
+.home-section-title {
+  font-size: 0.62rem; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--ink-soft);
+  font-weight: 600;
+}
+
+.home-card {
+  margin: 0 16px 10px; padding: 14px 16px;
+  background: var(--white); border-radius: var(--radius);
+  border: 1px solid rgba(194,113,79,0.1);
   box-shadow: var(--shadow-s);
 }
-.quick-card-icon { font-size: 1.2rem; margin-bottom: 6px; }
-.quick-card-label {
-  font-size: 0.5rem; letter-spacing: 0.14em;
-  text-transform: uppercase; color: var(--ink-soft);
-  margin-bottom: 2px;
+.home-card-row {
+  display: flex; align-items: flex-start; gap: 12px;
 }
-.quick-card-value {
+.home-card-icon {
+  font-size: 1.25rem; flex-shrink: 0; width: 28px;
+  text-align: center; line-height: 1.2;
+}
+.home-card-body { flex: 1; min-width: 0; }
+.home-card-label {
+  font-size: 0.52rem; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--ink-soft);
+  margin-bottom: 3px;
+}
+.home-card-value {
   font-family: 'Playfair Display', serif;
   font-size: 1rem; color: var(--ink); font-weight: 500;
+  line-height: 1.25; word-wrap: break-word;
 }
-.quick-card-sub { font-size: 0.68rem; color: var(--ink-soft); margin-top: 2px; }
+.home-card-sub {
+  font-size: 0.74rem; color: var(--ink-soft);
+  margin-top: 3px; line-height: 1.4;
+}
+.home-card-cta {
+  display: block; margin-top: 10px;
+  padding: 9px 14px; background: var(--warm); color: #fff;
+  border-radius: 8px; font-size: 0.76rem; font-weight: 500;
+  text-decoration: none; text-align: center;
+  transition: background 0.15s;
+}
+.home-card-cta:hover { background: var(--warm-d, #a8593a); }
 
-/* Host message */
-.host-message {
-  margin: 0 16px 16px; padding: 16px;
-  background: var(--white); border-radius: var(--radius);
-  border: 1px solid rgba(194,113,79,0.1);
-  box-shadow: var(--shadow-s);
-}
-.host-msg-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.host-avatar {
-  width: 40px; height: 40px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--warm), var(--gold));
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1rem; color: #fff;
-}
-.host-name { font-weight: 600; font-size: 0.82rem; color: var(--ink); }
-.host-role { font-size: 0.6rem; color: var(--ink-soft); }
-.host-msg-text {
-  font-size: 0.78rem; color: var(--ink-2); line-height: 1.6;
-  font-weight: 300;
-}
-
-/* Round 19: arrival / departure instruction cards */
-.instruction-card {
-  margin: 0 16px 16px; padding: 14px 16px;
-  background: var(--white); border-radius: var(--radius);
-  border: 1px solid rgba(194,113,79,0.1);
-  box-shadow: var(--shadow-s);
-}
-.instruction-card-header {
-  display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
-}
-.instruction-card-icon { font-size: 1.1rem; }
-.instruction-card-title {
-  font-weight: 600; font-size: 0.84rem; color: var(--ink);
-}
-.instruction-card-text {
+/* Instructions text inside a card (host's free-text block) */
+.home-card-text {
+  margin-top: 12px; padding-top: 12px;
+  border-top: 1px solid rgba(194,113,79,0.08);
   font-size: 0.8rem; color: var(--ink-2); line-height: 1.55;
   font-weight: 300; white-space: pre-wrap;
-  /* pre-wrap so host's line breaks are preserved */
 }
-.instruction-card-lockbox {
+
+/* Lockbox row — visually distinct chip inside the check-in card */
+.home-card-lockbox {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 10px; padding: 10px 12px; margin: 0 0 12px;
+  gap: 10px; padding: 10px 12px; margin-top: 12px;
   background: rgba(194,113,79,0.07);
   border: 1px dashed rgba(194,113,79,0.3);
   border-radius: 10px;
 }
-.instruction-card-lockbox-label {
-  font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase;
+.home-card-lockbox-label {
+  font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase;
   color: var(--ink-soft); font-weight: 500;
 }
-.instruction-card-lockbox-code {
+.home-card-lockbox-code {
   font-family: 'Courier New', monospace;
-  font-size: 1.1rem; font-weight: 600; letter-spacing: 0.12em;
+  font-size: 1.15rem; font-weight: 600; letter-spacing: 0.14em;
   color: var(--warm);
   user-select: all;
 }
 
-/* Emergency card */
-.emergency-card {
-  margin: 0 16px 16px; padding: 14px 16px;
-  background: var(--red-bg); border-radius: var(--radius-s);
-  border: 1px solid rgba(217,75,75,0.15);
-  display: flex; align-items: center; gap: 12px;
+/* Emergency variant — softly tinted so it stands out */
+.home-card-emergency {
+  background: linear-gradient(135deg, rgba(224,90,90,0.04), rgba(224,90,90,0.01));
+  border-color: rgba(224,90,90,0.18);
 }
-.emergency-icon { font-size: 1.4rem; }
-.emergency-label { font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--red); font-weight: 600; }
-.emergency-number { font-size: 0.82rem; color: var(--ink); font-weight: 600; }
+.home-card-emergency .home-card-value { color: var(--ink); font-size: 0.82rem; }
+
+/* Host card avatar styles (used in #hostMessageCard, also referenced
+   in other places like chat) */
+.host-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--warm), var(--gold));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; color: #fff; flex-shrink: 0;
+}
+.host-name { font-weight: 600; font-size: 0.82rem; color: var(--ink); }
+.host-role { font-size: 0.6rem; color: var(--ink-soft); }
+
+/* Host message card uses the avatar instead of an icon */
+#hostMessageCard .host-avatar {
+  width: 36px; height: 36px; flex-shrink: 0;
+}
+#hostMessageCard .home-card-body { padding-top: 2px; }
+#hostMessageCard .home-card-text {
+  margin-top: 10px; padding-top: 10px;
+}
 
 /* Section headers */
 .section-header {
@@ -696,72 +718,115 @@ body.tab-chat #privacyLink {
     </div>
   </div>
 
-  <div class="quick-grid">
-    <div class="quick-card">
-      <div class="quick-card-icon">📶</div>
-      <div class="quick-card-label">WiFi</div>
-      <div class="quick-card-value" id="wifiName">&nbsp;</div>
-      <div class="quick-card-sub" id="wifiPass" data-i18n="wifi_pass">&nbsp;</div>
+  <!-- ════════════════════════════════════════════════════════
+       SECTION 1 — ARRIVING
+       Everything a guest needs to get to the property and inside.
+       Address + map, check-in time + instructions + lockbox,
+       and the host's welcome message live here.
+  ════════════════════════════════════════════════════════ -->
+  <div class="home-section">
+    <div class="home-section-header">
+      <span class="home-section-icon">🛬</span>
+      <span class="home-section-title" data-i18n="section_arriving">Arriving</span>
     </div>
-    <div class="quick-card">
-      <div class="quick-card-icon">📍</div>
-      <div class="quick-card-label" data-i18n="address_label">Address</div>
-      <div class="quick-card-value" id="propAddress" style="font-size:0.82rem">&nbsp;</div>
-      <div class="quick-card-sub" id="propCityZip">&nbsp;</div>
-      <a id="mapsBtn" href="#" target="_blank" rel="noopener" style="display:none;margin-top:8px;padding:7px 12px;background:var(--warm);color:#fff;border-radius:6px;font-size:0.72rem;font-weight:500;text-decoration:none;text-align:center;" data-i18n="maps_btn">📍 Get Directions</a>
+
+    <!-- Address card (always shown if we have an address) -->
+    <div class="home-card" id="addressCard">
+      <div class="home-card-row">
+        <div class="home-card-icon">📍</div>
+        <div class="home-card-body">
+          <div class="home-card-label" data-i18n="address_label">Address</div>
+          <div class="home-card-value" id="propAddress">&nbsp;</div>
+          <div class="home-card-sub" id="propCityZip">&nbsp;</div>
+        </div>
+      </div>
+      <a id="mapsBtn" href="#" target="_blank" rel="noopener" class="home-card-cta" style="display:none" data-i18n="maps_btn">📍 Get Directions</a>
     </div>
-    <div class="quick-card">
-      <div class="quick-card-icon">🔑</div>
-      <div class="quick-card-label">Check-in</div>
-      <div class="quick-card-value" id="checkinTime" style="font-size:0.88rem">&nbsp;</div>
-      <div class="quick-card-sub" id="accessMethod" data-i18n="checkin_sub">&nbsp;</div>
+
+    <!-- Check-in card: time + instructions + lockbox (merged) -->
+    <div class="home-card" id="checkinCard">
+      <div class="home-card-row">
+        <div class="home-card-icon">🕐</div>
+        <div class="home-card-body">
+          <div class="home-card-label" data-i18n="checkin_time_label">Check-in time</div>
+          <div class="home-card-value" id="checkinTime">&nbsp;</div>
+          <div class="home-card-sub" id="accessMethod">&nbsp;</div>
+        </div>
+      </div>
+      <div class="home-card-lockbox" id="lockboxCodeRow" style="display:none">
+        <span class="home-card-lockbox-label" data-i18n="lockbox_label">Lockbox code</span>
+        <span class="home-card-lockbox-code" id="lockboxCodeValue">—</span>
+      </div>
+      <div class="home-card-text" id="checkinInstructionsText" style="display:none"></div>
     </div>
-    <div class="quick-card">
-      <div class="quick-card-icon">🚪</div>
-      <div class="quick-card-label">Check-out</div>
-      <div class="quick-card-value" id="checkoutTime" style="font-size:0.88rem">&nbsp;</div>
-      <div class="quick-card-sub" data-i18n="checkout_sub">&nbsp;</div>
+
+    <!-- Host welcome message — feels like part of arriving because it's
+         the first contact moment between host and guest -->
+    <div class="home-card" id="hostMessageCard">
+      <div class="home-card-row">
+        <div class="host-avatar" id="hostAvatar">&nbsp;</div>
+        <div class="home-card-body">
+          <div class="host-name" id="hostName">&nbsp;</div>
+          <div class="host-role" data-i18n="host_role">Your hosts</div>
+        </div>
+      </div>
+      <div class="home-card-text" id="hostMsg" data-i18n="host_msg">&nbsp;</div>
     </div>
   </div>
 
-  <div class="host-message">
-    <div class="host-msg-header">
-      <div class="host-avatar" id="hostAvatar">&nbsp;</div>
-      <div>
-        <div class="host-name" id="hostName">&nbsp;</div>
-        <div class="host-role" data-i18n="host_role">Your hosts</div>
+  <!-- ════════════════════════════════════════════════════════
+       SECTION 2 — STAYING
+       Practical info needed during the stay: WiFi, emergency.
+  ════════════════════════════════════════════════════════ -->
+  <div class="home-section">
+    <div class="home-section-header">
+      <span class="home-section-icon">🏡</span>
+      <span class="home-section-title" data-i18n="section_staying">Staying</span>
+    </div>
+
+    <!-- WiFi card -->
+    <div class="home-card">
+      <div class="home-card-row">
+        <div class="home-card-icon">📶</div>
+        <div class="home-card-body">
+          <div class="home-card-label" data-i18n="wifi_label">WiFi</div>
+          <div class="home-card-value" id="wifiName">&nbsp;</div>
+          <div class="home-card-sub" id="wifiPass" data-i18n="wifi_pass">&nbsp;</div>
+        </div>
       </div>
     </div>
-    <div class="host-msg-text" id="hostMsg" data-i18n="host_msg">&nbsp;</div>
+
+    <!-- Emergency card -->
+    <div class="home-card home-card-emergency">
+      <div class="home-card-row">
+        <div class="home-card-icon">🚨</div>
+        <div class="home-card-body">
+          <div class="home-card-label" data-i18n="emergency_label">Emergency</div>
+          <div class="home-card-value" id="emergencyNum" style="font-size:0.85rem">&nbsp;</div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- Round 19: arrival instructions card (hidden if empty) -->
-  <div class="instruction-card" id="checkinInstructionsCard" style="display:none;">
-    <div class="instruction-card-header">
-      <span class="instruction-card-icon">📍</span>
-      <div class="instruction-card-title" data-i18n="checkin_instructions_title">How to find us</div>
+  <!-- ════════════════════════════════════════════════════════
+       SECTION 3 — LEAVING
+       Check-out time + departure instructions, merged.
+  ════════════════════════════════════════════════════════ -->
+  <div class="home-section">
+    <div class="home-section-header">
+      <span class="home-section-icon">👋</span>
+      <span class="home-section-title" data-i18n="section_leaving">Leaving</span>
     </div>
-    <div class="instruction-card-lockbox" id="lockboxCodeRow" style="display:none;">
-      <span class="instruction-card-lockbox-label" data-i18n="lockbox_label">Lockbox code</span>
-      <span class="instruction-card-lockbox-code" id="lockboxCodeValue">—</span>
-    </div>
-    <div class="instruction-card-text" id="checkinInstructionsText"></div>
-  </div>
 
-  <!-- Round 19: departure instructions card (hidden if empty) -->
-  <div class="instruction-card" id="checkoutInstructionsCard" style="display:none;">
-    <div class="instruction-card-header">
-      <span class="instruction-card-icon">🚪</span>
-      <div class="instruction-card-title" data-i18n="checkout_instructions_title">When you leave</div>
-    </div>
-    <div class="instruction-card-text" id="checkoutInstructionsText"></div>
-  </div>
-
-  <div class="emergency-card">
-    <div class="emergency-icon">🚨</div>
-    <div>
-      <div class="emergency-label" data-i18n="emergency_label">Emergency</div>
-      <div class="emergency-number" id="emergencyNum">&nbsp;</div>
+    <div class="home-card" id="checkoutCard">
+      <div class="home-card-row">
+        <div class="home-card-icon">🚪</div>
+        <div class="home-card-body">
+          <div class="home-card-label" data-i18n="checkout_time_label">Check-out time</div>
+          <div class="home-card-value" id="checkoutTime">&nbsp;</div>
+        </div>
+      </div>
+      <div class="home-card-text" id="checkoutInstructionsText" style="display:none"></div>
     </div>
   </div>
 
@@ -1333,6 +1398,13 @@ const T = {
     checkin_instructions_title: 'How to find us',
     checkout_instructions_title: 'When you leave',
     lockbox_label: 'Lockbox code',
+    // Round 19.1 — Home sections + card labels
+    section_arriving: 'Arriving',
+    section_staying: 'Staying',
+    section_leaving: 'Leaving',
+    checkin_time_label: 'Check-in time',
+    checkout_time_label: 'Check-out time',
+    wifi_label: 'WiFi',
     // Check-in
     checkin_title: 'Online Check-in',
     checkin_h2: 'Complete Your Check-in',
@@ -1450,6 +1522,13 @@ const T = {
     checkin_instructions_title: 'Come trovarci',
     checkout_instructions_title: 'Quando parti',
     lockbox_label: 'Codice lockbox',
+    // Round 19.1 — Home sections + card labels
+    section_arriving: 'Arrivo',
+    section_staying: 'Soggiorno',
+    section_leaving: 'Partenza',
+    checkin_time_label: 'Orario check-in',
+    checkout_time_label: 'Orario check-out',
+    wifi_label: 'WiFi',
     checkin_title: 'Check-in Online',
     checkin_h2: 'Completa il Check-in',
     checkin_p: 'La legge italiana richiede la registrazione di tutti gli ospiti. Ci vogliono circa 2 minuti per ospite.',
@@ -3724,21 +3803,24 @@ async function init() {
       if (el('emergencyNum')) el('emergencyNum').textContent = `112 · ${d.host_names || 'Host'}: ${d.host_phone || ''}`;
 
       // ── Round 19: Check-in/out instructions + lockbox code ──────────
-      // Each card is hidden by default and only shown when its content
-      // exists. The lockbox row inside the check-in card resolves the
-      // per-guest code (if the property opted in and the head-of-family
-      // checkin has a non-null keybox_code), falling back to the
-      // property default. If neither, the row stays hidden.
+      // Round 19.1 restructure: instructions are now rendered INSIDE
+      // the check-in / check-out cards (not as separate cards). The
+      // cards themselves are always shown (they always have a time);
+      // we just toggle the visibility of the instructions text and the
+      // lockbox row based on whether the host has filled them in.
       const ciInst = (d.checkin_instructions || '').trim();
       const coInst = (d.checkout_instructions || '').trim();
       const lockboxCode = _resolveLockboxCode(d);
-      if (el('checkinInstructionsText')) el('checkinInstructionsText').textContent = ciInst;
-      if (el('checkoutInstructionsText')) el('checkoutInstructionsText').textContent = coInst;
+      if (el('checkinInstructionsText')) {
+        el('checkinInstructionsText').textContent = ciInst;
+        el('checkinInstructionsText').style.display = ciInst ? 'block' : 'none';
+      }
+      if (el('checkoutInstructionsText')) {
+        el('checkoutInstructionsText').textContent = coInst;
+        el('checkoutInstructionsText').style.display = coInst ? 'block' : 'none';
+      }
       if (el('lockboxCodeValue')) el('lockboxCodeValue').textContent = lockboxCode || '—';
       if (el('lockboxCodeRow')) el('lockboxCodeRow').style.display = lockboxCode ? 'flex' : 'none';
-      // Show the check-in card if there are either instructions or a code to show
-      if (el('checkinInstructionsCard')) el('checkinInstructionsCard').style.display = (ciInst || lockboxCode) ? 'block' : 'none';
-      if (el('checkoutInstructionsCard')) el('checkoutInstructionsCard').style.display = coInst ? 'block' : 'none';
 
       // Update i18n translations with DB data
       T.en.welcome_title = `Welcome to<br><em>${d.name}</em>`;
@@ -4014,24 +4096,18 @@ function _resolveLockboxCode(propData) {
   return (propData.keybox_code || '').trim();
 }
 
-// Refresh the home-tab lockbox row + card visibility after existingCheckins
-// changes (welcome-back lookup completes, surname lookup completes, etc.).
-// Called from multiple places so the per-guest code shows up as soon as we
-// know who the guest is.
+// Refresh the home-tab lockbox row after existingCheckins changes
+// (welcome-back lookup, surname lookup, etc.). Called from multiple
+// places so the per-guest code shows up as soon as we know who the
+// guest is. The check-in card itself is always visible — only the
+// lockbox row toggles based on whether a code is available.
 function refreshLockboxDisplay() {
   if (!propertyData) return;
   const code = _resolveLockboxCode(propertyData);
   const row = document.getElementById('lockboxCodeRow');
   const val = document.getElementById('lockboxCodeValue');
-  const card = document.getElementById('checkinInstructionsCard');
   if (val) val.textContent = code || '—';
   if (row) row.style.display = code ? 'flex' : 'none';
-  // Card may have been hidden if instructions were empty AND code was empty;
-  // re-evaluate now that we may have a code.
-  if (card) {
-    const hasText = (propertyData.checkin_instructions || '').trim().length > 0;
-    card.style.display = (hasText || code) ? 'block' : 'none';
-  }
 }
 
 init();

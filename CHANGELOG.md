@@ -21,6 +21,12 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
   - Per-Guest Action Board: weight "checking out today" higher in sort
 
 ### Medium value, build when triggered
+- **Multi-language strategy beyond EN/IT** _(flagged Round 19)_
+  Currently the guest app supports only EN/IT toggle. Real Italian B&Bs receive guests from France, Germany, Spain, the Netherlands, Eastern Europe, etc. — most read English fine, but not all. Three approaches worth considering when this surfaces as a real need:
+  - **Pre-translate at save time**: host writes once, app calls Claude to fill in 4-5 other languages, stored as JSONB column. Host can review/edit. ~$0.005 per property edit. Zero runtime cost. Best UX for guests; some host friction.
+  - **On-demand translation in guest app**: a small "translate" button on each text section calls Claude. Cheap (~$0.001 per click), but every guest re-pays the cost. Adds latency.
+  - **Browser-native translate hint** (current approach): zero cost, zero risk, but discoverability is poor and trust is uneven for safety-critical instructions.
+  Right call probably hinges on whether non-EN/IT guests become >10% of volume. Worth measuring before building. **Trigger**: when a host explicitly asks, or when we see French/German/Spanish browser-language sessions hitting >15% in admin analytics.
 - **Year-over-year analytics view** using `analytics_monthly`
   The aggregate table is being populated; nothing currently *reads* it in the admin UI. Build a comparison view (Apr 2026 vs Apr 2025 etc.) once you have at least two seasons of data.
 - **Channel manager / OTA calendar sync (Airbnb, Booking.com)**
@@ -54,6 +60,17 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 ---
 
 ## 📋 Done / Shipped
+
+### Round 19 — Check-in/out instructions + per-guest lockbox codes _(2026-05-29)_
+**Two host-requested capabilities. The lockbox toggle is opt-in to keep existing behavior unchanged.**
+
+- **Check-in / check-out instructions**: two free-text fields on the property (`checkin_instructions`, `checkout_instructions`, 800 chars each). Shown on the guest's Home tab in two new cards ("How to find us" / "When you leave"). Cards hidden if empty. Plain text only — host writes in their preferred language; the form hint reminds them guests can use browser-native translate (long-press iOS / three-dot menu Android) if needed. Whitespace preserved via `white-space: pre-wrap` so the host's line breaks survive intact.
+- **Per-guest lockbox codes (opt-in)**: new boolean column `properties.use_per_guest_lockbox` (default `false`, preserves existing behavior). When the host toggles it on, the guest detail modal exposes an editable lockbox-code field with two buttons: **🎲 Generate** (random 4-digit code) and **Save** (writes to `checkins.keybox_code`).
+- **Resolution logic on the guest side**: new `_resolveLockboxCode(propData)` picks per-guest code from the head-of-family's `checkins` row when the toggle is on; falls back to `properties.keybox_code` if the per-guest field is blank. Lockbox row in the Home card is hidden if no code is configured anywhere.
+- **Refresh hooks**: lockbox display refreshes after every `existingCheckins` assignment (welcome-back lookup, surname lookup, in-app lookup) since the per-guest code depends on knowing who the guest is.
+- **Schema**: `migration_round19_instructions_lockbox.sql` adds three columns to `properties` (`checkin_instructions`, `checkout_instructions`, `use_per_guest_lockbox`) and one to `checkins` (`keybox_code`).
+- **Bilingual EN/IT** for all new host-facing labels, hints, modal text, and guest-app card titles.
+- **Files**: `host-console.html`, `index.html`, `migration_round19_instructions_lockbox.sql`
 
 ### Round 18.4 — Per-property PayTourist portal URL _(2026-05-07)_
 - **Problem**: the PayTourist export card hardcoded `https://bari.paytourist.com/admin/ps/import`. PayTourist runs one subdomain per comune (bari, lecce, matera, …), so the link was wrong for any property outside Bari. (Note: the 403 the host saw was a PayTourist-side WAF block, not a WelcomeBnB bug — but it surfaced the real hardcoding issue.)

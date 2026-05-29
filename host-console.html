@@ -1042,7 +1042,30 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           <div class="form-group">
             <label class="form-label" data-h="prop_keybox">Keybox Code</label>
             <input class="form-input" type="text" value="" id="propKeybox">
-            <div class="form-hint" data-h="prop_keybox_hint">Sent to guest before arrival (not shown in app)</div>
+            <div class="form-hint" data-h="prop_keybox_hint">Default code shown to guests. Override per-booking below if rotating codes between guests.</div>
+          </div>
+          <div class="form-group full">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;font-size:0.86rem;">
+              <input type="checkbox" id="propUsePerGuestLockbox" onchange="onTogglePerGuestLockbox()" style="width:18px;height:18px;cursor:pointer;">
+              <span data-h="prop_per_guest_lockbox">Use a different lockbox code for each guest</span>
+            </label>
+            <div class="form-hint" data-h="prop_per_guest_lockbox_hint" style="margin-left:28px;">When on, you'll set a code per booking in the Check-ins tab. If you don't set one for a booking, the default above is used as fallback.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <div class="form-card-title" data-h="prop_instructions">Arrival & Departure Instructions</div>
+        <div class="form-grid">
+          <div class="form-group full">
+            <label class="form-label" data-h="prop_checkin_inst">Check-in instructions</label>
+            <textarea class="form-textarea" id="propCheckinInstructions" rows="4" maxlength="800" placeholder="e.g., Walk past the green gate on Via Roma. The lockbox is on the left wall next to the bell. Code on arrival day below."></textarea>
+            <div class="form-hint" data-h="prop_checkin_inst_hint">Step-by-step instructions for arrival. Write in your preferred language — guests can use their browser's translate feature if needed (long-press on iOS, three-dot menu on Android).</div>
+          </div>
+          <div class="form-group full">
+            <label class="form-label" data-h="prop_checkout_inst">Check-out instructions</label>
+            <textarea class="form-textarea" id="propCheckoutInstructions" rows="4" maxlength="800" placeholder="e.g., Leave keys on the kitchen table. Don't lock the door — it locks itself. Open windows to air the apartment if possible."></textarea>
+            <div class="form-hint" data-h="prop_checkout_inst_hint">What guests should do before leaving.</div>
           </div>
         </div>
       </div>
@@ -2525,7 +2548,14 @@ const HT = {
     prop_type: 'Property type', prop_type_hint: 'Helps with platform analytics and audience-aware suggestions.',
     prop_times: 'Check-in / Check-out', prop_times_desc: 'Times and access instructions for your guests.',
     prop_checkin_time: 'Check-in Time', prop_checkout_time: 'Check-out Time',
-    prop_access: 'Access Method', prop_keybox: 'Keybox Code', prop_keybox_hint: 'Sent to guest before arrival (not shown in app)',
+    prop_access: 'Access Method', prop_keybox: 'Keybox Code', prop_keybox_hint: 'Default code shown to guests. Override per-booking below if rotating codes between guests.',
+    prop_per_guest_lockbox: 'Use a different lockbox code for each guest',
+    prop_per_guest_lockbox_hint: "When on, you'll set a code per booking in the Check-ins tab. If you don't set one for a booking, the default above is used as fallback.",
+    prop_instructions: 'Arrival & Departure Instructions',
+    prop_checkin_inst: 'Check-in instructions',
+    prop_checkin_inst_hint: "Step-by-step instructions for arrival. Write in your preferred language — guests can use their browser's translate feature if needed (long-press on iOS, three-dot menu on Android).",
+    prop_checkout_inst: 'Check-out instructions',
+    prop_checkout_inst_hint: 'What guests should do before leaving.',
     prop_wifi: 'WiFi & Essentials', prop_wifi_name: 'WiFi Network', prop_wifi_pass: 'WiFi Password',
     prop_welcome: 'Host Welcome Message', prop_emergency: 'Emergency Phone', prop_host: 'Host Name(s)',
     btn_save_property: '💾 Save Property Details',
@@ -2748,7 +2778,14 @@ const HT = {
     prop_type: 'Tipo di immobile', prop_type_hint: 'Aiuta con le statistiche di piattaforma e i suggerimenti mirati al pubblico.',
     prop_times: 'Check-in / Check-out', prop_times_desc: 'Orari e istruzioni di accesso per gli ospiti.',
     prop_checkin_time: 'Orario Check-in', prop_checkout_time: 'Orario Check-out',
-    prop_access: 'Metodo di Accesso', prop_keybox: 'Codice Lockbox', prop_keybox_hint: 'Inviato all\'ospite prima dell\'arrivo',
+    prop_access: 'Metodo di Accesso', prop_keybox: 'Codice Lockbox', prop_keybox_hint: 'Codice predefinito mostrato agli ospiti. Sovrascrivilo per prenotazione qui sotto se ruoti i codici tra ospiti.',
+    prop_per_guest_lockbox: 'Usa un codice lockbox diverso per ogni ospite',
+    prop_per_guest_lockbox_hint: 'Quando attivo, imposterai un codice per prenotazione nella scheda Check-in. Se non lo imposti per una prenotazione, viene usato il codice predefinito sopra.',
+    prop_instructions: 'Istruzioni di Arrivo e Partenza',
+    prop_checkin_inst: 'Istruzioni di check-in',
+    prop_checkin_inst_hint: "Istruzioni passo-passo per l'arrivo. Scrivi nella tua lingua preferita — gli ospiti possono usare la traduzione automatica del browser (tieni premuto su iOS, menu a tre punti su Android).",
+    prop_checkout_inst: 'Istruzioni di check-out',
+    prop_checkout_inst_hint: 'Cosa devono fare gli ospiti prima di lasciare la proprietà.',
     prop_wifi: 'WiFi & Essenziali', prop_wifi_name: 'Rete WiFi', prop_wifi_pass: 'Password WiFi',
     prop_welcome: 'Messaggio di Benvenuto', prop_emergency: 'Telefono Emergenza', prop_host: 'Nome Host',
     btn_save_property: '💾 Salva Dettagli Proprietà',
@@ -3180,6 +3217,9 @@ async function saveProperty() {
     checkout_time: document.getElementById('propCheckoutFrom').value + '-' + document.getElementById('propCheckoutTo').value,
     access_method: document.getElementById('propAccess').value,
     keybox_code: document.getElementById('propKeybox').value,
+    use_per_guest_lockbox: !!document.getElementById('propUsePerGuestLockbox')?.checked,
+    checkin_instructions: document.getElementById('propCheckinInstructions')?.value || null,
+    checkout_instructions: document.getElementById('propCheckoutInstructions')?.value || null,
     wifi_name: document.getElementById('propWifiName').value,
     wifi_password: document.getElementById('propWifiPass').value,
     welcome_message: document.getElementById('propWelcome').value,
@@ -4862,6 +4902,26 @@ function viewGuest(id) {
   const sectionTitle = (txt) => `
     <div style="font-family:'Playfair Display',serif;font-size:0.95rem;font-weight:600;color:var(--ink);margin:18px 0 8px;padding-bottom:6px;border-bottom:1.5px solid rgba(74,42,24,0.12);">${safe(txt)}</div>`;
 
+  // Round 19: per-guest lockbox code. Only shown when the property has
+  // opted into per-guest codes. Inline-editable with a Generate button.
+  const perGuestLockbox = propertyData?.use_per_guest_lockbox === true;
+  const lockboxRow = perGuestLockbox ? (() => {
+    const fallbackHint = c.keybox_code
+      ? ''
+      : `<div style="font-size:0.7rem;color:var(--ink-soft);margin-top:4px;">${it ? 'Vuoto = usa il codice predefinito della proprietà' : 'Empty = uses the property default code'}</div>`;
+    const lockboxCell = `
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <input id="lockboxEdit_${c.id}" type="text" value="${safe(c.keybox_code)==='—'?'':safe(c.keybox_code)}" maxlength="20"
+               style="flex:1;min-width:120px;padding:6px 10px;border:1px solid rgba(74,42,24,0.15);border-radius:6px;font-family:monospace;font-size:0.84rem;letter-spacing:0.04em;">
+        <button type="button" onclick="generateLockboxCode('lockboxEdit_${c.id}')"
+                style="padding:6px 10px;border:1px solid rgba(74,42,24,0.15);background:#fff;border-radius:6px;font-size:0.72rem;cursor:pointer;white-space:nowrap;">🎲 ${it ? 'Genera' : 'Generate'}</button>
+        <button type="button" onclick="saveGuestLockbox('${c.id}', 'lockboxEdit_${c.id}')"
+                style="padding:6px 12px;border:none;background:var(--warm);color:#fff;border-radius:6px;font-size:0.74rem;cursor:pointer;white-space:nowrap;">${it ? 'Salva' : 'Save'}</button>
+      </div>
+      ${fallbackHint}`;
+    return field(it ? 'Codice lockbox' : 'Lockbox code', lockboxCell);
+  })() : '';
+
   // Body sections
   const bookingSection = `
     ${sectionTitle(it ? 'Soggiorno' : 'Stay')}
@@ -4870,6 +4930,7 @@ function viewGuest(id) {
     ${field(it ? 'Data arrivo' : 'Arrival date', safe(fmtDate(c.arrival_date)))}
     ${field(it ? 'Data partenza' : 'Departure date', safe(fmtDate(c.departure_date)))}
     ${field(it ? 'Notti' : 'Nights', safe(c.nights))}
+    ${lockboxRow}
   `;
 
   const personalSection = `
@@ -4955,6 +5016,50 @@ function viewGuest(id) {
       if (box) box.innerHTML = `<div style="font-size:0.78rem;color:#b03939;padding:8px;">${it ? '⚠ Errore caricamento foto' : '⚠ Photo load error'}</div>`;
     });
   }
+}
+
+// ── Round 19: per-guest lockbox helpers ─────────────────────────────
+// Called when the toggle in property settings changes. For now it's a
+// no-op visual hook — the per-guest field appears inside the guest
+// detail modal, which is always re-rendered with current state on open.
+// Function exists so we can extend (e.g. show a banner in the check-ins
+// list) without changing wiring.
+function onTogglePerGuestLockbox() {
+  // intentionally minimal — the modal reads propertyData.use_per_guest_lockbox
+  // at open time, so this currently has no side effects to apply.
+}
+
+// Generate a random 4-digit code into the input identified by id.
+// 4 digits is the most common mechanical-lockbox length. The host still
+// has to physically program the lockbox; this just saves them thinking
+// of a number.
+function generateLockboxCode(inputId) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  const code = String(Math.floor(1000 + Math.random() * 9000));
+  el.value = code;
+  el.focus();
+}
+
+// Save a per-guest lockbox code. Empty string → NULL in DB (falls back
+// to property's default code on the guest side).
+async function saveGuestLockbox(checkinId, inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const newVal = input.value.trim() || null;
+  const { error } = await sb.from('checkins')
+    .update({ keybox_code: newVal })
+    .eq('id', checkinId);
+  if (error) {
+    console.error('Lockbox save error:', error);
+    toast('Error: ' + error.message);
+    return;
+  }
+  // Update local cache so the modal stays consistent on re-open
+  const c = allCheckins.find(g => g.id === checkinId);
+  if (c) c.keybox_code = newVal;
+  toast(hostLang === 'it' ? '✓ Codice lockbox salvato' : '✓ Lockbox code saved');
+  track('save_guest_lockbox', { has_value: !!newVal });
 }
 
 function closeGuestDetailModal() {
@@ -5110,6 +5215,10 @@ function fillPropertyForm(data) {
   if (el('propCheckoutTo')) el('propCheckoutTo').value = coParts[1] || '10:00';
   if (el('propAccess')) el('propAccess').value = data.access_method || 'Self check-in · Keybox';
   if (el('propKeybox')) el('propKeybox').value = data.keybox_code || '';
+  if (el('propUsePerGuestLockbox')) el('propUsePerGuestLockbox').checked = !!data.use_per_guest_lockbox;
+  if (el('propCheckinInstructions')) el('propCheckinInstructions').value = data.checkin_instructions || '';
+  if (el('propCheckoutInstructions')) el('propCheckoutInstructions').value = data.checkout_instructions || '';
+  onTogglePerGuestLockbox(); // refresh check-ins list visibility of per-guest field
   if (el('propWifiName')) el('propWifiName').value = data.wifi_name || '';
   if (el('propWifiPass')) el('propWifiPass').value = data.wifi_password || '';
   if (el('propWelcome')) el('propWelcome').value = data.welcome_message || '';

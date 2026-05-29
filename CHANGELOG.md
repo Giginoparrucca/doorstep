@@ -61,6 +61,14 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 19.3 — Admin RLS UPDATE policies (mark-test / soft-delete buttons) _(2026-05-29)_
+- **Bug**: clicking 🧪 (mark as test) or 🗑 (soft delete) on any row in the admin event log returned the toast *"No row updated — RLS may be blocking. Check admin policies."*
+- **Root cause** (textbook recurrence of the RLS+GRANT gap from CHANGELOG gotchas): `analytics_events` had SELECT/INSERT policies but no UPDATE policy for `authenticated`. The Supabase update returned `data: []` with `error: null` — Supabase's signature for "RLS filtered the row out of the writable set."
+- **Fix** (`migration_round19_3_admin_rls.sql`): adds `*_admin_update` RLS policies + scoped `GRANT UPDATE (is_test, deleted_at)` on five tables — `analytics_events`, `chat_messages`, `checkins`, `recommendations`, `properties`. Admin can flag/soft-delete but cannot tamper with payload columns.
+- **Security note**: policies are permissive (any authenticated user can flag/soft-delete any row). Acceptable at current scale (single admin, gated admin page). When multiple non-admin users exist, swap to role-based policies or move admin writes to `SECURITY DEFINER` functions checking a role flag.
+- **Bonus**: migration includes a commented-out one-time hard-delete block for clearing all `is_test = true` rows, with a preview query to run first. Useful for cleaning house after testing.
+- **Files**: `migration_round19_3_admin_rls.sql`
+
 ### Round 19.2 — Home page density pass _(2026-05-29)_
 **Feedback on Round 19.1**: too much vertical scrolling; host message buried; could pack info side-by-side. All correct.
 

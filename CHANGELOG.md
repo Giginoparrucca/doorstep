@@ -61,6 +61,16 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 19.4 — Host-dismissed bookings (hide test/junk from dashboard) _(2026-05-29)_
+- **Need**: hosts test their own apps and accumulate fake bookings (TRU-NJYVD7, etc.) that clutter the action board long after testing. They asked for self-service hiding without needing admin.
+- **Design choice (kept separate from `is_test`)**: a host saying "this booking isn't real to me" is conceptually different from a developer saying "exclude this row from analytics". Mixed concepts muddle both. So this is a new table `host_dismissed_bookings` (host_id + property_id + booking_code + dismissed_at + optional note), strictly separate from `is_test`. RLS scopes everything to the calling host.
+- **Schema**: `migration_round19_4_dismissed_bookings.sql` — table + composite UNIQUE + RLS for SELECT/INSERT/DELETE (no UPDATE; restore = delete then re-add) + explicit GRANTs (avoiding the recurring RLS+GRANT gotcha).
+- **Action board UX**: small 🗑 button in the top-right of each card → confirm dialog showing name + code → insert into table → card disappears. Filter applied in both the dashboard render and the Guest Analytics per-guest breakdown.
+- **Settings UX**: new "Dismissed bookings" card in property settings showing each dismissed code + date + Restore button. Restore confirms, deletes the row, refreshes both views.
+- **State management**: module-level `dismissedBookingCodes` Set populated by `loadDismissedBookings()` on property load and after every dismiss/restore. Renderers consult the Set inline (cheap O(1) lookup).
+- **Bilingual EN/IT** for confirm dialogs, toasts, button labels, empty-state messages.
+- **Files**: `host-console.html`, `migration_round19_4_dismissed_bookings.sql`
+
 ### Round 19.3 — Admin RLS UPDATE policies (mark-test / soft-delete buttons) _(2026-05-29)_
 - **Bug**: clicking 🧪 (mark as test) or 🗑 (soft delete) on any row in the admin event log returned the toast *"No row updated — RLS may be blocking. Check admin policies."*
 - **Root cause** (textbook recurrence of the RLS+GRANT gap from CHANGELOG gotchas): `analytics_events` had SELECT/INSERT policies but no UPDATE policy for `authenticated`. The Supabase update returned `data: []` with `error: null` — Supabase's signature for "RLS filtered the row out of the writable set."

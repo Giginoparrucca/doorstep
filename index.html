@@ -1336,6 +1336,18 @@ function getUrlParams() {
   return { b: params.get('b'), p: params.get('p') };
 }
 
+// Round 19.5 — Host "Preview as guest" mode.
+// When a host opens the guest app with ?test=1 in the URL, all analytics
+// events from this session are flagged is_test=true. A small banner is
+// shown at the top of the screen so the host always knows tracking is
+// off. The flag is sticky for the session (closing the tab clears it).
+const IS_TEST_SESSION = (() => {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('test') === '1';
+  } catch (_) { return false; }
+})();
+
 function getBookingCode() {
   const { b: urlCode, p: urlProp } = getUrlParams();
   // Cache in localStorage for returning visits, but URL is the source of truth.
@@ -1378,13 +1390,15 @@ async function trackGuest(eventType, eventData = {}) {
       event_data: { ...eventData, lang },
       session_id: _guestSessionId,
       property_id: propertyId,
+      // Round 19.5: ?test=1 → flag all events from this session as test
+      is_test: IS_TEST_SESSION,
     };
     // Include booking_code when known so events can be attributed to a guest.
     if (bookingCode) row.booking_code = bookingCode;
     // Anonymous — user_id / user_email stay null by design.
     const { error } = await sb.from('analytics_events').insert(row);
     if (error) console.warn('📊 guest analytics:', error.message);
-    else console.log('📊', eventType, eventData);
+    else console.log('📊', eventType, eventData, IS_TEST_SESSION ? '(test mode)' : '');
   } catch (e) { console.warn('📊 guest analytics error:', e); }
 }
 
@@ -1397,6 +1411,7 @@ function trackGuestBeacon(eventType, eventData = {}) {
       event_data: { ...eventData, lang },
       session_id: _guestSessionId,
       property_id: propertyId,
+      is_test: IS_TEST_SESSION,  // Round 19.5
     };
     if (bookingCode) row.booking_code = bookingCode;
     fetch(`${SUPABASE_URL}/rest/v1/analytics_events`, {
@@ -4184,6 +4199,34 @@ function refreshLockboxDisplay() {
   if (row) row.style.display = code ? 'flex' : 'none';
 }
 
+// Round 19.5 — show test-mode banner if we're in preview mode.
+// Inserts a fixed bar at the top of the screen so the host always knows
+// their activity isn't being tracked. Idempotent — safe to call repeatedly.
+function setupTestModeBanner() {
+  if (!IS_TEST_SESSION) return;
+  if (document.getElementById('testModeBanner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'testModeBanner';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:10000;background:#2a1a0e;color:#fff;padding:8px 14px;display:flex;align-items:center;justify-content:center;gap:10px;font-family:\'DM Sans\',sans-serif;font-size:0.74rem;line-height:1.3;box-shadow:0 2px 8px rgba(0,0,0,0.18);';
+  const it = (typeof lang !== 'undefined' && lang === 'it');
+  banner.innerHTML = `
+    <span style="font-size:0.95rem;">🧪</span>
+    <span><strong>${it ? 'Modalità anteprima' : 'Preview mode'}</strong> · ${it ? 'la tua attività non viene registrata' : 'your activity is not being tracked'}</span>
+    <button onclick="exitTestMode()" style="margin-left:8px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.22);color:#fff;padding:3px 10px;border-radius:4px;font-size:0.7rem;cursor:pointer;font-family:inherit;">${it ? 'Esci' : 'Exit'}</button>`;
+  document.body.insertBefore(banner, document.body.firstChild);
+  // Push down the whole app to make room for the banner. The simplest
+  // way without restructuring CSS is a body padding-top.
+  document.body.style.paddingTop = '36px';
+}
+
+function exitTestMode() {
+  // Reload without ?test=1. Any unsaved test events stay flagged in DB.
+  const url = new URL(window.location.href);
+  url.searchParams.delete('test');
+  window.location.href = url.toString();
+}
+
+setupTestModeBanner();
 init();
 </script>
 <!-- ── Round 13.1 — Privacy notice modal (guest) ─────────────────────── -->

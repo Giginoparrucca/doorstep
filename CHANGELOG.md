@@ -61,6 +61,29 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 19.5 — "Preview as guest" + bulk-purge of untagged test events _(2026-05-29)_
+**Two-part fix for the "I just tested my app and now I have garbage analytics" problem.**
+
+#### Part 1 — Preview as guest mode (going forward)
+- Guest app reads `?test=1` from URL at module load → sets `IS_TEST_SESSION` flag
+- Both `trackGuest()` and `trackGuestBeacon()` set `is_test: true` on every event when the flag is on
+- A fixed top-of-screen banner appears: "🧪 Preview mode · your activity is not being tracked" with an Exit button that reloads without the param
+- Host console has two entry points to launch test mode:
+  - **Property settings**: "🧪 Preview as guest" button next to Save
+  - **QR & Links panel**: dedicated dashed-border card under the apartment QR
+- Both call `openPreviewAsGuest()` which opens `https://welcomebnb.vercel.app/?p={propertyId}&test=1` in a new tab
+- **Threat model considered**: a guest could append `?test=1` themselves to disable tracking. Stakes: low (worst case = one guest's events go uncounted, no data leak / no fraud). Decided lax over signed-token approach to keep UX simple.
+- Bilingual EN/IT for all new strings and the banner text.
+- **Fixup (same day)**: Exit button on the test banner originally reloaded without `?test=1`, which spawned a normal tracked guest session — exactly what test mode was meant to avoid. Now `exitTestMode()` calls `window.close()` (works because the tab was opened by `window.open()` from the host console). For the edge case where the user reached the URL another way (bookmark, manual edit) and `window.close()` is silently blocked, it falls back to replacing the document with a static "Test mode ended" page that doesn't run any tracking code.
+
+#### Part 2 — Bulk-purge of pre-existing untagged test events
+- `migration_round19_5_purge_untagged_tests.sql` — three-step SQL: **preview**, **tag**, **delete** (each commented separately so you can stop after preview if counts look off)
+- Heuristic for "looks like test data": session_id that never produced a `guest_checkin_completed` event AND has no `booking_code` AND is >24h old. Also catches events from any booking_code already in `host_dismissed_bookings`
+- 24-hour gate intentional: prevents catching a real anonymous guest currently using the app
+- Tagging (Step 2) sets `is_test = true`. Reversible. Hard-delete (Step 3) is optional and only after verifying the tag looked right.
+
+- **Files**: `index.html`, `host-console.html`, `migration_round19_5_purge_untagged_tests.sql`
+
 ### Round 19.4 — Host-dismissed bookings (hide test/junk from dashboard) _(2026-05-29)_
 - **Need**: hosts test their own apps and accumulate fake bookings (TRU-NJYVD7, etc.) that clutter the action board long after testing. They asked for self-service hiding without needing admin.
 - **Design choice (kept separate from `is_test`)**: a host saying "this booking isn't real to me" is conceptually different from a developer saying "exclude this row from analytics". Mixed concepts muddle both. So this is a new table `host_dismissed_bookings` (host_id + property_id + booking_code + dismissed_at + optional note), strictly separate from `is_test`. RLS scopes everything to the calling host.

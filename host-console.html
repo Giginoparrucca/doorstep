@@ -1071,6 +1071,12 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       </div>
 
       <div class="form-card">
+        <div class="form-card-title" data-h="prop_dismissed_title">Dismissed bookings</div>
+        <div class="form-hint" data-h="prop_dismissed_hint" style="margin-bottom:10px;">Bookings you've hidden from your dashboard (test codes, friend trials, etc.). Restore any to bring it back.</div>
+        <div id="dismissedList"></div>
+      </div>
+
+      <div class="form-card">
         <div class="form-card-title" data-h="prop_wifi">WiFi & Essentials</div>
         <div class="form-grid">
           <div class="form-group">
@@ -1437,6 +1443,131 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let propertyId = null;
 let propertyData = null;
 let allCheckins = [];
+
+// Round 19.4 — per-host dismissed booking codes. Populated from
+// host_dismissed_bookings on property load and after any dismiss/restore
+// action. Used by the dashboard action board and Guest Analytics
+// per-guest breakdown to filter out test/junk bookings the host has
+// hidden.
+let dismissedBookingCodes = new Set();
+
+async function loadDismissedBookings() {
+  if (!propertyId) { dismissedBookingCodes = new Set(); return; }
+  try {
+    const { data, error } = await sb.from('host_dismissed_bookings')
+      .select('booking_code')
+      .eq('property_id', propertyId);
+    if (error) { console.warn('Dismissed bookings load failed:', error); return; }
+    dismissedBookingCodes = new Set((data || []).map(r => r.booking_code));
+  } catch (e) {
+    console.warn('Dismissed bookings load error:', e);
+  }
+}
+
+// Round 19.4 — dismiss a booking from the host's view. Requires confirm
+// because it's intentional and reversible-but-only-from-settings.
+async function dismissBooking(code, displayName) {
+  if (!code || !propertyId) return;
+  const it = hostLang === 'it';
+  const confirmMsg = (h('dash_dismiss_confirm')
+    || (it ? `Nascondi "{name}" ({code}) dalla bacheca? Puoi ripristinarla in Impostazioni.`
+           : `Hide "{name}" ({code}) from your dashboard? You can restore it from settings.`))
+    .replace('{name}', displayName || code).replace('{code}', code);
+  if (!confirm(confirmMsg)) return;
+
+  // Need the current user's id for host_id (RLS will validate it matches auth.uid()).
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) { toast('Not signed in'); return; }
+
+  const { error } = await sb.from('host_dismissed_bookings').insert({
+    host_id: user.id,
+    property_id: propertyId,
+    booking_code: code,
+  });
+  if (error) {
+    // Unique constraint violation = already dismissed; treat as success
+    if (error.code === '23505') {
+      dismissedBookingCodes.add(code);
+    } else {
+      console.error('Dismiss failed:', error);
+      toast('Error: ' + error.message);
+      return;
+    }
+  } else {
+    dismissedBookingCodes.add(code);
+  }
+
+  toast(h('dash_dismissed_toast') || (it ? `Prenotazione ${code} nascosta` : `Booking ${code} hidden`));
+  track('dismiss_booking', { code });
+  renderDashboard();
+  // Refresh GA tab too if it's currently mounted (it shares the data)
+  const gaEl = document.getElementById('gaGuestBreakdown');
+  if (gaEl) {
+    // Re-run the loader that builds the breakdown; simplest is a panel refresh
+    // by re-calling the loader, but most callers will hit it on next nav.
+  }
+  // Refresh the settings list if it's open
+  renderDismissedList();
+}
+
+async function restoreDismissal(code) {
+  if (!code || !propertyId) return;
+  const it = hostLang === 'it';
+  const confirmMsg = (h('dash_restore_confirm')
+    || (it ? `Ripristina la prenotazione {code}? Tornerà visibile nella bacheca.`
+           : `Restore booking {code}? It will appear on your dashboard again.`))
+    .replace('{code}', code);
+  if (!confirm(confirmMsg)) return;
+
+  const { error } = await sb.from('host_dismissed_bookings')
+    .delete()
+    .eq('property_id', propertyId)
+    .eq('booking_code', code);
+  if (error) { toast('Error: ' + error.message); return; }
+
+  dismissedBookingCodes.delete(code);
+  toast(h('dash_restored_toast') || (it ? `Prenotazione ${code} ripristinata` : `Booking ${code} restored`));
+  track('restore_dismissal', { code });
+  renderDashboard();
+  renderDismissedList();
+}
+
+// Render the "Dismissed bookings" list in property settings.
+async function renderDismissedList() {
+  const el = document.getElementById('dismissedList');
+  if (!el || !propertyId) return;
+  const it = hostLang === 'it';
+  // Fetch full rows (with dismissed_at) for display, since the cached
+  // Set only has the codes.
+  let rows = [];
+  try {
+    const { data } = await sb.from('host_dismissed_bookings')
+      .select('booking_code, dismissed_at')
+      .eq('property_id', propertyId)
+      .order('dismissed_at', { ascending: false });
+    rows = data || [];
+  } catch (_) {}
+
+  if (rows.length === 0) {
+    el.innerHTML = `<div style="font-size:0.78rem;color:var(--ink-soft);padding:8px 0;">${
+      h('dash_no_dismissed') || (it ? 'Nessuna prenotazione nascosta.' : 'No dismissed bookings.')
+    }</div>`;
+    return;
+  }
+  const safe = s => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  el.innerHTML = rows.map(r => {
+    const when = new Date(r.dismissed_at).toLocaleDateString(it ? 'it-IT' : 'en-GB');
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid rgba(74,42,24,0.06);">
+        <div>
+          <span style="font-family:monospace;font-size:0.78rem;color:var(--warm);">${safe(r.booking_code)}</span>
+          <span style="font-size:0.7rem;color:var(--ink-soft);margin-left:8px;">${safe(when)}</span>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="restoreDismissal('${safe(r.booking_code)}')"
+                style="padding:4px 10px;font-size:0.7rem;">${h('btn_restore') || (it ? 'Ripristina' : 'Restore')}</button>
+      </div>`;
+  }).join('');
+}
 let allChats = [];
 let hostLang = 'it';
 let isSignUp = false;
@@ -2050,6 +2181,7 @@ function renderGaGuestBreakdown(events, summaryMap) {
       anonEvents += g.events.length;
       continue;
     }
+    if (dismissedBookingCodes.has(g.code)) continue;  // Round 19.4: skip dismissed
     const summary = summaryMap[g.code] || null;
     const isPreCheckin = !summary; // code known but no checkin row yet
     const status = summary ? _gpgComputeStayStatus(summary, today) : null;
@@ -2556,6 +2688,15 @@ const HT = {
     prop_checkin_inst_hint: "Step-by-step instructions for arrival. Write in your preferred language — guests can use their browser's translate feature if needed (long-press on iOS, three-dot menu on Android).",
     prop_checkout_inst: 'Check-out instructions',
     prop_checkout_inst_hint: 'What guests should do before leaving.',
+    prop_dismissed_title: 'Dismissed bookings',
+    prop_dismissed_hint: "Bookings you've hidden from your dashboard (test codes, friend trials, etc.). Restore any to bring it back.",
+    btn_restore: 'Restore',
+    dash_dismiss_tooltip: 'Hide this booking from your dashboard',
+    dash_dismiss_confirm: 'Hide "{name}" ({code}) from your dashboard? You can restore it from settings.',
+    dash_dismissed_toast: 'Booking {code} hidden',
+    dash_restore_confirm: 'Restore booking {code}? It will appear on your dashboard again.',
+    dash_restored_toast: 'Booking {code} restored',
+    dash_no_dismissed: 'No dismissed bookings.',
     prop_wifi: 'WiFi & Essentials', prop_wifi_name: 'WiFi Network', prop_wifi_pass: 'WiFi Password',
     prop_welcome: 'Host Welcome Message', prop_emergency: 'Emergency Phone', prop_host: 'Host Name(s)',
     btn_save_property: '💾 Save Property Details',
@@ -2786,6 +2927,15 @@ const HT = {
     prop_checkin_inst_hint: "Istruzioni passo-passo per l'arrivo. Scrivi nella tua lingua preferita — gli ospiti possono usare la traduzione automatica del browser (tieni premuto su iOS, menu a tre punti su Android).",
     prop_checkout_inst: 'Istruzioni di check-out',
     prop_checkout_inst_hint: 'Cosa devono fare gli ospiti prima di lasciare la proprietà.',
+    prop_dismissed_title: 'Prenotazioni nascoste',
+    prop_dismissed_hint: 'Prenotazioni che hai nascosto dalla bacheca (codici di test, prove di amici, ecc.). Ripristina per riportarne una alla vista.',
+    btn_restore: 'Ripristina',
+    dash_dismiss_tooltip: 'Nascondi questa prenotazione dalla bacheca',
+    dash_dismiss_confirm: 'Nascondere "{name}" ({code}) dalla bacheca? Puoi ripristinarla dalle impostazioni.',
+    dash_dismissed_toast: 'Prenotazione {code} nascosta',
+    dash_restore_confirm: 'Ripristinare la prenotazione {code}? Tornerà visibile nella bacheca.',
+    dash_restored_toast: 'Prenotazione {code} ripristinata',
+    dash_no_dismissed: 'Nessuna prenotazione nascosta.',
     prop_wifi: 'WiFi & Essenziali', prop_wifi_name: 'Rete WiFi', prop_wifi_pass: 'Password WiFi',
     prop_welcome: 'Messaggio di Benvenuto', prop_emergency: 'Telefono Emergenza', prop_host: 'Nome Host',
     btn_save_property: '💾 Salva Dettagli Proprietà',
@@ -2973,6 +3123,7 @@ function showPanel(id, btn) {
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebarOverlay').classList.remove('show');
   if (id === 'qrlink') initQRPanel();
+  if (id === 'property') renderDismissedList();
   if (id === 'chat') { loadHostChat(); document.getElementById('chatBadge').style.display = 'none'; requestNotifPermission(); }
   if (id === 'guestanalytics') loadGuestAnalytics();
   trackPanelSwitch(id);
@@ -3031,6 +3182,7 @@ async function renderDashboard() {
 
   const rows = [];
   for (const [code, g] of Object.entries(groups)) {
+    if (dismissedBookingCodes.has(code)) continue;  // Round 19.4: skip dismissed
     const summary = summaryMap[code] || null;
     if (!summary) continue;  // skip anonymous / unknown bookings
     const isPreCheckin = false;  // dashboard treats anyone with a checkin row as checked-in
@@ -3090,12 +3242,16 @@ async function renderDashboard() {
       : '';
 
     return `
-      <div style="background:var(--white);border:1px solid rgba(74,42,24,0.08);border-left:3px solid ${paneTone === 'urgent' ? '#c84545' : '#6DBF82'};border-radius:8px;padding:10px 14px;margin-bottom:8px;">
-        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+      <div style="background:var(--white);border:1px solid rgba(74,42,24,0.08);border-left:3px solid ${paneTone === 'urgent' ? '#c84545' : '#6DBF82'};border-radius:8px;padding:10px 14px;margin-bottom:8px;position:relative;">
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding-right:32px;">
           <span style="font-weight:600;color:var(--ink);font-size:0.92rem;">${safe(r.summary.name)}</span>
           <span style="font-family:monospace;font-size:0.66rem;color:var(--warm);background:rgba(194,113,79,0.08);border-radius:3px;padding:1px 6px;">${safe(r.code)}</span>
           ${statusBadge}
         </div>
+        <button onclick="dismissBooking('${safe(r.code)}', '${safe(r.summary.name)}')" title="${safe(h('dash_dismiss_tooltip') || 'Hide this booking from your dashboard')}"
+                style="position:absolute;top:8px;right:8px;background:transparent;border:none;cursor:pointer;color:var(--ink-soft);font-size:0.78rem;line-height:1;padding:6px 8px;border-radius:6px;transition:all 0.15s;"
+                onmouseover="this.style.background='rgba(224,90,90,0.08)';this.style.color='#c84545'"
+                onmouseout="this.style.background='transparent';this.style.color='var(--ink-soft)'">🗑</button>
         ${statRow ? `<div style="font-size:0.78rem;color:var(--ink-soft);margin-top:3px;">${statRow}</div>` : ''}
         ${recoLine}
         ${actionBox}
@@ -5155,6 +5311,9 @@ async function init() {
 
   // 2. Load rules, recos, checkins, chats — all scoped by propertyId
   if (propertyId) {
+    // Round 19.4 — load this host's dismissed bookings so the action
+    // board and Guest Analytics filter them out.
+    await loadDismissedBookings();
     try {
       const { data } = await sb.from('rules').select('*').eq('property_id', propertyId).order('sort_order');
       if (data) rulesData = data;

@@ -1102,8 +1102,9 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
       </div>
 
-      <div class="panel-actions">
+      <div class="panel-actions" style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn btn-primary" onclick="saveProperty()" data-h="btn_save_property">💾 Save Property Details</button>
+        <button class="btn btn-secondary" onclick="openPreviewAsGuest()" data-h="btn_preview_guest" title="Open the guest app in test mode (no analytics)">🧪 Preview as guest</button>
       </div>
     </div>
 
@@ -1266,6 +1267,13 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           <div class="qr-link" id="apartmentLink" style="font-size:0.72rem;flex:1;word-break:break-all;">—</div>
           <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard?.writeText(document.getElementById('apartmentLink').textContent);toast(h('toast_link_copied'));" style="white-space:nowrap;">📋</button>
         </div>
+      </div>
+
+      <!-- Round 19.5 — Preview as guest -->
+      <div class="form-card" style="margin-top:16px;background:rgba(232,184,75,0.06);border:1px dashed rgba(232,184,75,0.4);">
+        <div class="form-card-title" data-h="qr_preview_title">🧪 Preview as guest</div>
+        <div class="form-card-desc" data-h="qr_preview_desc">Open the guest app in test mode. Your activity won't be tracked in analytics — useful for checking layout, copy, and features without polluting your data.</div>
+        <button class="btn btn-secondary btn-sm" onclick="openPreviewAsGuest()" data-h="qr_preview_btn">🧪 Open in test mode</button>
       </div>
 
       <div id="pastBookingCodes" style="margin-top:16px;display:none;">
@@ -2779,6 +2787,10 @@ const HT = {
     qr_returning_hint: '💡 Returning guests who use the same link will see their check-in status and details automatically.',
     qr_apartment_title: '🏠 QR Code for Apartment',
     qr_apartment_desc: 'Print this QR code and place it in your property. Guests who scan it can browse property info, house rules, and recommendations — and look up their check-in with surname + arrival date.',
+    qr_preview_title: '🧪 Preview as guest',
+    qr_preview_desc: "Open the guest app in test mode. Your activity won't be tracked in analytics — useful for checking layout, copy, and features without polluting your data.",
+    qr_preview_btn: '🧪 Open in test mode',
+    btn_preview_guest: '🧪 Preview as guest',
     recent_codes_title: 'Recent Booking Codes',
     template_title: 'Pre-Arrival Message Template',
     template_desc: 'Generate a booking link above, then copy this message to send to your guests.',
@@ -3009,6 +3021,10 @@ const HT = {
     qr_returning_hint: '💡 Gli ospiti che tornano con lo stesso link vedranno automaticamente il loro stato di check-in e i dettagli.',
     qr_apartment_title: '🏠 QR Code per l\'Appartamento',
     qr_apartment_desc: 'Stampa questo QR code e posizionalo nella tua proprietà. Gli ospiti che lo scansionano possono consultare le info, le regole e i consigli — e cercare il loro check-in con cognome + data di arrivo.',
+    qr_preview_title: '🧪 Anteprima come ospite',
+    qr_preview_desc: "Apri l'app guest in modalità test. La tua attività non verrà tracciata nelle analitiche — utile per verificare layout, testi e funzionalità senza inquinare i tuoi dati.",
+    qr_preview_btn: '🧪 Apri in modalità test',
+    btn_preview_guest: '🧪 Anteprima come ospite',
     recent_codes_title: 'Codici Prenotazione Recenti',
     template_title: 'Modello Messaggio Pre-Arrivo',
     template_desc: 'Genera un link prenotazione qui sopra, poi copia questo messaggio da inviare ai tuoi ospiti.',
@@ -4533,6 +4549,16 @@ function initQRPanel() {
     document.getElementById('apartmentLink').textContent = aptLink;
     renderQR(aptLink);
   }
+}
+
+// Round 19.5 — Open the guest app in a new tab with ?test=1 so the
+// guest-side analytics tagger flags everything is_test=true. Shows a
+// banner on the guest side so the host knows tracking is off.
+function openPreviewAsGuest() {
+  if (!propertyId) { toast('No property loaded yet'); return; }
+  const url = `https://welcomebnb.vercel.app/?p=${propertyId}&test=1`;
+  window.open(url, '_blank', 'noopener');
+  track('preview_as_guest', {});
 }
 
 function renderQR(url) {

@@ -4220,10 +4220,31 @@ function setupTestModeBanner() {
 }
 
 function exitTestMode() {
-  // Reload without ?test=1. Any unsaved test events stay flagged in DB.
-  const url = new URL(window.location.href);
-  url.searchParams.delete('test');
-  window.location.href = url.toString();
+  // The host opened this tab from the host console via window.open(),
+  // so window.close() works. If the user reached this page another way
+  // (bookmark, typed URL), the browser will silently block close — we
+  // fall back to replacing the document with a static "session ended"
+  // notice rather than reloading into a tracked guest session.
+  try { window.close(); } catch (_) {}
+  // Give the browser a moment to honor close(). If we're still alive,
+  // show the fallback.
+  setTimeout(() => {
+    const it = (typeof lang !== 'undefined' && lang === 'it');
+    document.documentElement.innerHTML = `
+      <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+      <title>${it ? 'Modalità test terminata' : 'Test mode ended'}</title></head>
+      <body style="margin:0;font-family:'DM Sans',sans-serif;background:#f4ede0;color:#28140a;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
+        <div style="max-width:420px;text-align:center;">
+          <div style="font-size:2.4rem;margin-bottom:12px;">🧪</div>
+          <h1 style="font-family:'Playfair Display',serif;font-weight:500;font-size:1.4rem;margin:0 0 10px;">${it ? 'Modalità test terminata' : 'Test mode ended'}</h1>
+          <p style="font-size:0.86rem;color:#7a5240;margin:0 0 22px;line-height:1.5;">${
+            it ? 'Puoi chiudere questa scheda e tornare alla console host.'
+               : 'You can close this tab and return to the host console.'
+          }</p>
+          <button onclick="window.close()" style="background:#c2714f;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:0.86rem;cursor:pointer;font-family:inherit;">${it ? 'Chiudi scheda' : 'Close tab'}</button>
+        </div>
+      </body>`;
+  }, 100);
 }
 
 setupTestModeBanner();

@@ -61,6 +61,15 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 20.1 — Sidebar contrast fix _(2026-05-29)_
+- **Feedback on the rebrand**: the host console's navy sidebar had too little contrast between the active menu item and the navy background — the active state used `rgba(0,91,255,0.18)`, a translucent blue over navy, so both read as dark blue.
+- **Fix (option A — solid blue active pill)**: active item now uses a solid bright `#005BFF` fill with white text — strong "you are here" signal against the navy.
+- Inactive items brightened from the leftover warm-cream `rgba(244,237,224,…)` (a warm off-white that looked muddy on navy) to clean cool white `rgba(255,255,255,0.72)`, hover to 0.95.
+- Section labels brightened to `rgba(109,168,255,0.75)` for legibility.
+- Badge counts on the active item flip to white-bg/blue-text so they don't disappear into the solid-blue pill.
+- Footer user name/role switched from cream to cool white. Two stray inline cream-RGB hover states also cooled.
+- **Files**: `host-console.html`
+
 ### Round 20 — Blue palette rebrand _(2026-05-29)_
 - Full visual rebrand across all three apps (`index.html`, `host-console.html`, `admin.html`) from the warm terracotta/cream system to a cool blue system.
 - **Palette mapping** (warm role → blue):

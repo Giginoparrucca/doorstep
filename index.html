@@ -11,29 +11,29 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
-  --warm: #C2714F;
-  --warm-l: #D4876A;
-  --warm-d: #9E5538;
-  --cream: #FAF6F0;
-  --cream-2: #F0EAE0;
-  --cream-3: #E8DFD0;
-  --gold: #C9A96E;
-  --gold-l: #DEC48F;
-  --ink: #1E1008;
-  --ink-2: #261208;
-  --ink-soft: #4A2E20;
+  --warm: #005BFF;
+  --warm-l: #006DFF;
+  --warm-d: #0047CC;
+  --cream: #F8FBFF;
+  --cream-2: #EAF3FF;
+  --cream-3: #D7E7FF;
+  --gold: #1E7BFF;
+  --gold-l: #6DA8FF;
+  --ink: #061A3D;
+  --ink-2: #020A1F;
+  --ink-soft: #6B7A90;
   --white: #FFFFFF;
-  --green: #4CAF7D;
-  --green-bg: #E8F5EE;
-  --amber: #E8A840;
-  --amber-bg: #FFF4DE;
-  --red: #D94B4B;
-  --red-bg: #FDECEC;
-  --blue: #4A90D9;
-  --blue-bg: #E8F0FA;
-  --shadow-s: 0 1px 3px rgba(30,16,8,0.06);
-  --shadow-m: 0 4px 16px rgba(30,16,8,0.08);
-  --shadow-l: 0 8px 32px rgba(30,16,8,0.12);
+  --green: #2E9E6B;
+  --green-bg: #E4F5EC;
+  --amber: #E0982E;
+  --amber-bg: #FBF0DD;
+  --red: #E0455E;
+  --red-bg: #FCEAEE;
+  --blue: #1E7BFF;
+  --blue-bg: #EAF3FF;
+  --shadow-s: 0 1px 3px rgba(6,26,61,0.06);
+  --shadow-m: 0 4px 16px rgba(6,26,61,0.08);
+  --shadow-l: 0 8px 32px rgba(6,26,61,0.12);
   --radius: 14px;
   --radius-s: 8px;
 }
@@ -52,10 +52,10 @@ body {
 .nav-bar {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000;
   background: var(--white);
-  border-top: 1px solid rgba(194,113,79,0.12);
+  border-top: 1px solid rgba(0,91,255,0.12);
   display: flex; align-items: stretch;
   height: 64px;
-  box-shadow: 0 -2px 20px rgba(30,16,8,0.06);
+  box-shadow: 0 -2px 20px rgba(6,26,61,0.06);
 }
 .nav-item {
   flex: 1; display: flex; flex-direction: column;
@@ -94,7 +94,7 @@ body {
   background: rgba(250,246,240,0.92);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(194,113,79,0.08);
+  border-bottom: 1px solid rgba(0,91,255,0.08);
 }
 .top-bar-title {
   font-family: 'Playfair Display', serif;
@@ -104,7 +104,7 @@ body {
   display: flex; align-items: center;
   background: var(--cream-2); border-radius: 20px;
   padding: 3px; gap: 2px; cursor: pointer;
-  border: 1px solid rgba(194,113,79,0.1);
+  border: 1px solid rgba(0,91,255,0.1);
 }
 .lang-opt {
   padding: 4px 10px; border-radius: 16px;
@@ -127,7 +127,7 @@ body {
 }
 .welcome-hero-overlay {
   position: absolute; inset: 0;
-  background: linear-gradient(to bottom, transparent 30%, rgba(30,16,8,0.7) 100%);
+  background: linear-gradient(to bottom, transparent 30%, rgba(6,26,61,0.7) 100%);
 }
 .welcome-hero-content {
   position: absolute; bottom: 20px; left: 20px; right: 20px; z-index: 2;
@@ -176,7 +176,7 @@ body {
 .home-card {
   margin: 0 16px 10px; padding: 14px 16px;
   background: var(--white); border-radius: var(--radius);
-  border: 1px solid rgba(194,113,79,0.1);
+  border: 1px solid rgba(0,91,255,0.1);
   box-shadow: var(--shadow-s);
 }
 .home-card-row {
@@ -205,15 +205,15 @@ body {
   white-space: nowrap;
   transition: background 0.15s;
 }
-.home-card-inline-cta:hover { background: var(--warm-d, #a8593a); }
+.home-card-inline-cta:hover { background: var(--warm-d, #0047CC); }
 
 /* Inline lockbox chip (sits at the right of the check-in card row) */
 .home-card-lockbox-inline {
   flex-shrink: 0;
   display: flex; flex-direction: column; align-items: center;
   gap: 2px; padding: 8px 14px;
-  background: rgba(194,113,79,0.07);
-  border: 1px dashed rgba(194,113,79,0.3);
+  background: rgba(0,91,255,0.07);
+  border: 1px dashed rgba(0,91,255,0.3);
   border-radius: 10px;
   min-width: 90px;
 }
@@ -278,12 +278,12 @@ body {
   text-decoration: none; text-align: center;
   transition: background 0.15s;
 }
-.home-card-cta:hover { background: var(--warm-d, #a8593a); }
+.home-card-cta:hover { background: var(--warm-d, #0047CC); }
 
 /* Instructions text inside a card (host's free-text block) */
 .home-card-text {
   margin-top: 12px; padding-top: 12px;
-  border-top: 1px solid rgba(194,113,79,0.08);
+  border-top: 1px solid rgba(0,91,255,0.08);
   font-size: 0.8rem; color: var(--ink-2); line-height: 1.55;
   font-weight: 300; white-space: pre-wrap;
 }
@@ -292,8 +292,8 @@ body {
 .home-card-lockbox {
   display: flex; align-items: center; justify-content: space-between;
   gap: 10px; padding: 10px 12px; margin-top: 12px;
-  background: rgba(194,113,79,0.07);
-  border: 1px dashed rgba(194,113,79,0.3);
+  background: rgba(0,91,255,0.07);
+  border: 1px dashed rgba(0,91,255,0.3);
   border-radius: 10px;
 }
 .home-card-lockbox-label {
@@ -389,7 +389,7 @@ body {
 .form-label .req { color: var(--red); }
 .form-input, .form-select {
   width: 100%; padding: 11px 14px;
-  border: 1px solid rgba(194,113,79,0.18);
+  border: 1px solid rgba(0,91,255,0.18);
   border-radius: var(--radius-s);
   font-family: 'DM Sans', sans-serif;
   font-size: 0.82rem; color: var(--ink);
@@ -399,7 +399,7 @@ body {
 }
 .form-input:focus, .form-select:focus {
   outline: none; border-color: var(--warm);
-  box-shadow: 0 0 0 3px rgba(194,113,79,0.1);
+  box-shadow: 0 0 0 3px rgba(0,91,255,0.1);
 }
 .form-input::placeholder { color: rgba(122,90,72,0.4); }
 .form-row { display: flex; gap: 10px; }
@@ -407,13 +407,13 @@ body {
 
 /* Photo upload */
 .upload-zone {
-  border: 2px dashed rgba(194,113,79,0.25);
+  border: 2px dashed rgba(0,91,255,0.25);
   border-radius: var(--radius);
   padding: 28px 16px; text-align: center;
   cursor: pointer; transition: all 0.2s;
-  background: rgba(194,113,79,0.03);
+  background: rgba(0,91,255,0.03);
 }
-.upload-zone:hover { border-color: var(--warm); background: rgba(194,113,79,0.06); }
+.upload-zone:hover { border-color: var(--warm); background: rgba(0,91,255,0.06); }
 .upload-zone.has-file { border-color: var(--green); border-style: solid; background: var(--green-bg); }
 .upload-icon { font-size: 2rem; margin-bottom: 8px; }
 .upload-text { font-size: 0.78rem; color: var(--ink-soft); font-weight: 300; }
@@ -428,13 +428,13 @@ body {
 }
 .guest-type-opt {
   padding: 10px; border-radius: var(--radius-s);
-  border: 1px solid rgba(194,113,79,0.15);
+  border: 1px solid rgba(0,91,255,0.15);
   background: var(--white); cursor: pointer;
   text-align: center; transition: all 0.2s;
   font-family: 'DM Sans', sans-serif;
 }
 .guest-type-opt:hover { border-color: var(--warm); }
-.guest-type-opt.active { border-color: var(--warm); background: rgba(194,113,79,0.06); }
+.guest-type-opt.active { border-color: var(--warm); background: rgba(0,91,255,0.06); }
 .guest-type-opt .gt-icon { font-size: 1.3rem; }
 .guest-type-opt .gt-label { font-size: 0.65rem; font-weight: 500; color: var(--ink); margin-top: 4px; }
 
@@ -483,7 +483,7 @@ body {
   margin: 0 16px 10px;
   background: var(--white); border-radius: var(--radius-s);
   padding: 14px 16px;
-  border: 1px solid rgba(194,113,79,0.08);
+  border: 1px solid rgba(0,91,255,0.08);
   display: flex; align-items: flex-start; gap: 12px;
   box-shadow: var(--shadow-s);
 }
@@ -512,7 +512,7 @@ body {
   padding: 7px 14px; border-radius: 20px;
   font-size: 0.68rem; font-weight: 500;
   white-space: nowrap; cursor: pointer;
-  border: 1px solid rgba(194,113,79,0.15);
+  border: 1px solid rgba(0,91,255,0.15);
   background: var(--white); color: var(--ink-soft);
   transition: all 0.2s; font-family: 'DM Sans', sans-serif;
   -webkit-tap-highlight-color: transparent;
@@ -522,7 +522,7 @@ body {
 .reco-card {
   margin: 0 16px 12px;
   background: var(--white); border-radius: var(--radius);
-  overflow: hidden; border: 1px solid rgba(194,113,79,0.08);
+  overflow: hidden; border: 1px solid rgba(0,91,255,0.08);
   box-shadow: var(--shadow-s);
 }
 .reco-body { padding: 14px 16px 14px; }
@@ -554,10 +554,10 @@ body {
   background: var(--cream-2); color: var(--warm);
   border-radius: 6px; font-size: 0.65rem; font-weight: 500;
   text-decoration: none; transition: all 0.2s;
-  border: 1px solid rgba(194,113,79,0.12);
+  border: 1px solid rgba(0,91,255,0.12);
 }
 .reco-maps-btn:hover, .reco-maps-btn:active {
-  background: rgba(194,113,79,0.08);
+  background: rgba(0,91,255,0.08);
   border-color: var(--warm);
 }
 
@@ -585,7 +585,7 @@ body {
 @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 .chat-bubble.bot {
   background: var(--white); color: var(--ink);
-  border: 1px solid rgba(194,113,79,0.1);
+  border: 1px solid rgba(0,91,255,0.1);
   align-self: flex-start;
   border-bottom-left-radius: 4px;
 }
@@ -611,23 +611,23 @@ body {
 .chat-sug {
   padding: 7px 12px; border-radius: 18px;
   font-size: 0.68rem; font-weight: 500;
-  border: 1px solid rgba(194,113,79,0.2);
+  border: 1px solid rgba(0,91,255,0.2);
   background: var(--white); color: var(--warm);
   cursor: pointer; transition: all 0.2s;
   font-family: 'DM Sans', sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
-.chat-sug:hover { background: rgba(194,113,79,0.06); }
+.chat-sug:hover { background: rgba(0,91,255,0.06); }
 
 .chat-input-bar {
   display: flex; gap: 8px; padding: 8px 12px 10px;
-  border-top: 1px solid rgba(194,113,79,0.1);
+  border-top: 1px solid rgba(0,91,255,0.1);
   background: var(--white); flex-shrink: 0;
   align-items: center;
 }
 .chat-input-wrap {
   flex: 1; position: relative; display: flex; align-items: center;
-  background: var(--cream); border: 1px solid rgba(194,113,79,0.18);
+  background: var(--cream); border: 1px solid rgba(0,91,255,0.18);
   border-radius: 22px; padding-left: 4px;
   transition: border-color 0.2s;
 }
@@ -658,26 +658,26 @@ body {
   cursor: pointer; flex-shrink: 0;
   transition: background 0.15s;
 }
-.chat-icon-btn:hover { background: rgba(194,113,79,0.08); }
+.chat-icon-btn:hover { background: rgba(0,91,255,0.08); }
 .chat-icon-btn svg { stroke: var(--ink-soft); width: 17px; height: 17px; transition: stroke 0.15s; }
 .chat-icon-btn:hover svg { stroke: var(--warm); }
 .chat-icon-btn.listening { background: var(--warm); animation: mic-pulse 1.2s ease-in-out infinite; }
 .chat-icon-btn.listening svg { stroke: #fff; }
 .chat-icon-btn.unsupported { opacity: 0.3; cursor: not-allowed; }
 @keyframes mic-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(194,113,79,0.4); }
-  50%      { box-shadow: 0 0 0 6px rgba(194,113,79,0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0,91,255,0.4); }
+  50%      { box-shadow: 0 0 0 6px rgba(0,91,255,0); }
 }
 
 .chat-image-preview {
   display: none; padding: 8px 16px; background: var(--white);
-  border-top: 1px solid rgba(194,113,79,0.1);
+  border-top: 1px solid rgba(0,91,255,0.1);
   align-items: center; gap: 10px;
 }
 .chat-image-preview.show { display: flex; }
 .chat-image-preview img {
   height: 48px; width: 48px; border-radius: 8px;
-  object-fit: cover; border: 1px solid rgba(194,113,79,0.2);
+  object-fit: cover; border: 1px solid rgba(0,91,255,0.2);
 }
 .chat-image-preview-text {
   flex: 1; font-size: 0.74rem; color: var(--ink-soft);
@@ -924,7 +924,7 @@ body.tab-chat #privacyLink {
 
   <!-- "Already checked in?" lookup -->
   <div id="alreadyCheckedInBar" style="margin:0 16px 14px;">
-    <div id="lookupToggle" onclick="toggleLookup()" style="display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;background:rgba(194,113,79,0.05);border:1px solid rgba(194,113,79,0.15);border-radius:10px;cursor:pointer;transition:all 0.2s;">
+    <div id="lookupToggle" onclick="toggleLookup()" style="display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;background:rgba(0,91,255,0.05);border:1px solid rgba(0,91,255,0.15);border-radius:10px;cursor:pointer;transition:all 0.2s;">
       <span style="font-size:0.78rem;">🔑</span>
       <span style="font-size:0.72rem;color:var(--warm);font-weight:500;" data-i18n="already_checkedin">Already checked in?</span>
       <span style="font-size:0.6rem;color:var(--ink-soft);" data-i18n="already_checkedin_tap">Tap to find your booking</span>
@@ -940,7 +940,7 @@ body.tab-chat #privacyLink {
         <input class="form-input" type="date" id="lookupDate">
       </div>
       <button class="btn-checkin" onclick="lookupCheckin()" id="lookupBtn" style="width:100%;padding:10px;font-size:0.75rem;" data-i18n="lookup_btn">Find My Check-in</button>
-      <div id="lookupError" style="display:none;margin-top:8px;padding:8px 12px;background:var(--red-bg);border-radius:8px;border:1px solid rgba(217,75,75,0.15);font-size:0.68rem;color:var(--red);"></div>
+      <div id="lookupError" style="display:none;margin-top:8px;padding:8px 12px;background:var(--red-bg);border-radius:8px;border:1px solid rgba(224,69,94,0.15);font-size:0.68rem;color:var(--red);"></div>
       <div id="lookupLoading" style="display:none;margin-top:8px;text-align:center;font-size:0.68rem;color:var(--ink-soft);" data-i18n="lookup_searching">Searching...</div>
     </div>
   </div>
@@ -1029,7 +1029,7 @@ body.tab-chat #privacyLink {
         <span style="font-size:0.68rem;color:var(--ink-soft)" data-i18n="scan_sub">Take a photo — we'll fill the form automatically</span>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:6px;">
-        <button type="button" onclick="document.getElementById('scanInputCamera').click()" class="upload-zone" style="flex:1;border-color:var(--warm);background:rgba(194,113,79,0.04);padding:14px 10px;cursor:pointer;">
+        <button type="button" onclick="document.getElementById('scanInputCamera').click()" class="upload-zone" style="flex:1;border-color:var(--warm);background:rgba(0,91,255,0.04);padding:14px 10px;cursor:pointer;">
           <div class="upload-icon" style="font-size:1.5rem;">📷</div>
           <div style="font-size:0.68rem;font-weight:500;color:var(--warm);" data-i18n="scan_take_photo">Take Photo</div>
         </button>
@@ -1046,7 +1046,7 @@ body.tab-chat #privacyLink {
         <div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;color:var(--green);font-weight:600;">✅ <span id="scanResultText"></span></div>
         <div style="font-size:0.62rem;color:var(--ink-soft);margin-top:4px;" id="scanConfidence"></div>
       </div>
-      <div id="scanError" style="display:none;margin-top:10px;padding:10px 14px;background:var(--red-bg);border-radius:8px;border:1px solid rgba(217,75,75,0.2);">
+      <div id="scanError" style="display:none;margin-top:10px;padding:10px 14px;background:var(--red-bg);border-radius:8px;border:1px solid rgba(224,69,94,0.2);">
         <div style="font-size:0.72rem;color:var(--red);font-weight:500;" id="scanErrorText"></div>
       </div>
       <div style="text-align:center;margin-top:8px;font-size:0.58rem;color:var(--ink-soft);" data-i18n="scan_or_manual">or fill in manually below ↓</div>
@@ -1133,7 +1133,7 @@ body.tab-chat #privacyLink {
     </div>
 
     <div id="documentSection">
-      <div style="margin:16px 0 8px;padding-top:12px;border-top:1px solid rgba(194,113,79,0.1);">
+      <div style="margin:16px 0 8px;padding-top:12px;border-top:1px solid rgba(0,91,255,0.1);">
         <div style="font-size:0.5rem;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink-soft);" data-i18n="doc_section">Identity Document</div>
       </div>
       <div class="form-row">
@@ -1243,7 +1243,7 @@ body.tab-chat #privacyLink {
     <!-- Escalation banner -->
     <div id="chatEscalatedBanner" style="display:none;padding:8px 14px;background:rgba(232,168,64,0.08);border-top:1px solid rgba(232,168,64,0.2);display:none;align-items:center;justify-content:space-between;gap:8px;">
       <span style="font-size:0.75rem;color:var(--ink-soft);" id="escalatedBannerText">💬 Chatting with your host</span>
-      <button onclick="endEscalation()" style="padding:6px 12px;border-radius:6px;border:1px solid var(--warm);background:rgba(194,113,79,0.06);color:var(--warm);font-size:0.72rem;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;white-space:nowrap;" id="backToAiBtn">🤖 Back to AI</button>
+      <button onclick="endEscalation()" style="padding:6px 12px;border-radius:6px;border:1px solid var(--warm);background:rgba(0,91,255,0.06);color:var(--warm);font-size:0.72rem;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;white-space:nowrap;" id="backToAiBtn">🤖 Back to AI</button>
     </div>
 
     <div class="chat-image-preview" id="chatImagePreview">
@@ -1459,10 +1459,10 @@ function showLinkErrorAndHalt(msg) {
   const overlay = document.getElementById('loadingOverlay');
   if (overlay) overlay.remove();
   document.body.innerHTML = `
-    <div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F5EFE3;color:#2D1810">
+    <div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#EAF3FF;color:#2D1810">
       <div style="font-size:48px;margin-bottom:16px">🔗</div>
       <h2 style="font-size:22px;margin:0 0 12px">${msg}</h2>
-      <p style="font-size:14px;color:#6B5D4F;max-width:340px">This link may be incomplete or expired. Your host can send you a new one.</p>
+      <p style="font-size:14px;color:#6B7A90;max-width:340px">This link may be incomplete or expired. Your host can send you a new one.</p>
     </div>`;
 }
 let uploadedIdFile = null;
@@ -1874,14 +1874,14 @@ function toggleLookup() {
   if (form.style.display === 'none') {
     form.style.display = 'block';
     toggle.style.borderColor = 'var(--warm)';
-    toggle.style.background = 'rgba(194,113,79,0.08)';
+    toggle.style.background = 'rgba(0,91,255,0.08)';
     // Pre-fill date with today
     document.getElementById('lookupDate').value = new Date().toISOString().split('T')[0];
     document.getElementById('lookupSurname').focus();
   } else {
     form.style.display = 'none';
-    toggle.style.borderColor = 'rgba(194,113,79,0.15)';
-    toggle.style.background = 'rgba(194,113,79,0.05)';
+    toggle.style.borderColor = 'rgba(0,91,255,0.15)';
+    toggle.style.background = 'rgba(0,91,255,0.05)';
   }
 }
 
@@ -2267,7 +2267,7 @@ function _markComuneValidated(input, entry) {
   input.dataset.comuneProv = entry.prov;
   input.value = entry.name;
   // Visual feedback — green left border.
-  input.style.borderLeft = '4px solid var(--green, #2D7A3D)';
+  input.style.borderLeft = '4px solid var(--green, #2E9E6B)';
 }
 
 // Clear validation state. Called when the user types or focuses without a
@@ -2366,14 +2366,14 @@ function attachComuneAutocomplete(input, onSelect) {
     if (input.dataset.comuneValidated === 'true') {
       const arr = _getComuniArr();
       const entry = arr.find(c => c.code === input.dataset.comuneCode);
-      hint.style.color = 'var(--green, #2D7A3D)';
+      hint.style.color = 'var(--green, #2E9E6B)';
       hint.textContent = `✓ ${entry ? entry.name + ' (' + entry.prov + ')' : 'matched'}`;
     } else if (input.value.trim()) {
       // Try fuzzy resolution
       const entry = _resolveComuneEntry(input.value);
       if (entry) {
         // Show "did you mean" suggestion
-        hint.style.color = 'var(--warm, #C2714F)';
+        hint.style.color = 'var(--warm, #005BFF)';
         hint.innerHTML = `<span style="cursor:pointer; text-decoration:underline;" data-fuzzy-pick="1">${T[lang]?.comune_did_you_mean || 'Did you mean'}: ${entry.name} (${entry.prov})?</span>`;
         const link = hint.querySelector('[data-fuzzy-pick]');
         if (link) {
@@ -2385,7 +2385,7 @@ function attachComuneAutocomplete(input, onSelect) {
           });
         }
       } else {
-        hint.style.color = 'var(--red, #C73E2E)';
+        hint.style.color = 'var(--red, #0047CC)';
         hint.textContent = T[lang]?.comune_pick_required || '⚠ Please pick a city from the list';
       }
     } else {
@@ -2430,7 +2430,7 @@ function attachComuneAutocomplete(input, onSelect) {
     const row = e.target.closest('.comune-row');
     if (!row) return;
     panel.querySelectorAll('.comune-row').forEach(r => r.style.background = '');
-    row.style.background = 'var(--cream-2, #f5f0e8)';
+    row.style.background = 'var(--cream-2, #F8FBFF)';
   });
 
   // If the input already has a value at attach time (autofill / edit mode),
@@ -4233,15 +4233,15 @@ function exitTestMode() {
     document.documentElement.innerHTML = `
       <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
       <title>${it ? 'Modalità test terminata' : 'Test mode ended'}</title></head>
-      <body style="margin:0;font-family:'DM Sans',sans-serif;background:#f4ede0;color:#28140a;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
+      <body style="margin:0;font-family:'DM Sans',sans-serif;background:#EAF3FF;color:#28140a;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
         <div style="max-width:420px;text-align:center;">
           <div style="font-size:2.4rem;margin-bottom:12px;">🧪</div>
           <h1 style="font-family:'Playfair Display',serif;font-weight:500;font-size:1.4rem;margin:0 0 10px;">${it ? 'Modalità test terminata' : 'Test mode ended'}</h1>
-          <p style="font-size:0.86rem;color:#7a5240;margin:0 0 22px;line-height:1.5;">${
+          <p style="font-size:0.86rem;color:#6B7A90;margin:0 0 22px;line-height:1.5;">${
             it ? 'Puoi chiudere questa scheda e tornare alla console host.'
                : 'You can close this tab and return to the host console.'
           }</p>
-          <button onclick="window.close()" style="background:#c2714f;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:0.86rem;cursor:pointer;font-family:inherit;">${it ? 'Chiudi scheda' : 'Close tab'}</button>
+          <button onclick="window.close()" style="background:#005BFF;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:0.86rem;cursor:pointer;font-family:inherit;">${it ? 'Chiudi scheda' : 'Close tab'}</button>
         </div>
       </body>`;
   }, 100);
@@ -4251,7 +4251,7 @@ setupTestModeBanner();
 init();
 </script>
 <!-- ── Round 13.1 — Privacy notice modal (guest) ─────────────────────── -->
-<div id="privacyLink" onclick="openPrivacyModal()" style="position:fixed;bottom:74px;right:12px;z-index:1100;background:rgba(255,255,255,0.94);backdrop-filter:blur(8px);border:1px solid rgba(30,16,8,0.1);border-radius:6px;padding:5px 11px;font-size:0.7rem;color:var(--ink);cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 1px 3px rgba(0,0,0,0.08);user-select:none;opacity:0.85;">Privacy</div>
+<div id="privacyLink" onclick="openPrivacyModal()" style="position:fixed;bottom:74px;right:12px;z-index:1100;background:rgba(255,255,255,0.94);backdrop-filter:blur(8px);border:1px solid rgba(6,26,61,0.1);border-radius:6px;padding:5px 11px;font-size:0.7rem;color:var(--ink);cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 1px 3px rgba(0,0,0,0.08);user-select:none;opacity:0.85;">Privacy</div>
 
 <div id="privacyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:flex-start;justify-content:center;padding:24px 12px;overflow-y:auto;" onclick="if(event.target===this)closePrivacyModal()">
   <div style="background:var(--cream);max-width:680px;width:100%;border-radius:14px;padding:24px 26px 20px;box-shadow:0 12px 48px rgba(0,0,0,0.3);max-height:calc(100vh - 48px);overflow-y:auto;">
@@ -4261,7 +4261,7 @@ init();
     </div>
 
     <div id="privacyContentEN" style="font-size:0.84rem;color:var(--ink);line-height:1.55;">
-      <p style="margin:0 0 12px;font-size:0.74rem;color:rgba(30,16,8,0.65);">
+      <p style="margin:0 0 12px;font-size:0.74rem;color:rgba(6,26,61,0.65);">
         <strong>Operated by:</strong> WelcomeBnB · <strong>Contact:</strong> info@welcomebnb.it
       </p>
 
@@ -4285,7 +4285,7 @@ init();
     </div>
 
     <div id="privacyContentIT" style="display:none;font-size:0.84rem;color:var(--ink);line-height:1.55;">
-      <p style="margin:0 0 12px;font-size:0.74rem;color:rgba(30,16,8,0.65);">
+      <p style="margin:0 0 12px;font-size:0.74rem;color:rgba(6,26,61,0.65);">
         <strong>Gestito da:</strong> WelcomeBnB · <strong>Contatti:</strong> info@welcomebnb.it
       </p>
 

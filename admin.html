@@ -7,10 +7,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root {
-  --warm:#C2714F; --warm-d:#A85D3E; --ink:#1E1008; --ink-2:#2E1810; --ink-soft:#5C3D2E;
-  --cream:#FAF6F0; --cream-2:#F0E8DC; --cream-3:#E4D8C8; --white:#FFFFFF;
-  --green:#4CAF7D; --amber:#E8A840; --red:#D94B4B; --blue:#4A90D9;
-  --border:rgba(194,113,79,0.12); --shadow:0 2px 12px rgba(30,16,8,0.06);
+  --warm:#005BFF; --warm-d:#0047CC; --ink:#061A3D; --ink-2:#020A1F; --ink-soft:#6B7A90;
+  --cream:#F8FBFF; --cream-2:#EAF3FF; --cream-3:#D7E7FF; --white:#FFFFFF;
+  --green:#2E9E6B; --amber:#E0982E; --red:#E0455E; --blue:#1E7BFF;
+  --border:rgba(0,91,255,0.12); --shadow:0 2px 12px rgba(6,26,61,0.06);
   --radius:10px;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -28,7 +28,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
   background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.35);border-radius:6px;
   color:#fff;padding:8px 12px;font-size:0.85rem;font-family:'DM Sans',sans-serif;font-weight:500;
 }
-.top-bar-right select option { background:#1E1008; color:#fff; }
+.top-bar-right select option { background:#061A3D; color:#fff; }
 .refresh-btn{
   background:var(--warm);border:none;color:#fff;padding:8px 14px;border-radius:6px;
   font-size:0.82rem;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;
@@ -72,7 +72,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
   text-transform:uppercase;color:var(--ink-soft);border-bottom:1px solid var(--border);
   background:rgba(250,246,240,0.5);font-weight:600;
 }
-.data-table td{padding:10px 14px;font-size:0.82rem;border-bottom:1px solid rgba(194,113,79,0.06);color:var(--ink-2);}
+.data-table td{padding:10px 14px;font-size:0.82rem;border-bottom:1px solid rgba(0,91,255,0.06);color:var(--ink-2);}
 .data-table tr:last-child td{border-bottom:none;}
 .data-table tr:hover td{background:rgba(250,246,240,0.6);}
 
@@ -80,7 +80,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .event-log{max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--white);box-shadow:var(--shadow);}
 .event-row{
   display:flex;align-items:center;gap:10px;padding:8px 14px;
-  border-bottom:1px solid rgba(194,113,79,0.04);font-size:0.78rem;
+  border-bottom:1px solid rgba(0,91,255,0.04);font-size:0.78rem;
 }
 .event-row:last-child{border-bottom:none;}
 .event-time{font-size:0.75rem;color:var(--ink-2);min-width:130px;flex-shrink:0;}
@@ -89,7 +89,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
   background:var(--cream-2);color:var(--ink-2);flex-shrink:0;
 }
 .event-type.login{background:rgba(76,175,125,0.12);color:#2d7a4a;}
-.event-type.export{background:rgba(194,113,79,0.12);color:var(--warm);}
+.event-type.export{background:rgba(0,91,255,0.12);color:var(--warm);}
 .event-type.save{background:rgba(74,144,217,0.12);color:#3570a8;}
 .event-user{font-size:0.78rem;color:var(--ink-2);flex-shrink:0;min-width:120px;}
 .event-detail{font-size:0.75rem;color:var(--ink-2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -139,8 +139,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .login-btn:hover:not(:disabled) { background: var(--warm); }
 .login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .login-error {
-  margin-top: 12px; padding: 10px 12px; background: rgba(217,75,75,0.08);
-  border: 1px solid rgba(217,75,75,0.25); border-radius: 6px;
+  margin-top: 12px; padding: 10px 12px; background: rgba(224,69,94,0.08);
+  border: 1px solid rgba(224,69,94,0.25); border-radius: 6px;
   color: var(--red); font-size: 0.82rem; display: none;
 }
 .login-error.show { display: block; }
@@ -168,10 +168,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 }
 .admin-action-btn:hover { background: var(--cream-3); border-color: var(--warm); }
 .admin-action-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.admin-action-btn.danger { color: var(--red); border-color: rgba(217,75,75,0.25); }
-.admin-action-btn.danger:hover { background: rgba(217,75,75,0.1); border-color: var(--red); }
-.admin-action-btn.warn { color: #B07A4B; border-color: rgba(176,122,75,0.25); }
-.admin-action-btn.warn:hover { background: rgba(176,122,75,0.1); border-color: #B07A4B; }
+.admin-action-btn.danger { color: var(--red); border-color: rgba(224,69,94,0.25); }
+.admin-action-btn.danger:hover { background: rgba(224,69,94,0.1); border-color: var(--red); }
+.admin-action-btn.warn { color: #1E7BFF; border-color: rgba(30,123,255,0.25); }
+.admin-action-btn.warn:hover { background: rgba(30,123,255,0.1); border-color: #1E7BFF; }
 .admin-action-btn.success { color: var(--green); border-color: rgba(76,175,125,0.25); }
 .admin-action-btn.success:hover { background: rgba(76,175,125,0.1); border-color: var(--green); }
 
@@ -179,12 +179,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 tr.row-test td, tr.row-deleted td { opacity: 0.65; }
 tr.row-test td:first-child::before {
   content: '🧪 TEST'; display: inline-block; font-size: 0.55rem; padding: 2px 5px;
-  background: rgba(232,168,64,0.2); color: #8a6024; border-radius: 3px; margin-right: 6px;
+  background: rgba(232,168,64,0.2); color: #9a6b00; border-radius: 3px; margin-right: 6px;
   font-weight: 700; letter-spacing: 0.05em;
 }
 tr.row-deleted td:first-child::before {
   content: '🗑 DELETED'; display: inline-block; font-size: 0.55rem; padding: 2px 5px;
-  background: rgba(217,75,75,0.2); color: #b03a3a; border-radius: 3px; margin-right: 6px;
+  background: rgba(224,69,94,0.2); color: #b03a3a; border-radius: 3px; margin-right: 6px;
   font-weight: 700; letter-spacing: 0.05em;
 }
 tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED'; }
@@ -192,7 +192,7 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
 /* ── Purge confirm modal ── */
 #purgeModal {
   position: fixed; inset: 0; z-index: 999;
-  background: rgba(30,16,8,0.72); display: none;
+  background: rgba(6,26,61,0.72); display: none;
   align-items: center; justify-content: center; padding: 20px;
 }
 #purgeModal.show { display: flex; }
@@ -205,7 +205,7 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
   margin-bottom: 6px; display: flex; align-items: center; gap: 8px;
 }
 .purge-warning {
-  background: rgba(217,75,75,0.08); border: 1px solid rgba(217,75,75,0.25);
+  background: rgba(224,69,94,0.08); border: 1px solid rgba(224,69,94,0.25);
   border-radius: 8px; padding: 12px 14px; margin: 14px 0;
   font-size: 0.83rem; color: var(--ink-2); line-height: 1.5;
 }
@@ -235,7 +235,7 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
 .purge-actions .btn-confirm { background: var(--red); border-color: var(--red); color: #fff; }
 .purge-actions .btn-confirm:disabled { opacity: 0.45; cursor: not-allowed; background: var(--ink-soft); border-color: var(--ink-soft); }
 .purge-error {
-  margin-top: 8px; padding: 8px 10px; background: rgba(217,75,75,0.1);
+  margin-top: 8px; padding: 8px 10px; background: rgba(224,69,94,0.1);
   border-radius: 5px; color: var(--red); font-size: 0.78rem; display: none;
 }
 .purge-error.show { display: block; }
@@ -529,10 +529,10 @@ async function runRetentionPreview() {
     const cells = [
       { label: 'Resolved chats',  n: r.chat_resolved_purged|0, color: '#6BAED6' },
       { label: 'Archived chats',  n: r.chat_archived_purged|0, color: '#8B9DAB' },
-      { label: 'Analytics events',n: r.analytics_purged|0,     color: '#C9A96E' },
-      { label: 'Test rows',       n: r.test_rows_purged|0,     color: '#E8B84B' },
-      { label: 'Soft-deleted',    n: r.soft_deleted_purged|0,  color: '#A0978C' },
-      { label: 'ID photos',       n: r.photos_purged|0,        color: '#C2714F' },
+      { label: 'Analytics events',n: r.analytics_purged|0,     color: '#1E7BFF' },
+      { label: 'Test rows',       n: r.test_rows_purged|0,     color: '#E0982E' },
+      { label: 'Soft-deleted',    n: r.soft_deleted_purged|0,  color: '#6B7A90' },
+      { label: 'ID photos',       n: r.photos_purged|0,        color: '#005BFF' },
     ];
     out.innerHTML = `
       <div style="background:rgba(109,191,130,0.08);border:1px solid rgba(109,191,130,0.25);border-radius:8px;padding:14px 16px;margin:8px 0 0;">
@@ -658,7 +658,7 @@ async function loadRetentionLog() {
       <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
         <thead>
-          <tr style="border-bottom:2px solid rgba(74,46,32,0.12);">
+          <tr style="border-bottom:2px solid rgba(107,122,144,0.12);">
             <th style="text-align:left;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">When</th>
             <th style="text-align:left;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Trigger</th>
             <th style="text-align:left;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Mode</th>
@@ -678,7 +678,7 @@ async function loadRetentionLog() {
             ? `<span style="background:rgba(107,174,214,0.15);color:#29638a;padding:2px 8px;border-radius:3px;font-size:0.68rem;font-weight:600;">Preview</span>`
             : `<span style="background:rgba(224,90,90,0.12);color:#b03939;padding:2px 8px;border-radius:3px;font-size:0.68rem;font-weight:600;">Live</span>`;
           return `
-            <tr style="border-bottom:1px solid rgba(74,46,32,0.06);">
+            <tr style="border-bottom:1px solid rgba(107,122,144,0.06);">
               <td style="padding:6px 10px;color:var(--ink);white-space:nowrap;">${when}</td>
               <td style="padding:6px 10px;color:var(--ink-soft);font-size:0.74rem;">${trigger}</td>
               <td style="padding:6px 10px;">${mode}</td>
@@ -776,7 +776,7 @@ async function loadGdprExclusions() {
     el.innerHTML = `
       <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
-        <thead><tr style="border-bottom:2px solid rgba(74,46,32,0.12);">
+        <thead><tr style="border-bottom:2px solid rgba(107,122,144,0.12);">
           <th style="text-align:left;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Booking</th>
           <th style="text-align:left;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">When</th>
           <th style="text-align:left;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Reason</th>
@@ -786,7 +786,7 @@ async function loadGdprExclusions() {
         </tr></thead>
         <tbody>
           ${data.map(r => `
-            <tr style="border-bottom:1px solid rgba(74,46,32,0.06);">
+            <tr style="border-bottom:1px solid rgba(107,122,144,0.06);">
               <td style="padding:6px 10px;font-family:monospace;color:var(--ink);">${safe(r.booking_code)}</td>
               <td style="padding:6px 10px;color:var(--ink-soft);white-space:nowrap;">${new Date(r.excluded_at).toLocaleDateString()}</td>
               <td style="padding:6px 10px;color:var(--ink-soft);">${safe(r.reason) || '—'}</td>
@@ -1970,7 +1970,7 @@ function renderView() {
     hostRows.sort((a, b) => (b.score - a.score) || (b.sessions - a.sessions));
 
     if (hostRows.length > 0) {
-      const tierColor = { gold: '#C9A96E', silver: '#8B9DAB', bronze: '#B07A4B', dormant: '#A0978C' };
+      const tierColor = { gold: '#1E7BFF', silver: '#8B9DAB', bronze: '#1E7BFF', dormant: '#6B7A90' };
       const tierLabel = { gold: '🥇 Gold', silver: '🥈 Silver', bronze: '🥉 Bronze', dormant: '💤 Dormant' };
 
       html += `<div class="section-title">Host Performance Leaderboard (${hostRows.length})</div>
@@ -2037,7 +2037,7 @@ function renderView() {
       html += `<div class="section-title">Business Opportunities</div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:10px;">
           ${oppCard('🥇', 'Top hosts (premium tier)', goldHosts.length,
-            `High-engagement hosts — candidates for "Curator" badge, custom AI voice, featured listings. ${goldHosts.slice(0,3).map(h => h.email.split('@')[0]).join(', ')}${goldHosts.length > 3 ? '…' : ''}`, '#C9A96E')}
+            `High-engagement hosts — candidates for "Curator" badge, custom AI voice, featured listings. ${goldHosts.slice(0,3).map(h => h.email.split('@')[0]).join(', ')}${goldHosts.length > 3 ? '…' : ''}`, '#1E7BFF')}
           ${oppCard('💡', 'Leaky funnel', leakyHosts.length,
             `Traffic but no completed check-ins — listing optimization or photo audit could unlock revenue. ${leakyHosts.slice(0,3).map(h => h.email.split('@')[0]).join(', ')}${leakyHosts.length > 3 ? '…' : ''}`, 'var(--amber)')}
           ${oppCard('💬', 'Concierge upsell', helpHeavyHosts.length,
@@ -2045,7 +2045,7 @@ function renderView() {
           ${oppCard('🛠️', 'Onboarding outreach', incompleteProps.length,
             `Properties with &lt;80% setup completion — automated email or 1:1 onboarding reduces churn risk.`, 'var(--red)')}
           ${oppCard('💤', 'Re-engagement', dormantHosts.length,
-            `Active hosts whose guests barely engage with the app — needs hands-on help or product education.`, '#A0978C')}
+            `Active hosts whose guests barely engage with the app — needs hands-on help or product education.`, '#6B7A90')}
           ${oppCard('🎯', 'Silver hosts (mid-funnel)', silverHosts.length,
             `Solid hosts with room to grow — small nudges (more recos, better welcome message) could promote them to Gold.`, '#8B9DAB')}
         </div>`;
@@ -2070,7 +2070,7 @@ function renderView() {
             const safeEx = exShort.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
             const crossHost = g.properties >= 2;
             return `
-              <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid rgba(74,46,32,0.06);">
+              <div style="display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid rgba(107,122,144,0.06);">
                 <div style="font-size:0.7rem;color:var(--ink-2);font-weight:600;width:18px;flex-shrink:0;text-align:right;">${i + 1}</div>
                 <div style="flex:1;min-width:0;">
                   <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap;">
@@ -2109,8 +2109,8 @@ function renderView() {
         return `
           <div style="display:grid;grid-template-columns:140px 1fr 100px;align-items:center;gap:12px;padding:8px 0;">
             <div style="font-size:0.82rem;color:var(--ink);font-weight:500;">${label}</div>
-            <div style="background:rgba(74,46,32,0.06);border-radius:4px;height:22px;position:relative;overflow:hidden;">
-              <div style="background:linear-gradient(90deg,#C2714F,#D4876A);height:100%;width:${Math.max(pct, 4)}%;border-radius:4px;display:flex;align-items:center;padding:0 8px;color:#fff;font-size:0.72rem;font-weight:600;">${pct >= 15 ? pct + '%' : ''}</div>
+            <div style="background:rgba(107,122,144,0.06);border-radius:4px;height:22px;position:relative;overflow:hidden;">
+              <div style="background:linear-gradient(90deg,#005BFF,#006DFF);height:100%;width:${Math.max(pct, 4)}%;border-radius:4px;display:flex;align-items:center;padding:0 8px;color:#fff;font-size:0.72rem;font-weight:600;">${pct >= 15 ? pct + '%' : ''}</div>
             </div>
             <div style="text-align:right;font-size:0.82rem;color:var(--ink-soft);">
               ${count}${dropCount !== null ? ` <span style="color:#b03939;font-weight:600;">−${dropCount} (${dropPct}%)</span>` : ''}
@@ -2124,7 +2124,7 @@ function renderView() {
             const safeName = p.name.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
             const tone = p.doneRate < 30 ? '#b03939' : p.doneRate < 50 ? '#8a6914' : 'var(--ink-soft)';
             return `
-              <div style="display:grid;grid-template-columns:1fr 70px 80px 80px;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(74,46,32,0.06);font-size:0.82rem;">
+              <div style="display:grid;grid-template-columns:1fr 70px 80px 80px;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(107,122,144,0.06);font-size:0.82rem;">
                 <div style="min-width:0;">
                   <div style="font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${safeName}</div>
                   <div style="font-size:0.68rem;color:var(--ink-soft);">${p.hostShort}</div>
@@ -2148,7 +2148,7 @@ function renderView() {
 
           <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin:18px 0 8px;">Worst-converting properties (≥5 opens)</div>
           ${funnel.worst.length > 0 ? `
-          <div style="display:grid;grid-template-columns:1fr 70px 80px 80px;align-items:center;gap:10px;padding:0 0 6px;border-bottom:2px solid rgba(74,46,32,0.12);">
+          <div style="display:grid;grid-template-columns:1fr 70px 80px 80px;align-items:center;gap:10px;padding:0 0 6px;border-bottom:2px solid rgba(107,122,144,0.12);">
             <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;">Property</div>
             <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;text-align:right;">Opens</div>
             <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;text-align:right;">Starts</div>
@@ -2173,7 +2173,7 @@ function renderView() {
         const pct = total > 0 ? Math.round(n / total * 100) : 0;
         return `<div style="display:flex;align-items:center;gap:8px;font-size:0.78rem;">
           <span style="width:60px;color:var(--ink-soft);">${label}</span>
-          <div style="flex:1;background:rgba(74,46,32,0.06);border-radius:3px;height:14px;overflow:hidden;">
+          <div style="flex:1;background:rgba(107,122,144,0.06);border-radius:3px;height:14px;overflow:hidden;">
             <div style="background:${color};height:100%;width:${Math.max(pct, 1)}%;"></div>
           </div>
           <span style="width:64px;text-align:right;color:var(--ink);font-weight:500;">${n} (${pct}%)</span>
@@ -2192,7 +2192,7 @@ function renderView() {
         : `<div style="overflow-x:auto;">
             <table style="width:100%;border-collapse:collapse;font-size:0.78rem;min-width:560px;">
               <thead>
-                <tr style="border-bottom:2px solid rgba(74,46,32,0.12);">
+                <tr style="border-bottom:2px solid rgba(107,122,144,0.12);">
                   <th style="text-align:left;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Property</th>
                   <th style="text-align:right;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);">Bookings</th>
                   <th style="text-align:right;padding:6px 10px;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);" title="High engagement: chat used, multiple recos clicked, or 5+ events">High</th>
@@ -2207,7 +2207,7 @@ function renderView() {
                   const safeName = p.name.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
                   const tone = p.silentRate >= 50 ? '#b03939' : p.silentRate >= 30 ? '#8a6914' : 'var(--ink-soft)';
                   return `
-                  <tr style="border-bottom:1px solid rgba(74,46,32,0.06);">
+                  <tr style="border-bottom:1px solid rgba(107,122,144,0.06);">
                     <td style="padding:7px 10px;color:var(--ink);">
                       <div style="font-weight:500;">${safeName}</div>
                       <div style="font-size:0.66rem;color:var(--ink-soft);">${p.hostShort}</div>
@@ -2244,7 +2244,7 @@ function renderView() {
               else if (arr > today) stayStatus = 'Pre-arrival';
             }
             return `
-              <div style="display:grid;grid-template-columns:1.4fr 1.1fr 90px 100px 90px;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(74,46,32,0.06);font-size:0.8rem;">
+              <div style="display:grid;grid-template-columns:1.4fr 1.1fr 90px 100px 90px;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(107,122,144,0.06);font-size:0.8rem;">
                 <div style="min-width:0;">
                   <div style="font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${safeGuest}</div>
                   <div style="font-size:0.66rem;color:var(--ink-soft);font-family:monospace;">${g.booking_code}</div>
@@ -2289,8 +2289,8 @@ function renderView() {
             <div style="display:flex;flex-direction:column;gap:5px;">
               ${distBar('High',   platHi.high,   platHi.total, '#6DBF82')}
               ${distBar('Normal', platHi.normal, platHi.total, '#6BAED6')}
-              ${distBar('Low',    platHi.low,    platHi.total, '#C9A96E')}
-              ${distBar('Silent', platHi.silent, platHi.total, '#A0978C')}
+              ${distBar('Low',    platHi.low,    platHi.total, '#1E7BFF')}
+              ${distBar('Silent', platHi.silent, platHi.total, '#6B7A90')}
             </div>
           </div>
 
@@ -2303,7 +2303,7 @@ function renderView() {
             ${eng.silentList.length > 0 ? `
             <div>
               <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:6px;">Silent guests — coaching list</div>
-              <div style="display:grid;grid-template-columns:1.4fr 1.1fr 90px 100px 90px;align-items:center;gap:10px;padding:0 0 6px;border-bottom:2px solid rgba(74,46,32,0.12);">
+              <div style="display:grid;grid-template-columns:1.4fr 1.1fr 90px 100px 90px;align-items:center;gap:10px;padding:0 0 6px;border-bottom:2px solid rgba(107,122,144,0.12);">
                 <div style="font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;">Guest</div>
                 <div style="font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;">Property</div>
                 <div style="font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;text-align:right;">Arrival</div>
@@ -2329,7 +2329,7 @@ function renderView() {
         : upsell.byIntent.map(it => {
             const safeLbl = it.label.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
             return `
-              <div style="display:grid;grid-template-columns:30px 1fr 80px 90px 90px;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(74,46,32,0.06);font-size:0.84rem;">
+              <div style="display:grid;grid-template-columns:30px 1fr 80px 90px 90px;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(107,122,144,0.06);font-size:0.84rem;">
                 <div style="font-size:1.1rem;text-align:center;">${it.icon}</div>
                 <div style="color:var(--ink);font-weight:500;">${safeLbl}</div>
                 <div style="text-align:right;color:var(--ink-soft);">${it.count} ${it.count === 1 ? 'guest' : 'guests'}</div>
@@ -2344,7 +2344,7 @@ function renderView() {
             const shortEmail = h.email.split('@')[0];
             const safeName = shortEmail.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
             return `
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid rgba(74,46,32,0.06);font-size:0.82rem;">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid rgba(107,122,144,0.06);font-size:0.82rem;">
                 <div style="color:var(--ink);font-weight:500;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${safeName}</div>
                 <div style="color:var(--ink-soft);font-size:0.76rem;flex-shrink:0;">${h.guests} ${h.guests === 1 ? 'guest' : 'guests'} · <strong style="color:var(--ink);">${fmtEur(h.value)}</strong></div>
               </div>`;
@@ -2358,7 +2358,7 @@ function renderView() {
             const safeMsg = short.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
             const safeIntent = ex.intent.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
             return `
-              <div style="padding:8px 0;border-bottom:1px solid rgba(74,46,32,0.06);">
+              <div style="padding:8px 0;border-bottom:1px solid rgba(107,122,144,0.06);">
                 <div style="font-size:0.62rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--blue);font-weight:600;margin-bottom:2px;">→ ${safeIntent}</div>
                 <div style="font-size:0.78rem;color:var(--ink-soft);font-style:italic;line-height:1.4;">"${safeMsg}"</div>
               </div>`;
@@ -2370,7 +2370,7 @@ function renderView() {
 
       html += `
         <div class="section-title">Concierge Upsell Value</div>
-        <div style="background:linear-gradient(135deg,#FAF6F0 0%,#F4ECE0 100%);border:1px solid var(--border);border-left:3px solid var(--warm);border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);margin-bottom:18px;">
+        <div style="background:linear-gradient(135deg,#F8FBFF 0%,#EAF3FF 100%);border:1px solid var(--border);border-left:3px solid var(--warm);border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);margin-bottom:18px;">
           <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:18px;line-height:1.5;">
             Bookable services guests asked about in chat, valued at conservative platform-average prices. Each service counts <strong>once per guest</strong>, regardless of repetition. This is unmet demand the platform could capture as commission.
           </div>
@@ -2397,7 +2397,7 @@ function renderView() {
             <div>
               <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:6px;">By service</div>
               ${upsell.byIntent.length > 0 ? `
-              <div style="display:grid;grid-template-columns:30px 1fr 80px 90px 90px;align-items:center;gap:10px;padding:0 0 6px;border-bottom:2px solid rgba(74,46,32,0.12);">
+              <div style="display:grid;grid-template-columns:30px 1fr 80px 90px 90px;align-items:center;gap:10px;padding:0 0 6px;border-bottom:2px solid rgba(107,122,144,0.12);">
                 <div></div>
                 <div style="font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;">Service</div>
                 <div style="font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;text-align:right;">Demand</div>
@@ -2415,7 +2415,7 @@ function renderView() {
           </div>
 
           ${exampleRows ? `
-          <div style="margin-top:18px;padding-top:14px;border-top:1px solid rgba(74,46,32,0.08);">
+          <div style="margin-top:18px;padding-top:14px;border-top:1px solid rgba(107,122,144,0.08);">
             <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:6px;">Sample of detected intents</div>
             ${exampleRows}
           </div>` : ''}
@@ -2564,8 +2564,8 @@ function renderView() {
               <td style="font-size:0.72rem;">${s.sessions.size || 0} sess · ${s.saves || 0} saves · ${s.exports || 0} exp</td>
               <td style="font-size:0.72rem;color:var(--ink-soft);">${s.lastSeen ? new Date(s.lastSeen).toLocaleDateString() : '—'}</td>
               <td><div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
-                <a href="host-console.html?p=${p.id}" target="_blank" style="padding:4px 8px;background:#C2714F;color:#fff;border-radius:4px;font-size:0.65rem;text-decoration:none;white-space:nowrap;">✏️ Edit</a>
-                <a href="/?p=${p.id}" target="_blank" style="padding:4px 8px;background:#4A2A18;color:#fff;border-radius:4px;font-size:0.65rem;text-decoration:none;white-space:nowrap;">👁 View</a>
+                <a href="host-console.html?p=${p.id}" target="_blank" style="padding:4px 8px;background:#005BFF;color:#fff;border-radius:4px;font-size:0.65rem;text-decoration:none;white-space:nowrap;">✏️ Edit</a>
+                <a href="/?p=${p.id}" target="_blank" style="padding:4px 8px;background:#6B7A90;color:#fff;border-radius:4px;font-size:0.65rem;text-decoration:none;white-space:nowrap;">👁 View</a>
                 ${p._email ? `<button onclick="document.getElementById('userFilter').value='${p._email}';renderView();" style="padding:4px 8px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.65rem;cursor:pointer;color:var(--warm);font-weight:500;white-space:nowrap;">📊</button>` : ''}
                 ${adminRowActions('properties', p)}
               </div></td>
@@ -2609,7 +2609,7 @@ function renderView() {
             { icon: '📷', label: 'Document photos',   days: 30, note: 'after guest departure (Garante guidance)' },
             { icon: '🛂', label: 'Check-in data',     days: '5 yr', note: 'Italian fiscal requirement — never auto-purged' },
           ].map(p => `
-            <div style="background:rgba(250,246,240,0.6);border:1px solid rgba(74,46,32,0.06);border-radius:8px;padding:10px 12px;">
+            <div style="background:rgba(250,246,240,0.6);border:1px solid rgba(107,122,144,0.06);border-radius:8px;padding:10px 12px;">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
                 <span style="font-size:1.05rem;">${p.icon}</span>
                 <span style="font-weight:600;color:var(--ink);font-size:0.85rem;">${p.label}</span>
@@ -2692,8 +2692,8 @@ function renderView() {
           : e.event_type.includes('export') ? 'export'
           : e.event_type.includes('save') || e.event_type.includes('booking') ? 'save' : '';
         const detail = e.event_data ? Object.entries(e.event_data).map(([k,v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join(' · ') : '';
-        const stateBadge = e.is_test ? '<span style="font-size:0.55rem;padding:1px 5px;background:rgba(232,168,64,0.2);color:#8a6024;border-radius:3px;margin-left:6px;font-weight:600;">TEST</span>' : '';
-        const delBadge   = e.deleted_at ? '<span style="font-size:0.55rem;padding:1px 5px;background:rgba(217,75,75,0.2);color:#b03a3a;border-radius:3px;margin-left:6px;font-weight:600;">DELETED</span>' : '';
+        const stateBadge = e.is_test ? '<span style="font-size:0.55rem;padding:1px 5px;background:rgba(232,168,64,0.2);color:#9a6b00;border-radius:3px;margin-left:6px;font-weight:600;">TEST</span>' : '';
+        const delBadge   = e.deleted_at ? '<span style="font-size:0.55rem;padding:1px 5px;background:rgba(224,69,94,0.2);color:#b03a3a;border-radius:3px;margin-left:6px;font-weight:600;">DELETED</span>' : '';
         return `
           <div class="event-row" style="${e.is_test || e.deleted_at ? 'opacity:0.65;' : ''}">
             <div class="event-time">${new Date(e.created_at).toLocaleString()}</div>

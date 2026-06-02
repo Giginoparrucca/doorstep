@@ -61,6 +61,19 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 20 — Blue palette rebrand _(2026-05-29)_
+- Full visual rebrand across all three apps (`index.html`, `host-console.html`, `admin.html`) from the warm terracotta/cream system to a cool blue system.
+- **Palette mapping** (warm role → blue):
+  - Primary/CTA `#C2714F` → `#005BFF`; accent `#D4876A` → `#006DFF`; hover `#9E5538` → `#0047CC`
+  - Secondary accent (gold) `#C9A96E` → `#1E7BFF`
+  - Main text `#1E1008` → navy `#061A3D`; darkest `#261208` → `#020A1F`; secondary text `#4A2E20` → blue-grey `#6B7A90`
+  - Page bg `#FAF6F0` → off-white `#F8FBFF`; soft bg `#F0EAE0` → azure `#EAF3FF`; light borders `#E8DFD0` → `#D7E7FF`; cards stay `#FFFFFF`
+  - Info blue `#4A90D9` → brand `#1E7BFF`
+- **Status colors kept semantic, cool-shifted slightly**: green `#4CAF7D`→`#2E9E6B`, amber `#E8A840`→`#E0982E`, red `#D94B4B`→`#E0455E`. Dark text-on-tint variants for amber/red badges (e.g. `#9a6b00`, `#c84545`, `#b03939`) intentionally left warm — they signal warning/error/urgency and must remain legible-as-status.
+- **Method**: replaced the `:root` CSS variable blocks (which cascade to most of the UI), then swept hardcoded hex values and warm `rgba()` tints in inline styles (terracotta `194,113,79` → `0,91,255`; warm ink `30,16,8` → navy `6,26,61`; etc.). Shadows re-tinted from warm-brown to navy.
+- All three files syntax-validated; warm-tone scan confirms only intentional status colors remain.
+- **Files**: `index.html`, `host-console.html`, `admin.html`
+
 ### Round 19.5 — "Preview as guest" + bulk-purge of untagged test events _(2026-05-29)_
 **Two-part fix for the "I just tested my app and now I have garbage analytics" problem.**
 

@@ -61,6 +61,16 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 20.2 — Host check-in delete actually deletes (RLS + analytics) _(2026-05-29)_
+- **Bug**: host deleted a guest from the check-ins tab; UI showed it gone, but the guest still appeared in the Alloggiati/PayTourist export and their clicks still showed in analytics.
+- **Root cause 1 (RLS)**: the only DELETE policy on `checkins` was `checkins_admin_all`, which requires `public.is_admin()`. A regular host is authenticated but not an admin, so the DELETE matched zero rows. Supabase returns `error: null` on a 0-row delete, and `deleteCheckin` only checked `error` — so it optimistically removed the row from the local `allCheckins` array, making the UI look right while the DB row survived and reappeared in the export on reload. **Fourth occurrence of the RLS+GRANT pattern** — now clearly the #1 recurring gotcha in this project.
+- **Root cause 2 (separate tables)**: deleting a checkin never touched `analytics_events`. Clicks/page-views live there keyed by booking_code and were never removed — so the lingering clicks were expected.
+- **Fix (migration `migration_round20_2_host_delete.sql`)**:
+  - Host-scoped DELETE policies on `checkins`, `analytics_events`, `chat_messages`, `recommendations` (owner-only via `properties.owner_id = auth.uid()`) + GRANTs.
+  - `purge_booking(property_id, booking_code)` SECURITY DEFINER RPC that removes a booking's checkins + analytics + chat in one transaction, after verifying caller owns the property.
+- **Fix (code)**: `deleteCheckin` now (a) requests deleted rows back via `.select()` and checks the count — surfaces a clear "permission blocked, run migration 20.2" toast on 0-row deletes instead of silently faking success; (b) also deletes the booking's `analytics_events` so clicks don't linger.
+- **Files**: `host-console.html`, `migration_round20_2_host_delete.sql`
+
 ### Round 20.1 — Sidebar contrast fix _(2026-05-29)_
 - **Feedback on the rebrand**: the host console's navy sidebar had too little contrast between the active menu item and the navy background — the active state used `rgba(0,91,255,0.18)`, a translucent blue over navy, so both read as dark blue.
 - **Fix (option A — solid blue active pill)**: active item now uses a solid bright `#005BFF` fill with white text — strong "you are here" signal against the navy.

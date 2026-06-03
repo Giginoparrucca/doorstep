@@ -3344,9 +3344,36 @@ async function deleteCheckin(id, name) {
   if (!id) { console.error('No ID to delete'); toast('Error: no ID'); return; }
   if (!confirm(h('delete_confirm').replace('{name}', name))) return;
 
-  console.log('🗑 Deleting checkin:', id, name);
-  const { error, count } = await sb.from('checkins').delete().eq('id', id);
+  // Find the row so we know its booking_code (to clean analytics too)
+  const row = allCheckins.find(c => c.id === id);
+  const bookingCode = row?.booking_code || null;
+
+  console.log('🗑 Deleting checkin:', id, name, 'booking', bookingCode);
+  // Round 20.2: request the deleted rows back so we can confirm the DB
+  // actually deleted something. A 0-row delete (RLS blocked) returns
+  // error:null + data:[] — previously this silently "succeeded" in the
+  // UI while the row survived in the DB and reappeared in the export.
+  const { data: deleted, error } = await sb.from('checkins')
+    .delete()
+    .eq('id', id)
+    .select();
   if (error) { console.error('Delete error:', error); toast('Error: ' + error.message); return; }
+  if (!deleted || deleted.length === 0) {
+    toast(hostLang === 'it'
+      ? '⚠ Nessuna riga eliminata — permessi insufficienti. Esegui la migrazione 20.2.'
+      : '⚠ No row deleted — permission blocked. Run migration 20.2.');
+    return;
+  }
+
+  // Also clear the analytics events for this booking so their clicks
+  // don't linger in the dashboard / analytics. Best-effort.
+  if (bookingCode && row?.property_id) {
+    const { error: aErr } = await sb.from('analytics_events')
+      .delete()
+      .eq('property_id', row.property_id)
+      .eq('booking_code', bookingCode);
+    if (aErr) console.warn('Analytics cleanup failed (non-fatal):', aErr);
+  }
 
   allCheckins = allCheckins.filter(c => c.id !== id);
   renderCheckins();

@@ -62,6 +62,53 @@ body { display: flex; overflow: hidden; }
   border-radius: 4px;
 }
 
+/* Round 21: property switcher */
+.prop-switcher { position: relative; padding: 0 12px 10px; }
+.prop-switcher-btn {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; padding: 9px 11px; cursor: pointer;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 9px;
+  font-family: 'DM Sans', sans-serif; text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+.prop-switcher-btn:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.18); }
+.prop-switcher-current { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.prop-switcher-label {
+  font-size: 0.46rem; letter-spacing: 0.18em; text-transform: uppercase;
+  color: rgba(109,168,255,0.8);
+}
+.prop-switcher-name {
+  font-size: 0.82rem; color: #fff; font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;
+}
+.prop-switcher-caret { color: rgba(255,255,255,0.5); font-size: 0.7rem; flex-shrink: 0; transition: transform 0.2s; }
+.prop-switcher.open .prop-switcher-caret { transform: rotate(180deg); }
+.prop-switcher-menu {
+  display: none; position: absolute; left: 12px; right: 12px; top: calc(100% - 4px);
+  z-index: 50; background: #0b2350;
+  border: 1px solid rgba(255,255,255,0.14); border-radius: 9px;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.4); overflow: hidden;
+  max-height: 320px; overflow-y: auto;
+}
+.prop-switcher.open .prop-switcher-menu { display: block; }
+.prop-switcher-option {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 10px 12px; cursor: pointer; border: none; background: none;
+  font-family: 'DM Sans', sans-serif; text-align: left;
+  color: rgba(255,255,255,0.78); font-size: 0.8rem;
+  transition: background 0.12s;
+}
+.prop-switcher-option:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.prop-switcher-option.active { color: #fff; font-weight: 500; }
+.prop-switcher-option.active::before { content: '✓'; color: var(--warm-l); margin-right: 2px; }
+.prop-switcher-option:not(.active)::before { content: ''; width: 12px; display: inline-block; }
+.prop-switcher-add {
+  border-top: 1px solid rgba(255,255,255,0.1);
+  color: var(--warm-l); font-weight: 500;
+}
+.prop-switcher-add::before { content: '+'; font-size: 1rem; margin-right: 2px; width: 12px; display: inline-block; }
+
 .sidebar-nav { flex: 1; padding: 12px 10px; overflow-y: auto; }
 .sidebar-section {
   font-size: 0.52rem; letter-spacing: 0.2em; text-transform: uppercase;
@@ -809,6 +856,18 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     <div class="sidebar-badge" data-h="login_badge">Host Console</div>
   </div>
 
+  <!-- Round 21: property switcher -->
+  <div class="prop-switcher" id="propSwitcher">
+    <button class="prop-switcher-btn" id="propSwitcherBtn" onclick="togglePropSwitcher(event)">
+      <div class="prop-switcher-current">
+        <span class="prop-switcher-label" data-h="switcher_managing">Managing</span>
+        <span class="prop-switcher-name" id="propSwitcherName">—</span>
+      </div>
+      <span class="prop-switcher-caret">▾</span>
+    </button>
+    <div class="prop-switcher-menu" id="propSwitcherMenu"></div>
+  </div>
+
   <nav class="sidebar-nav">
     <div class="sidebar-section" data-h="sidebar_overview">Overview</div>
     <button class="sidebar-item active" onclick="showPanel('dashboard', this)">
@@ -1451,6 +1510,8 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let propertyId = null;
 let propertyData = null;
+let allProperties = [];  // Round 21: all properties owned by this user
+let _hostUserId = null;  // cached for property creation/switching
 let allCheckins = [];
 
 // Round 19.4 — per-host dismissed booking codes. Populated from
@@ -2565,6 +2626,10 @@ const HT = {
     sidebar_overview: 'Overview', sidebar_property_sec: 'Property', sidebar_guests_sec: 'Guests', sidebar_share_sec: 'Share',
     // Login
     login_badge: 'Host Console',
+    switcher_managing: 'Managing',
+    switcher_add: 'Add property',
+    switcher_switched: 'Now managing',
+    switcher_add_prompt: 'Name for the new property:',
     login_signin: 'Sign In', login_create: 'Create Account',
     login_signing_in: 'Signing in…', login_creating: 'Creating account…',
     login_no_account: 'Don\'t have an account?', login_create_link: 'Create one', login_forgot: 'Forgot password?',
@@ -2812,6 +2877,10 @@ const HT = {
     sidebar_overview: 'Panoramica', sidebar_property_sec: 'Proprietà', sidebar_guests_sec: 'Ospiti', sidebar_share_sec: 'Condividi',
     // Login
     login_badge: 'Console Host',
+    switcher_managing: 'Gestione',
+    switcher_add: 'Aggiungi struttura',
+    switcher_switched: 'Ora gestisci',
+    switcher_add_prompt: 'Nome della nuova struttura:',
     login_signin: 'Accedi', login_create: 'Crea Account',
     login_signing_in: 'Accesso in corso…', login_creating: 'Creazione account…',
     login_no_account: 'Non hai un account?', login_create_link: 'Creane uno', login_forgot: 'Password dimenticata?',
@@ -3087,6 +3156,7 @@ function setHostLang(l) {
   renderCheckins();
   renderRules();
   renderRecos();
+  if (typeof renderPropertySwitcher === 'function') renderPropertySwitcher(); // Round 21
   // Round 11.4: action board cards are built from h() — re-render them too,
   // but ONLY if the analytics panel is currently visible (otherwise we'd
   // trigger an unnecessary Supabase fetch).
@@ -3429,6 +3499,11 @@ async function saveProperty() {
   const { error } = await sb.from('properties').update(update).eq('id', propertyId);
   if (error) { console.error('Save error:', error); toast('Error: ' + error.message); return; }
   propertyData = { ...propertyData, ...update };
+  // Round 21: keep allProperties + switcher in sync after a save (name/city
+  // may have changed, which the switcher displays)
+  const idx = allProperties.findIndex(p => p.id === propertyId);
+  if (idx > -1) allProperties[idx] = { ...allProperties[idx], ...update };
+  renderPropertySwitcher();
   toast(h('toast_property_saved'));
   track('save_property', { name: document.getElementById('propName').value });
 }
@@ -5309,94 +5384,178 @@ async function init() {
   } catch (e) {}
 
   if (!userId) { document.getElementById('loginOverlay').classList.remove('hidden'); return; }
+  _hostUserId = userId;
 
   // Admin override: ?p=UUID loads any property directly (for admin management)
   const adminPropId = new URLSearchParams(window.location.search).get('p');
 
-  // 1. Load property
+  // 1. Load the FULL list of properties this user owns (Round 21 multi-property)
   try {
-    let data;
     if (adminPropId) {
-      // Admin mode — load specific property regardless of owner
+      // Admin mode — load just the one specified property regardless of owner
       const res = await sb.from('properties').select('*').eq('id', adminPropId).is('deleted_at', null).single();
-      data = res.data;
-      if (data) console.log('🔑 Admin mode — loaded property:', data.name);
-    }
-    if (!data) {
-      // Normal mode — load property owned by this user
-      const res = await sb.from('properties').select('*').eq('owner_id', userId).is('deleted_at', null).limit(1).single();
-      data = res.data;
-    }
-    if (data) {
-      propertyId = data.id;
-      propertyData = data;
-      console.log('✅ Property loaded:', data.name);
-      fillPropertyForm(data);
+      if (res.data) { allProperties = [res.data]; console.log('🔑 Admin mode — loaded property:', res.data.name); }
     } else {
-      // No property for this user — try legacy (unowned properties) and claim it
-      const { data: unclaimed } = await sb.from('properties').select('*').is('owner_id', null).is('deleted_at', null).limit(1).single();
+      const res = await sb.from('properties').select('*')
+        .eq('owner_id', userId).is('deleted_at', null)
+        .order('created_at', { ascending: true });
+      allProperties = res.data || [];
+    }
+
+    if (allProperties.length === 0 && !adminPropId) {
+      // No properties for this user — try claiming a legacy unowned one, else create
+      const { data: unclaimed } = await sb.from('properties').select('*')
+        .is('owner_id', null).is('deleted_at', null).limit(1).maybeSingle();
       if (unclaimed) {
         await sb.from('properties').update({ owner_id: userId }).eq('id', unclaimed.id);
-        propertyId = unclaimed.id;
-        propertyData = unclaimed;
         console.log('✅ Claimed unowned property:', unclaimed.name);
-        fillPropertyForm(unclaimed);
+        allProperties = [unclaimed];
       } else {
-        // No property at all — create a blank one
-        const { data: newProp, error: createErr } = await sb.from('properties').insert({
-          owner_id: userId,
-          name: 'My Property',
-          city: '',
-          region: '',
-          property_type: 'apartment',
+        const { data: newProp } = await sb.from('properties').insert({
+          owner_id: userId, name: 'My Property', city: '', region: '', property_type: 'apartment',
         }).select('*').single();
-        if (newProp) {
-          propertyId = newProp.id;
-          propertyData = newProp;
-          console.log('✅ Created new property for user');
-          fillPropertyForm(newProp);
-          showPanel('property', document.querySelector('[onclick*=property]'));
-          document.getElementById('onboardingBanner').style.display = 'block';
-          toast(h('toast_new_property'));
-        }
+        if (newProp) { allProperties = [newProp]; }
       }
     }
-  } catch (e) { console.log('Property load error:', e); }
 
-  // 2. Load rules, recos, checkins, chats — all scoped by propertyId
-  if (propertyId) {
-    // Round 19.4 — load this host's dismissed bookings so the action
-    // board and Guest Analytics filter them out.
-    await loadDismissedBookings();
-    try {
-      const { data } = await sb.from('rules').select('*').eq('property_id', propertyId).order('sort_order');
-      if (data) rulesData = data;
-    } catch (e) {}
-    try {
-      const { data } = await sb.from('recommendations').select('*')
-        .eq('property_id', propertyId)
-        .eq('is_test', false)
-        .is('deleted_at', null)
-        .order('sort_order');
-      if (data) recoData = data;
-    } catch (e) {}
-    try {
-      const { data } = await sb.from('checkins').select('*')
-        .eq('property_id', propertyId)
-        .eq('is_test', false)
-        .is('deleted_at', null)
-        .order('submitted_at', { ascending: false });
-      if (data) allCheckins = data;
-    } catch (e) {}
-    try {
-      const { data } = await sb.from('chat_messages').select('*')
-        .eq('property_id', propertyId)
-        .eq('is_test', false)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false }).limit(50);
-      if (data) allChats = data;
-    } catch (e) {}
+    // Pick which property to show: persisted selection if it's still owned,
+    // else the first in the list.
+    const saved = localStorage.getItem('wbnb_host_selected_property');
+    let chosen = allProperties.find(p => p.id === saved) || allProperties[0];
+    if (chosen) {
+      propertyId = chosen.id;
+      propertyData = chosen;
+      fillPropertyForm(chosen);
+      // First-property onboarding banner (only when the single property is blank)
+      if (allProperties.length === 1 && !chosen.address && !chosen.wifi_name) {
+        showPanel('property', document.querySelector('[onclick*=property]'));
+        const ob = document.getElementById('onboardingBanner');
+        if (ob) ob.style.display = 'block';
+      }
+    }
+    renderPropertySwitcher();
+  } catch (e) { console.log('Property list load error:', e); }
+
+  // 2. Load all property-scoped data for the selected property
+  await loadPropertyData();
+}
+
+// Round 21: render the property switcher dropdown from allProperties
+function renderPropertySwitcher() {
+  const nameEl = document.getElementById('propSwitcherName');
+  const menu = document.getElementById('propSwitcherMenu');
+  const switcher = document.getElementById('propSwitcher');
+  if (!nameEl || !menu) return;
+
+  // Hide the whole switcher if there's only one property AND no desire to add —
+  // actually keep it visible so "+ Add property" is always reachable.
+  nameEl.textContent = propertyData?.name || '—';
+
+  const opts = allProperties.map(p => {
+    const active = p.id === propertyId ? ' active' : '';
+    const label = (p.name || 'Untitled').replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+    const city = p.city ? ` <span style="color:rgba(255,255,255,0.4);font-size:0.7rem;">· ${p.city.replace(/[<>&]/g,'')}</span>` : '';
+    return `<button class="prop-switcher-option${active}" onclick="switchProperty('${p.id}')">${label}${city}</button>`;
+  }).join('');
+
+  const addLabel = (h('switcher_add') || 'Add property');
+  menu.innerHTML = opts +
+    `<button class="prop-switcher-option prop-switcher-add" onclick="addProperty()">${addLabel}</button>`;
+}
+
+function togglePropSwitcher(event) {
+  if (event) event.stopPropagation();
+  const sw = document.getElementById('propSwitcher');
+  sw.classList.toggle('open');
+}
+
+// Close the switcher when clicking elsewhere
+document.addEventListener('click', (e) => {
+  const sw = document.getElementById('propSwitcher');
+  if (sw && sw.classList.contains('open') && !sw.contains(e.target)) {
+    sw.classList.remove('open');
   }
+});
+
+// Round 21: switch the active property and reload all its data
+async function switchProperty(propId) {
+  document.getElementById('propSwitcher')?.classList.remove('open');
+  if (propId === propertyId) return; // already on it
+  const target = allProperties.find(p => p.id === propId);
+  if (!target) return;
+
+  propertyId = propId;
+  propertyData = target;
+  localStorage.setItem('wbnb_host_selected_property', propId);
+  // Reset the chat cursor so we don't cross-pollinate notifications
+  localStorage.removeItem('wbnb_host_last_chat');
+
+  fillPropertyForm(target);
+  renderPropertySwitcher();
+  await loadPropertyData();
+  toast((h('switcher_switched') || 'Now managing') + ' ' + (target.name || ''));
+  track('switch_property', { property_id: propId });
+}
+
+// Round 21: create a new property owned by the current host and switch to it
+async function addProperty() {
+  document.getElementById('propSwitcher')?.classList.remove('open');
+  const name = prompt(h('switcher_add_prompt') || 'Name for the new property:');
+  if (name === null) return; // cancelled
+  const trimmed = (name || '').trim() || 'My Property';
+  try {
+    const { data: newProp, error } = await sb.from('properties').insert({
+      owner_id: _hostUserId, name: trimmed, city: '', region: '', property_type: 'apartment',
+    }).select('*').single();
+    if (error || !newProp) { toast('Error creating property: ' + (error?.message || '')); return; }
+    allProperties.push(newProp);
+    propertyId = newProp.id;
+    propertyData = newProp;
+    localStorage.setItem('wbnb_host_selected_property', newProp.id);
+    localStorage.removeItem('wbnb_host_last_chat');
+    fillPropertyForm(newProp);
+    renderPropertySwitcher();
+    await loadPropertyData();
+    showPanel('property', document.querySelector('[onclick*=property]'));
+    toast(h('toast_new_property') || 'New property created — fill in its details');
+    track('add_property', { property_id: newProp.id });
+  } catch (e) {
+    console.error('addProperty error:', e);
+    toast('Error creating property');
+  }
+}
+
+// Round 21: load (or reload) all data scoped to the currently-selected
+// propertyId. Extracted from init() so switching properties can re-run it.
+async function loadPropertyData() {
+  if (!propertyId) return;
+  // Reset per-property in-memory state so nothing leaks across a switch
+  rulesData = []; recoData = []; allCheckins = []; allChats = [];
+  dismissedBookingCodes = new Set();
+
+  await loadDismissedBookings();
+  try {
+    const { data } = await sb.from('rules').select('*').eq('property_id', propertyId).order('sort_order');
+    if (data) rulesData = data;
+  } catch (e) {}
+  try {
+    const { data } = await sb.from('recommendations').select('*')
+      .eq('property_id', propertyId).eq('is_test', false).is('deleted_at', null)
+      .order('sort_order');
+    if (data) recoData = data;
+  } catch (e) {}
+  try {
+    const { data } = await sb.from('checkins').select('*')
+      .eq('property_id', propertyId).eq('is_test', false).is('deleted_at', null)
+      .order('submitted_at', { ascending: false });
+    if (data) allCheckins = data;
+  } catch (e) {}
+  try {
+    const { data } = await sb.from('chat_messages').select('*')
+      .eq('property_id', propertyId).eq('is_test', false).is('deleted_at', null)
+      .order('created_at', { ascending: false }).limit(50);
+    if (data) allChats = data;
+  } catch (e) {}
 
   renderDashboard();
   renderCheckins();

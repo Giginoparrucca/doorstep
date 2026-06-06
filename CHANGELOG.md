@@ -63,6 +63,16 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 21.1 — Per-property chat notification cursor _(2026-05-29)_
+- **Why**: Round 21 made property switching seamless everywhere except chat. The unread-message cursor was a single global localStorage key (`wbnb_host_last_chat`) that got wiped on every switch — so switching reset the "last seen" mark and a property couldn't track its own unread state.
+- **Fix**: cursor is now **per-property** — `wbnb_host_last_chat_<propertyId>` via `_chatCursorKey()`. Each property independently remembers its last-seen guest message.
+- The poll, the initial-cursor set, and the "mark seen on open" all use the per-property key. Removed the two `removeItem` workarounds in `switchProperty`/`addProperty` — switching no longer wipes anything.
+- New `markChatSeen()`: advances the current property's cursor to the latest message when the host opens the chat panel, so the badge doesn't re-flash for already-seen messages on the next poll.
+- New `refreshChatBadge()`: after a switch (and on initial load), shows/hides the unread dot to reflect THAT property's own unread state by comparing its latest guest message to its stored cursor.
+- One-time cleanup of the orphaned global key on init.
+- **Result**: switch between properties freely; each shows its own correct unread dot, notifications fire only for the property you're viewing, and nothing resets on switch.
+- **Files**: `host-console.html`
+
 ### Round 21 — Multi-property with one login _(2026-05-29)_
 - **Goal**: a host with several properties manages them all from one account, switching between them in the console.
 - **Key finding**: the database was already multi-property-ready — every table is scoped by `property_id` and `properties.owner_id` ties properties to a user. The gap was entirely front-end: the console hardcoded a single `propertyId` and loaded only the *first* property the user owned (`.limit(1).single()`). No schema/migration change needed.

@@ -12,6 +12,8 @@ Newest entries at the top of each section.
 Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ### High value, ready to build
+- **Automated Alloggiati Web submission (SOAP)** — _full spec written: `SPEC_alloggiati_web_service.md`_
+  The big one. Direct API filing to the Polizia di Stato instead of manual `.txt` upload. The data-format layer is already done (Rounds 8/9/18.2/18.3); this adds a SOAP transport layer (GenerateToken → Test → Send → Ricevuta) via a new Vercel function, encrypted credential storage, and per-guest filing-status chips in the host console. HIGH risk (government system, sensitive credentials, SOAP). Build in phases — Phases 1–2 (auth + validate) carry zero filing risk. **Gated on Phase 0 pre-flight**: confirm web-service access is enabled on the test account + generate a WSKEY (one per day, invalidated on every password change). See the spec for the full breakdown.
 - **Cross-property guest read leak fix** _(deferred from Round 12.1)_
   Currently any anon with the API key can read chat messages across all properties. Today's exposure is low (you have ~2 test hosts), but onboarding a paying customer makes this urgent. Real work — half a day or so. Needs either signed JWTs per guest or an Edge Function gateway.
 - **Polish pass on existing analytics** _(Round 14.5, bundled)_
@@ -60,6 +62,18 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 ---
 
 ## 📋 Done / Shipped
+
+### Round 21 — Multi-property with one login _(2026-05-29)_
+- **Goal**: a host with several properties manages them all from one account, switching between them in the console.
+- **Key finding**: the database was already multi-property-ready — every table is scoped by `property_id` and `properties.owner_id` ties properties to a user. The gap was entirely front-end: the console hardcoded a single `propertyId` and loaded only the *first* property the user owned (`.limit(1).single()`). No schema/migration change needed.
+- **Refactor**: `init()` now loads the *full list* of the user's properties into `allProperties`, picks the persisted selection (`wbnb_host_selected_property` localStorage) or the first one. Extracted `loadPropertyData()` — all property-scoped loads (rules, recos, checkins, chats, dismissals) + renders — so it can re-run on switch. In-memory state is reset at the top of `loadPropertyData()` so nothing leaks across a switch.
+- **Property switcher**: dropdown in the sidebar header (under the logo) showing the current property name + city. Lists all owned properties with a ✓ on the active one, plus a "+ Add property" option. Persists selection across sessions.
+- **`switchProperty(id)`**: sets selection, persists it, resets the chat cursor (so notifications don't cross-pollinate), re-renders the property form + switcher, reloads all data.
+- **`addProperty()`**: prompts for a name, inserts a new `properties` row owned by the host, switches to it, drops the host in the settings panel to fill it out.
+- **Sync**: saving the property form updates `allProperties` + re-renders the switcher (name/city changes show immediately). Language toggle re-renders the switcher so dropdown labels translate.
+- **Admin mode** (`?p=UUID`) unchanged — still loads a single specified property.
+- Bilingual EN/IT.
+- **Files**: `host-console.html` (no migration needed)
 
 ### Round 20.2 — Host check-in delete actually deletes (RLS + analytics) _(2026-05-29)_
 - **Bug**: host deleted a guest from the check-ins tab; UI showed it gone, but the guest still appeared in the Alloggiati/PayTourist export and their clicks still showed in analytics.

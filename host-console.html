@@ -3211,7 +3211,7 @@ function showPanel(id, btn) {
   document.getElementById('sidebarOverlay').classList.remove('show');
   if (id === 'qrlink') initQRPanel();
   if (id === 'property') renderDismissedList();
-  if (id === 'chat') { loadHostChat(); document.getElementById('chatBadge').style.display = 'none'; requestNotifPermission(); }
+  if (id === 'chat') { loadHostChat(); document.getElementById('chatBadge').style.display = 'none'; markChatSeen(); requestNotifPermission(); }
   if (id === 'guestanalytics') loadGuestAnalytics();
   trackPanelSwitch(id);
 }
@@ -4953,24 +4953,79 @@ async function loadHostChat() {
 
 let hostChatPoll = null;
 
+// Round 21.1: chat notification cursor is now PER-PROPERTY so switching
+// properties is seamless — each property remembers its own "last seen"
+// message independently, rather than sharing one global cursor that got
+// wiped on every switch.
+function _chatCursorKey(propId) {
+  return 'wbnb_host_last_chat_' + (propId || propertyId || 'none');
+}
+
+// Round 21.1: when the host opens the chat panel, advance THIS property's
+// cursor to the latest guest message so the unread badge doesn't reappear
+// on the next poll for messages they've just seen.
+async function markChatSeen() {
+  if (!propertyId) return;
+  const key = _chatCursorKey(propertyId);
+  try {
+    const { data } = await sb.from('chat_messages')
+      .select('created_at').eq('property_id', propertyId)
+      .eq('is_test', false).is('deleted_at', null)
+      .order('created_at', { ascending: false }).limit(1);
+    if (data?.[0]) localStorage.setItem(key, data[0].created_at);
+    else localStorage.setItem(key, new Date().toISOString());
+  } catch (e) { /* non-fatal */ }
+}
+
+// Round 21.1: show/hide the unread dot to reflect the CURRENT property's
+// own unread state (called after switching properties). If the latest
+// guest message for this property is newer than the stored cursor, show
+// the badge; otherwise hide it.
+async function refreshChatBadge() {
+  const badge = document.getElementById('chatBadge');
+  if (!badge || !propertyId) return;
+  // If the chat panel is currently open, there's nothing unread by definition.
+  if (document.getElementById('panel-chat')?.classList.contains('active')) {
+    badge.style.display = 'none';
+    markChatSeen();
+    return;
+  }
+  const key = _chatCursorKey(propertyId);
+  try {
+    const { data } = await sb.from('chat_messages')
+      .select('created_at').eq('property_id', propertyId)
+      .eq('sender', 'guest').eq('is_test', false).is('deleted_at', null)
+      .order('created_at', { ascending: false }).limit(1);
+    const latest = data?.[0]?.created_at || '';
+    const stored = localStorage.getItem(key) || '';
+    // If no cursor yet, initialize it to latest (treat as seen — avoids a
+    // dot the first time you ever view a property).
+    if (!stored && latest) { localStorage.setItem(key, latest); badge.style.display = 'none'; return; }
+    badge.style.display = (latest && latest > stored) ? 'block' : 'none';
+  } catch (e) { badge.style.display = 'none'; }
+}
+
 function startHostChatSubscription() {
   if (hostChatPoll) return;
 
-  // Set initial cursor to latest message so old messages don't trigger
+  // Set initial cursor to latest message so old messages don't trigger.
+  // Keyed per-property.
   (async () => {
     if (!propertyId) return;
-    if (!localStorage.getItem('wbnb_host_last_chat')) {
+    const key = _chatCursorKey(propertyId);
+    if (!localStorage.getItem(key)) {
       const { data } = await sb.from('chat_messages')
         .select('created_at').eq('property_id', propertyId)
         .eq('is_test', false).is('deleted_at', null)
         .order('created_at', { ascending: false }).limit(1);
-      if (data?.[0]) localStorage.setItem('wbnb_host_last_chat', data[0].created_at);
-      console.log('🔔 Chat cursor initialized');
+      if (data?.[0]) localStorage.setItem(key, data[0].created_at);
+      console.log('🔔 Chat cursor initialized for', propertyId);
     }
   })();
 
   hostChatPoll = setInterval(async () => {
     if (!propertyId) return;
+    const key = _chatCursorKey(propertyId);
     try {
       const { data } = await sb.from('chat_messages')
         .select('id, sender, message, booking_code, created_at')
@@ -4982,10 +5037,10 @@ function startHostChatSubscription() {
         .limit(1);
       if (data && data.length > 0) {
         const latest = data[0].created_at;
-        const stored = localStorage.getItem('wbnb_host_last_chat') || '';
+        const stored = localStorage.getItem(key) || '';
         if (latest > stored) {
           console.log('🔔 New guest message detected:', data[0].message.substring(0, 40));
-          localStorage.setItem('wbnb_host_last_chat', latest);
+          localStorage.setItem(key, latest);
           document.getElementById('chatBadge').style.display = 'block';
           showHostNotification(
             hostLang === 'it' ? '💬 Nuovo messaggio ospite' : '💬 New guest message',
@@ -5364,6 +5419,9 @@ document.addEventListener('keydown', (e) => {
    INIT — Load everything from Supabase
 ══════════════════════════════════════ */
 async function init() {
+  // Round 21.1: the chat cursor became per-property; clean up the old
+  // global key if it's still lingering from a previous version.
+  localStorage.removeItem('wbnb_host_last_chat');
   // Check auth first
   const authed = await checkAuth();
   if (!authed) return;
@@ -5487,12 +5545,11 @@ async function switchProperty(propId) {
   propertyId = propId;
   propertyData = target;
   localStorage.setItem('wbnb_host_selected_property', propId);
-  // Reset the chat cursor so we don't cross-pollinate notifications
-  localStorage.removeItem('wbnb_host_last_chat');
 
   fillPropertyForm(target);
   renderPropertySwitcher();
   await loadPropertyData();
+  refreshChatBadge(); // Round 21.1: show this property's own unread state
   toast((h('switcher_switched') || 'Now managing') + ' ' + (target.name || ''));
   track('switch_property', { property_id: propId });
 }
@@ -5512,7 +5569,6 @@ async function addProperty() {
     propertyId = newProp.id;
     propertyData = newProp;
     localStorage.setItem('wbnb_host_selected_property', newProp.id);
-    localStorage.removeItem('wbnb_host_last_chat');
     fillPropertyForm(newProp);
     renderPropertySwitcher();
     await loadPropertyData();
@@ -5562,6 +5618,7 @@ async function loadPropertyData() {
   renderRules();
   renderRecos();
   startHostChatSubscription();
+  refreshChatBadge(); // Round 21.1: reflect this property's unread state
 }
 
 function fillPropertyForm(data) {

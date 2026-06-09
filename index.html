@@ -504,10 +504,8 @@ body {
 .explore-header p { font-size: 0.78rem; color: var(--ink-soft); font-weight: 300; margin-top: 4px; }
 
 .cat-tabs {
-  display: flex; gap: 6px; padding: 10px 16px;
-  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px;
 }
-.cat-tabs::-webkit-scrollbar { display: none; }
 .cat-tab {
   padding: 7px 14px; border-radius: 20px;
   font-size: 0.68rem; font-weight: 500;

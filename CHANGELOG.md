@@ -63,6 +63,11 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 22.2 — Preview banner no longer covers the language toggle _(2026-06-09)_
+- **Bug**: in preview mode (`?test=1`), the fixed "Preview mode" banner (z-index 10000) covered the language toggle. The banner pushed page content down via body `padding-top`, but the `.top-bar` is `position: sticky; top: 0` — so on scroll it stuck to the top of the scroll container and slid *under* the higher-z-index banner.
+- **Fix**: added `body.has-test-banner .top-bar { top: 36px }` so the sticky top-bar sticks just below the banner instead of under it, and `setupTestModeBanner()` now adds the `has-test-banner` class to `<body>`. One rule covers all five pages (all toggles live in `.top-bar`).
+- **Files**: `index.html`
+
 ### Round 22.1 — Guest reco category tabs wrap (no more sideways scroll) _(2026-06-09)_
 - **Feedback**: with 7 categories (after adding Experiences), the guest Explore category tabs scrolled sideways, hiding the last ones off-screen.
 - **Fix**: changed `.cat-tabs` from `overflow-x: auto` + single nowrap row to `flex-wrap: wrap`. All categories now flow onto a second row and are visible at first glance. Removed the now-unused `::-webkit-scrollbar` rule. Pills keep their shape and individual widths (a grid would cramp the varying label lengths).

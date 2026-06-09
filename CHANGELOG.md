@@ -63,6 +63,16 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 22 — Property detail + guest info updates _(2026-06-09)_
+Four changes across host console + guest app:
+
+1. **CIR → CIN** in property details. CIN (Codice Identificativo Nazionale) is the now-more-relevant national code. Changed all user-facing labels: the property-settings field label + hint (EN + IT), the ISTAT C/59 report label (`CIS/CIR:` → `CIN:`), and the export error toasts. The DB column `cir_code` and element id `cirCode` are kept as-is — internal identifiers the user never sees; renaming would need a pointless migration. The PayTourist CSV column comment is left as "CIR" since it documents PayTourist's own column name.
+2. **Extended instruction fields**: check-in and check-out instruction textareas bumped from `maxlength=800` → `2000`, and 4 → 6 rows. DB columns already TEXT; no migration. (For reference: the previous limit was 800 characters.)
+3. **Transport info in the Staying section**: new `transport_info` TEXT column (`migration_round22_transport_info.sql`). Host console gets a "Getting Around" card (parking / public transport / taxis / airport), wired to save + load, bilingual. Guest app renders it as a card in the Staying section, hidden when empty.
+4. **"Experiences" recommendation category**: added the ✨ Experiences tab in the host reco editor (with its own preset tag set — cooking class, wine tasting, boat tour, hiking, guided tour, etc.) and the matching category in the guest Explore tab (icon + filter + i18n). Bilingual throughout.
+
+- **Files**: `host-console.html`, `index.html`, `migration_round22_transport_info.sql`
+
 ### Round 21.1 — Per-property chat notification cursor _(2026-05-29)_
 - **Why**: Round 21 made property switching seamless everywhere except chat. The unread-message cursor was a single global localStorage key (`wbnb_host_last_chat`) that got wiped on every switch — so switching reset the "last seen" mark and a property couldn't track its own unread state.
 - **Fix**: cursor is now **per-property** — `wbnb_host_last_chat_<propertyId>` via `_chatCursorKey()`. Each property independently remembers its last-seen guest message.

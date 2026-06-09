@@ -1046,9 +1046,9 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <input class="form-input" value="" id="propRegion">
           </div>
           <div class="form-group">
-            <label class="form-label" data-h="prop_cir">CIR Code (Regional ID)</label>
-            <input class="form-input" placeholder="e.g., 072006-APP-00123" id="cirCode">
-            <div class="form-hint" data-h="prop_cir_hint">Required for Puglia DMS reporting</div>
+            <label class="form-label" data-h="prop_cir">CIN Code (National ID)</label>
+            <input class="form-input" placeholder="e.g., IT072006B4XXXXXXXX" id="cirCode">
+            <div class="form-hint" data-h="prop_cir_hint">Codice Identificativo Nazionale — required for tourist-accommodation reporting</div>
           </div>
           <div class="form-group">
             <label class="form-label" data-h="prop_paytourist">PayTourist portal</label>
@@ -1119,13 +1119,24 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="form-grid">
           <div class="form-group full">
             <label class="form-label" data-h="prop_checkin_inst">Check-in instructions</label>
-            <textarea class="form-textarea" id="propCheckinInstructions" rows="4" maxlength="800" placeholder="e.g., Walk past the green gate on Via Roma. The lockbox is on the left wall next to the bell. Code on arrival day below."></textarea>
+            <textarea class="form-textarea" id="propCheckinInstructions" rows="6" maxlength="2000" placeholder="e.g., Walk past the green gate on Via Roma. The lockbox is on the left wall next to the bell. Code on arrival day below."></textarea>
             <div class="form-hint" data-h="prop_checkin_inst_hint">Step-by-step instructions for arrival. Write in your preferred language — guests can use their browser's translate feature if needed (long-press on iOS, three-dot menu on Android).</div>
           </div>
           <div class="form-group full">
             <label class="form-label" data-h="prop_checkout_inst">Check-out instructions</label>
-            <textarea class="form-textarea" id="propCheckoutInstructions" rows="4" maxlength="800" placeholder="e.g., Leave keys on the kitchen table. Don't lock the door — it locks itself. Open windows to air the apartment if possible."></textarea>
+            <textarea class="form-textarea" id="propCheckoutInstructions" rows="6" maxlength="2000" placeholder="e.g., Leave keys on the kitchen table. Don't lock the door — it locks itself. Open windows to air the apartment if possible."></textarea>
             <div class="form-hint" data-h="prop_checkout_inst_hint">What guests should do before leaving.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <div class="form-card-title" data-h="prop_transport_title">Getting Around</div>
+        <div class="form-grid">
+          <div class="form-group full">
+            <label class="form-label" data-h="prop_transport">Parking, public transport & taxis</label>
+            <textarea class="form-textarea" id="propTransportInfo" rows="6" maxlength="2000" placeholder="e.g., Free street parking on Via Roma after 8pm. Bus #20 to the centre stops 50m away (every 15 min). Taxi: Radio Taxi Bari +39 080 5210500. Airport: 40 min by taxi (~€35) or the Tempesta shuttle from the station."></textarea>
+            <div class="form-hint" data-h="prop_transport_hint">Parking situation, nearest bus/metro/train, taxi numbers, airport transfers. Shown to guests in the "Staying" section. Write in your preferred language — guests can browser-translate.</div>
           </div>
         </div>
       </div>
@@ -1199,6 +1210,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <button class="panel-tab" onclick="setRecoCat('see',this)" data-h="tab_see">👁 Sights</button>
         <button class="panel-tab" onclick="setRecoCat('beach',this)" data-h="tab_beach">🏖 Beach</button>
         <button class="panel-tab" onclick="setRecoCat('shop',this)" data-h="tab_shop">🛍 Shop</button>
+        <button class="panel-tab" onclick="setRecoCat('experiences',this)" data-h="tab_experiences">✨ Experiences</button>
       </div>
 
       <div class="edit-list" id="recoList"></div>
@@ -2749,7 +2761,7 @@ const HT = {
     // Property
     prop_basic: 'Basic Information', prop_basic_desc: 'This information will appear on the guest welcome screen.',
     prop_name: 'Property Name', prop_type: 'Property Type', prop_address: 'Street Address', prop_maps_link: 'Google Maps Link', prop_maps_hint: 'Open Google Maps, find your property, tap Share → Copy link, paste here',
-    prop_city: 'City', prop_zip: 'ZIP / CAP', prop_region: 'Region', prop_cir: 'CIR Code (Regional ID)', prop_cir_hint: 'Required for Puglia DMS reporting',
+    prop_city: 'City', prop_zip: 'ZIP / CAP', prop_region: 'Region', prop_cir: 'CIN Code (National ID)', prop_cir_hint: 'Codice Identificativo Nazionale — required for tourist-accommodation reporting',
     prop_paytourist: 'PayTourist portal', prop_paytourist_hint: "Your municipality's PayTourist subdomain. Leave empty if your comune doesn't use PayTourist.", paytourist_not_set: 'ℹ️ Set your PayTourist portal in property settings to show a direct link here.',
     prop_type: 'Property type', prop_type_hint: 'Helps with platform analytics and audience-aware suggestions.',
     prop_times: 'Check-in / Check-out', prop_times_desc: 'Times and access instructions for your guests.',
@@ -2762,6 +2774,9 @@ const HT = {
     prop_checkin_inst_hint: "Step-by-step instructions for arrival. Write in your preferred language — guests can use their browser's translate feature if needed (long-press on iOS, three-dot menu on Android).",
     prop_checkout_inst: 'Check-out instructions',
     prop_checkout_inst_hint: 'What guests should do before leaving.',
+    prop_transport_title: 'Getting Around',
+    prop_transport: 'Parking, public transport & taxis',
+    prop_transport_hint: 'Parking situation, nearest bus/metro/train, taxi numbers, airport transfers. Shown to guests in the "Staying" section. Write in your preferred language — guests can browser-translate.',
     prop_dismissed_title: 'Dismissed bookings',
     prop_dismissed_hint: "Bookings you've hidden from your dashboard (test codes, friend trials, etc.). Restore any to bring it back.",
     btn_restore: 'Restore',
@@ -2796,7 +2811,7 @@ const HT = {
     // Recos
     recos_info: 'These appear in the guest app\'s "Explore" tab. Add your favorite restaurants, bars, sights, beaches, and shops.',
     btn_add_reco: '+ Add Recommendation', btn_save_recos: '💾 Save',
-    tab_food: '🍝 Food', tab_drink: '🍷 Drinks', tab_see: '👁 Sights', tab_beach: '🏖 Beach', tab_shop: '🛍 Shop',
+    tab_food: '🍝 Food', tab_drink: '🍷 Drinks', tab_see: '👁 Sights', tab_beach: '🏖 Beach', tab_shop: '🛍 Shop', tab_experiences: '✨ Experiences',
     // Checkins
     checkins_warn: 'Italian law requires all guest data to be submitted to <strong>Alloggiati Web</strong> (State Police) within 24 hours of arrival. Puglia also requires <strong>Puglia DMS</strong> reporting.',
     filter_all: 'All Bookings',
@@ -2815,7 +2830,7 @@ const HT = {
     link_alloggiati: 'Open Alloggiati Web',
     link_dms: 'Open Puglia DMS (SPOT Easy)',
     export_paytourist: '💰 PayTourist (Tourist Tax)',
-    export_paytourist_desc: 'CSV file for <strong>PayTourist</strong> (municipal tourist tax). Auto-fills guest groups, CIR code, nationality codes. Upload at Soggiorni → Importa.',
+    export_paytourist_desc: 'CSV file for <strong>PayTourist</strong> (municipal tourist tax). Auto-fills guest groups, CIN code, nationality codes. Upload at Soggiorni → Importa.',
     btn_gen_paytourist: '📥 Generate PayTourist CSV',
     link_paytourist: 'Open PayTourist Import',
     // QR
@@ -2996,7 +3011,7 @@ const HT = {
     btn_view: 'Vedi', btn_delete_single: 'Elimina',
     prop_basic: 'Informazioni Base', prop_basic_desc: 'Queste informazioni appariranno nella schermata di benvenuto.',
     prop_name: 'Nome Proprietà', prop_type: 'Tipo Proprietà', prop_address: 'Indirizzo', prop_maps_link: 'Link Google Maps', prop_maps_hint: 'Apri Google Maps, trova la tua proprietà, tocca Condividi → Copia link, incolla qui',
-    prop_city: 'Città', prop_zip: 'CAP', prop_region: 'Regione', prop_cir: 'Codice CIR (ID Regionale)', prop_cir_hint: 'Richiesto per la segnalazione Puglia DMS',
+    prop_city: 'Città', prop_zip: 'CAP', prop_region: 'Regione', prop_cir: 'Codice CIN (ID Nazionale)', prop_cir_hint: 'Codice Identificativo Nazionale — richiesto per la segnalazione delle locazioni turistiche',
     prop_paytourist: 'Portale PayTourist', prop_paytourist_hint: 'Il sottodominio PayTourist del tuo comune. Lascia vuoto se il tuo comune non usa PayTourist.', paytourist_not_set: 'ℹ️ Imposta il portale PayTourist nei dettagli proprietà per mostrare qui un link diretto.',
     prop_type: 'Tipo di immobile', prop_type_hint: 'Aiuta con le statistiche di piattaforma e i suggerimenti mirati al pubblico.',
     prop_times: 'Check-in / Check-out', prop_times_desc: 'Orari e istruzioni di accesso per gli ospiti.',
@@ -3009,6 +3024,9 @@ const HT = {
     prop_checkin_inst_hint: "Istruzioni passo-passo per l'arrivo. Scrivi nella tua lingua preferita — gli ospiti possono usare la traduzione automatica del browser (tieni premuto su iOS, menu a tre punti su Android).",
     prop_checkout_inst: 'Istruzioni di check-out',
     prop_checkout_inst_hint: 'Cosa devono fare gli ospiti prima di lasciare la proprietà.',
+    prop_transport_title: 'Come Spostarsi',
+    prop_transport: 'Parcheggio, trasporti pubblici e taxi',
+    prop_transport_hint: 'Situazione parcheggio, bus/metro/treno più vicini, numeri dei taxi, trasferimenti aeroportuali. Mostrato agli ospiti nella sezione "Soggiorno". Scrivi nella tua lingua preferita — gli ospiti possono tradurre con il browser.',
     prop_dismissed_title: 'Prenotazioni nascoste',
     prop_dismissed_hint: 'Prenotazioni che hai nascosto dalla bacheca (codici di test, prove di amici, ecc.). Ripristina per riportarne una alla vista.',
     btn_restore: 'Ripristina',
@@ -3040,7 +3058,7 @@ const HT = {
     btn_add_rule: '+ Aggiungi Regola', btn_save_rules: '💾 Salva Regole',
     recos_info: 'Questi appaiono nella scheda "Esplora" dell\'app ospiti. Aggiungi i tuoi ristoranti, bar, luoghi preferiti.',
     btn_add_reco: '+ Aggiungi Consiglio', btn_save_recos: '💾 Salva',
-    tab_food: '🍝 Cibo', tab_drink: '🍷 Bevande', tab_see: '👁 Luoghi', tab_beach: '🏖 Spiaggia', tab_shop: '🛍 Shopping',
+    tab_food: '🍝 Cibo', tab_drink: '🍷 Bevande', tab_see: '👁 Luoghi', tab_beach: '🏖 Spiaggia', tab_shop: '🛍 Shopping', tab_experiences: '✨ Esperienze',
     checkins_warn: 'La legge italiana richiede che tutti i dati degli ospiti siano inviati ad <strong>Alloggiati Web</strong> (Polizia di Stato) entro 24 ore dall\'arrivo. La Puglia richiede anche la segnalazione <strong>Puglia DMS</strong>.',
     filter_all: 'Tutte le Prenotazioni',
     export_info: 'Genera i file per i portali di conformità italiani. Il <strong>File Ospiti (.txt)</strong> è lo stesso formato accettato sia da Alloggiati Web (polizia, entro 24h dall\'arrivo) sia da SPOT Easy (turismo regionale, entro il 10 del mese successivo).',
@@ -3057,7 +3075,7 @@ const HT = {
     link_alloggiati: 'Apri Alloggiati Web',
     link_dms: 'Apri Puglia DMS (SPOT Easy)',
     export_paytourist: '💰 PayTourist (Imposta di Soggiorno)',
-    export_paytourist_desc: 'File CSV per <strong>PayTourist</strong> (tassa di soggiorno comunale). Compila automaticamente gruppi ospiti, codice CIR, codici nazionalità. Carica su Soggiorni → Importa.',
+    export_paytourist_desc: 'File CSV per <strong>PayTourist</strong> (tassa di soggiorno comunale). Compila automaticamente gruppi ospiti, codice CIN, codici nazionalità. Carica su Soggiorni → Importa.',
     btn_gen_paytourist: '📥 Genera CSV PayTourist',
     link_paytourist: 'Apri Importazione PayTourist',
     qr_title: 'Link App Ospiti',
@@ -3490,6 +3508,7 @@ async function saveProperty() {
     use_per_guest_lockbox: !!document.getElementById('propUsePerGuestLockbox')?.checked,
     checkin_instructions: document.getElementById('propCheckinInstructions')?.value || null,
     checkout_instructions: document.getElementById('propCheckoutInstructions')?.value || null,
+    transport_info: document.getElementById('propTransportInfo')?.value || null,
     wifi_name: document.getElementById('propWifiName').value,
     wifi_password: document.getElementById('propWifiPass').value,
     welcome_message: document.getElementById('propWelcome').value,
@@ -3813,6 +3832,12 @@ function renderRecos() {
       {icon:'🛍',label:'Souvenirs'},{icon:'🏺',label:'Ceramics'},{icon:'🫒',label:'Local Food'},
       {icon:'👗',label:'Fashion'},{icon:'📚',label:'Books'},{icon:'🥯',label:'Bakery'},
       {icon:'💰',label:'Budget'},{icon:'📍',label:'Nearby'},{icon:'🔥',label:'Must Visit'},
+    ],
+    experiences: [
+      {icon:'🍳',label:'Cooking Class'},{icon:'🍷',label:'Wine Tasting'},{icon:'🚤',label:'Boat Tour'},
+      {icon:'🚲',label:'Cycling'},{icon:'🥾',label:'Hiking'},{icon:'🎭',label:'Culture'},
+      {icon:'👨‍👩‍👧',label:'Family'},{icon:'❤️',label:'Romantic'},{icon:'🎫',label:'Guided Tour'},
+      {icon:'🌅',label:'Sunset'},{icon:'🔥',label:'Must Do'},{icon:'📍',label:'Nearby'},
     ],
   };
   const tags = PRESET_TAGS[activeRecoCat] || PRESET_TAGS.food;
@@ -4366,7 +4391,7 @@ function exportISTAT() {
   const lines = [
     `MODELLO C/59 - RIEPILOGO MENSILE`,
     `Struttura: ${propName}`,
-    `CIS/CIR: ${propertyData?.cir_code || 'N/D'}`,
+    `CIN: ${propertyData?.cir_code || 'N/D'}`,
     `Mese: ${new Date().toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}`,
     ``,
     `ITALIANI:   Arrivi: ${italiani.arr}   Presenze: ${italiani.pres}`,
@@ -4444,8 +4469,8 @@ function exportPayTourist() {
   const cirCode = (propertyData?.cir_code || '').trim();
   if (!cirCode) {
     toast(hostLang === 'it'
-      ? '⚠ Inserisci il codice CIR in Dettagli Proprietà prima di esportare'
-      : '⚠ Enter your CIR code in Property Details before exporting');
+      ? '⚠ Inserisci il codice CIN in Dettagli Proprietà prima di esportare'
+      : '⚠ Enter your CIN code in Property Details before exporting');
     return;
   }
 
@@ -5647,6 +5672,7 @@ function fillPropertyForm(data) {
   if (el('propUsePerGuestLockbox')) el('propUsePerGuestLockbox').checked = !!data.use_per_guest_lockbox;
   if (el('propCheckinInstructions')) el('propCheckinInstructions').value = data.checkin_instructions || '';
   if (el('propCheckoutInstructions')) el('propCheckoutInstructions').value = data.checkout_instructions || '';
+  if (el('propTransportInfo')) el('propTransportInfo').value = data.transport_info || '';
   onTogglePerGuestLockbox(); // refresh check-ins list visibility of per-guest field
   if (el('propWifiName')) el('propWifiName').value = data.wifi_name || '';
   if (el('propWifiPass')) el('propWifiPass').value = data.wifi_password || '';

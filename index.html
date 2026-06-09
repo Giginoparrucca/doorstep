@@ -880,6 +880,19 @@ body.tab-chat #privacyLink {
         </div>
       </div>
     </div>
+
+    <!-- Transport / getting around — full-width card, hidden if the host
+         hasn't filled it in. Free text from the host (parking, transit,
+         taxis, airport). -->
+    <div class="home-card" id="transportCard" style="display:none">
+      <div class="home-card-row">
+        <div class="home-card-icon">🚍</div>
+        <div class="home-card-body">
+          <div class="home-card-label" data-i18n="transport_label">Getting around</div>
+          <div class="home-card-text" id="transportInfoText" style="margin-top:6px;padding-top:0;border-top:none"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ════════════════════════════════════════════════════════
@@ -1494,6 +1507,7 @@ const T = {
     checkin_time_label: 'Check-in time',
     checkout_time_label: 'Check-out time',
     wifi_label: 'WiFi',
+    transport_label: 'Getting around',
     // Check-in
     checkin_title: 'Online Check-in',
     checkin_h2: 'Complete Your Check-in',
@@ -1574,7 +1588,7 @@ const T = {
     chat_placeholder: 'Ask anything…',
     nav_home: 'Home', nav_rules: 'Rules', nav_explore: 'Explore', nav_chat: 'Chat',
     sug1: 'What\'s the WiFi password?', sug2: 'Best restaurant nearby?', sug3: 'How does check-out work?', sug4: 'Talk to a human',
-    cat_all: 'All', cat_food: '🍝 Food', cat_drink: '🍷 Drinks', cat_see: '👁 See', cat_beach: '🏖 Beach', cat_shop: '🛍 Shop',
+    cat_all: 'All', cat_food: '🍝 Food', cat_drink: '🍷 Drinks', cat_see: '👁 See', cat_beach: '🏖 Beach', cat_shop: '🛍 Shop', cat_experiences: '✨ Experiences',
     open_maps: 'Open in Maps',
     loading: 'Loading…',
     req: '*',
@@ -1618,6 +1632,7 @@ const T = {
     checkin_time_label: 'Orario check-in',
     checkout_time_label: 'Orario check-out',
     wifi_label: 'WiFi',
+    transport_label: 'Come spostarsi',
     checkin_title: 'Check-in Online',
     checkin_h2: 'Completa il Check-in',
     checkin_p: 'La legge italiana richiede la registrazione di tutti gli ospiti. Ci vogliono circa 2 minuti per ospite.',
@@ -1691,7 +1706,7 @@ const T = {
     chat_placeholder: 'Chiedi qualsiasi cosa…',
     nav_home: 'Home', nav_rules: 'Regole', nav_explore: 'Esplora', nav_chat: 'Chat',
     sug1: 'Qual è la password WiFi?', sug2: 'Miglior ristorante vicino?', sug3: 'Come funziona il check-out?', sug4: 'Parla con una persona',
-    cat_all: 'Tutti', cat_food: '🍝 Cibo', cat_drink: '🍷 Bevande', cat_see: '👁 Vedere', cat_beach: '🏖 Spiaggia', cat_shop: '🛍 Shopping',
+    cat_all: 'Tutti', cat_food: '🍝 Cibo', cat_drink: '🍷 Bevande', cat_see: '👁 Vedere', cat_beach: '🏖 Spiaggia', cat_shop: '🛍 Shopping', cat_experiences: '✨ Esperienze',
     open_maps: 'Apri in Mappe',
     loading: 'Caricamento…',
     req: '*',
@@ -3266,8 +3281,8 @@ let recosFromDB = null;
 let activeCat = 'all';
 
 function renderCatTabs() {
-  const cats = ['all','food','drink','see','beach','shop'];
-  const keys = ['cat_all','cat_food','cat_drink','cat_see','cat_beach','cat_shop'];
+  const cats = ['all','food','drink','see','beach','shop','experiences'];
+  const keys = ['cat_all','cat_food','cat_drink','cat_see','cat_beach','cat_shop','cat_experiences'];
   document.getElementById('catTabs').innerHTML = cats.map((c,i) =>
     `<button class="cat-tab ${c===activeCat?'active':''}" onclick="filterCat('${c}')">${T[lang][keys[i]]}</button>`
   ).join('');
@@ -3276,7 +3291,7 @@ function filterCat(c) { activeCat = c; renderRecos(); }
 
 function renderRecos() {
   renderCatTabs();
-  const CAT_ICON = { food: '🍽️', drink: '🍷', see: '🏛️', beach: '🏖️', shop: '🛍️' };
+  const CAT_ICON = { food: '🍽️', drink: '🍷', see: '🏛️', beach: '🏖️', shop: '🛍️', experiences: '✨' };
   let data;
   if (recosFromDB && recosFromDB.length > 0) {
     data = recosFromDB.map(r => ({
@@ -3890,6 +3905,12 @@ async function init() {
       if (el('hostAvatar')) el('hostAvatar').textContent = (d.host_names || 'H').charAt(0);
       if (el('hostMsg') && d.welcome_message) el('hostMsg').textContent = d.welcome_message;
       if (el('emergencyNum')) el('emergencyNum').textContent = `112 · ${d.host_names || 'Host'}: ${d.host_phone || ''}`;
+
+      // Round 21: transport / getting-around info (Staying section).
+      // Hidden if the host hasn't filled it in.
+      const transportInfo = (d.transport_info || '').trim();
+      if (el('transportInfoText')) el('transportInfoText').textContent = transportInfo;
+      if (el('transportCard')) el('transportCard').style.display = transportInfo ? 'block' : 'none';
 
       // ── Round 19: Check-in/out instructions + lockbox code ──────────
       // Round 19.1 restructure: instructions are now rendered INSIDE

@@ -63,6 +63,11 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 22.1 — Guest reco category tabs wrap (no more sideways scroll) _(2026-06-09)_
+- **Feedback**: with 7 categories (after adding Experiences), the guest Explore category tabs scrolled sideways, hiding the last ones off-screen.
+- **Fix**: changed `.cat-tabs` from `overflow-x: auto` + single nowrap row to `flex-wrap: wrap`. All categories now flow onto a second row and are visible at first glance. Removed the now-unused `::-webkit-scrollbar` rule. Pills keep their shape and individual widths (a grid would cramp the varying label lengths).
+- **Files**: `index.html`
+
 ### Round 22 — Property detail + guest info updates _(2026-06-09)_
 Four changes across host console + guest app:
 

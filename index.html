@@ -96,6 +96,11 @@ body {
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(0,91,255,0.08);
 }
+/* When the preview-mode banner is showing, the body gets padding-top to
+   make room for the fixed banner. But sticky top-bars stick to top:0 of
+   the scroll container and slide UNDER the banner. Offset them so they
+   stick just below it instead. */
+body.has-test-banner .top-bar { top: 36px; }
 .top-bar-title {
   font-family: 'Playfair Display', serif;
   font-size: 1.1rem; font-weight: 500; color: var(--ink);
@@ -4234,8 +4239,11 @@ function setupTestModeBanner() {
     <button onclick="exitTestMode()" style="margin-left:8px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.22);color:#fff;padding:3px 10px;border-radius:4px;font-size:0.7rem;cursor:pointer;font-family:inherit;">${it ? 'Esci' : 'Exit'}</button>`;
   document.body.insertBefore(banner, document.body.firstChild);
   // Push down the whole app to make room for the banner. The simplest
-  // way without restructuring CSS is a body padding-top.
+  // way without restructuring CSS is a body padding-top. The body class
+  // also offsets sticky top-bars so they stick below the banner instead
+  // of sliding under it (which hid the language toggle).
   document.body.style.paddingTop = '36px';
+  document.body.classList.add('has-test-banner');
 }
 
 function exitTestMode() {

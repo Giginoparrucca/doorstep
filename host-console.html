@@ -255,6 +255,57 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   font-size: 1.1rem; font-weight: 500; margin-bottom: 4px;
 }
 .form-card-desc { font-size: 0.82rem; color: var(--ink-soft); margin-bottom: 18px; font-weight: 300; }
+
+/* ── Compliance Guide (static reference) ── */
+.cmp-axis-tag {
+  display: inline-block; font-size: 0.6rem; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 20px; margin-bottom: 10px;
+}
+.cmp-axis-tag.police { background: rgba(224,69,94,0.1); color: #b03939; }
+.cmp-axis-tag.stat   { background: rgba(0,91,255,0.1); color: var(--warm); }
+.cmp-axis-tag.tax    { background: rgba(224,152,46,0.12); color: #9a6b00; }
+.cmp-meta {
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0;
+}
+.cmp-meta-item {
+  font-size: 0.72rem; background: var(--cream-2); border-radius: 8px;
+  padding: 6px 11px; color: var(--ink-soft);
+}
+.cmp-meta-item strong { color: var(--ink); font-weight: 600; }
+.cmp-acc {
+  border: 1px solid var(--border); border-radius: 10px;
+  margin-bottom: 8px; overflow: hidden; background: var(--white);
+}
+.cmp-acc > summary {
+  padding: 12px 14px; cursor: pointer; font-size: 0.85rem;
+  font-weight: 500; color: var(--ink); list-style: none;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px;
+}
+.cmp-acc > summary::-webkit-details-marker { display: none; }
+.cmp-acc > summary::after {
+  content: '+'; font-size: 1.1rem; color: var(--warm); font-weight: 600;
+  transition: transform 0.2s;
+}
+.cmp-acc[open] > summary::after { content: '−'; }
+.cmp-acc > summary:hover { background: var(--cream); }
+.cmp-acc-body {
+  padding: 0 14px 14px; font-size: 0.8rem; line-height: 1.6;
+  color: var(--ink-soft); font-weight: 300;
+}
+.cmp-acc-body strong { color: var(--ink); font-weight: 600; }
+.cmp-acc-body ul { margin: 8px 0 8px 18px; }
+.cmp-acc-body li { margin-bottom: 4px; }
+.cmp-acc-body a { color: var(--warm); text-decoration: none; }
+.cmp-acc-body a:hover { text-decoration: underline; }
+.cmp-region-list { columns: 2; font-size: 0.78rem; margin: 8px 0; }
+@media (max-width: 600px) { .cmp-region-list { columns: 1; } }
+.cmp-disclaimer {
+  font-size: 0.74rem; color: var(--ink-soft); font-style: italic;
+  background: var(--amber-bg); border-left: 3px solid var(--amber);
+  padding: 10px 14px; border-radius: 6px; margin-top: 14px; font-weight: 300;
+}
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .form-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
 .form-group { display: flex; flex-direction: column; gap: 4px; }
@@ -902,6 +953,10 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       <span data-h="sidebar_export">Export / Alloggiati</span>
     </button>
+    <button class="sidebar-item" onclick="showPanel('compliance', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span data-h="sidebar_compliance">Compliance Guide</span>
+    </button>
 
     <div class="sidebar-section" data-h="sidebar_share_sec">Share</div>
     <button class="sidebar-item" onclick="showPanel('qrlink', this)">
@@ -1299,6 +1354,12 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
 
       </div>
+    </div>
+
+    <!-- ════════════ COMPLIANCE GUIDE (static reference) ════════════ -->
+    <div class="panel" id="panel-compliance">
+      <div class="alert alert-info" data-h="cmp_intro"></div>
+      <div id="complianceContent"></div>
     </div>
 
     <!-- ════════════ QR CODE & LINK ════════════ -->
@@ -2654,6 +2715,8 @@ const HT = {
     sidebar_recos: 'Recommendations', sidebar_checkins: 'Check-in Data', sidebar_export: 'Export & Compliance',
     sidebar_qr: 'QR Code & Link', sidebar_role: 'Property Manager',
     sidebar_guest_analytics: 'Guest Analytics',
+    sidebar_compliance: 'Compliance Guide',
+    cmp_intro: 'A plain-language guide to the three compliance obligations for short-term rentals in Italy. This is reference information — verify the specifics for your region and comune.',
     // Panel titles
     t_dashboard: 'Dashboard', s_dashboard: 'What needs your attention right now',
     // Round 15 — action-board dashboard
@@ -2719,6 +2782,7 @@ const HT = {
     t_recos: 'Recommendations', s_recos: 'Curate local tips for your guests',
     t_checkins: 'Check-in Data', s_checkins: 'View and manage guest registrations',
     t_export: 'Export & Compliance', s_export: 'Generate files for Italian authorities',
+    t_compliance: 'Compliance Guide', s_compliance: 'Your obligations explained: police, statistics, tourist tax',
     t_qrlink: 'QR Code & Link', s_qrlink: 'Share your guest portal',
     // Chat
     sidebar_chat: 'Guest Chat',
@@ -2908,6 +2972,8 @@ const HT = {
     sidebar_recos: 'Consigli', sidebar_checkins: 'Dati Check-in', sidebar_export: 'Export & Conformità',
     sidebar_qr: 'QR Code & Link', sidebar_role: 'Gestore Proprietà',
     sidebar_guest_analytics: 'Analisi Ospiti',
+    sidebar_compliance: 'Guida Conformità',
+    cmp_intro: 'Una guida in linguaggio semplice ai tre obblighi di conformità per le locazioni brevi in Italia. È informazione di riferimento — verifica i dettagli per la tua regione e il tuo comune.',
     t_dashboard: 'Dashboard', s_dashboard: 'Cosa richiede la tua attenzione adesso',
     // Round 15 — bacheca azioni
     dash_loading: 'Caricamento…',
@@ -2972,6 +3038,7 @@ const HT = {
     t_recos: 'Consigli', s_recos: 'Cura i consigli locali per i tuoi ospiti',
     t_checkins: 'Dati Check-in', s_checkins: 'Visualizza e gestisci le registrazioni degli ospiti',
     t_export: 'Export & Conformità', s_export: 'Genera file per le autorità italiane',
+    t_compliance: 'Guida Conformità', s_compliance: 'I tuoi obblighi spiegati: polizia, statistica, imposta di soggiorno',
     t_qrlink: 'QR Code & Link', s_qrlink: 'Condividi il portale ospiti',
     sidebar_chat: 'Chat Ospiti',
     t_chat: 'Chat Ospiti', s_chat: 'Rispondi ai messaggi degli ospiti',
@@ -3174,6 +3241,7 @@ function setHostLang(l) {
   renderCheckins();
   renderRules();
   renderRecos();
+  if (typeof renderCompliance === 'function') renderCompliance();
   if (typeof renderPropertySwitcher === 'function') renderPropertySwitcher(); // Round 21
   // Round 11.4: action board cards are built from h() — re-render them too,
   // but ONLY if the analytics panel is currently visible (otherwise we'd
@@ -3201,6 +3269,7 @@ const titlesMap = {
   checkins: ['t_checkins', 's_checkins'],
   guestanalytics: ['t_guest_analytics', 's_guest_analytics'],
   export: ['t_export', 's_export'],
+  compliance: ['t_compliance', 's_compliance'],
   qrlink: ['t_qrlink', 's_qrlink'],
   chat: ['t_chat', 's_chat'],
 };
@@ -3228,6 +3297,7 @@ function showPanel(id, btn) {
   document.getElementById('sidebar').classList.remove('open');
   document.getElementById('sidebarOverlay').classList.remove('show');
   if (id === 'qrlink') initQRPanel();
+  if (id === 'compliance') renderCompliance();
   if (id === 'property') renderDismissedList();
   if (id === 'chat') { loadHostChat(); document.getElementById('chatBadge').style.display = 'none'; markChatSeen(); requestNotifPermission(); }
   if (id === 'guestanalytics') loadGuestAnalytics();
@@ -3802,6 +3872,134 @@ function setRecoCat(cat, btn) {
   document.querySelectorAll('#recoTabs .panel-tab').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   renderRecos();
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   COMPLIANCE GUIDE (Round 23) — static reference, region/comune-agnostic.
+   Three independent obligation axes for Italian short-term rentals:
+     1. POLICE   — Alloggiati Web (national, individual guests, 24h)
+     2. STATS    — regional flow reporting (ROSS1000 / regional variants,
+                   aggregate, monthly)
+     3. TAX      — imposta di soggiorno (municipal, per-comune delibera)
+   Content is bilingual. This is reference material the host reads and
+   acts on; the dynamic region/comune filtering comes in a later round.
+   All facts here were verified against official/authoritative sources
+   in June 2026 — see CHANGELOG for the research notes.
+══════════════════════════════════════════════════════════════════════ */
+const COMPLIANCE_CONTENT = {
+  en: {
+    police: {
+      tag: 'Police · National',
+      title: '🏛 Alloggiati Web — guest registration with the Police',
+      meta: [['Who', 'All hosts, nationwide'], ['When', 'Within 24h of arrival'], ['Data', 'Each individual guest']],
+      body: `<p>You report each guest's identity document to the <strong>Polizia di Stato</strong> via the Alloggiati Web portal, within 24 hours of arrival (or at arrival for stays under 24h). This is a <strong>public-security</strong> obligation and applies everywhere in Italy.</p>
+        <p>WelcomeBnB already generates the Alloggiati <strong>.txt</strong> file for you on the Export tab — you upload it to the portal. Some regions also accept the same file through a regional portal (see below), but that does <strong>not</strong> remove the Alloggiati obligation.</p>
+        <ul>
+          <li><a href="https://alloggiatiweb.poliziadistato.it" target="_blank" rel="noopener">Open Alloggiati Web ↗</a></li>
+        </ul>`,
+    },
+    stats: {
+      tag: 'Statistics · Regional',
+      title: '📊 Tourist flow reporting (ROSS1000 & regional systems)',
+      meta: [['Who', 'All hosts incl. short lets'], ['When', 'Monthly, incl. "zero" months'], ['Data', 'Aggregate arrivals & nights']],
+      body: `<p>Separately from the Police report, every region requires <strong>aggregate statistical reporting</strong> of arrivals, nights (presenze) and guest origin — forwarded to ISTAT. This is <strong>monthly</strong>, and you must file even for months with <strong>no guests</strong> ("zero" declaration) or when the property is temporarily closed.</p>
+        <p><strong>This is a different obligation from Alloggiati Web</strong> — filing one does not satisfy the other. Both must be done.</p>
+        <p>The portal depends on your region. The most widespread is <strong>ROSS1000</strong> (formerly Turismo5), used by:</p>
+        <div class="cmp-region-list">Abruzzo · Basilicata · Calabria · Emilia-Romagna · Lazio · Liguria · Lombardia · Marche · Molise · Piemonte · Sardegna · Toscana · Veneto</div>
+        <p>Other regions run their own systems — e.g. <strong>Sinfonia</strong> in Campania, <strong>STU/DTU</strong> in Trento. <strong>Puglia</strong> (your test property's region) uses the regional flow system too. Always confirm the system in force in your area.</p>
+        <ul>
+          <li><a href="https://flussituristici.regione.veneto.it/" target="_blank" rel="noopener">ROSS1000 Veneto ↗</a> (login via SPID/CIE)</li>
+          <li>For other regions, search "[your region] ROSS1000" or check your regional tourism office.</li>
+        </ul>
+        <p><em>Note:</em> ROSS1000 can also generate the Alloggiati .txt for you, but you still upload it to Alloggiati Web yourself.</p>`,
+    },
+    tax: {
+      tag: 'Tourist Tax · Municipal',
+      title: '💶 Imposta di soggiorno (tourist tax)',
+      meta: [['Who', 'Only where the comune levies it'], ['Pay to comune', 'Monthly/quarterly (varies)'], ['Declare to AdE', 'Annually by 30 June']],
+      body: `<p>The tourist tax is a <strong>municipal</strong> tax — it only exists if your <strong>comune</strong> has adopted it by council resolution (<em>delibera</em>). You collect it from guests and pay it to the comune. Rules vary significantly by municipality:</p>
+        <ul>
+          <li><strong>Rate</strong>: set per night per person by the delibera (generally up to €5/night; some art cities up to €10).</li>
+          <li><strong>Night cap</strong>: many comuni only charge the first N consecutive nights (e.g. first 5 or 10).</li>
+          <li><strong>Exemptions</strong>: vary by comune — commonly children under a certain age, the disabled and a companion, sometimes armed forces. Ages and categories differ between municipalities.</li>
+        </ul>
+        <p><strong>Two separate deadlines</strong> hosts often confuse:</p>
+        <ul>
+          <li><strong>Payment to the comune</strong> — its own schedule (usually monthly or quarterly), set by the delibera.</li>
+          <li><strong>Annual declaration to the Agenzia delle Entrate</strong> — single national deadline, <strong>30 June</strong> each year (introduced by D.L. 34/2020, art. 180). Being current on payments does <strong>not</strong> exempt you from the declaration. Declarations must be kept until 31 December of the fifth following year.</li>
+        </ul>
+        <p>If you use <strong>PayTourist</strong>, it handles the calculation, exemptions and the comune-specific rules for you, and assists with the annual declaration. Check your comune's delibera for the exact rates and exemptions.</p>`,
+    },
+    disclaimer: 'This guide is general reference information, not legal or tax advice, and obligations change. Always verify the current rules with your Region, your Comune, and the Agenzia delle Entrate, or consult a qualified advisor.',
+  },
+  it: {
+    police: {
+      tag: 'Polizia · Nazionale',
+      title: '🏛 Alloggiati Web — registrazione ospiti alla Polizia',
+      meta: [['Chi', 'Tutti gli host, in tutta Italia'], ['Quando', 'Entro 24h dall\'arrivo'], ['Dati', 'Ogni singolo ospite']],
+      body: `<p>Comunichi il documento d'identità di ogni ospite alla <strong>Polizia di Stato</strong> tramite il portale Alloggiati Web, entro 24 ore dall'arrivo (o all'arrivo per soggiorni sotto le 24h). È un obbligo di <strong>pubblica sicurezza</strong> e vale in tutta Italia.</p>
+        <p>WelcomeBnB genera già per te il file <strong>.txt</strong> Alloggiati nella scheda Esporta — devi caricarlo sul portale. Alcune regioni accettano lo stesso file tramite un portale regionale (vedi sotto), ma questo <strong>non</strong> elimina l'obbligo Alloggiati.</p>
+        <ul>
+          <li><a href="https://alloggiatiweb.poliziadistato.it" target="_blank" rel="noopener">Apri Alloggiati Web ↗</a></li>
+        </ul>`,
+    },
+    stats: {
+      tag: 'Statistica · Regionale',
+      title: '📊 Rilevazione flussi turistici (ROSS1000 e sistemi regionali)',
+      meta: [['Chi', 'Tutti gli host, incl. locazioni brevi'], ['Quando', 'Mensile, anche mesi "a zero"'], ['Dati', 'Arrivi e presenze aggregati']],
+      body: `<p>Separatamente dalla comunicazione alla Polizia, ogni regione richiede la <strong>comunicazione statistica aggregata</strong> di arrivi, presenze e provenienza degli ospiti — poi inoltrata all'ISTAT. È <strong>mensile</strong>, e va presentata anche per i mesi <strong>senza ospiti</strong> (dichiarazione "a zero") o quando la struttura è temporaneamente chiusa.</p>
+        <p><strong>È un obbligo diverso da Alloggiati Web</strong> — adempiere a uno non sostituisce l'altro. Vanno fatti entrambi.</p>
+        <p>Il portale dipende dalla tua regione. Il più diffuso è <strong>ROSS1000</strong> (ex Turismo5), usato da:</p>
+        <div class="cmp-region-list">Abruzzo · Basilicata · Calabria · Emilia-Romagna · Lazio · Liguria · Lombardia · Marche · Molise · Piemonte · Sardegna · Toscana · Veneto</div>
+        <p>Altre regioni hanno sistemi propri — es. <strong>Sinfonia</strong> in Campania, <strong>STU/DTU</strong> a Trento. Anche la <strong>Puglia</strong> (la regione della tua struttura di test) usa il sistema regionale dei flussi. Verifica sempre il sistema in vigore nella tua zona.</p>
+        <ul>
+          <li><a href="https://flussituristici.regione.veneto.it/" target="_blank" rel="noopener">ROSS1000 Veneto ↗</a> (accesso con SPID/CIE)</li>
+          <li>Per altre regioni, cerca "[tua regione] ROSS1000" o contatta l'ufficio turismo regionale.</li>
+        </ul>
+        <p><em>Nota:</em> ROSS1000 può anche generare il file .txt Alloggiati, ma il caricamento su Alloggiati Web resta a tuo carico.</p>`,
+    },
+    tax: {
+      tag: 'Imposta di soggiorno · Comunale',
+      title: '💶 Imposta di soggiorno',
+      meta: [['Chi', 'Solo dove il comune la applica'], ['Versamento al comune', 'Mensile/trimestrale (varia)'], ['Dichiarazione AdE', 'Annuale entro il 30 giugno']],
+      body: `<p>L'imposta di soggiorno è un tributo <strong>comunale</strong> — esiste solo se il tuo <strong>comune</strong> l'ha adottata con delibera di consiglio. La riscuoti dagli ospiti e la versi al comune. Le regole variano molto da comune a comune:</p>
+        <ul>
+          <li><strong>Tariffa</strong>: stabilita per notte e per persona dalla delibera (in genere fino a €5/notte; alcune città d'arte fino a €10).</li>
+          <li><strong>Limite notti</strong>: molti comuni applicano l'imposta solo alle prime N notti consecutive (es. prime 5 o 10).</li>
+          <li><strong>Esenzioni</strong>: variano per comune — tipicamente minori sotto una certa età, disabili e un accompagnatore, a volte forze armate. Età e categorie cambiano tra comuni.</li>
+        </ul>
+        <p><strong>Due scadenze distinte</strong> che spesso si confondono:</p>
+        <ul>
+          <li><strong>Versamento al comune</strong> — con cadenza propria (di solito mensile o trimestrale), fissata dalla delibera.</li>
+          <li><strong>Dichiarazione annuale all'Agenzia delle Entrate</strong> — scadenza nazionale unica, <strong>30 giugno</strong> di ogni anno (introdotta dal D.L. 34/2020, art. 180). Essere in regola con i versamenti <strong>non</strong> esonera dalla dichiarazione. Le dichiarazioni vanno conservate fino al 31 dicembre del quinto anno successivo.</li>
+        </ul>
+        <p>Se usi <strong>PayTourist</strong>, gestisce per te il calcolo, le esenzioni e le regole specifiche del comune, e assiste con la dichiarazione annuale. Controlla la delibera del tuo comune per tariffe ed esenzioni esatte.</p>`,
+    },
+    disclaimer: 'Questa guida è informazione generale di riferimento, non consulenza legale o fiscale, e gli obblighi cambiano. Verifica sempre le regole aggiornate con la tua Regione, il tuo Comune e l\'Agenzia delle Entrate, oppure consulta un professionista.',
+  },
+};
+
+function renderCompliance() {
+  const box = document.getElementById('complianceContent');
+  if (!box) return;
+  const lang = (typeof hostLang !== 'undefined' && hostLang === 'it') ? 'it' : 'en';
+  const c = COMPLIANCE_CONTENT[lang];
+  const axisClass = { police: 'police', stats: 'stat', tax: 'tax' };
+  const sections = ['police', 'stats', 'tax'].map(key => {
+    const s = c[key];
+    const meta = s.meta.map(m => `<span class="cmp-meta-item"><strong>${m[0]}:</strong> ${m[1]}</span>`).join('');
+    return `
+      <div class="form-card">
+        <span class="cmp-axis-tag ${axisClass[key]}">${s.tag}</span>
+        <div class="form-card-title">${s.title}</div>
+        <div class="cmp-meta">${meta}</div>
+        <details class="cmp-acc">
+          <summary>${lang === 'it' ? 'Dettagli e link' : 'Details & links'}</summary>
+          <div class="cmp-acc-body">${s.body}</div>
+        </details>
+      </div>`;
+  }).join('');
+  box.innerHTML = sections + `<div class="cmp-disclaimer">⚖ ${c.disclaimer}</div>`;
 }
 
 function renderRecos() {

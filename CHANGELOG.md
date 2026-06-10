@@ -65,6 +65,25 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 24 — Veneto exports: ROSS1000 XML + CityTax declaration helper _(2026-06-10)_
+Built both Veneto exports against the real specs gathered last round.
+
+- **ROSS1000 statistical XML** (`exportRoss1000`, under the Statistics axis): generates the GIES Turismo5 v2.4 `<movimenti>` file for a chosen month — one `<movimento>` per day with `<struttura>` occupancy, `<arrivi>` on each guest's arrival date, `<partenze>` on departure date. Head/member grouping resolves `idcapo` from `idswh`. All location/guest-type codes reuse the existing Polizia lookups (`lookupStateCode`/`lookupPoliceCode`). `idswh` is a deterministic ≤20-char djb2 hash (UUIDs are too long). Downloadable `.xml` for file-upload mode; SOAP transmission intentionally out of scope. Verified end-to-end with a mixed IT-adult + FR-minor booking: correct codes, occupancy, head→member ref, departures.
+- **CityTax declaration helper** (`exportCityTax`, under the Tourist Tax axis): CityTax++ has no public file import (the `TBPRES.xls` automatic-mode layout is login-gated per-comune), and small hosts use declarative mode anyway — so this computes the quarterly figures to type into the portal: taxable overnights, exempt/over-cap overnights, arrivals, and amount due. Applies the comune's rate, max-taxable-consecutive-nights cap (counting only in-period nights, per the documented straddling rule), and exempt-under-age. Shows on-screen + downloads a `.txt` record. Verified: 3 taxable + 3 exempt nights → €6.00 at €2/night with a cap of 5 and exempt-under-14.
+- **New property settings** (`migration_round24_veneto_exports.sql`): `ross1000_codice`, `rooms_available`, `beds_available`, `default_tipoturismo`, `default_mezzotrasporto`, `tax_rate_eur`, `tax_max_nights`, `tax_exempt_under_age`. New "Tourist Tax Configuration" card + ROSS1000/capacity fields in Property Details. All wired to save/load; numeric fields via `_numOrNull`. Bilingual EN/IT throughout.
+- **Deferred**: CityTax *file* exporter (needs a host's per-comune `TBPRES.xls`); ROSS1000 SOAP transmission; per-guest tipoturismo/mezzotrasporto (property-level default for now). Known limitation: residence defaults to citizenship/birth comune since we don't capture a separate residence field — fine for stats, flagged for later.
+- **Files**: `host-console.html`, `migration_round24_veneto_exports.sql`
+
+### Round 23.1 — Export section restructured into the three compliance axes _(2026-06-10)_
+- Reorganized the Export panel to mirror the Compliance Guide's three obligations, each as a labeled group with the right export(s) + portal links:
+  - **🏛 Police · National** — Alloggiati `.txt` (working). Links: Alloggiati Web + Puglia SPOT Easy (same file accepted by both). Renamed from the misleading "Police & Tourism Report" — SPOT Easy is the regional *police-data* upload path, not tourism statistics.
+  - **📊 Statistics · Regional** — C/59 monthly summary (working, human-readable) + a "your region's portal" explainer card. Link: ROSS1000 (Veneto). Honest labeling that C/59 is a reference summary for manual entry, **not** yet the ROSS1000 file format.
+  - **💶 Tourist Tax · Municipal** — PayTourist CSV (working) + dynamic PayTourist portal link.
+  - **Utility** — raw CSV for the host's own records.
+- New axis-group CSS (tags reuse the compliance colour coding). Bilingual EN/IT for all new tags/titles/notes/links.
+- **Honest scope note**: did NOT fabricate a ROSS1000/regional XML exporter. The regional statistical file format is per-region and its official tracciato is distributed to software houses by the regions (e.g. via giesturismo@gies.sm); building it requires the specific published spec for the region a host actually files in. Flagged in the regional explainer card and the roadmap. Also spotted (not fixed this round, scope): `exportISTAT` counts presenze as 1 night/guest rather than actual nights stayed — worth fixing when the statistical export is built out.
+- **Files**: `host-console.html`
+
 ### Round 23 — Compliance Guide (static reference) _(2026-06-10)_
 First half of the "region/city-adaptive compliance" work. This round delivers a **static, bilingual reference section**; dynamic region/comune filtering comes later.
 

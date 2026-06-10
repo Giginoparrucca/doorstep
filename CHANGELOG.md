@@ -12,6 +12,10 @@ Newest entries at the top of each section.
 Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ### High value, ready to build
+- **Multi-language for host free-text content** _(scoped Round 23, building next)_
+  **Decision made**: JSONB-per-field architecture (`{"en": "...", "it": "...", "de": "..."}` in one column per translatable field — welcome message, check-in/checkout instructions, transport info, reco descriptions), so adding a language never needs a schema migration. Guest app reads `field[guestLang] || field[hostDefaultLang]`. Plus an optional **"suggest translation"** button per field that pre-fills a language via the Anthropic API for the host to review/edit — **never auto-published**, especially for safety-critical check-in instructions. Migration: convert existing TEXT columns to JSONB, back-filling current content under the host's default language key. Guest + host render/save paths updated to read/write the active language key. **This is the agreed next round.**
+
+### High value, ready to build (continued)
 - **Automated Alloggiati Web submission (SOAP)** — _full spec written: `SPEC_alloggiati_web_service.md`_
   The big one. Direct API filing to the Polizia di Stato instead of manual `.txt` upload. The data-format layer is already done (Rounds 8/9/18.2/18.3); this adds a SOAP transport layer (GenerateToken → Test → Send → Ricevuta) via a new Vercel function, encrypted credential storage, and per-guest filing-status chips in the host console. HIGH risk (government system, sensitive credentials, SOAP). Build in phases — Phases 1–2 (auth + validate) carry zero filing risk. **Gated on Phase 0 pre-flight**: confirm web-service access is enabled on the test account + generate a WSKEY (one per day, invalidated on every password change). See the spec for the full breakdown.
 - **Cross-property guest read leak fix** _(deferred from Round 12.1)_
@@ -23,12 +27,10 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
   - Per-Guest Action Board: weight "checking out today" higher in sort
 
 ### Medium value, build when triggered
-- **Multi-language strategy beyond EN/IT** _(flagged Round 19)_
-  Currently the guest app supports only EN/IT toggle. Real Italian B&Bs receive guests from France, Germany, Spain, the Netherlands, Eastern Europe, etc. — most read English fine, but not all. Three approaches worth considering when this surfaces as a real need:
-  - **Pre-translate at save time**: host writes once, app calls Claude to fill in 4-5 other languages, stored as JSONB column. Host can review/edit. ~$0.005 per property edit. Zero runtime cost. Best UX for guests; some host friction.
-  - **On-demand translation in guest app**: a small "translate" button on each text section calls Claude. Cheap (~$0.001 per click), but every guest re-pays the cost. Adds latency.
-  - **Browser-native translate hint** (current approach): zero cost, zero risk, but discoverability is poor and trust is uneven for safety-critical instructions.
-  Right call probably hinges on whether non-EN/IT guests become >10% of volume. Worth measuring before building. **Trigger**: when a host explicitly asks, or when we see French/German/Spanish browser-language sessions hitting >15% in admin analytics.
+- **Dynamic compliance (region/comune-aware)** _(Phase 1 of compliance, after Round 23 static guide)_
+  Round 23 shipped the static Compliance Guide. Next phases: (1) add `region` + `comune` fields to properties → filter the guide to show only what applies (region drives which statistical portal is named; comune drives the tourist-tax pointer). (2) Much later and only if clearly worth it: actual imposta-di-soggiorno calculation — dangerous, needs a per-comune config (rate, night cap, exemption ages/categories) maintained as deliberas change yearly. PayTourist already does this; duplicating may not be worth the maintenance. **Trigger**: hosts in multiple regions, or a host explicitly asking for region-specific guidance.
+- **Adding languages beyond EN/IT to the UI strings** _(flagged Round 19; content-side handled by the JSONB work above)_
+  The `T`/`h()` UI-string objects are still EN/IT only. Once the free-text content goes multilingual (JSONB, next round), the remaining piece is adding more UI-string locales (French, German, Spanish) to the static label dictionaries. Right call hinges on whether non-EN/IT guests become a real share of volume. **Trigger**: a host asks, or French/German/Spanish browser-language sessions exceed ~15% in admin analytics.
 - **Year-over-year analytics view** using `analytics_monthly`
   The aggregate table is being populated; nothing currently *reads* it in the admin UI. Build a comparison view (Apr 2026 vs Apr 2025 etc.) once you have at least two seasons of data.
 - **Channel manager / OTA calendar sync (Airbnb, Booking.com)**
@@ -62,6 +64,19 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 ---
 
 ## 📋 Done / Shipped
+
+### Round 23 — Compliance Guide (static reference) _(2026-06-10)_
+First half of the "region/city-adaptive compliance" work. This round delivers a **static, bilingual reference section**; dynamic region/comune filtering comes later.
+
+- **New "Compliance Guide" panel** in the host console (sidebar item after Export). Organized around the three independent obligation axes for Italian short-term rentals, which is the key conceptual insight — they vary on different geographic levels and must each be satisfied separately:
+  1. **Police · National** — Alloggiati Web, individual guests, within 24h. (We already generate the .txt.)
+  2. **Statistics · Regional** — tourist flow reporting (ROSS1000 and regional variants), aggregate arrivals/nights, monthly incl. "zero" months. Separate obligation from Alloggiati — filing one does not satisfy the other. ROSS1000 regions listed; known exceptions noted (Sinfonia/Campania, STU-DTU/Trento).
+  3. **Tourist tax · Municipal** — imposta di soggiorno, only where the comune levies it via delibera. Per-comune rate/night-cap/exemptions. Two deadlines hosts confuse: payment to comune (monthly/quarterly) vs. annual declaration to Agenzia delle Entrate (30 June, D.L. 34/2020 art. 180).
+- Each axis is a `.form-card` with an axis tag, quick meta chips (who/when/what), and a `<details>` accordion with the full explanation + official links. Closes with a legal/tax disclaimer.
+- **Research-backed**: ROSS1000 scope (13 regions, ex-Turismo5, monthly aggregate, distinct from Alloggiati, regional record-layout/XML), imposta di soggiorno mechanics (municipal delibera, €5/€10 caps, night caps, per-comune exemptions, dual deadlines) all verified against official/authoritative sources (regione.veneto.it, comune sites, Agenzia delle Entrate / PayTourist guidance) in June 2026.
+- Implemented as a JS-rendered bilingual data structure (`COMPLIANCE_CONTENT` + `renderCompliance()`), re-renders on language toggle. New CSS for axis tags, meta chips, accordions, region columns, disclaimer.
+- **Deliberately NOT built** (per scoping): live tax calculation (dangerous — per-comune config that changes yearly; PayTourist already does this), and dynamic region/comune auto-filtering (next phase: property gets region + comune fields → filter the guide).
+- **Files**: `host-console.html`
 
 ### Round 22.2 — Preview banner no longer covers the language toggle _(2026-06-09)_
 - **Bug**: in preview mode (`?test=1`), the fixed "Preview mode" banner (z-index 10000) covered the language toggle. The banner pushed page content down via body `padding-top`, but the `.top-bar` is `position: sticky; top: 0` — so on scroll it stuck to the top of the scroll container and slid *under* the higher-z-index banner.

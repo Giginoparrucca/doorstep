@@ -407,6 +407,26 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 .export-portal-links { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .export-portal-links .export-portal-link { flex: 1 1 0; min-width: 180px; margin-top: 0; }
 
+/* Round 23.1 — Export grouped by the three compliance axes */
+.export-axis { margin-bottom: 22px; }
+.export-axis-head {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+}
+.export-axis-tag {
+  font-size: 0.6rem; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; padding: 3px 9px; border-radius: 20px;
+}
+.export-axis-tag.police { background: rgba(224,69,94,0.1); color: #b03939; }
+.export-axis-tag.stat   { background: rgba(0,91,255,0.1); color: var(--warm); }
+.export-axis-tag.tax    { background: rgba(224,152,46,0.12); color: #9a6b00; }
+.export-axis-tag.util   { background: var(--cream-2); color: var(--ink-soft); }
+.export-axis-title { font-size: 0.9rem; font-weight: 600; color: var(--ink); }
+.export-axis-note {
+  font-size: 0.76rem; color: var(--ink-soft); font-weight: 300;
+  margin: -2px 0 10px; line-height: 1.5;
+}
+.export-axis .export-grid { margin-top: 0; }
+
 /* ── TABS inside panels ── */
 .panel-tabs {
   display: flex; gap: 0; border-bottom: 1px solid var(--border);
@@ -1106,6 +1126,21 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <div class="form-hint" data-h="prop_cir_hint">Codice Identificativo Nazionale — required for tourist-accommodation reporting</div>
           </div>
           <div class="form-group">
+            <label class="form-label" data-h="prop_ross_codice">ROSS1000 structure code</label>
+            <input class="form-input" placeholder="e.g., A00927P" id="propRossCodice">
+            <div class="form-hint" data-h="prop_ross_codice_hint">The code your Region assigns in ROSS1000 (not the CIN). Needed for the statistical XML export. Leave empty if your region doesn't use ROSS1000.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-h="prop_rooms_available">Rooms available</label>
+            <input class="form-input" type="number" min="0" placeholder="e.g., 1" id="propRoomsAvailable">
+            <div class="form-hint" data-h="prop_rooms_available_hint">Total rooms in this property (for statistical reporting).</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-h="prop_beds_available">Beds available</label>
+            <input class="form-input" type="number" min="0" placeholder="e.g., 4" id="propBedsAvailable">
+            <div class="form-hint" data-h="prop_beds_available_hint">Total sleeping capacity (for statistical reporting).</div>
+          </div>
+          <div class="form-group">
             <label class="form-label" data-h="prop_paytourist">PayTourist portal</label>
             <input class="form-input" placeholder="e.g., bari  (or bari.paytourist.com)" id="paytouristUrl" oninput="refreshPayTouristLink()">
             <div class="form-hint" data-h="prop_paytourist_hint">Your municipality's PayTourist subdomain. Leave empty if your comune doesn't use PayTourist.</div>
@@ -1197,9 +1232,24 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       </div>
 
       <div class="form-card">
-        <div class="form-card-title" data-h="prop_dismissed_title">Dismissed bookings</div>
-        <div class="form-hint" data-h="prop_dismissed_hint" style="margin-bottom:10px;">Bookings you've hidden from your dashboard (test codes, friend trials, etc.). Restore any to bring it back.</div>
-        <div id="dismissedList"></div>
+        <div class="form-card-title" data-h="prop_tax_title">Tourist Tax Configuration</div>
+        <div class="form-card-desc" data-h="prop_tax_desc">Used by the tourist-tax declaration helper in Export. Enter the values from your comune's tourist-tax resolution (delibera). Leave empty if your comune doesn't levy a tourist tax.</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label" data-h="prop_tax_rate">Rate (€ per person per night)</label>
+            <input class="form-input" type="number" min="0" step="0.01" placeholder="e.g., 2.00" id="propTaxRate">
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-h="prop_tax_max_nights">Max taxable consecutive nights</label>
+            <input class="form-input" type="number" min="0" placeholder="e.g., 5  (0 = no cap)" id="propTaxMaxNights">
+            <div class="form-hint" data-h="prop_tax_max_nights_hint">Many comuni only charge the first N consecutive nights per guest.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-h="prop_tax_exempt_age">Exempt under age</label>
+            <input class="form-input" type="number" min="0" placeholder="e.g., 14  (empty = none)" id="propTaxExemptAge">
+            <div class="form-hint" data-h="prop_tax_exempt_age_hint">Guests strictly under this age are exempt. Other exemptions vary — verify against your delibera.</div>
+          </div>
+        </div>
       </div>
 
       <div class="form-card">
@@ -1314,46 +1364,108 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     <div class="panel" id="panel-export">
       <div class="alert alert-info" data-h="export_info"></div>
 
-      <div class="export-grid">
-        <div class="export-card" style="grid-column: span 2;">
-          <h3 data-h="export_police_tourism">🏛 Police & Tourism Report</h3>
-          <p data-h="export_police_tourism_desc"></p>
-          <button class="btn btn-primary" onclick="exportAlloggiati()" data-h="btn_gen_alloggiati">📥 Generate Guest File (.txt)</button>
-          <div class="export-portal-links">
-            <a href="https://alloggiatiweb.poliziadistato.it" target="_blank" rel="noopener" class="export-portal-link">
-              🔗 <span data-h="link_alloggiati">Open Alloggiati Web</span> ↗
-            </a>
-            <a href="https://dms.puglia.it" target="_blank" rel="noopener" class="export-portal-link">
-              🔗 <span data-h="link_dms">Open Puglia DMS (SPOT Easy)</span> ↗
-            </a>
+      <!-- ─── Axis 1: Police · National ─── -->
+      <div class="export-axis">
+        <div class="export-axis-head">
+          <span class="export-axis-tag police" data-h="export_axis_police_tag">Police · National</span>
+          <span class="export-axis-title" data-h="export_axis_police_title">Guest registration</span>
+        </div>
+        <div class="export-axis-note" data-h="export_axis_police_note"></div>
+        <div class="export-grid">
+          <div class="export-card" style="grid-column: span 2;">
+            <h3 data-h="export_police_tourism">🏛 Alloggiati Web — Guest File</h3>
+            <p data-h="export_police_tourism_desc"></p>
+            <button class="btn btn-primary" onclick="exportAlloggiati()" data-h="btn_gen_alloggiati">📥 Generate Guest File (.txt)</button>
+            <div class="export-portal-links">
+              <a href="https://alloggiatiweb.poliziadistato.it" target="_blank" rel="noopener" class="export-portal-link">
+                🔗 <span data-h="link_alloggiati">Open Alloggiati Web</span> ↗
+              </a>
+              <a href="https://dms.puglia.it" target="_blank" rel="noopener" class="export-portal-link">
+                🔗 <span data-h="link_dms">Open Puglia DMS (SPOT Easy)</span> ↗
+              </a>
+            </div>
           </div>
         </div>
-
-        <div class="export-card">
-          <h3 data-h="export_paytourist">💰 PayTourist (Tourist Tax)</h3>
-          <p data-h="export_paytourist_desc"></p>
-          <button class="btn btn-primary" onclick="exportPayTourist()" data-h="btn_gen_paytourist">📥 Generate PayTourist CSV</button>
-          <a href="#" id="paytouristPortalLink" target="_blank" rel="noopener" class="export-portal-link" style="display:none">
-            🔗 <span data-h="link_paytourist">Open PayTourist Import</span> ↗
-          </a>
-          <div id="paytouristPortalHint" class="form-hint" style="display:none" data-h="paytourist_not_set">
-            ℹ️ Set your PayTourist portal in property settings to show a direct link here.
-          </div>
-        </div>
-
-        <div class="export-card">
-          <h3 data-h="export_monthly_summary">📊 Monthly Summary (C/59)</h3>
-          <p data-h="export_monthly_summary_desc"></p>
-          <button class="btn btn-secondary" onclick="exportISTAT()" data-h="btn_gen_istat">📊 Generate C/59 Summary</button>
-        </div>
-
-        <div class="export-card">
-          <h3 data-h="export_csv">📋 Raw Data Export</h3>
-          <p data-h="export_csv_desc"></p>
-          <button class="btn btn-secondary" onclick="exportCSV()" style="margin-top:auto" data-h="btn_dl_csv">📥 Download CSV</button>
-        </div>
-
       </div>
+
+      <!-- ─── Axis 2: Statistics · Regional ─── -->
+      <div class="export-axis">
+        <div class="export-axis-head">
+          <span class="export-axis-tag stat" data-h="export_axis_stat_tag">Statistics · Regional</span>
+          <span class="export-axis-title" data-h="export_axis_stat_title">Tourist flow reporting</span>
+        </div>
+        <div class="export-axis-note" data-h="export_axis_stat_note"></div>
+        <div class="export-grid">
+          <div class="export-card">
+            <h3 data-h="export_monthly_summary">📊 Monthly Summary (C/59)</h3>
+            <p data-h="export_monthly_summary_desc"></p>
+            <button class="btn btn-secondary" onclick="exportISTAT()" data-h="btn_gen_istat">📊 Generate C/59 Summary</button>
+            <div class="export-portal-links">
+              <a href="https://flussituristici.regione.veneto.it/" target="_blank" rel="noopener" class="export-portal-link">
+                🔗 <span data-h="link_ross1000">Open ROSS1000 (Veneto)</span> ↗
+              </a>
+            </div>
+          </div>
+          <div class="export-card">
+            <h3 data-h="export_ross1000_title">🗺 ROSS1000 statistical file</h3>
+            <p data-h="export_ross1000_desc"></p>
+            <button class="btn btn-primary" onclick="exportRoss1000()" data-h="btn_gen_ross1000">📥 Generate ROSS1000 XML</button>
+            <div class="export-portal-links">
+              <a href="https://flussituristici.regione.veneto.it/" target="_blank" rel="noopener" class="export-portal-link">
+                🔗 <span data-h="link_ross1000_portal">Open ROSS1000 Veneto</span> ↗
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── Axis 3: Tourist Tax · Municipal ─── -->
+      <div class="export-axis">
+        <div class="export-axis-head">
+          <span class="export-axis-tag tax" data-h="export_axis_tax_tag">Tourist Tax · Municipal</span>
+          <span class="export-axis-title" data-h="export_axis_tax_title">Imposta di soggiorno</span>
+        </div>
+        <div class="export-axis-note" data-h="export_axis_tax_note"></div>
+        <div class="export-grid">
+          <div class="export-card">
+            <h3 data-h="export_paytourist">💶 PayTourist (Tourist Tax)</h3>
+            <p data-h="export_paytourist_desc"></p>
+            <button class="btn btn-primary" onclick="exportPayTourist()" data-h="btn_gen_paytourist">📥 Generate PayTourist CSV</button>
+            <a href="#" id="paytouristPortalLink" target="_blank" rel="noopener" class="export-portal-link" style="display:none">
+              🔗 <span data-h="link_paytourist">Open PayTourist Import</span> ↗
+            </a>
+            <div id="paytouristPortalHint" class="form-hint" style="display:none" data-h="paytourist_not_set">
+              ℹ️ Set your PayTourist portal in property settings to show a direct link here.
+            </div>
+          </div>
+          <div class="export-card">
+            <h3 data-h="export_citytax_title">🧮 CityTax declaration helper</h3>
+            <p data-h="export_citytax_desc"></p>
+            <button class="btn btn-primary" onclick="exportCityTax()" data-h="btn_gen_citytax">🧮 Compute quarterly figures</button>
+            <div class="export-portal-links">
+              <a href="https://www.comune.venezia.it/it/content/portale-ids-tourist-tax-0" target="_blank" rel="noopener" class="export-portal-link">
+                🔗 <span data-h="link_citytax">Open CityTax++ (Venezia)</span> ↗
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── Utility ─── -->
+      <div class="export-axis">
+        <div class="export-axis-head">
+          <span class="export-axis-tag util" data-h="export_axis_util_tag">Utility</span>
+          <span class="export-axis-title" data-h="export_axis_util_title">Your own records</span>
+        </div>
+        <div class="export-grid">
+          <div class="export-card">
+            <h3 data-h="export_csv">📋 Raw Data Export</h3>
+            <p data-h="export_csv_desc"></p>
+            <button class="btn btn-secondary" onclick="exportCSV()" data-h="btn_dl_csv">📥 Download CSV</button>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <!-- ════════════ COMPLIANCE GUIDE (static reference) ════════════ -->
@@ -2841,6 +2953,27 @@ const HT = {
     prop_transport_title: 'Getting Around',
     prop_transport: 'Parking, public transport & taxis',
     prop_transport_hint: 'Parking situation, nearest bus/metro/train, taxi numbers, airport transfers. Shown to guests in the "Staying" section. Write in your preferred language — guests can browser-translate.',
+    prop_ross_codice: 'ROSS1000 structure code',
+    prop_ross_codice_hint: "The code your Region assigns in ROSS1000 (not the CIN). Needed for the statistical XML export. Leave empty if your region doesn't use ROSS1000.",
+    prop_rooms_available: 'Rooms available',
+    prop_rooms_available_hint: 'Total rooms in this property (for statistical reporting).',
+    prop_beds_available: 'Beds available',
+    prop_beds_available_hint: 'Total sleeping capacity (for statistical reporting).',
+    prop_tax_title: 'Tourist Tax Configuration',
+    prop_tax_desc: "Used by the tourist-tax declaration helper in Export. Enter the values from your comune's tourist-tax resolution (delibera). Leave empty if your comune doesn't levy a tourist tax.",
+    prop_tax_rate: 'Rate (€ per person per night)',
+    prop_tax_max_nights: 'Max taxable consecutive nights',
+    prop_tax_max_nights_hint: 'Many comuni only charge the first N consecutive nights per guest.',
+    prop_tax_exempt_age: 'Exempt under age',
+    prop_tax_exempt_age_hint: 'Guests strictly under this age are exempt. Other exemptions vary — verify against your delibera.',
+    export_ross1000_title: '🗺 ROSS1000 statistical file',
+    export_ross1000_desc: 'Generates the monthly <strong>ROSS1000 XML</strong> (arrivals, departures, daily occupancy) for upload in the Veneto flows portal. Requires your ROSS1000 structure code and room/bed capacity in Property Details.',
+    btn_gen_ross1000: '📥 Generate ROSS1000 XML',
+    link_ross1000_portal: 'Open ROSS1000 Veneto',
+    export_citytax_title: '🧮 CityTax declaration helper',
+    export_citytax_desc: 'Computes the quarterly figures to type into CityTax++ (taxable overnights, exempt, amount due) from your check-ins. Requires the Tourist Tax Configuration in Property Details. CityTax++ has no public file import, so this is a declaration aid.',
+    btn_gen_citytax: '🧮 Compute quarterly figures',
+    link_citytax: 'Open CityTax++ (Venezia)',
     prop_dismissed_title: 'Dismissed bookings',
     prop_dismissed_hint: "Bookings you've hidden from your dashboard (test codes, friend trials, etc.). Restore any to bring it back.",
     btn_restore: 'Restore',
@@ -2880,11 +3013,24 @@ const HT = {
     checkins_warn: 'Italian law requires all guest data to be submitted to <strong>Alloggiati Web</strong> (State Police) within 24 hours of arrival. Puglia also requires <strong>Puglia DMS</strong> reporting.',
     filter_all: 'All Bookings',
     // Export
-    export_info: 'Generate files for Italian compliance portals. The <strong>Guest File (.txt)</strong> is the same format accepted by both Alloggiati Web (police, required within 24h of arrival) and SPOT Easy (regional tourism, required by the 10th of the following month).',
-    export_police_tourism: '🏛 Police & Tourism Report',
-    export_police_tourism_desc: 'Generates a <strong>.txt file</strong> (Alloggiati Web tracciato record) accepted by <strong>both portals</strong>: upload it to Alloggiati Web → <em>Invio File</em> for the police (within 24h of each check-in), and to SPOT Easy → <em>Carica Scheda Alloggiati</em> for the regional tourism authority (monthly).',
+    export_info: 'Generate files for the Italian compliance portals, grouped by the three obligations: police (national), statistics (regional), and tourist tax (municipal). See the Compliance Guide for what each one is.',
+    export_police_tourism: '🏛 Alloggiati Web — Guest File',
+    export_police_tourism_desc: 'Generates the <strong>.txt file</strong> (Alloggiati tracciato record) of every guest. Upload to Alloggiati Web → <em>Invio File</em> for the police, within <strong>24h of arrival</strong>. The same file is also accepted by Puglia <strong>SPOT Easy</strong> → <em>Carica Scheda Alloggiati</em>.',
+    export_axis_police_tag: 'Police · National',
+    export_axis_police_title: 'Guest registration',
+    export_axis_police_note: 'Individual guest data to the Polizia di Stato, within 24h of arrival. Nationwide obligation.',
+    export_axis_stat_tag: 'Statistics · Regional',
+    export_axis_stat_title: 'Tourist flow reporting',
+    export_axis_stat_note: 'Aggregate arrivals & nights to your Region (forwarded to ISTAT), monthly — including "zero" months. A separate obligation from Alloggiati. The portal depends on your region.',
+    export_axis_tax_tag: 'Tourist Tax · Municipal',
+    export_axis_tax_title: 'Imposta di soggiorno',
+    export_axis_tax_note: 'Only where your comune levies it. Collected from guests, paid to the comune (monthly/quarterly), plus an annual declaration to the Agenzia delle Entrate by 30 June.',
+    export_axis_util_tag: 'Utility',
+    export_axis_util_title: 'Your own records',
     export_monthly_summary: '📊 Monthly Summary (C/59)',
-    export_monthly_summary_desc: 'A human-readable <strong>monthly breakdown by nationality</strong> (italiani / stranieri, arrivi e presenze). Useful as a reference when filling out additional statistical reports or for your own records.',
+    export_monthly_summary_desc: 'A human-readable <strong>monthly breakdown by nationality</strong> (italiani / stranieri, arrivi e presenze) you can use to fill in your regional statistical portal by hand. <em>Note: not yet the ROSS1000 file format — it is a reference summary for manual entry.</em>',
+    export_regional_note_title: '🗺 Your region\'s portal',
+    export_regional_note_desc: 'ROSS1000 covers many regions (Veneto, Lombardia, Emilia-Romagna, Toscana, Lazio, and others); some regions use their own (Campania → Sinfonia, Trento → STU/DTU). Puglia uses its own regional flow system. Confirm yours in the Compliance Guide and enter the monthly figures there. A direct file export per region can be added once you confirm which portal you file on.',
     export_csv: '📋 Raw Data Export',
     export_csv_desc: 'Download all guest check-in data as a <strong>CSV spreadsheet</strong> — for your own accounting or backup.',
     date_range: 'Date Range', month: 'Month',
@@ -2893,7 +3039,8 @@ const HT = {
     btn_gen_istat: '📊 Generate C/59 Summary',
     link_alloggiati: 'Open Alloggiati Web',
     link_dms: 'Open Puglia DMS (SPOT Easy)',
-    export_paytourist: '💰 PayTourist (Tourist Tax)',
+    link_ross1000: 'Open ROSS1000 (Veneto)',
+    export_paytourist: '💶 PayTourist (Tourist Tax)',
     export_paytourist_desc: 'CSV file for <strong>PayTourist</strong> (municipal tourist tax). Auto-fills guest groups, CIN code, nationality codes. Upload at Soggiorni → Importa.',
     btn_gen_paytourist: '📥 Generate PayTourist CSV',
     link_paytourist: 'Open PayTourist Import',
@@ -3094,6 +3241,27 @@ const HT = {
     prop_transport_title: 'Come Spostarsi',
     prop_transport: 'Parcheggio, trasporti pubblici e taxi',
     prop_transport_hint: 'Situazione parcheggio, bus/metro/treno più vicini, numeri dei taxi, trasferimenti aeroportuali. Mostrato agli ospiti nella sezione "Soggiorno". Scrivi nella tua lingua preferita — gli ospiti possono tradurre con il browser.',
+    prop_ross_codice: 'Codice struttura ROSS1000',
+    prop_ross_codice_hint: 'Il codice che la tua Regione assegna in ROSS1000 (non il CIN). Necessario per l\'export XML statistico. Lascia vuoto se la tua regione non usa ROSS1000.',
+    prop_rooms_available: 'Camere disponibili',
+    prop_rooms_available_hint: 'Numero totale di camere della struttura (per la rilevazione statistica).',
+    prop_beds_available: 'Posti letto disponibili',
+    prop_beds_available_hint: 'Capacità ricettiva totale (per la rilevazione statistica).',
+    prop_tax_title: 'Configurazione Imposta di Soggiorno',
+    prop_tax_desc: 'Usata dall\'assistente dichiarazione in Export. Inserisci i valori dalla delibera del tuo comune sull\'imposta di soggiorno. Lascia vuoto se il tuo comune non applica l\'imposta.',
+    prop_tax_rate: 'Tariffa (€ per persona a notte)',
+    prop_tax_max_nights: 'Notti consecutive max tassabili',
+    prop_tax_max_nights_hint: 'Molti comuni applicano l\'imposta solo alle prime N notti consecutive per ospite.',
+    prop_tax_exempt_age: 'Esenti sotto i (anni)',
+    prop_tax_exempt_age_hint: 'Gli ospiti sotto questa età sono esenti. Altre esenzioni variano — verifica con la tua delibera.',
+    export_ross1000_title: '🗺 File statistico ROSS1000',
+    export_ross1000_desc: 'Genera l\'<strong>XML ROSS1000</strong> mensile (arrivi, partenze, occupazione giornaliera) da caricare sul portale flussi del Veneto. Richiede il codice struttura ROSS1000 e la capacità camere/letti in Dettagli Proprietà.',
+    btn_gen_ross1000: '📥 Genera XML ROSS1000',
+    link_ross1000_portal: 'Apri ROSS1000 Veneto',
+    export_citytax_title: '🧮 Assistente dichiarazione CityTax',
+    export_citytax_desc: 'Calcola i dati trimestrali da inserire in CityTax++ (pernottamenti tassabili, esenti, importo dovuto) dai tuoi check-in. Richiede la Configurazione Imposta di Soggiorno in Dettagli Proprietà. CityTax++ non ha un import file pubblico, quindi questo è un aiuto alla dichiarazione.',
+    btn_gen_citytax: '🧮 Calcola dati trimestrali',
+    link_citytax: 'Apri CityTax++ (Venezia)',
     prop_dismissed_title: 'Prenotazioni nascoste',
     prop_dismissed_hint: 'Prenotazioni che hai nascosto dalla bacheca (codici di test, prove di amici, ecc.). Ripristina per riportarne una alla vista.',
     btn_restore: 'Ripristina',
@@ -3128,11 +3296,24 @@ const HT = {
     tab_food: '🍝 Cibo', tab_drink: '🍷 Bevande', tab_see: '👁 Luoghi', tab_beach: '🏖 Spiaggia', tab_shop: '🛍 Shopping', tab_experiences: '✨ Esperienze',
     checkins_warn: 'La legge italiana richiede che tutti i dati degli ospiti siano inviati ad <strong>Alloggiati Web</strong> (Polizia di Stato) entro 24 ore dall\'arrivo. La Puglia richiede anche la segnalazione <strong>Puglia DMS</strong>.',
     filter_all: 'Tutte le Prenotazioni',
-    export_info: 'Genera i file per i portali di conformità italiani. Il <strong>File Ospiti (.txt)</strong> è lo stesso formato accettato sia da Alloggiati Web (polizia, entro 24h dall\'arrivo) sia da SPOT Easy (turismo regionale, entro il 10 del mese successivo).',
-    export_police_tourism: '🏛 Report Polizia & Turismo',
-    export_police_tourism_desc: 'Genera un <strong>file .txt</strong> (tracciato record Alloggiati Web) accettato da <strong>entrambi i portali</strong>: caricalo su Alloggiati Web → <em>Invio File</em> per la polizia (entro 24h da ogni check-in), e su SPOT Easy → <em>Carica Scheda Alloggiati</em> per l\'autorità turistica regionale (mensilmente).',
+    export_info: 'Genera i file per i portali di conformità italiani, raggruppati per i tre obblighi: polizia (nazionale), statistica (regionale) e imposta di soggiorno (comunale). Vedi la Guida Conformità per cosa è ciascuno.',
+    export_police_tourism: '🏛 Alloggiati Web — File Ospiti',
+    export_police_tourism_desc: 'Genera il <strong>file .txt</strong> (tracciato record Alloggiati) di ogni ospite. Caricalo su Alloggiati Web → <em>Invio File</em> per la polizia, entro <strong>24h dall\'arrivo</strong>. Lo stesso file è accettato anche da Puglia <strong>SPOT Easy</strong> → <em>Carica Scheda Alloggiati</em>.',
+    export_axis_police_tag: 'Polizia · Nazionale',
+    export_axis_police_title: 'Registrazione ospiti',
+    export_axis_police_note: 'Dati del singolo ospite alla Polizia di Stato, entro 24h dall\'arrivo. Obbligo nazionale.',
+    export_axis_stat_tag: 'Statistica · Regionale',
+    export_axis_stat_title: 'Rilevazione flussi turistici',
+    export_axis_stat_note: 'Arrivi e presenze aggregati alla tua Regione (poi inoltrati all\'ISTAT), mensile — anche mesi "a zero". È un obbligo diverso da Alloggiati. Il portale dipende dalla tua regione.',
+    export_axis_tax_tag: 'Imposta di Soggiorno · Comunale',
+    export_axis_tax_title: 'Imposta di soggiorno',
+    export_axis_tax_note: 'Solo dove il tuo comune la applica. Riscossa dagli ospiti, versata al comune (mensile/trimestrale), più la dichiarazione annuale all\'Agenzia delle Entrate entro il 30 giugno.',
+    export_axis_util_tag: 'Utilità',
+    export_axis_util_title: 'I tuoi archivi',
     export_monthly_summary: '📊 Riepilogo Mensile (C/59)',
-    export_monthly_summary_desc: 'Un <strong>riepilogo mensile per nazionalità</strong> leggibile (italiani / stranieri, arrivi e presenze). Utile come riferimento quando compili report statistici aggiuntivi o per i tuoi archivi.',
+    export_monthly_summary_desc: 'Un <strong>riepilogo mensile per nazionalità</strong> leggibile (italiani / stranieri, arrivi e presenze) da usare per compilare a mano il portale statistico regionale. <em>Nota: non è ancora il formato file ROSS1000 — è un riepilogo di riferimento per l\'inserimento manuale.</em>',
+    export_regional_note_title: '🗺 Il portale della tua regione',
+    export_regional_note_desc: 'ROSS1000 copre molte regioni (Veneto, Lombardia, Emilia-Romagna, Toscana, Lazio e altre); alcune regioni usano il proprio (Campania → Sinfonia, Trento → STU/DTU). La Puglia usa il proprio sistema regionale dei flussi. Verifica il tuo nella Guida Conformità e inserisci lì i dati mensili. Un export file dedicato per regione può essere aggiunto quando confermi su quale portale comunichi.',
     export_csv: '📋 Esportazione Dati',
     export_csv_desc: 'Scarica tutti i dati dei check-in come <strong>foglio di calcolo CSV</strong> — per la tua contabilità o backup.',
     date_range: 'Intervallo Date', month: 'Mese',
@@ -3141,7 +3322,8 @@ const HT = {
     btn_gen_istat: '📊 Genera Riepilogo C/59',
     link_alloggiati: 'Apri Alloggiati Web',
     link_dms: 'Apri Puglia DMS (SPOT Easy)',
-    export_paytourist: '💰 PayTourist (Imposta di Soggiorno)',
+    link_ross1000: 'Apri ROSS1000 (Veneto)',
+    export_paytourist: '💶 PayTourist (Imposta di Soggiorno)',
     export_paytourist_desc: 'File CSV per <strong>PayTourist</strong> (tassa di soggiorno comunale). Compila automaticamente gruppi ospiti, codice CIN, codici nazionalità. Carica su Soggiorni → Importa.',
     btn_gen_paytourist: '📥 Genera CSV PayTourist',
     link_paytourist: 'Apri Importazione PayTourist',
@@ -3579,6 +3761,12 @@ async function saveProperty() {
     checkin_instructions: document.getElementById('propCheckinInstructions')?.value || null,
     checkout_instructions: document.getElementById('propCheckoutInstructions')?.value || null,
     transport_info: document.getElementById('propTransportInfo')?.value || null,
+    ross1000_codice: document.getElementById('propRossCodice')?.value?.trim() || null,
+    rooms_available: _numOrNull(document.getElementById('propRoomsAvailable')?.value),
+    beds_available: _numOrNull(document.getElementById('propBedsAvailable')?.value),
+    tax_rate_eur: _numOrNull(document.getElementById('propTaxRate')?.value),
+    tax_max_nights: _numOrNull(document.getElementById('propTaxMaxNights')?.value),
+    tax_exempt_under_age: _numOrNull(document.getElementById('propTaxExemptAge')?.value),
     wifi_name: document.getElementById('propWifiName').value,
     wifi_password: document.getElementById('propWifiPass').value,
     welcome_message: document.getElementById('propWelcome').value,
@@ -4360,6 +4548,13 @@ function isItalianCitizenshipCode(code) { return code && code.trim() === '100000
 // ── Formatting helpers (unchanged) ─────────────────────────────────────
 function pad(str, len) { return (str || '').substring(0, len).padEnd(len); }
 function padNum(n, len) { return String(n || 0).padStart(len, '0').substring(0, len); }
+// Parse a numeric input field → number, or null if blank/invalid. Used for
+// the optional capacity/tax settings so empty stays NULL in the DB.
+function _numOrNull(v) {
+  if (v === undefined || v === null || String(v).trim() === '') return null;
+  const n = Number(v);
+  return isNaN(n) ? null : n;
+}
 
 // Alloggiati Web only accepts A–Z and spaces in names. Hyphens, apostrophes,
 // and accented characters will cause "Nome/Cognome con caratteri non validi".
@@ -4602,6 +4797,290 @@ function exportISTAT() {
   downloadFile('istat_c59_' + new Date().toISOString().slice(0,7) + '.txt', lines.join('\n'));
   track('export_istat', { lines: lines.length });
   toast('ISTAT C/59 report generated!');
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   ROSS1000 — Statistical flow XML  (Round 24)
+   Builds the GIES Turismo5 v2.4 "movimentazione" XML for a chosen month:
+   one <movimento> per day, with <arrivi>/<partenze> derived from each
+   guest's arrival_date / departure_date. Codes (cittadinanza, residenza,
+   nascita, tipoalloggiato) reuse the Polizia tables already used by the
+   Alloggiati exporter. Spec: SPEC_ross1000_citytax.md.
+   This produces a downloadable .xml the host uploads in ROSS1000 (file
+   mode). SOAP transmission is intentionally out of scope.
+══════════════════════════════════════════════════════════════════════ */
+
+// Trimmed code lookups (the Alloggiati versions pad to fixed width; XML
+// wants bare codes).
+function _codeStato(input) { return lookupStateCode(input).trim(); }
+function _codeComune(cityName, prov) { return (lookupPoliceCode(cityName, prov) || '').trim(); }
+
+// Stable ≤20-char check-in id for <idswh>. Row UUIDs exceed 20 chars and
+// aren't guaranteed present, so derive a deterministic short id from the
+// most stable fields. Must stay constant across re-exports for the same
+// guest so ROSS1000 can match amendments.
+function _ross1000Idswh(c) {
+  const basis = String(c.id || (c.booking_code || 'X') + '|' + (c.surname || '') + '|' + (c.date_of_birth || '') + '|' + (c.arrival_date || ''));
+  // djb2 hash → base36, capped. Deterministic, collision-resistant enough
+  // for a single property's guest volume.
+  let h = 5381;
+  for (let i = 0; i < basis.length; i++) h = ((h << 5) + h + basis.charCodeAt(i)) >>> 0;
+  return ('W' + h.toString(36)).substring(0, 20).toUpperCase();
+}
+
+function _xmlEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+}
+
+// YYYY-MM-DD (or ISO) → YYYYMMDD; '' if unparseable
+function _ymd(isoDate) {
+  if (!isoDate) return '';
+  const s = String(isoDate).split('T')[0];
+  const p = s.split('-');
+  if (p.length === 3 && p[0].length === 4) return p[0] + p[1].padStart(2,'0') + p[2].padStart(2,'0');
+  const d = new Date(isoDate);
+  if (isNaN(d)) return '';
+  return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// Build one <arrivo> block for a guest
+function _ross1000Arrivo(c, idswhByGuest) {
+  const idswh = idswhByGuest.get(c);
+  const tipo = GUEST_TYPE_CODES[c.guest_type] || '16';
+  const isMember = (tipo === '19' || tipo === '20');
+  const sesso = c.sex === 'F' ? 'F' : 'M';
+  const citt = _codeStato(c.citizenship);
+  const birthCountry = c.birth_country || c.citizenship || '';
+  const birthCode = _codeStato(birthCountry);
+  const bornInItaly = (c.birth_province && c.birth_province !== 'EE' && c.birth_province !== '') ||
+                      isItalianCitizenshipCode(birthCode);
+  const statoNascita = bornInItaly ? '100000100' : birthCode;
+  const comuneNascita = bornInItaly ? _codeComune(c.place_of_birth, c.birth_province) : '';
+  // Residence: we don't capture a separate residence field; default residence
+  // = citizenship country, and for Italians use birth comune as a best-effort
+  // luogoresidenza (ROSS1000 requires SOMETHING when statoresidenza=Italia).
+  const statoRes = citt || statoNascita || '';
+  const isItalRes = isItalianCitizenshipCode(statoRes);
+  const luogoRes = isItalRes ? (comuneNascita || '') : '';
+  const fields = [
+    ['idswh', idswh],
+    ['tipoalloggiato', tipo],
+    ['idcapo', isMember ? (idswhByGuest.get(c._head) || '') : ''],
+    ['cognome', _xmlEsc((c.surname || '').substring(0,50))],
+    ['nome', _xmlEsc((c.name || '').substring(0,30))],
+    ['sesso', sesso],
+    ['cittadinanza', citt],
+    ['statoresidenza', statoRes],
+    ['luogoresidenza', luogoRes],
+    ['datanascita', _ymd(c.date_of_birth)],
+    ['statonascita', statoNascita],
+    ['comunenascita', comuneNascita],
+    ['tipoturismo', _xmlEsc(propertyData?.default_tipoturismo || 'Non specificato')],
+    ['mezzotrasporto', _xmlEsc(propertyData?.default_mezzotrasporto || 'Non Specificato')],
+  ];
+  return '        <arrivo>\n' +
+    fields.map(([k,v]) => `          <${k}>${v}</${k}>`).join('\n') +
+    '\n        </arrivo>';
+}
+
+function exportRoss1000() {
+  if (!propertyData?.ross1000_codice) {
+    toast(hostLang === 'it'
+      ? '⚠ Inserisci il codice struttura ROSS1000 in Dettagli Proprietà'
+      : '⚠ Enter your ROSS1000 structure code in Property Details');
+    return;
+  }
+  if (allCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato' : 'No data!'); return; }
+
+  // Choose the month: default current month; prompt for override (YYYY-MM)
+  const nowMonth = new Date().toISOString().slice(0,7);
+  const month = (prompt(hostLang === 'it'
+    ? 'Mese da esportare (AAAA-MM):'
+    : 'Month to export (YYYY-MM):', nowMonth) || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    if (month !== '') toast(hostLang === 'it' ? 'Formato mese non valido' : 'Invalid month format');
+    return;
+  }
+  const [yy, mm] = month.split('-').map(Number);
+  const daysInMonth = new Date(yy, mm, 0).getDate();
+
+  // Resolve head-of-group references for idcapo (mirror Alloggiati grouping)
+  const groups = {};
+  allCheckins.forEach(c => {
+    const key = c.booking_code || `_arr_${c.arrival_date || 'x'}`;
+    (groups[key] = groups[key] || []).push(c);
+  });
+  const mainTypes = ['single', 'head', 'group'];
+  Object.values(groups).forEach(g => {
+    const head = g.find(x => mainTypes.includes(x.guest_type)) || g[0];
+    g.forEach(x => { x._head = head; });
+  });
+  const idswhByGuest = new Map();
+  allCheckins.forEach(c => idswhByGuest.set(c, _ross1000Idswh(c)));
+
+  const rooms = propertyData?.rooms_available ?? 1;
+  const beds = propertyData?.beds_available ?? '';
+
+  // Build per-day movimenti
+  const movimenti = [];
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${yy}-${String(mm).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const ymd = dateStr.replace(/-/g,'');
+    // Arrivals / departures on this exact day
+    const arrivalsToday = allCheckins.filter(c => (c.arrival_date || '').split('T')[0] === dateStr);
+    const departuresToday = allCheckins.filter(c => (c.departure_date || '').split('T')[0] === dateStr);
+    // Occupancy: guests whose stay covers this night (arrival <= day < departure)
+    const occupants = allCheckins.filter(c => {
+      const a = (c.arrival_date || '').split('T')[0];
+      const d = (c.departure_date || '').split('T')[0];
+      if (!a) return false;
+      return a <= dateStr && (!d || dateStr < d);
+    });
+    const camereOccupate = occupants.length > 0 ? Math.min(occupants.length, rooms || occupants.length) : 0;
+
+    let body = `    <movimento>\n      <data>${ymd}</data>\n      <struttura>\n`
+      + `        <apertura>SI</apertura>\n`
+      + `        <camereoccupate>${camereOccupate}</camereoccupate>\n`
+      + `        <cameredisponibili>${rooms || 0}</cameredisponibili>\n`
+      + `        <lettidisponibili>${beds || 0}</lettidisponibili>\n`
+      + `      </struttura>\n`;
+
+    if (arrivalsToday.length) {
+      // head first so idcapo refs resolve
+      arrivalsToday.sort((a,b) => (mainTypes.includes(a.guest_type)?0:1) - (mainTypes.includes(b.guest_type)?0:1));
+      body += '      <arrivi>\n' + arrivalsToday.map(c => _ross1000Arrivo(c, idswhByGuest)).join('\n') + '\n      </arrivi>\n';
+    }
+    if (departuresToday.length) {
+      body += '      <partenze>\n' + departuresToday.map(c =>
+        `        <partenza>\n          <idswh>${idswhByGuest.get(c)}</idswh>\n          <tipoalloggiato>${GUEST_TYPE_CODES[c.guest_type] || '16'}</tipoalloggiato>\n          <arrivo>${_ymd(c.arrival_date)}</arrivo>\n        </partenza>`
+      ).join('\n') + '\n      </partenze>\n';
+    }
+    body += '    </movimento>';
+    movimenti.push(body);
+  }
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<movimenti>\n`
+    + `  <codice>${_xmlEsc(propertyData.ross1000_codice)}</codice>\n`
+    + `  <prodotto>WelcomeBnB</prodotto>\n`
+    + movimenti.join('\n') + '\n</movimenti>\n';
+
+  downloadFile(`ross1000_${month}.xml`, xml);
+  track('export_ross1000', { month });
+  toast(hostLang === 'it' ? 'File ROSS1000 generato!' : 'ROSS1000 file generated!');
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   CITYTAX — Tourist-tax declaration helper  (Round 24)
+   Computes the quarterly figures a host types into CityTax++ in
+   "declarative" mode: taxable overnights, exempt overnights, guests, and
+   amount due. No file (CityTax's automatic-mode TBPRES.xls is login-gated
+   per-comune). Applies the comune's rate / max-taxable-nights / exempt-age
+   from the property's Tourist Tax Configuration.
+══════════════════════════════════════════════════════════════════════ */
+
+// Guest age at arrival (years), or null if DOB missing
+function _ageAtArrival(c) {
+  if (!c.date_of_birth || !c.arrival_date) return null;
+  const dob = new Date(String(c.date_of_birth).split('T')[0]);
+  const arr = new Date(String(c.arrival_date).split('T')[0]);
+  if (isNaN(dob) || isNaN(arr)) return null;
+  let age = arr.getFullYear() - dob.getFullYear();
+  const m = arr.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && arr.getDate() < dob.getDate())) age--;
+  return age;
+}
+
+function exportCityTax() {
+  if (allCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato' : 'No data!'); return; }
+  const rate = propertyData?.tax_rate_eur;
+  if (rate == null) {
+    toast(hostLang === 'it'
+      ? '⚠ Imposta la configurazione imposta di soggiorno in Dettagli Proprietà'
+      : '⚠ Set the Tourist Tax Configuration in Property Details');
+    return;
+  }
+  const maxNights = propertyData?.tax_max_nights || 0; // 0 = no cap
+  const exemptAge = propertyData?.tax_exempt_under_age; // null = none
+
+  // Choose quarter (default current). Format YYYY-Q[1-4].
+  const now = new Date();
+  const curQ = Math.floor(now.getMonth()/3) + 1;
+  const input = (prompt(hostLang === 'it'
+    ? 'Trimestre (AAAA-T, es. 2026-2):'
+    : 'Quarter (YYYY-Q, e.g. 2026-2):', `${now.getFullYear()}-${curQ}`) || '').trim();
+  const qm = input.match(/^(\d{4})-([1-4])$/);
+  if (!qm) { if (input !== '') toast(hostLang === 'it' ? 'Formato non valido' : 'Invalid format'); return; }
+  const qy = Number(qm[1]); const q = Number(qm[2]);
+  const qStart = new Date(qy, (q-1)*3, 1);
+  const qEnd = new Date(qy, q*3, 0); // last day of quarter
+  const qStartStr = qStart.toISOString().slice(0,10);
+  const qEndStr = qEnd.toISOString().slice(0,10);
+
+  // For each guest, count nights falling within the quarter, apply the
+  // consecutive-night cap counting only nights inside the tax period, and
+  // split taxable vs exempt.
+  let taxableNights = 0, exemptNights = 0, guestsCount = 0, arrivalsCount = 0;
+  allCheckins.forEach(c => {
+    const a = (c.arrival_date || '').split('T')[0];
+    const d = (c.departure_date || '').split('T')[0];
+    if (!a) return;
+    // Nights span [arrival, departure); if no departure, use nights field
+    let nights = c.nights || (d ? Math.max(0, (new Date(d) - new Date(a)) / 86400000) : 1);
+    nights = Math.round(nights);
+    if (nights <= 0) return;
+    // Clip the stay's nights to those within the quarter
+    let inQuarter = 0;
+    for (let i = 0; i < nights; i++) {
+      const night = new Date(a); night.setDate(night.getDate() + i);
+      const ns = night.toISOString().slice(0,10);
+      if (ns >= qStartStr && ns <= qEndStr) inQuarter++;
+    }
+    if (inQuarter === 0) return;
+    arrivalsCount++;
+    guestsCount++;
+    // Apply max taxable consecutive nights cap, counting only in-period nights
+    const taxablePer = maxNights > 0 ? Math.min(inQuarter, maxNights) : inQuarter;
+    const age = _ageAtArrival(c);
+    const isExempt = (exemptAge != null && age != null && age < exemptAge);
+    if (isExempt) {
+      exemptNights += inQuarter;
+    } else {
+      taxableNights += taxablePer;
+      // nights beyond the cap are neither taxable nor "exempt" by rule —
+      // count them as exempt-from-tax for the host's reference
+      exemptNights += (inQuarter - taxablePer);
+    }
+  });
+
+  const due = (taxableNights * rate);
+  const it = hostLang === 'it';
+  const lines = [
+    it ? `RIEPILOGO IMPOSTA DI SOGGIORNO — da inserire in CityTax++` : `TOURIST TAX SUMMARY — to enter in CityTax++`,
+    `${it ? 'Struttura' : 'Property'}: ${propertyData?.name || ''}`,
+    `${it ? 'Trimestre' : 'Quarter'}: ${qy}-Q${q}  (${qStartStr} → ${qEndStr})`,
+    ``,
+    `${it ? 'Tariffa' : 'Rate'}: € ${Number(rate).toFixed(2)} ${it ? 'per persona/notte' : 'per person/night'}`,
+    `${it ? 'Notti max tassabili' : 'Max taxable nights'}: ${maxNights || (it ? 'nessun limite' : 'no cap')}`,
+    `${it ? 'Esenti sotto i' : 'Exempt under age'}: ${exemptAge != null ? exemptAge : (it ? 'n/d' : 'n/a')}`,
+    ``,
+    `${it ? 'Arrivi nel trimestre' : 'Arrivals in quarter'}: ${arrivalsCount}`,
+    `${it ? 'Pernottamenti TASSABILI' : 'TAXABLE overnights'}: ${taxableNights}`,
+    `${it ? 'Pernottamenti esenti/oltre soglia' : 'Exempt / over-cap overnights'}: ${exemptNights}`,
+    ``,
+    `${it ? 'IMPORTO DOVUTO' : 'AMOUNT DUE'}: € ${due.toFixed(2)}`,
+    ``,
+    it ? '⚠ Verifica sempre contro la delibera del tuo comune. Esenzioni diverse'
+       : '⚠ Always verify against your comune\'s resolution. Exemptions other',
+    it ? '  dall\'età (disabili, ecc.) vanno gestite manualmente.'
+       : '  than age (disabled, etc.) must be handled manually.',
+  ];
+  // Show on screen (alert) AND offer a text download for the host's records
+  alert(lines.join('\n'));
+  downloadFile(`citytax_${qy}-Q${q}.txt`, lines.join('\n'));
+  track('export_citytax', { quarter: `${qy}-Q${q}`, taxableNights, due });
+  toast(it ? 'Riepilogo imposta generato!' : 'Tax summary generated!');
 }
 
 /* ══════════════════════════════════════
@@ -5871,6 +6350,12 @@ function fillPropertyForm(data) {
   if (el('propCheckinInstructions')) el('propCheckinInstructions').value = data.checkin_instructions || '';
   if (el('propCheckoutInstructions')) el('propCheckoutInstructions').value = data.checkout_instructions || '';
   if (el('propTransportInfo')) el('propTransportInfo').value = data.transport_info || '';
+  if (el('propRossCodice')) el('propRossCodice').value = data.ross1000_codice || '';
+  if (el('propRoomsAvailable')) el('propRoomsAvailable').value = (data.rooms_available ?? '');
+  if (el('propBedsAvailable')) el('propBedsAvailable').value = (data.beds_available ?? '');
+  if (el('propTaxRate')) el('propTaxRate').value = (data.tax_rate_eur ?? '');
+  if (el('propTaxMaxNights')) el('propTaxMaxNights').value = (data.tax_max_nights ?? '');
+  if (el('propTaxExemptAge')) el('propTaxExemptAge').value = (data.tax_exempt_under_age ?? '');
   onTogglePerGuestLockbox(); // refresh check-ins list visibility of per-guest field
   if (el('propWifiName')) el('propWifiName').value = data.wifi_name || '';
   if (el('propWifiPass')) el('propWifiPass').value = data.wifi_password || '';

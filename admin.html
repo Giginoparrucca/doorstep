@@ -421,13 +421,6 @@ async function markTest(table, id) {
   adminToast(`${ADMIN_TABLES[table].label} marked as test data`, 'success');
   loadData();
 }
-  if (!ADMIN_TABLES[table]) return adminToast('Unknown table', 'error');
-  const { data, error } = await sb.from(table).update({ is_test: true }).eq('id', id).select();
-  if (error) return adminToast(`Mark test failed: ${error.message}`, 'error');
-  if (!data || data.length === 0) return adminToast(`No row updated — RLS may be blocking. Check admin policies.`, 'error');
-  adminToast(`${ADMIN_TABLES[table].label} marked as test data`, 'success');
-  loadData();
-}
 
 async function unmarkTest(table, id) {
   if (!ADMIN_TABLES[table]) return adminToast('Unknown table', 'error');

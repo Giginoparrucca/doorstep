@@ -392,7 +392,35 @@ function toggleShowHidden(checked) {
 
 // Mark a row as test data. is_test flag → row hidden from analytics + apps,
 // but the row itself is preserved. Reversible via unmarkTest.
+// Round 25: admin "view as host" — log the impersonation, then open the
+// host console scoped to this property in read-only mode (admin=1). The
+// console reads the flag and shows a warning banner + disables inputs until
+// the admin opts into editing.
+async function viewAsHost(propertyId) {
+  if (!propertyId) return;
+  try {
+    const { data: { user } } = await sb.auth.getUser();
+    await sb.from('admin_impersonation_log').insert({
+      admin_id: user?.id,
+      admin_email: user?.email || null,
+      property_id: propertyId,
+      action: 'view',
+    });
+  } catch (e) {
+    // Logging failure shouldn't block support work, but surface it.
+    console.warn('Impersonation log failed:', e);
+  }
+  window.open(`host-console.html?p=${encodeURIComponent(propertyId)}&admin=1`, '_blank');
+}
+
 async function markTest(table, id) {
+  if (!ADMIN_TABLES[table]) return adminToast('Unknown table', 'error');
+  const { data, error } = await sb.from(table).update({ is_test: true }).eq('id', id).select();
+  if (error) return adminToast(`Mark test failed: ${error.message}`, 'error');
+  if (!data || data.length === 0) return adminToast(`No row updated — RLS may be blocking. Check admin policies.`, 'error');
+  adminToast(`${ADMIN_TABLES[table].label} marked as test data`, 'success');
+  loadData();
+}
   if (!ADMIN_TABLES[table]) return adminToast('Unknown table', 'error');
   const { data, error } = await sb.from(table).update({ is_test: true }).eq('id', id).select();
   if (error) return adminToast(`Mark test failed: ${error.message}`, 'error');
@@ -815,6 +843,11 @@ function adminRowActions(table, row) {
   const isDeleted = !!row.deleted_at;
 
   const parts = [];
+  // Round 25: admin "view as host" — open the host console scoped to this
+  // property, read-only by default. Only meaningful for the properties table.
+  if (table === 'properties') {
+    parts.push(`<button class="admin-action-btn" onclick="viewAsHost('${id}')" title="Open this host's console (read-only)">👁 Console</button>`);
+  }
   if (isDeleted) {
     parts.push(`<button class="admin-action-btn success" onclick="restoreRow('${table}','${id}')" title="Restore (clears deleted_at)">↩️</button>`);
   } else {

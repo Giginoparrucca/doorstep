@@ -65,6 +65,14 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 25 — Admin "view as host" (impersonation for support) _(2026-06-11)_
+- Admins can now open any host's console for troubleshooting — read-only by default, with an opt-in editing toggle, logged for accountability.
+- **Admin panel**: a "👁 Console" button on each property row opens `host-console.html?p=<id>&admin=1` in a new tab, after writing an audit-log row.
+- **Host console**: detects `?admin=1`, shows a fixed dark warning banner ("👁 Admin view · <property> — read-only"), and locks the console read-only by disabling every input/textarea/select/button in `.main`. An "Enable editing" checkbox in the banner unlocks it (and the banner flips to a red "EDITING ENABLED" warning). Read-only is re-applied after panel switches so freshly-rendered buttons stay locked. (The existing `?p=` admin override already loaded any property via `is_admin()` RLS; this adds the safe, surfaced UX on top.)
+- **Audit log** (`migration_round25_admin_impersonation_log.sql`): append-only `admin_impersonation_log` table (admin_id, admin_email, property_id, action, created_at). Logs `view` on open and `enable_edit` when the admin elevates to editing, so any change is attributable. RLS: admins-only select/insert (insert must be self); no update/delete policies, so the trail can't be quietly rewritten.
+- Bilingual EN/IT banner. Note: relies on the existing admin `is_admin()` RLS for cross-property access — a non-admin opening the URL still can't read others' data (RLS blocks it); the banner/read-only is UX, RLS is the real boundary.
+- **Files**: `admin.html`, `host-console.html`, `migration_round25_admin_impersonation_log.sql`
+
 ### Round 24.1 — Guest app: welcome message (and host free-text) honor line breaks _(2026-06-10)_
 - **Bug** (from host screenshots): the host's **welcome message** — written with deliberate line breaks and emoji sub-headers (Accesso al palazzo / Accesso appartamento / Informazioni utili / Comfort / Energia elettrica…) — rendered as one dense wall in the guest app, ignoring the host's spacing.
 - **Root cause**: the welcome message is set twice. The loader sets `#hostMsg` via `textContent` (preserves `\n`), but the element also has `data-i18n="host_msg"`, so `applyLang()` overwrites it via `el.innerHTML = T[lang][key]` on load and on every language toggle — and `innerHTML` collapses the host's `\n` into whitespace.

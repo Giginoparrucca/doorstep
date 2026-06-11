@@ -289,7 +289,7 @@ body.has-test-banner .top-bar { top: 36px; }
 .home-card-text {
   margin-top: 12px; padding-top: 12px;
   border-top: 1px solid rgba(0,91,255,0.08);
-  font-size: 0.8rem; color: var(--ink-2); line-height: 1.55;
+  font-size: 0.8rem; color: var(--ink-2); line-height: 1.65;
   font-weight: 300; white-space: pre-wrap;
 }
 
@@ -485,16 +485,16 @@ body.has-test-banner .top-bar { top: 36px; }
   font-size: 1.4rem; font-weight: 500; color: var(--ink);
 }
 .rule-card {
-  margin: 0 16px 10px;
+  margin: 0 16px 12px;
   background: var(--white); border-radius: var(--radius-s);
-  padding: 14px 16px;
+  padding: 16px 18px;
   border: 1px solid rgba(0,91,255,0.08);
   display: flex; align-items: flex-start; gap: 12px;
   box-shadow: var(--shadow-s);
 }
 .rule-icon { font-size: 1.3rem; flex-shrink: 0; margin-top: 2px; }
-.rule-title { font-size: 0.82rem; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
-.rule-desc { font-size: 0.72rem; color: var(--ink-soft); line-height: 1.5; font-weight: 300; }
+.rule-title { font-size: 0.82rem; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
+.rule-desc { font-size: 0.74rem; color: var(--ink-soft); line-height: 1.65; font-weight: 300; white-space: pre-wrap; }
 .rule-card.important { border-left: 3px solid var(--red); }
 .rule-card.tip { border-left: 3px solid var(--green); }
 
@@ -1744,7 +1744,17 @@ function setLang(l) {
   });
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
-    if (T[lang][key] !== undefined) el.innerHTML = T[lang][key];
+    if (T[lang][key] === undefined) return;
+    // Host free-text fields (the welcome message) must be set as TEXT, not
+    // HTML — they contain the host's own line breaks, which innerHTML would
+    // collapse. textContent preserves the \n, and the element's
+    // `white-space: pre-wrap` renders them. All other keys are UI strings
+    // that may legitimately contain markup (e.g. welcome_title's <br><em>).
+    if (key === 'host_msg') {
+      el.textContent = T[lang][key];
+    } else {
+      el.innerHTML = T[lang][key];
+    }
   });
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     const key = el.getAttribute('data-i18n-placeholder');
@@ -3264,12 +3274,14 @@ function renderRules() {
   } else {
     data = fallbackRules[lang];
   }
+  const escapeHtml = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   c.innerHTML = data.map(r => `
     <div class="rule-card ${r.type}">
-      <div class="rule-icon">${r.icon}</div>
+      <div class="rule-icon">${escapeHtml(r.icon)}</div>
       <div>
-        <div class="rule-title">${r.title}</div>
-        <div class="rule-desc">${r.desc}</div>
+        <div class="rule-title">${escapeHtml(r.title)}</div>
+        <div class="rule-desc">${escapeHtml(r.desc)}</div>
       </div>
     </div>
   `).join('');

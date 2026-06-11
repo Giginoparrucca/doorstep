@@ -6220,9 +6220,39 @@ async function init() {
   // 2. Load all property-scoped data for the selected property
   await loadPropertyData();
 
-  // 3. Round 25: if launched from the admin panel (?admin=1), show the
-  // warning banner and lock the console read-only until the admin opts in.
-  if (isAdminView) activateAdminView();
+  // 3. Round 25: if launched from the admin panel (?admin=1), AND the
+  // logged-in user is genuinely an admin, show the warning banner and lock
+  // read-only. We must verify admin status here — trusting the URL param
+  // alone would show the banner (and read-only lock) to a normal host who
+  // happens to have ?admin=1 left in their URL. (RLS already prevents a
+  // non-admin from actually reading another host's data; this is the UX
+  // half of that boundary.)
+  if (isAdminView) {
+    const reallyAdmin = await _hostIsAdmin(userId);
+    if (reallyAdmin) {
+      activateAdminView();
+    } else {
+      // Strip the stray params so the banner never shows for a normal host,
+      // and so a refresh doesn't keep re-triggering this path.
+      const url = new URL(window.location.href);
+      url.searchParams.delete('admin');
+      url.searchParams.delete('p');
+      history.replaceState(null, '', url.toString());
+    }
+  }
+}
+
+// Is the currently-authenticated user an admin? Checks the admin_users
+// table (same source of truth the admin console uses).
+async function _hostIsAdmin(userId) {
+  try {
+    const { data: { user } } = await sb.auth.getUser();
+    const email = user?.email;
+    if (!email) return false;
+    const { data, error } = await sb.from('admin_users').select('email').eq('email', email).maybeSingle();
+    if (error) { console.warn('admin check failed:', error.message); return false; }
+    return !!data;
+  } catch (e) { console.warn('admin check exception:', e); return false; }
 }
 
 // ── Round 25: Admin "view as host" mode ──────────────────────────────────

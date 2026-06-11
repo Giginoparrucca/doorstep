@@ -884,6 +884,18 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 </head>
 <body>
 
+<!-- Round 25: admin "view as host" banner. Hidden unless ?admin=1. Fixed
+     bar across the top; read-only until the admin enables editing. -->
+<div id="adminViewBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#061A3D;color:#fff;padding:8px 14px;display:flex;align-items:center;gap:12px;font-family:'DM Sans',sans-serif;font-size:0.8rem;box-shadow:0 2px 12px rgba(0,0,0,0.25);">
+  <span style="font-size:1rem;">👁</span>
+  <span id="adminViewLabel" style="flex:1;min-width:0;">Admin view</span>
+  <label style="display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap;font-size:0.74rem;">
+    <input type="checkbox" id="adminEditToggle" onchange="toggleAdminEdit(this.checked)" style="cursor:pointer;">
+    <span data-h="admin_enable_edit">Enable editing</span>
+  </label>
+  <button onclick="window.close()" style="background:rgba(255,255,255,0.12);border:none;color:#fff;border-radius:6px;padding:5px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" data-h="admin_close">Close</button>
+</div>
+
 <!-- LOGIN SCREEN -->
 <div class="login-overlay" id="loginOverlay">
   <div class="login-card">
@@ -2828,6 +2840,8 @@ const HT = {
     sidebar_qr: 'QR Code & Link', sidebar_role: 'Property Manager',
     sidebar_guest_analytics: 'Guest Analytics',
     sidebar_compliance: 'Compliance Guide',
+    admin_enable_edit: 'Enable editing',
+    admin_close: 'Close',
     cmp_intro: 'A plain-language guide to the three compliance obligations for short-term rentals in Italy. This is reference information — verify the specifics for your region and comune.',
     // Panel titles
     t_dashboard: 'Dashboard', s_dashboard: 'What needs your attention right now',
@@ -3120,6 +3134,8 @@ const HT = {
     sidebar_qr: 'QR Code & Link', sidebar_role: 'Gestore Proprietà',
     sidebar_guest_analytics: 'Analisi Ospiti',
     sidebar_compliance: 'Guida Conformità',
+    admin_enable_edit: 'Abilita modifica',
+    admin_close: 'Chiudi',
     cmp_intro: 'Una guida in linguaggio semplice ai tre obblighi di conformità per le locazioni brevi in Italia. È informazione di riferimento — verifica i dettagli per la tua regione e il tuo comune.',
     t_dashboard: 'Dashboard', s_dashboard: 'Cosa richiede la tua attenzione adesso',
     // Round 15 — bacheca azioni
@@ -3481,6 +3497,10 @@ function showPanel(id, btn) {
   if (id === 'qrlink') initQRPanel();
   if (id === 'compliance') renderCompliance();
   if (id === 'property') renderDismissedList();
+  // Round 25: re-apply read-only lock after a panel re-renders its buttons
+  if (typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled) {
+    setTimeout(() => setConsoleReadOnly(true), 0);
+  }
   if (id === 'chat') { loadHostChat(); document.getElementById('chatBadge').style.display = 'none'; markChatSeen(); requestNotifPermission(); }
   if (id === 'guestanalytics') loadGuestAnalytics();
   trackPanelSwitch(id);
@@ -6148,6 +6168,7 @@ async function init() {
 
   // Admin override: ?p=UUID loads any property directly (for admin management)
   const adminPropId = new URLSearchParams(window.location.search).get('p');
+  const isAdminView = adminPropId && new URLSearchParams(window.location.search).get('admin') === '1';
 
   // 1. Load the FULL list of properties this user owns (Round 21 multi-property)
   try {
@@ -6198,6 +6219,71 @@ async function init() {
 
   // 2. Load all property-scoped data for the selected property
   await loadPropertyData();
+
+  // 3. Round 25: if launched from the admin panel (?admin=1), show the
+  // warning banner and lock the console read-only until the admin opts in.
+  if (isAdminView) activateAdminView();
+}
+
+// ── Round 25: Admin "view as host" mode ──────────────────────────────────
+let IS_ADMIN_VIEW = false;
+let _adminEditEnabled = false;
+function activateAdminView() {
+  IS_ADMIN_VIEW = true;
+  const banner = document.getElementById('adminViewBanner');
+  if (!banner) return;
+  banner.style.display = 'flex';
+  const label = document.getElementById('adminViewLabel');
+  if (label) {
+    const nm = propertyData?.name || 'property';
+    label.textContent = (hostLang === 'it'
+      ? `Vista admin · ${nm} — sola lettura`
+      : `Admin view · ${nm} — read-only`);
+  }
+  // Push the layout down so the fixed banner doesn't cover the top bar.
+  document.body.style.paddingTop = '40px';
+  setConsoleReadOnly(true);
+}
+
+// Disable/enable every input, textarea, select and action button in the
+// console. We scope to the main content; the banner's own controls are
+// explicitly re-enabled so the admin can still toggle/close.
+function setConsoleReadOnly(ro) {
+  const main = document.querySelector('.main');
+  if (main) {
+    main.querySelectorAll('input, textarea, select, button').forEach(elm => {
+      elm.disabled = ro;
+      elm.style.opacity = ro ? '0.6' : '';
+      elm.style.pointerEvents = ro ? 'none' : '';
+    });
+  }
+  // Banner controls always usable
+  ['adminEditToggle'].forEach(id => {
+    const e = document.getElementById(id);
+    if (e) { e.disabled = false; e.style.opacity = ''; e.style.pointerEvents = ''; }
+  });
+}
+
+async function toggleAdminEdit(on) {
+  _adminEditEnabled = on;
+  setConsoleReadOnly(!on);
+  const label = document.getElementById('adminViewLabel');
+  if (label) {
+    const nm = propertyData?.name || 'property';
+    label.textContent = on
+      ? (hostLang === 'it' ? `⚠ Vista admin · ${nm} — MODIFICA ATTIVA` : `⚠ Admin view · ${nm} — EDITING ENABLED`)
+      : (hostLang === 'it' ? `Vista admin · ${nm} — sola lettura` : `Admin view · ${nm} — read-only`);
+  }
+  // Log the elevation to editing so edits are attributable.
+  if (on) {
+    try {
+      const { data: { user } } = await sb.auth.getUser();
+      await sb.from('admin_impersonation_log').insert({
+        admin_id: user?.id, admin_email: user?.email || null,
+        property_id: propertyId, action: 'enable_edit',
+      });
+    } catch (e) { console.warn('Impersonation edit-log failed:', e); }
+  }
 }
 
 // Round 21: render the property switcher dropdown from allProperties

@@ -66,10 +66,13 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 ## 📋 Done / Shipped
 
 ### Round 25.1 — Hotfix: admin login broken + banner showing for normal hosts _(2026-06-11)_
-Two bugs from Round 25, both fixed:
-- **Admin login did nothing**: Round 25's edit to `admin.html` left an orphaned duplicate fragment of `markTest`'s body after its closing brace — a syntax error that broke the *entire* admin script block, so `adminSignIn` (and everything else) was never defined. Clicking Sign In did nothing because the handler didn't exist. Removed the duplicate; script parses clean again.
-- **Admin banner showed for a normal host**: the host console activated admin-view purely from the `?admin=1` URL param, so a normal host (Daniele on his own console) with the param left in the URL saw the red "Admin view" banner + read-only lock. Fixed: the console now verifies the logged-in user is genuinely in `admin_users` (`_hostIsAdmin`) before activating; if not, it strips the stray `?admin`/`?p` params from the URL so the banner never shows and a refresh won't re-trigger it. (RLS already prevented a non-admin from actually reading another host's data — this fixes the UX half.)
+Three fixes from Round 25:
+- **Admin login did nothing**: Round 25's edit to `admin.html` left an orphaned duplicate fragment of `markTest`'s body after its closing brace — a syntax error that broke the *entire* admin script block, so `adminSignIn` (and everything else) was never defined. Clicking Sign In did nothing because the handler didn't exist. Removed the duplicate; script parses clean again. **This was also why the banner appeared "stuck"** — the live site was running the broken build.
+- **Admin banner showed for a normal host**: the host console activated admin-view purely from the `?admin=1` URL param. Fixed: the console now verifies the logged-in user is genuinely in `admin_users` (`_hostIsAdmin`) before activating; if not, it strips the stray `?admin`/`?p` params from the URL. (RLS already prevented a non-admin from reading another host's data — this fixes the UX half.)
+- **Consolidated the launch button**: the "Hosts & Properties" table in the admin dashboard already had an "✏️ Edit" link that opened the console *without* the banner/read-only (bypassing the Round 25 safety) plus a redundant "👁 Console" from `adminRowActions`. Replaced both with a single "👁 Console" button calling `viewAsHost()` (logged + banner + read-only), renamed the guest-app link to "👁 Guest app", and removed the duplicate. **Location**: admin dashboard → scroll to "Hosts & Properties" → each property row's Actions column.
 - **Files**: `admin.html`, `host-console.html`
+
+### Round 25 — Admin "view as host" (impersonation for support) _(2026-06-11)_
 
 ### Round 25 — Admin "view as host" (impersonation for support) _(2026-06-11)_
 - Admins can now open any host's console for troubleshooting — read-only by default, with an opt-in editing toggle, logged for accountability.

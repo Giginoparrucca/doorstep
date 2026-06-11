@@ -65,6 +65,14 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 24.1 — Guest app: welcome message (and host free-text) honor line breaks _(2026-06-10)_
+- **Bug** (from host screenshots): the host's **welcome message** — written with deliberate line breaks and emoji sub-headers (Accesso al palazzo / Accesso appartamento / Informazioni utili / Comfort / Energia elettrica…) — rendered as one dense wall in the guest app, ignoring the host's spacing.
+- **Root cause**: the welcome message is set twice. The loader sets `#hostMsg` via `textContent` (preserves `\n`), but the element also has `data-i18n="host_msg"`, so `applyLang()` overwrites it via `el.innerHTML = T[lang][key]` on load and on every language toggle — and `innerHTML` collapses the host's `\n` into whitespace.
+- **Fix**: `applyLang()` now special-cases `host_msg` to set `textContent` (preserves newlines; the element's `white-space: pre-wrap` renders them) instead of `innerHTML`. Other i18n keys still use `innerHTML` (they legitimately contain markup like `welcome_title`'s `<br><em>`).
+- Also added `white-space: pre-wrap` + HTML-escaping to `.rule-desc` (rules had the same latent gap), and a breathing-room pass (more padding/gap, line-height 1.65) on rule cards and host-text blocks.
+- Host console already stores textarea newlines verbatim — no host-side change needed.
+- **Files**: `index.html`
+
 ### Round 24 — Veneto exports: ROSS1000 XML + CityTax declaration helper _(2026-06-10)_
 Built both Veneto exports against the real specs gathered last round.
 

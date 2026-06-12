@@ -65,12 +65,15 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
-### Round 25.1 — Hotfix: admin login broken + banner showing for normal hosts _(2026-06-11)_
-Three fixes from Round 25:
-- **Admin login did nothing**: Round 25's edit to `admin.html` left an orphaned duplicate fragment of `markTest`'s body after its closing brace — a syntax error that broke the *entire* admin script block, so `adminSignIn` (and everything else) was never defined. Clicking Sign In did nothing because the handler didn't exist. Removed the duplicate; script parses clean again. **This was also why the banner appeared "stuck"** — the live site was running the broken build.
-- **Admin banner showed for a normal host**: the host console activated admin-view purely from the `?admin=1` URL param. Fixed: the console now verifies the logged-in user is genuinely in `admin_users` (`_hostIsAdmin`) before activating; if not, it strips the stray `?admin`/`?p` params from the URL. (RLS already prevented a non-admin from reading another host's data — this fixes the UX half.)
-- **Consolidated the launch button**: the "Hosts & Properties" table in the admin dashboard already had an "✏️ Edit" link that opened the console *without* the banner/read-only (bypassing the Round 25 safety) plus a redundant "👁 Console" from `adminRowActions`. Replaced both with a single "👁 Console" button calling `viewAsHost()` (logged + banner + read-only), renamed the guest-app link to "👁 Guest app", and removed the duplicate. **Location**: admin dashboard → scroll to "Hosts & Properties" → each property row's Actions column.
+### Round 25.1 — Hotfix: admin login broken + banner always showing _(2026-06-11)_
+Fixes from Round 25:
+- **Banner always visible (the real culprit)**: the banner's inline style declared `display:none` AND `display:flex` in the same attribute. CSS last-declaration-wins meant `display:flex` always overrode the `none` — so the banner showed for *everyone, always*, regardless of URL params or any JavaScript. No amount of correct JS logic could hide it. Removed the duplicate `display:flex` (kept the flex layout props); banner now defaults to hidden and is only switched to `flex` by `activateAdminView()`.
+- **Admin login did nothing**: an orphaned duplicate fragment of `markTest`'s body after its closing brace was a syntax error that broke the entire admin script, so `adminSignIn` was never defined. Removed it.
+- **Belt-and-suspenders admin check**: the host console also now verifies the user is genuinely in `admin_users` (`_hostIsAdmin`) before activating admin-view, and strips stray `?admin`/`?p` params otherwise.
+- **Consolidated launch button**: in the admin "Hosts & Properties" table, replaced the old "✏️ Edit" link (opened the console with no banner/read-only) and the duplicate `adminRowActions` console button with a single "👁 Console" button calling `viewAsHost()` (logged + banner + read-only). Guest-app link renamed "👁 Guest app". **Location**: admin dashboard → scroll to "Hosts & Properties" → row Actions.
 - **Files**: `admin.html`, `host-console.html`
+
+### Round 25 — Admin "view as host" (impersonation for support) _(2026-06-11)_
 
 ### Round 25 — Admin "view as host" (impersonation for support) _(2026-06-11)_
 

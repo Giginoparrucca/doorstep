@@ -101,6 +101,11 @@ body {
    the scroll container and slide UNDER the banner. Offset them so they
    stick just below it instead. */
 body.has-test-banner .top-bar { top: 36px; }
+/* The pages are position:fixed top:0, so they ignore the body padding-top
+   that makes room for the preview banner — their own headers (e.g. the chat
+   page's .chat-header-area, which isn't a .top-bar) end up under the banner.
+   Push every page down by the banner height so all headers clear it. */
+body.has-test-banner .page { top: 36px; }
 .top-bar-title {
   font-family: 'Playfair Display', serif;
   font-size: 1.1rem; font-weight: 500; color: var(--ink);
@@ -3401,12 +3406,31 @@ function renderChatSuggestions() {
   ).join('');
 }
 
+// Robustly pin the chat to the bottom. Runs after layout (rAF) so the
+// newly-appended bubble's height is included — a plain scrollTop set right
+// after appendChild often fires before reflow and lands mid-conversation.
+// `force` always scrolls (use when the USER sends); without it, we only
+// follow the stream if the user is already near the bottom, so we don't
+// yank them down while they're scrolling up to re-read.
+function scrollChatToBottom(force) {
+  const el = document.getElementById('chatMessages');
+  if (!el) return;
+  const nearBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 120;
+  if (force || nearBottom) {
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+      // second pass after images/animations settle
+      requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+    });
+  }
+}
+
 function addBubble(text, type) {
   const div = document.createElement('div');
   div.className = 'chat-bubble ' + type;
   div.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
   document.getElementById('chatMessages').appendChild(div);
-  document.getElementById('chatMessages').scrollTop = 99999;
+  scrollChatToBottom(true);
 }
 
 async function saveChatMsg(sender, message) {
@@ -3607,7 +3631,7 @@ async function sendChat() {
     userBubble.appendChild(txt);
   }
   document.getElementById('chatMessages').appendChild(userBubble);
-  document.getElementById('chatMessages').scrollTop = 99999;
+  scrollChatToBottom(true);
 
   // Save guest message — for image-only message, save a placeholder
   const savedText = msg || (hasImage ? '[📎 photo]' : '');
@@ -3644,7 +3668,7 @@ async function sendChat() {
   botBubble.className = 'chat-bubble bot streaming';
   botBubble.textContent = '';
   document.getElementById('chatMessages').appendChild(botBubble);
-  document.getElementById('chatMessages').scrollTop = 99999;
+  scrollChatToBottom(true);
 
   let fullReply = '';
   try {
@@ -3686,7 +3710,7 @@ async function sendChat() {
             fullReply += payload.text;
             // Render with bold markdown support
             botBubble.innerHTML = fullReply.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            document.getElementById('chatMessages').scrollTop = 99999;
+            scrollChatToBottom(false);
           } else if (payload.type === 'done') {
             escalated = !!payload.escalated;
             followups = Array.isArray(payload.followups) ? payload.followups : [];

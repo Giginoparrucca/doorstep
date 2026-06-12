@@ -65,6 +65,11 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 25.2 — Chat scroll-to-bottom + preview banner covers chat title _(2026-06-11)_
+- **Chat jumped to the middle after sending**: the code set `chatMessages.scrollTop = 99999` immediately after `appendChild`, which often runs *before* the browser reflows with the new bubble's height (made worse by the bubble's fadeIn transform), so it landed mid-conversation. Replaced all five call sites with a `scrollChatToBottom(force)` helper that scrolls inside `requestAnimationFrame` (after layout, with a second rAF pass for images/animations) using `scrollHeight`. User-sent messages and fresh bot bubbles `force` scroll; mid-stream tokens only follow if the user is already near the bottom (so it doesn't yank them down while they scroll up to re-read).
+- **Preview banner covered the chat "Concierge" title**: `.page` is `position:fixed; top:0`, so it ignores the body `padding-top` that makes room for the fixed preview banner — and the chat page's header is `.chat-header-area`, not a `.top-bar`, so the earlier Round 22.2 `.top-bar` offset didn't help it. Added `body.has-test-banner .page { top: 36px }` so every page (and its header) clears the banner. One rule covers all pages.
+- **Files**: `index.html`
+
 ### Round 25.1 — Hotfix: admin login broken + banner always showing _(2026-06-11)_
 Fixes from Round 25:
 - **Banner always visible (the real culprit)**: the banner's inline style declared `display:none` AND `display:flex` in the same attribute. CSS last-declaration-wins meant `display:flex` always overrode the `none` — so the banner showed for *everyone, always*, regardless of URL params or any JavaScript. No amount of correct JS logic could hide it. Removed the duplicate `display:flex` (kept the flex layout props); banner now defaults to hidden and is only switched to `flex` by `activateAdminView()`.

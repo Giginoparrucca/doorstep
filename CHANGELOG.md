@@ -65,6 +65,11 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 25.4 — Preview banner still clipping page titles (real fix) _(2026-06-12)_
+- Round 25.2's banner offset was wrong in two ways: (1) it set a **hard-coded 36px**, but the banner wraps to two lines on narrow phones (~60px), so the offset undershot and titles like "Our Recommendations" stayed clipped; (2) it offset **both** `.top-bar` and `.page` by 36px, which double-counted to ~72px on pages that have a top-bar.
+- **Fix**: removed the `.top-bar` offset rule (the `.page` offset alone is sufficient — the sticky top-bar inside an already-offset page sticks to the right place). `setupTestModeBanner()` now **measures the banner's real rendered height** and publishes it as `--test-banner-h`, re-measuring on resize/orientation change; `.page` offsets by that variable (fallback 36px). Body padding-top uses the same measured value.
+- **Files**: `index.html`
+
 ### Round 25.3 — Stuck no-code chat + archive returning 0 rows _(2026-06-12)_
 - **Symptom**: an old "Ospite (senza codice prenotazione)" conversation (53 msgs, April) stuck in the host chat; 📁 Archive errored with "nothing archived"; plus a Vercel Speed Insights INP warning on the archive button.
 - **Diagnosis**: (1) The no-code bucket deliberately bypasses "Active stays only" (it has no dates), so it never ages out — and these specific messages are pre-Round-19.5 anonymous testing, before `?test=1` tagging existed, so they masquerade as a live guest conversation forever. (2) Archive = UPDATE setting `deleted_at`; a 0-row result with no error is the project's #1 RLS+GRANT gotcha — the host UPDATE policy/GRANT on `chat_messages` is missing or was narrowed in the live DB (can't confirm from code; the migration may never have been applied). (3) The INP warning is benign: `archiveCurrentChat` uses a blocking `confirm()`, and the metric counts the time the dialog sat open (~1.2s of user thinking) as "blocked UI".

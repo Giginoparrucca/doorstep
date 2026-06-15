@@ -96,16 +96,13 @@ body {
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(0,91,255,0.08);
 }
-/* When the preview-mode banner is showing, the body gets padding-top to
-   make room for the fixed banner. But sticky top-bars stick to top:0 of
-   the scroll container and slide UNDER the banner. Offset them so they
-   stick just below it instead. */
-body.has-test-banner .top-bar { top: 36px; }
-/* The pages are position:fixed top:0, so they ignore the body padding-top
-   that makes room for the preview banner — their own headers (e.g. the chat
-   page's .chat-header-area, which isn't a .top-bar) end up under the banner.
-   Push every page down by the banner height so all headers clear it. */
-body.has-test-banner .page { top: 36px; }
+/* When the preview-mode banner (fixed, ~36px tall) is showing, push every
+   page down by the banner height so nothing sits under it. The pages are
+   position:fixed, so this `top` offset is the single source of truth for
+   clearing the banner — the sticky .top-bar inside then naturally sticks to
+   the page's (already-offset) top. We deliberately do NOT also offset
+   .top-bar, which would double up to 72px. */
+body.has-test-banner .page { top: var(--test-banner-h, 36px); }
 .top-bar-title {
   font-family: 'Playfair Display', serif;
   font-size: 1.1rem; font-weight: 500; color: var(--ink);
@@ -4274,12 +4271,20 @@ function setupTestModeBanner() {
     <span><strong>${it ? 'Modalità anteprima' : 'Preview mode'}</strong> · ${it ? 'la tua attività non viene registrata' : 'your activity is not being tracked'}</span>
     <button onclick="exitTestMode()" style="margin-left:8px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.22);color:#fff;padding:3px 10px;border-radius:4px;font-size:0.7rem;cursor:pointer;font-family:inherit;">${it ? 'Esci' : 'Exit'}</button>`;
   document.body.insertBefore(banner, document.body.firstChild);
-  // Push down the whole app to make room for the banner. The simplest
-  // way without restructuring CSS is a body padding-top. The body class
-  // also offsets sticky top-bars so they stick below the banner instead
-  // of sliding under it (which hid the language toggle).
-  document.body.style.paddingTop = '36px';
   document.body.classList.add('has-test-banner');
+  // Measure the banner's ACTUAL height (it wraps to two lines on narrow
+  // phones, so a hard-coded 36px undershoots and the page title gets
+  // clipped). Publish it as a CSS var the .page offset reads, and re-measure
+  // on resize/orientation change.
+  const applyBannerHeight = () => {
+    const h = banner.offsetHeight || 36;
+    document.documentElement.style.setProperty('--test-banner-h', h + 'px');
+    document.body.style.paddingTop = h + 'px';
+  };
+  applyBannerHeight();
+  // One more pass after fonts/layout settle.
+  requestAnimationFrame(applyBannerHeight);
+  window.addEventListener('resize', applyBannerHeight);
 }
 
 function exitTestMode() {

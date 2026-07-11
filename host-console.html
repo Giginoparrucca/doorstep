@@ -981,6 +981,10 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="M7 15l4-6 4 3 5-8"/></svg>
       <span data-h="sidebar_guest_analytics">Guest Analytics</span>
     </button>
+    <button class="sidebar-item" onclick="showPanel('contacts', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 4h16v16H4z"/><path d="M22 6l-10 7L2 6"/></svg>
+      <span data-h="sidebar_contacts">Marketing Contacts</span>
+    </button>
     <button class="sidebar-item" onclick="showPanel('export', this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       <span data-h="sidebar_export">Export / Alloggiati</span>
@@ -1367,6 +1371,38 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             </tr>
           </thead>
           <tbody id="checkinTable">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ════════════ MARKETING CONTACTS (Round 26) ════════════
+         Opt-in only — guests who ticked the consent checkbox on the
+         check-in success screen. Separate legal basis (Art. 6(1)(a) consent)
+         from the Alloggiati data above, so it's a separate table/panel, not
+         a column on checkins. Withdrawn contacts are excluded here entirely. -->
+    <div class="panel" id="panel-contacts">
+      <div class="alert alert-info" data-h="contacts_info">
+        These guests opted in to receive future offers and news. Always include a working unsubscribe link in any email you send — it's a legal requirement, not optional.
+      </div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <div class="table-title" id="contactsTitle" data-h="contacts_title">Marketing Contacts</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button class="btn btn-secondary btn-sm" onclick="exportContactsCSV()" data-h="btn_dl_contacts_csv">📥 Download CSV</button>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th data-h="th_contact_name">Guest</th>
+              <th data-h="th_contact_email">Email</th>
+              <th data-h="th_contact_phone">Phone</th>
+              <th data-h="th_contact_booking">Booking</th>
+              <th data-h="th_contact_date">Consented on</th>
+            </tr>
+          </thead>
+          <tbody id="contactsTable">
           </tbody>
         </table>
       </div>
@@ -2839,6 +2875,7 @@ const HT = {
     sidebar_recos: 'Recommendations', sidebar_checkins: 'Check-in Data', sidebar_export: 'Export & Compliance',
     sidebar_qr: 'QR Code & Link', sidebar_role: 'Property Manager',
     sidebar_guest_analytics: 'Guest Analytics',
+    sidebar_contacts: 'Marketing Contacts',
     sidebar_compliance: 'Compliance Guide',
     admin_enable_edit: 'Enable editing',
     admin_close: 'Close',
@@ -2907,6 +2944,12 @@ const HT = {
     t_rules: 'House Rules', s_rules: 'Manage rules shown to guests',
     t_recos: 'Recommendations', s_recos: 'Curate local tips for your guests',
     t_checkins: 'Check-in Data', s_checkins: 'View and manage guest registrations',
+    t_contacts: 'Marketing Contacts', s_contacts: 'Guests who opted in to hear from you again',
+    contacts_info: 'These guests opted in to receive future offers and news. Always include a working unsubscribe link in any email you send — it\'s a legal requirement, not optional.',
+    contacts_title: 'Marketing Contacts', contacts_empty: 'No opted-in contacts yet.',
+    btn_dl_contacts_csv: '📥 Download CSV',
+    th_contact_name: 'Guest', th_contact_email: 'Email', th_contact_phone: 'Phone',
+    th_contact_booking: 'Booking', th_contact_date: 'Consented on',
     t_export: 'Export & Compliance', s_export: 'Generate files for Italian authorities',
     t_compliance: 'Compliance Guide', s_compliance: 'Your obligations explained: police, statistics, tourist tax',
     t_qrlink: 'QR Code & Link', s_qrlink: 'Share your guest portal',
@@ -3133,6 +3176,7 @@ const HT = {
     sidebar_recos: 'Consigli', sidebar_checkins: 'Dati Check-in', sidebar_export: 'Export & Conformità',
     sidebar_qr: 'QR Code & Link', sidebar_role: 'Gestore Proprietà',
     sidebar_guest_analytics: 'Analisi Ospiti',
+    sidebar_contacts: 'Contatti Marketing',
     sidebar_compliance: 'Guida Conformità',
     admin_enable_edit: 'Abilita modifica',
     admin_close: 'Chiudi',
@@ -3200,6 +3244,12 @@ const HT = {
     t_rules: 'Regole della Casa', s_rules: 'Gestisci le regole mostrate agli ospiti',
     t_recos: 'Consigli', s_recos: 'Cura i consigli locali per i tuoi ospiti',
     t_checkins: 'Dati Check-in', s_checkins: 'Visualizza e gestisci le registrazioni degli ospiti',
+    t_contacts: 'Contatti Marketing', s_contacts: 'Ospiti che hanno accettato di essere ricontattati',
+    contacts_info: 'Questi ospiti hanno acconsentito a ricevere offerte future e novità. Includi sempre un link di disiscrizione funzionante in ogni email che invii — è un obbligo di legge, non facoltativo.',
+    contacts_title: 'Contatti Marketing', contacts_empty: 'Nessun contatto ancora.',
+    btn_dl_contacts_csv: '📥 Scarica CSV',
+    th_contact_name: 'Ospite', th_contact_email: 'Email', th_contact_phone: 'Telefono',
+    th_contact_booking: 'Prenotazione', th_contact_date: 'Consenso il',
     t_export: 'Export & Conformità', s_export: 'Genera file per le autorità italiane',
     t_compliance: 'Guida Conformità', s_compliance: 'I tuoi obblighi spiegati: polizia, statistica, imposta di soggiorno',
     t_qrlink: 'QR Code & Link', s_qrlink: 'Condividi il portale ospiti',
@@ -3466,6 +3516,7 @@ const titlesMap = {
   recos: ['t_recos', 's_recos'],
   checkins: ['t_checkins', 's_checkins'],
   guestanalytics: ['t_guest_analytics', 's_guest_analytics'],
+  contacts: ['t_contacts', 's_contacts'],
   export: ['t_export', 's_export'],
   compliance: ['t_compliance', 's_compliance'],
   qrlink: ['t_qrlink', 's_qrlink'],
@@ -3503,6 +3554,7 @@ function showPanel(id, btn) {
   }
   if (id === 'chat') { loadHostChat(); document.getElementById('chatBadge').style.display = 'none'; markChatSeen(); requestNotifPermission(); }
   if (id === 'guestanalytics') loadGuestAnalytics();
+  if (id === 'contacts') loadMarketingContacts();
   trackPanelSwitch(id);
 }
 
@@ -4823,6 +4875,67 @@ function exportAlloggiati() {
   } else {
     toast(`✅ ${lines.length} guest(s) · ${groupCount} stay(s) · works on Alloggiati + SPOT Easy`);
   }
+}
+
+/* ══════════════════════════════════════
+   MARKETING CONTACTS (Round 26) — opt-in guests only.
+   RLS scopes marketing_consents to the calling host's own properties
+   (see migration_round27_marketing_consent.sql); we additionally filter
+   client-side to withdrawn_at IS NULL so a stale cache never shows a
+   contact who's already unsubscribed.
+══════════════════════════════════════ */
+let _marketingContacts = [];
+
+async function loadMarketingContacts() {
+  const tbody = document.getElementById('contactsTable');
+  if (!propertyId || !tbody) return;
+  tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--ink-soft);padding:20px;">…</td></tr>`;
+
+  const { data, error } = await sb.from('marketing_consents')
+    .select('*')
+    .eq('property_id', propertyId)
+    .is('withdrawn_at', null)
+    .order('consent_given_at', { ascending: false });
+
+  if (error) {
+    console.error('loadMarketingContacts error:', error);
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--red);padding:20px;">${error.message}</td></tr>`;
+    return;
+  }
+
+  _marketingContacts = data || [];
+  document.getElementById('contactsTitle').textContent = `${h('contacts_title')} (${_marketingContacts.length})`;
+
+  if (_marketingContacts.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--ink-soft);padding:20px;">${h('contacts_empty')}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = _marketingContacts.map(c => `
+    <tr>
+      <td>${c.guest_name || '—'}</td>
+      <td>${c.email || '—'}</td>
+      <td>${c.phone || '—'}</td>
+      <td>${c.booking_code || '—'}</td>
+      <td>${c.consent_given_at ? new Date(c.consent_given_at).toLocaleDateString() : '—'}</td>
+    </tr>
+  `).join('');
+}
+
+function exportContactsCSV() {
+  if (_marketingContacts.length === 0) { toast('No contacts to export!'); return; }
+  const header = 'Guest,Email,Phone,Booking,ConsentedOn,ConsentTextVersion';
+  const rows = _marketingContacts.map(c => [
+    `"${(c.guest_name || '').replace(/"/g, '""')}"`,
+    `"${(c.email || '').replace(/"/g, '""')}"`,
+    `"${(c.phone || '').replace(/"/g, '""')}"`,
+    `"${(c.booking_code || '').replace(/"/g, '""')}"`,
+    c.consent_given_at || '',
+    c.consent_text_version || '',
+  ].join(','));
+  downloadFile('marketing_contacts_' + new Date().toISOString().slice(0,10) + '.csv', [header, ...rows].join('\r\n'));
+  track('export_marketing_contacts', { count: _marketingContacts.length });
+  toast(`✅ ${_marketingContacts.length} contact(s) exported — remember every email needs a working unsubscribe link`);
 }
 
 /* ══════════════════════════════════════

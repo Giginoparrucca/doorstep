@@ -65,6 +65,13 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 26 — Alloggiati export: unresolved citizenship silently shipped blank _(2026-07-11)_
+- **Symptom**: host uploaded the generated `.txt` to Alloggiati Web and got "Cittadinanza non valida" on several rows, with no warning from our own export that anything was wrong.
+- **Diagnosis**: two separate bugs in `exportAlloggiati()` / the state-code lookup, both in `host-console.html`. (1) `citizenship` is a free-text field (guest-typed or OCR-filled), resolved via `lookupStateCode()` → `COUNTRY_ALIASES` → `ALLOG_STATI`. Common nationality *adjectives* — "Moroccan", "Emirati", "Serbian", "Bosnian", "Armenian", and ~150 others — weren't in `COUNTRY_ALIASES` (only some country nouns were), so the lookup silently fell through to 9 blank spaces. (2) The export's post-build validation only checked `statoNascita` (birth country) for a blank code — it never checked `citizenshipCode` (the `cittadinanza` field) itself, so rows with a blank citizenship shipped with zero warning. The file "generated successfully" and only failed once it hit the government portal.
+- **Fix**: expanded `COUNTRY_ALIASES` with ~155 validated demonym/adjective entries (every new value checked against `ALLOG_STATI` keys — zero unresolved targets); added the missing warning block so an unresolved citizenship now surfaces in the same "⚠️ Review" list as unresolved birth country, before the host ever uploads.
+- **Note**: `index.html` has its own leftover copy of `lookupStateCode()`/`COUNTRY_ALIASES` that references an undefined `ALLOG_STATI` (dead code — nothing calls it), left untouched since it doesn't run. Worth deleting in a later cleanup pass.
+- **Files**: `host-console.html`
+
 ### Round 25.4 — Preview banner still clipping page titles (real fix) _(2026-06-12)_
 - Round 25.2's banner offset was wrong in two ways: (1) it set a **hard-coded 36px**, but the banner wraps to two lines on narrow phones (~60px), so the offset undershot and titles like "Our Recommendations" stayed clipped; (2) it offset **both** `.top-bar` and `.page` by 36px, which double-counted to ~72px on pages that have a top-bar.
 - **Fix**: removed the `.top-bar` offset rule (the `.page` offset alone is sufficient — the sticky top-bar inside an already-offset page sticks to the right place). `setupTestModeBanner()` now **measures the banner's real rendered height** and publishes it as `--test-banner-h`, re-measuring on resize/orientation change; `.page` offsets by that variable (fallback 36px). Body padding-top uses the same measured value.

@@ -769,6 +769,16 @@ body.tab-chat #privacyLink {
 </div>
 <style>@keyframes loadSlide{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}</style>
 
+<!-- Round 26: standalone unsubscribe screen, shown for ?unsub=<consent_id> links.
+     Deliberately independent of the property-load flow in init() — an
+     unsubscribe link must work even without a valid/known ?p= property param,
+     since all it needs is the marketing_consents row id. -->
+<div id="unsubScreen" style="display:none;position:fixed;inset:0;z-index:9998;background:var(--cream);align-items:center;justify-content:center;flex-direction:column;gap:12px;padding:24px;text-align:center;">
+  <div style="font-size:2.4rem;" id="unsubIcon">✅</div>
+  <div style="font-family:'Playfair Display',serif;font-size:1.25rem;color:var(--ink);" id="unsubTitle" data-i18n="unsub_title">You've been unsubscribed</div>
+  <div style="font-size:0.85rem;color:var(--ink-soft);max-width:340px;line-height:1.5;" id="unsubText" data-i18n="unsub_text"></div>
+</div>
+
 <!-- ══════════════════════════════════════
      PAGES
 ══════════════════════════════════════ -->
@@ -1193,6 +1203,30 @@ body.tab-chat #privacyLink {
     <div style="margin-top:16px;padding:10px 14px;background:rgba(74,144,217,0.06);border-radius:8px;border:1px solid rgba(74,144,217,0.12);">
       <div style="font-size:0.65rem;color:var(--blue);line-height:1.5;" id="reviewHintText"></div>
     </div>
+
+    <!-- Round 26: marketing consent — fully optional, opt-in, separate from
+         check-in itself. Only shown to the main guest (see showConsentCard()). -->
+    <div id="consentCard" style="display:none;margin-top:16px;text-align:left;background:var(--white);border:1px solid var(--border);border-radius:10px;padding:16px;">
+      <div style="font-size:0.92rem;font-weight:600;color:var(--ink);margin-bottom:6px;" data-i18n="consent_title">📬 Stay in touch?</div>
+      <div style="font-size:0.72rem;color:var(--ink-soft);line-height:1.5;margin-bottom:12px;" data-i18n="consent_text"></div>
+      <label style="display:flex;align-items:flex-start;gap:8px;font-size:0.76rem;color:var(--ink);cursor:pointer;margin-bottom:10px;">
+        <input type="checkbox" id="consentCheckbox" onchange="toggleConsentFields()" style="margin-top:2px;">
+        <span data-i18n="consent_checkbox">Yes, I'd like to receive future offers and news by email/phone.</span>
+      </label>
+      <div id="consentFields" style="display:none;">
+        <div style="margin-bottom:8px;">
+          <label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;" data-i18n="consent_email_label">Email</label>
+          <input class="form-input" type="email" id="consentEmail" style="font-size:0.78rem;">
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;" data-i18n="consent_phone_label">Phone (optional)</label>
+          <input class="form-input" type="tel" id="consentPhone" style="font-size:0.78rem;">
+        </div>
+        <div id="consentErr" style="display:none;font-size:0.68rem;color:#c0392b;margin-bottom:8px;"></div>
+        <button class="btn btn-primary" id="consentSaveBtn" onclick="saveMarketingConsent()" style="width:100%;padding:9px;font-size:0.78rem;" data-i18n="consent_save">Save my preference</button>
+      </div>
+      <div id="consentSavedMsg" style="display:none;font-size:0.76rem;color:#2e7d32;line-height:1.5;" data-i18n="consent_saved"></div>
+    </div>
   </div>
 
   <div style="height:24px"></div>
@@ -1578,6 +1612,19 @@ const T = {
     review_main: 'Main guest', review_companion: 'Companion',
     review_no_doc: 'No document needed',
     review_edit: 'Edit', review_save: 'Save', review_cancel: 'Cancel',
+    // Marketing consent (opt-in, Round 26)
+    consent_title: '📬 Stay in touch?',
+    consent_text: 'If you\'d like to hear about future offers and news from us, leave your email and/or phone below. This is completely optional and separate from your check-in — we\'ll never use it without your OK, and you can opt out at any time.',
+    consent_checkbox: 'Yes, I\'d like to receive future offers and news by email/phone.',
+    consent_email_label: 'Email',
+    consent_phone_label: 'Phone (optional)',
+    consent_save: 'Save my preference',
+    consent_saved: '✅ Thanks! We\'ll only reach out with your permission — you can opt out anytime using the link in any email we send.',
+    consent_err_contact: 'Please add an email or phone number.',
+    consent_err_generic: 'Something went wrong saving your preference. Please try again.',
+    unsub_title: 'You\'ve been unsubscribed',
+    unsub_text: 'You won\'t receive any further offers or news from us. Thank you for staying with us.',
+    unsub_err: 'This unsubscribe link is invalid or has already been used.',
     review_saved: 'already registered',
     review_fill: 'Fill details for each guest',
     guest_x_of_y: 'Guest',
@@ -1697,6 +1744,19 @@ const T = {
     review_main: 'Ospite principale', review_companion: 'Accompagnatore',
     review_no_doc: 'Nessun documento necessario',
     review_edit: 'Modifica', review_save: 'Salva', review_cancel: 'Annulla',
+    // Consenso marketing (opt-in, Round 26)
+    consent_title: '📬 Restiamo in contatto?',
+    consent_text: 'Se vuoi ricevere offerte future e novità da parte nostra, lascia qui sotto la tua email e/o il telefono. È completamente facoltativo e separato dal check-in — non li useremo mai senza il tuo consenso, e puoi annullare l\'iscrizione in qualsiasi momento.',
+    consent_checkbox: 'Sì, voglio ricevere offerte future e novità via email/telefono.',
+    consent_email_label: 'Email',
+    consent_phone_label: 'Telefono (facoltativo)',
+    consent_save: 'Salva la mia preferenza',
+    consent_saved: '✅ Grazie! Ti contatteremo solo con il tuo consenso — puoi annullare l\'iscrizione in qualsiasi momento tramite il link in ogni email che ti invieremo.',
+    consent_err_contact: 'Inserisci un\'email o un numero di telefono.',
+    consent_err_generic: 'Si è verificato un errore nel salvataggio. Riprova.',
+    unsub_title: 'Iscrizione annullata',
+    unsub_text: 'Non riceverai più offerte o novità da parte nostra. Grazie per essere stato nostro ospite.',
+    unsub_err: 'Questo link di annullamento non è valido o è già stato utilizzato.',
     review_saved: 'già registrati',
     review_fill: 'Compila i dati per ogni ospite',
     guest_x_of_y: 'Ospite',
@@ -2911,6 +2971,7 @@ async function saveCurrentGuest() {
       document.getElementById('reviewHintText').innerHTML = T[lang].review_hint;
       document.getElementById('checkinBadge').style.display = 'none';
       renderReviewCards();
+      showConsentCard();
       console.log(`✅ All ${savedGuests.length} guests checked in!`);
 
       // Analytics: funnel completion
@@ -3008,6 +3069,73 @@ function renderReviewCards() {
       if (_edi.value && _edi.value.trim()) refreshComuneValidation(_edi, null);
     }
   });
+}
+
+/* ══════════════════════════════════════
+   MARKETING CONSENT (Round 26) — fully optional, opt-in, separate from the
+   check-in itself. Only asked once, of the main guest, on the success screen.
+   Legal basis: Art. 6(1)(a) GDPR consent — NOT the same basis as the
+   Alloggiati/tourist-tax data above, so this lives in its own table
+   (marketing_consents) and is never mixed into `checkins`.
+══════════════════════════════════════ */
+function showConsentCard() {
+  const card = document.getElementById('consentCard');
+  if (!card) return;
+  // Reset to a clean state each time (defensive — success screen only shows once per session in practice)
+  document.getElementById('consentCheckbox').checked = false;
+  document.getElementById('consentFields').style.display = 'none';
+  document.getElementById('consentSavedMsg').style.display = 'none';
+  document.getElementById('consentErr').style.display = 'none';
+  card.style.display = 'block';
+}
+
+function toggleConsentFields() {
+  const checked = document.getElementById('consentCheckbox').checked;
+  document.getElementById('consentFields').style.display = checked ? 'block' : 'none';
+}
+
+async function saveMarketingConsent() {
+  const email = document.getElementById('consentEmail').value.trim();
+  const phone = document.getElementById('consentPhone').value.trim();
+  const errEl = document.getElementById('consentErr');
+  errEl.style.display = 'none';
+
+  if (!email && !phone) {
+    errEl.textContent = T[lang].consent_err_contact;
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('consentSaveBtn');
+  const originalText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '...';
+
+  try {
+    const mainGuest = savedGuests[0] || {};
+    const canonicalPropId = getStoredPropertyId() || propertyId;
+    const canonicalBooking = getBookingCode() || bookingCode;
+    const { error } = await sb.from('marketing_consents').insert({
+      property_id: canonicalPropId,
+      booking_code: canonicalBooking || null,
+      guest_name: `${mainGuest.surname || ''} ${mainGuest.name || ''}`.trim() || null,
+      email: email || null,
+      phone: phone || null,
+      consent_text_version: 'v1',
+    });
+    if (error) throw error;
+
+    document.getElementById('consentFields').style.display = 'none';
+    document.querySelector('#consentCard label').style.display = 'none';
+    document.getElementById('consentSavedMsg').style.display = 'block';
+    trackGuest('marketing_consent_given', { has_email: !!email, has_phone: !!phone });
+  } catch (err) {
+    console.error('Marketing consent save error:', err);
+    errEl.textContent = T[lang].consent_err_generic;
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 }
 
 function editGuest(idx) {
@@ -3875,10 +4003,57 @@ async function checkExistingChat() {
 
 
 /* ══════════════════════════════════════
+   UNSUBSCRIBE (Round 26) — handles ?unsub=<marketing_consents.id> links sent
+   in host marketing emails. Deliberately independent of the property-load
+   flow below: it must work even without a valid ?p= param, since all it
+   needs is the consent row's own id (unguessable uuid, functions as a
+   bearer token — same pattern as a password-reset link).
+   Returns true if it handled an unsubscribe request (caller should stop).
+══════════════════════════════════════ */
+async function handleUnsubscribeIfPresent() {
+  const params = new URLSearchParams(window.location.search);
+  const unsubId = params.get('unsub');
+  if (!unsubId) return false;
+
+  const overlay = document.getElementById('loadingOverlay');
+  if (overlay) overlay.remove();
+  const screen = document.getElementById('unsubScreen');
+  screen.style.display = 'flex';
+
+  try {
+    // Only the anon column-scoped GRANT UPDATE (withdrawn_at) permits this —
+    // see migration_round27_marketing_consent.sql. Scoping to
+    // withdrawn_at IS NULL avoids clobbering an already-set timestamp and
+    // lets us tell "already unsubscribed" apart from "bad id" below.
+    const { data, error } = await sb.from('marketing_consents')
+      .update({ withdrawn_at: new Date().toISOString() })
+      .eq('id', unsubId)
+      .is('withdrawn_at', null)
+      .select();
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      document.getElementById('unsubIcon').textContent = 'ℹ️';
+      document.getElementById('unsubTitle').textContent = '';
+      document.getElementById('unsubText').textContent = T[lang].unsub_err;
+    } else {
+      document.getElementById('unsubTitle').textContent = T[lang].unsub_title;
+      document.getElementById('unsubText').textContent = T[lang].unsub_text;
+    }
+  } catch (err) {
+    console.error('Unsubscribe error:', err);
+    document.getElementById('unsubIcon').textContent = 'ℹ️';
+    document.getElementById('unsubTitle').textContent = '';
+    document.getElementById('unsubText').textContent = T[lang].unsub_err;
+  }
+  return true;
+}
+
+/* ══════════════════════════════════════
    INIT — Load from Supabase, fallback to local data
 ══════════════════════════════════════ */
 async function init() {
   console.log('🏠 WelcomeBnB Guest App v2.1');
+  if (await handleUnsubscribeIfPresent()) return;
   // Extract URL params first (?b=CODE&p=PROPERTY_UUID) — MUST run before property load
   bookingCode = getBookingCode();
   console.log('🔑 Booking:', bookingCode, 'Property from URL/storage:', getStoredPropertyId());

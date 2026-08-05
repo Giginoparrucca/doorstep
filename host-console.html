@@ -6067,13 +6067,14 @@ async function archiveCurrentChat() {
   if (!confirm(confirmMsg)) return;
 
   // Soft-delete every chat row for this property + booking_code.
-  // Note: Supabase's .is() filter handles _no_code (= booking_code IS NULL)
-  // differently from a string code — we branch.
+  // The dropdown collapses both NULL and empty-string booking_code into
+  // "_no_code", so when archiving that bucket we must match both — the
+  // legacy default was ''::text and stray empty strings may still appear.
   let q = sb.from('chat_messages').update({ deleted_at: new Date().toISOString() })
     .eq('property_id', propertyId)
     .is('deleted_at', null); // don't re-archive already-archived rows
   if (code === '_no_code') {
-    q = q.is('booking_code', null);
+    q = q.or('booking_code.is.null,booking_code.eq.');
   } else {
     q = q.eq('booking_code', code);
   }
@@ -6085,14 +6086,10 @@ async function archiveCurrentChat() {
     return;
   }
   const n = (data || []).length;
-  // RLS gotcha: if the host doesn't have UPDATE permission on chat_messages,
-  // Supabase returns no error but 0 rows updated. Surface a clearer message
-  // pointing to the migration that fixes it.
   if (n === 0) {
-    console.warn('Archive returned 0 rows. If this conversation has messages, the host UPDATE policy/GRANT on chat_messages is missing in the database. Run migration_round25_3_fix_chat_archive.sql in the Supabase SQL Editor.');
     toast(hostLang === 'it'
-      ? '⚠ Archiviazione bloccata dai permessi del database — esegui migration_round25_3_fix_chat_archive.sql'
-      : '⚠ Archive blocked by database permissions — run migration_round25_3_fix_chat_archive.sql');
+      ? 'Nessun messaggio da archiviare'
+      : 'No messages to archive');
     return;
   }
   toast(hostLang === 'it'

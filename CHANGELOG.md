@@ -65,6 +65,19 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 30.2 — Dashboard: staying-first order + per-reservation guest link _(2026-08-25)_
+- **Reordered** the dashboard so "Currently staying" sits above "Upcoming reservations" — today first, planning next. "Needs your attention" (urgent help requests) stays at the very top.
+- **Auto-generated stable guest link per OTA reservation**: `renderUpcomingReservationsPanel` now assigns a `booking_code` to any reservation that doesn't have one, using the existing `PROPINIT-XXXXXX` convention (`generateBookingCode()` in the QR panel). Codes are PATCHed back to `ota_reservations.booking_code` with the Round 20.2 `.select()` safety pattern, so subsequent syncs / renders preserve the same code — the link the host shared never breaks. Each reservation row now shows the truncated link + a 🔗 Copy button and an ↗ Open (as guest) link.
+- **Correlator upgrade**: when a reservation has a `booking_code`, checkins with the same code win as the match — the guest used the link we handed them. Falls back to date-overlap grouping for pre-Round-30.2 checkins that arrived without a code.
+- **Not regenerated**: never overwrite an existing `booking_code`. The endpoint's upsert already omits `booking_code` from the payload, so a re-sync of the same UID keeps the code stable.
+- **Files**: `host-console.html`
+
+### Round 30.1 — Sync now auto-persists unsaved feed rows first _(2026-08-25)_
+- **Symptom**: user added an iCal URL, clicked "Sync now" — nothing visible happened.
+- **Root cause**: the editor writes into DOM inputs only; feeds reach `properties.ical_feeds` only when "Save Property Details" is clicked. The sync endpoint reads from the DB, found `ical_feeds=[]`, and returned `synced=0`. The green "Synced 0 reservation(s) across 0 feed(s)" toast technically painted but read as "nothing happened".
+- **Fix**: `syncIcalNow` now diffs current DOM feeds vs. `propertyData.ical_feeds` and PATCHes the properties row first (Round 20.2 `.select()` pattern so a permission-blocked save can't masquerade as success). If the final feed list is empty, shows an explicit amber "Add at least one feed before syncing" instead of the misleading green success. Adds console logs on the click path so future misfires are observable in devtools.
+- **Files**: `host-console.html`
+
 ### Round 30 — Edit check-in from the Check-in Data tab _(2026-08-25)_
 - **What**: hosts can now correct an already-submitted check-in without deleting and re-doing it. New ✏️ Edit button on every row opens a modal with editable fields for stay (booking code, guest type, arrival, departure, nights), personal (surname, name, sex, DOB, place of birth, Italian province, birth country, citizenship), and document (type, number, place of issue). Saves via Supabase UPDATE and refreshes the table in place.
 - **DB gap fixed first** (`migration_round30_checkins_host_update.sql`, applied via MCP as `checkins_host_update_policy`): `checkins` had host SELECT + host DELETE owner-scoped, plus admin ALL and admin UPDATE — but **no host UPDATE policy**. A UPDATE from the host client would have returned `data:[] error:null` — the Round 28 silent-0-rows trap. Added `checkins_host_update` as an exact mirror of `checkins_host_delete` (`EXISTS SELECT 1 FROM properties WHERE id = checkins.property_id AND owner_id = auth.uid()`). Verified: owner UPDATE returned rows, non-owner returned zero.

@@ -3851,15 +3851,15 @@ async function renderDashboard() {
       <p style="margin:0;font-size:0.86rem;color:var(--ink-soft);">${h('dash_nothing_pending') || 'No urgent items, no guests currently staying.'}</p>
     </div>` : '';
 
-  // Round 26 — Upcoming reservations (OTA iCal sync). Rendered above the
-  // action pane so hosts see the "who's coming next" view first.
+  // Round 26 — Upcoming reservations (OTA iCal sync). Rendered below the
+  // "currently staying" block: today's guests first, planning next.
   const upcomingPanel = await renderUpcomingReservationsPanel();
 
   el.innerHTML = `
     <div style="max-width:920px;">
-      ${upcomingPanel}
       ${urgentPanel}
       ${stayingPanel}
+      ${upcomingPanel}
       ${allCaughtUp}
     </div>
   `;
@@ -3882,7 +3882,7 @@ async function renderUpcomingReservationsPanel() {
   let rows = [];
   try {
     const { data, error } = await sb.from('ota_reservations')
-      .select('id, platform, guest_name, checkin_date, checkout_date, reservation_url, summary')
+      .select('id, platform, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code')
       .eq('property_id', propertyId)
       .eq('entry_type', 'reservation')
       .eq('status', 'active')
@@ -3896,6 +3896,11 @@ async function renderUpcomingReservationsPanel() {
     console.warn('Upcoming reservations exception:', e);
     return '';
   }
+
+  // Round 30.2 — every reservation gets a stable unique guest-link.
+  // Generate a booking_code for any row that doesn't have one yet and
+  // PATCH it back so the link is stable across future syncs.
+  rows = await ensureReservationBookingCodes(rows);
 
   const title = h('dash_upcoming_title');
   const headerHtml = `
@@ -3941,13 +3946,19 @@ async function renderUpcomingReservationsPanel() {
     { day: '2-digit', month: 'short' }) : '—';
 
   const rendered = rows.map(r => {
-    // Overlap: reservation [ci, co] overlaps a check-in row whose
-    // arrival <= r.checkout_date AND (departure is null OR >= r.checkin_date).
-    // (departure can be null for open-ended pre-checkins.)
-    const matched = dated.filter(c =>
-      c.arrival_date <= r.checkout_date &&
-      (!c.departure_date || c.departure_date >= r.checkin_date)
-    );
+    // Round 30.2 — exact booking_code match wins (the guest used the
+    // per-reservation link we handed them). Fall back to date-overlap
+    // grouping for pre-Round-30.2 checkins that arrived without a code.
+    let matched = [];
+    if (r.booking_code) {
+      matched = dated.filter(c => c.booking_code === r.booking_code);
+    }
+    if (matched.length === 0) {
+      matched = dated.filter(c =>
+        c.arrival_date <= r.checkout_date &&
+        (!c.departure_date || c.departure_date >= r.checkin_date)
+      );
+    }
     // Group by booking_code (empty/null bucket keeps its own key so we don't
     // merge unrelated anonymous checkins together)
     const groups = {};
@@ -3991,6 +4002,20 @@ async function renderUpcomingReservationsPanel() {
       : `<span style="font-size:0.62rem;font-weight:600;letter-spacing:0.05em;padding:2px 8px;border-radius:999px;background:rgba(232,184,75,0.18);color:#9a6b00;white-space:nowrap;">${safe(h('dash_awaiting'))}</span>`;
 
     const style = platformStyle(r.platform);
+    const guestLink = r.booking_code
+      ? `https://welcomebnb.vercel.app/?b=${encodeURIComponent(r.booking_code)}&p=${propertyId}`
+      : '';
+    const codeChip = r.booking_code
+      ? `<span title="${safe(hostLang === 'it' ? 'Codice prenotazione' : 'Booking code')}" style="font-family:monospace;font-size:0.68rem;color:var(--warm);background:rgba(0,91,255,0.08);border-radius:3px;padding:1px 6px;">${safe(r.booking_code)}</span>`
+      : '';
+    const linkRow = guestLink ? `
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:8px;padding-top:8px;border-top:1px dashed rgba(107,122,144,0.15);">
+        <span style="font-family:monospace;font-size:0.7rem;color:var(--ink-soft);flex:1;min-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safe(guestLink)}</span>
+        <button type="button" onclick="copyReservationLink('${safe(guestLink)}', this)" title="${safe(hostLang === 'it' ? 'Copia link ospite' : 'Copy guest link')}"
+                style="padding:4px 10px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:0.72rem;cursor:pointer;color:var(--ink);font-family:inherit;">🔗 ${safe(hostLang === 'it' ? 'Copia' : 'Copy')}</button>
+        <a href="${safe(guestLink)}" target="_blank" rel="noopener" title="${safe(hostLang === 'it' ? 'Apri come ospite' : 'Open as guest')}"
+           style="padding:4px 10px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:0.72rem;color:var(--ink);text-decoration:none;">↗ ${safe(hostLang === 'it' ? 'Apri' : 'Open')}</a>
+      </div>` : '';
     return `
       <div style="background:var(--white);border:1px solid rgba(107,122,144,0.10);border-left:3px solid ${style.color};border-radius:8px;padding:10px 14px;margin-bottom:8px;">
         <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
@@ -4002,7 +4027,9 @@ async function renderUpcomingReservationsPanel() {
         <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:6px;font-size:0.85rem;color:var(--ink);">
           <span style="font-weight:500;">${safe(name || '—')}</span>
           <span style="font-size:0.78rem;color:var(--ink-soft);">· ${safe(guestsLabel)}</span>
+          ${codeChip}
         </div>
+        ${linkRow}
       </div>`;
   }).join('');
 
@@ -4011,6 +4038,49 @@ async function renderUpcomingReservationsPanel() {
       ${headerHtml}
       ${rendered}
     </div>`;
+}
+
+// Round 30.2 — ensure every reservation carries a stable booking_code so
+// the host can hand the guest a pre-filled link (?b=CODE&p=PROPERTY).
+// Matches the existing PROPINIT-XXXXXX convention used by
+// generateBookingCode() in the QR panel. Missing codes are PATCHed back
+// so subsequent renders / iCal syncs keep the same value — never
+// regenerated, or the link the host already shared would break.
+async function ensureReservationBookingCodes(rows) {
+  const missing = (rows || []).filter(r => !r.booking_code);
+  if (missing.length === 0) return rows;
+  const propInit = (propertyData?.name || 'DS').replace(/[^A-Za-z]/g, '').substring(0, 3).toUpperCase() || 'DS';
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const rand6 = () => {
+    let s = '';
+    for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
+    return s;
+  };
+  for (const r of missing) {
+    const code = `${propInit}-${rand6()}`;
+    // Round 20.2 pattern: .select() after update so a silent-0-rows
+    // permission block surfaces in the console instead of leaving us
+    // with a phantom code the DB doesn't have.
+    const { data, error } = await sb.from('ota_reservations')
+      .update({ booking_code: code }).eq('id', r.id).select('id, booking_code');
+    if (error) { console.warn('[ota] booking_code assign failed:', error.message); continue; }
+    if (data && data[0]) r.booking_code = data[0].booking_code;
+  }
+  return rows;
+}
+
+// Copy a reservation's guest link with a tiny confirmation on the button.
+async function copyReservationLink(link, btn) {
+  try {
+    await navigator.clipboard.writeText(link);
+    const original = btn.textContent;
+    btn.textContent = hostLang === 'it' ? '✓ Copiato' : '✓ Copied';
+    btn.disabled = true;
+    setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1400);
+    track('copy_reservation_link', {});
+  } catch (e) {
+    toast(hostLang === 'it' ? 'Copia fallita' : 'Copy failed');
+  }
 }
 
 /* ══════════════════════════════════════

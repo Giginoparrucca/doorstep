@@ -3014,6 +3014,7 @@ const HT = {
     edit_save_blocked: '⚠ No row updated — permission denied. Run migration_round30_checkins_host_update.sql.',
     edit_save_failed: '⚠ Save failed',
     edit_field_missing: 'Missing required field: {name}',
+    edit_country_unresolved: '⚠ {name}: not a recognized country. Pick one from the dropdown so the Alloggiati export doesn\'t ship blank.',
     edit_stay: 'Stay',
     edit_personal: 'Personal details',
     edit_document: 'Document',
@@ -3374,6 +3375,7 @@ const HT = {
     edit_save_blocked: '⚠ Nessuna riga aggiornata — permessi mancanti. Esegui migration_round30_checkins_host_update.sql.',
     edit_save_failed: '⚠ Salvataggio fallito',
     edit_field_missing: 'Campo obbligatorio mancante: {name}',
+    edit_country_unresolved: '⚠ {name}: paese non riconosciuto. Scegline uno dall\'elenco così l\'export Alloggiati non parte vuoto.',
     edit_stay: 'Soggiorno',
     edit_personal: 'Dati personali',
     edit_document: 'Documento',
@@ -5186,6 +5188,61 @@ const COUNTRY_ALIASES = {
   'UGANDAN':'UGANDA', 'URUGUAYAN':'URUGUAY',
   'UZBEK':'UZBEKISTAN', 'UZBEKISTANI':'UZBEKISTAN', 'NI-VANUATU':'VANUATU',
   'YEMENI':'YEMEN', 'ZAMBIAN':'ZAMBIA', 'ZIMBABWEAN':'ZIMBABWE',
+  // ── Round 31: official long-form country names as they appear on
+  // passports / IDs / OCR output. Previously the export silently emitted
+  // 9 spaces for guests whose citizenship or birth_country came through
+  // as "United States of America", "Islamic Republic of Iran" etc.
+  'UNITED STATES OF AMERICA':"STATI UNITI D'AMERICA",
+  'THE UNITED STATES OF AMERICA':"STATI UNITI D'AMERICA",
+  'U.S.A.':"STATI UNITI D'AMERICA", 'U.S.':"STATI UNITI D'AMERICA",
+  'UNITED KINGDOM OF GREAT BRITAIN AND NORTHERN IRELAND':'REGNO UNITO',
+  'GREAT BRITAIN AND NORTHERN IRELAND':'REGNO UNITO',
+  'ISLAMIC REPUBLIC OF IRAN':'IRAN',
+  'FEDERAL REPUBLIC OF GERMANY':'GERMANIA',
+  'FRENCH REPUBLIC':'FRANCIA',
+  'ITALIAN REPUBLIC':'ITALIA',
+  'KINGDOM OF SPAIN':'SPAGNA',
+  'KINGDOM OF THE NETHERLANDS':'PAESI BASSI',
+  'KINGDOM OF BELGIUM':'BELGIO',
+  'KINGDOM OF SWEDEN':'SVEZIA',
+  'KINGDOM OF NORWAY':'NORVEGIA',
+  'KINGDOM OF DENMARK':'DANIMARCA',
+  'PORTUGUESE REPUBLIC':'PORTOGALLO',
+  'HELLENIC REPUBLIC':'GRECIA',
+  'REPUBLIC OF POLAND':'POLONIA',
+  'REPUBLIC OF AUSTRIA':'AUSTRIA',
+  'REPUBLIC OF IRELAND':'IRLANDA',
+  'REPUBLIC OF FINLAND':'FINLANDIA',
+  'REPUBLIC OF TURKEY':'TURCHIA', 'REPUBLIC OF TURKIYE':'TURCHIA', 'TURKIYE':'TURCHIA',
+  'REPUBLIC OF INDIA':'INDIA',
+  'STATE OF ISRAEL':'ISRAELE',
+  'ARAB REPUBLIC OF EGYPT':'EGITTO',
+  "PEOPLE'S REPUBLIC OF CHINA":'CINA',
+  'REPUBLIC OF KOREA':'COREA DEL SUD',
+  "DEMOCRATIC PEOPLE'S REPUBLIC OF KOREA":'COREA DEL NORD',
+  'RUSSIAN FEDERATION':'FEDERAZIONE RUSSA',
+  'FEDERATIVE REPUBLIC OF BRAZIL':'BRASILE',
+  'UNITED MEXICAN STATES':'MESSICO',
+  'ARGENTINE REPUBLIC':'ARGENTINA',
+  'PLURINATIONAL STATE OF BOLIVIA':'BOLIVIA',
+  'BOLIVARIAN REPUBLIC OF VENEZUELA':'VENEZUELA',
+  'COMMONWEALTH OF AUSTRALIA':'AUSTRALIA',
+  'REPUBLIC OF SOUTH AFRICA':'SUDAFRICA',
+  'KINGDOM OF MOROCCO':'MAROCCO',
+  'KINGDOM OF SAUDI ARABIA':'ARABIA SAUDITA',
+  'STATE OF QATAR':'QATAR', 'STATE OF KUWAIT':'KUWAIT',
+  'SULTANATE OF OMAN':'OMAN',
+  'HASHEMITE KINGDOM OF JORDAN':'GIORDANIA',
+  'REPUBLIC OF LEBANON':'LIBANO', 'LEBANESE REPUBLIC':'LIBANO',
+  'SYRIAN ARAB REPUBLIC':'SIRIA',
+  'REPUBLIC OF IRAQ':'IRAQ',
+  'ISLAMIC REPUBLIC OF PAKISTAN':'PAKISTAN',
+  "PEOPLE'S REPUBLIC OF BANGLADESH":'BANGLADESH',
+  'DEMOCRATIC SOCIALIST REPUBLIC OF SRI LANKA':'SRI LANKA (CEYLON)',
+  'REPUBLIC OF INDONESIA':'INDONESIA',
+  'REPUBLIC OF THE PHILIPPINES':'FILIPPINE',
+  'KINGDOM OF THAILAND':'THAILANDIA',
+  'SOCIALIST REPUBLIC OF VIET NAM':'VIETNAM', 'SOCIALIST REPUBLIC OF VIETNAM':'VIETNAM',
 };
 
 // Document-type input aliases → official 5-char code
@@ -5251,6 +5308,28 @@ function lookupDocCode(input) {
 }
 
 function isItalianCitizenshipCode(code) { return code && code.trim() === '100000100'; }
+
+// Round 31 — country autocomplete + validation shared by the edit-checkin
+// modal and (mirrored in index.html) the guest check-in form.
+// Options = every acceptable INPUT (Italian canonical names from
+// ALLOG_STATI + English aliases and demonyms from COUNTRY_ALIASES),
+// deduped and sorted. Both sources are already the "accepted" set —
+// COUNTRY_ALIASES keys map to canonical Italian names, and ALLOG_STATI
+// keys are themselves canonical.
+let _wbnbCountryOptsCache = null;
+function wbnbCountryPickerOptions() {
+  if (_wbnbCountryOptsCache) return _wbnbCountryOptsCache;
+  const set = new Set();
+  for (const k of Object.keys(COUNTRY_ALIASES)) set.add(k);
+  for (const k of Object.keys(ALLOG_STATI))     set.add(k);
+  _wbnbCountryOptsCache = [...set].sort((a, b) => a.localeCompare(b));
+  return _wbnbCountryOptsCache;
+}
+function wbnbAcceptsCountry(input) {
+  if (!input) return false;
+  // Trim(9) tells us whether lookupStateCode found a real code.
+  return lookupStateCode(input).trim().length === 9;
+}
 
 // ── Formatting helpers (unchanged) ─────────────────────────────────────
 function pad(str, len) { return (str || '').substring(0, len).padEnd(len); }
@@ -6910,10 +6989,17 @@ function editGuest(id) {
     ${field('field_birth_province',
       `<input id="edit_birth_province" type="text" maxlength="2" value="${safeAttr((c.birth_province || '').toUpperCase())}" style="${inputStyle}text-transform:uppercase;max-width:120px;">`)}
     ${field('field_birth_country',
-      `<input id="edit_birth_country" type="text" value="${safeAttr(c.birth_country || '')}" style="${inputStyle}">`)}
+      `<input id="edit_birth_country" type="text" list="wbnbCountryList" autocomplete="off" value="${safeAttr(c.birth_country || '')}" style="${inputStyle}">`)}
     ${field('field_citizenship',
-      `<input id="edit_citizenship" type="text" value="${safeAttr(c.citizenship || '')}" style="${inputStyle}">`)}
+      `<input id="edit_citizenship" type="text" list="wbnbCountryList" autocomplete="off" value="${safeAttr(c.citizenship || '')}" style="${inputStyle}">`)}
   `;
+
+  // Shared datalist so both birth_country and citizenship inputs get
+  // autocomplete from the same acceptable-country pool. Rendered inline
+  // so it exists as soon as the modal opens.
+  const countryOpts = wbnbCountryPickerOptions()
+    .map(n => `<option value="${safeAttr(n)}"></option>`).join('');
+  const countryListHTML = `<datalist id="wbnbCountryList">${countryOpts}</datalist>`;
 
   const docSection = `
     ${sectionTitle(h('edit_document'))}
@@ -6943,6 +7029,7 @@ function editGuest(id) {
           <button type="button" onclick="closeGuestEditModal()" style="background:none;border:none;font-size:1.5rem;color:var(--ink-soft);cursor:pointer;padding:4px 10px;line-height:1;">×</button>
         </div>
         <div style="font-size:0.78rem;color:var(--ink-soft);margin-top:6px;background:rgba(0,91,255,0.05);border-left:3px solid var(--warm);padding:8px 12px;border-radius:4px;">${safeAttr(h('edit_intro'))}</div>
+        ${countryListHTML}
         ${stay}
         ${personal}
         ${docSection}
@@ -7002,6 +7089,18 @@ async function saveGuestEdits(id) {
     return;
   }
 
+  // Round 31 — country values must resolve to an Alloggiati Web code.
+  // Otherwise the export silently emits 9 spaces for citizenship or
+  // birth_country and the .txt is rejected upstream.
+  const birth_country = v('edit_birth_country');
+  const unresolved = [];
+  if (!wbnbAcceptsCountry(citizenship))            unresolved.push(h('field_citizenship'));
+  if (birth_country && !wbnbAcceptsCountry(birth_country)) unresolved.push(h('field_birth_country'));
+  if (unresolved.length > 0) {
+    setStatus(h('edit_country_unresolved').replace('{name}', unresolved.join(', ')), 'error');
+    return;
+  }
+
   const arrival_date   = v('edit_arrival_date') || null;
   const departure_date = v('edit_departure_date') || null;
   const nightsRaw = v('edit_nights');
@@ -7026,7 +7125,7 @@ async function saveGuestEdits(id) {
     date_of_birth: dob,
     place_of_birth,
     birth_province: birthProv || null,
-    birth_country: v('edit_birth_country') || null,
+    birth_country: birth_country || null,
     citizenship,
     document_type: document_type_raw || '',
     document_number: document_number || '',

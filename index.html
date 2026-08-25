@@ -1108,13 +1108,17 @@ body.tab-chat #privacyLink {
     <div class="form-row">
       <div class="form-group">
         <label class="form-label" data-i18n="birth_country_label">Country of Birth <span class="req">*</span></label>
-        <input class="form-input" type="text" id="birthCountry" data-i18n-placeholder="birth_country_hint" oninput="onBirthCountryChange()">
+        <input class="form-input" type="text" id="birthCountry" list="wbnbCountryList" autocomplete="off" data-i18n-placeholder="birth_country_hint" oninput="onBirthCountryChange()">
       </div>
       <div class="form-group">
         <label class="form-label" data-i18n="citizenship_label">Citizenship <span class="req">*</span></label>
-        <input class="form-input" type="text" id="citizenship" data-i18n-placeholder="citizenship_hint">
+        <input class="form-input" type="text" id="citizenship" list="wbnbCountryList" autocomplete="off" data-i18n-placeholder="citizenship_hint">
       </div>
     </div>
+    <!-- Round 31 — shared country autocomplete for birth_country + citizenship.
+         Populated from wbnbCountryPickerOptions() on load. The submit handler
+         rejects any value that doesn't resolve to a canonical country. -->
+    <datalist id="wbnbCountryList"></datalist>
 
     <!-- Province — shows ONLY when born in Italy (not based on citizenship) -->
     <div class="form-group" id="provinceGroup" style="display:none;">
@@ -1601,6 +1605,8 @@ const T = {
     comune_pick_required: '⚠ Please pick a city from the list',
     val_birth_country: 'Country of birth is required',
     val_citizenship: 'Citizenship is required',
+    val_birth_country_unknown: 'Country of birth "{v}" isn\'t recognized — please pick one from the list.',
+    val_citizenship_unknown: 'Citizenship "{v}" isn\'t recognized — please pick one from the list.',
     val_province: 'Province of birth is required for Italian citizens',
     val_doc: 'Document number is required for the main guest',
     val_docnum: 'Document number is required',
@@ -1734,6 +1740,8 @@ const T = {
     comune_pick_required: '⚠ Seleziona una città dall\'elenco',
     val_birth_country: 'Lo stato di nascita è obbligatorio',
     val_citizenship: 'La cittadinanza è obbligatoria',
+    val_birth_country_unknown: 'Stato di nascita "{v}" non riconosciuto — scegline uno dall\'elenco.',
+    val_citizenship_unknown: 'Cittadinanza "{v}" non riconosciuta — scegline una dall\'elenco.',
     val_province: 'La provincia di nascita è obbligatoria per i cittadini italiani',
     val_doc: 'Il numero del documento è obbligatorio per l\'ospite principale',
     val_docnum: 'Il numero del documento è obbligatorio',
@@ -2239,9 +2247,65 @@ const COUNTRY_ALIASES = {
   'SOUTH KOREA':'COREA DEL SUD', 'KOREA':'COREA DEL SUD', 'KOREAN':'COREA DEL SUD',
   'INDIA':'INDIA', 'INDIAN':'INDIA',
   'ISRAEL':'ISRAELE', 'ISRAELI':'ISRAELE',
-  'MOROCCO':'MAROCCO', 'EGYPT':'EGITTO', 'TUNISIA':'TUNISIA',
-  'SOUTH AFRICA':'SUD AFRICA',
+  'MOROCCO':'MAROCCO', 'MOROCCAN':'MAROCCO', 'EGYPT':'EGITTO', 'TUNISIA':'TUNISIA',
+  'SOUTH AFRICA':'SUDAFRICA', 'SOUTH AFRICAN':'SUDAFRICA',
   'ITALY':'ITALIA', 'ITALIAN':'ITALIA',
+  // ── Round 31: keep aligned with host-console.html so the guest
+  // picker and Alloggiati export agree on what "acceptable" means.
+  'PHILIPPINES':'FILIPPINE', 'FILIPINO':'FILIPPINE', 'PHILIPPINE':'FILIPPINE',
+  'NIGERIA':'NIGERIA', 'NIGERIAN':'NIGERIA',
+  'GHANA':'GHANA', 'KENYA':'KENYA', 'SENEGAL':'SENEGAL', 'ALGERIA':'ALGERIA',
+  'CAMEROON':'CAMERUN', 'ETHIOPIA':'ETIOPIA',
+  'PAKISTAN':'PAKISTAN', 'PAKISTANI':'PAKISTAN',
+  'BANGLADESH':'BANGLADESH', 'BANGLADESHI':'BANGLADESH',
+  'SRI LANKA':'SRI LANKA (CEYLON)', 'SRI LANKAN':'SRI LANKA (CEYLON)',
+  'INDONESIA':'INDONESIA', 'INDONESIAN':'INDONESIA',
+  'MALAYSIA':'MALAYSIA', 'MALAYSIAN':'MALAYSIA',
+  'THAILAND':'THAILANDIA', 'THAI':'THAILANDIA',
+  'VIETNAM':'VIETNAM', 'VIETNAMESE':'VIETNAM',
+  'SINGAPORE':'SINGAPORE', 'TAIWAN':'TAIWAN', 'HONG KONG':'HONG KONG',
+  'NEPAL':'NEPAL', 'IRAN':'IRAN', 'IRANIAN':'IRAN',
+  'IRAQ':'IRAQ', 'LEBANON':'LIBANO', 'JORDAN':'GIORDANIA', 'SYRIA':'SIRIA',
+  'UNITED ARAB EMIRATES':'EMIRATI ARABI UNITI', 'UAE':'EMIRATI ARABI UNITI',
+  'QATAR':'QATAR', 'KUWAIT':'KUWAIT', 'SAUDI ARABIA':'ARABIA SAUDITA',
+  'PERU':"PERU'", 'CHILE':'CILE', 'VENEZUELA':'VENEZUELA', 'ECUADOR':'ECUADOR',
+  'BOLIVIA':'BOLIVIA', 'URUGUAY':'URUGUAY', 'PARAGUAY':'PARAGUAY',
+  'CUBA':'CUBA', 'DOMINICAN REPUBLIC':'REPUBBLICA DOMINICANA',
+  'COSTA RICA':'COSTA RICA', 'PANAMA':'PANAMA', 'GUATEMALA':'GUATEMALA',
+  'HONDURAS':'HONDURAS', 'NICARAGUA':'NICARAGUA', 'EL SALVADOR':'EL SALVADOR',
+  'ICELAND':'ISLANDA', 'LUXEMBOURG':'LUSSEMBURGO', 'MALTA':'MALTA',
+  'CYPRUS':'CIPRO', 'ESTONIA':'ESTONIA', 'LATVIA':'LETTONIA',
+  'LITHUANIA':'LITUANIA', 'BELARUS':'BIELORUSSIA', 'MOLDOVA':'MOLDAVIA',
+  'ALBANIA':'ALBANIA', 'NORTH MACEDONIA':'MACEDONIA DEL NORD',
+  'BOSNIA':'BOSNIA ED ERZEGOVINA', 'BOSNIA AND HERZEGOVINA':'BOSNIA ED ERZEGOVINA',
+  'MONTENEGRO':'MONTENEGRO', 'KOSOVO':'KOSOVO',
+  'GEORGIA':'GEORGIA', 'ARMENIA':'ARMENIA', 'AZERBAIJAN':'AZERBAIGIAN',
+  'KAZAKHSTAN':'KAZAKISTAN', 'UZBEKISTAN':'UZBEKISTAN',
+  // Long-form official names as printed on passports / from OCR
+  'UNITED STATES OF AMERICA':"STATI UNITI D'AMERICA",
+  'THE UNITED STATES OF AMERICA':"STATI UNITI D'AMERICA",
+  'U.S.A.':"STATI UNITI D'AMERICA", 'U.S.':"STATI UNITI D'AMERICA",
+  'UNITED KINGDOM OF GREAT BRITAIN AND NORTHERN IRELAND':'REGNO UNITO',
+  'ISLAMIC REPUBLIC OF IRAN':'IRAN',
+  'FEDERAL REPUBLIC OF GERMANY':'GERMANIA',
+  'FRENCH REPUBLIC':'FRANCIA', 'ITALIAN REPUBLIC':'ITALIA',
+  'KINGDOM OF SPAIN':'SPAGNA',
+  'KINGDOM OF THE NETHERLANDS':'PAESI BASSI',
+  'KINGDOM OF BELGIUM':'BELGIO',
+  'KINGDOM OF SWEDEN':'SVEZIA', 'KINGDOM OF NORWAY':'NORVEGIA',
+  'KINGDOM OF DENMARK':'DANIMARCA',
+  'PORTUGUESE REPUBLIC':'PORTOGALLO', 'HELLENIC REPUBLIC':'GRECIA',
+  'REPUBLIC OF POLAND':'POLONIA', 'REPUBLIC OF TURKEY':'TURCHIA', 'TURKIYE':'TURCHIA',
+  'REPUBLIC OF INDIA':'INDIA', 'STATE OF ISRAEL':'ISRAELE',
+  'ARAB REPUBLIC OF EGYPT':'EGITTO',
+  "PEOPLE'S REPUBLIC OF CHINA":'CINA',
+  'REPUBLIC OF KOREA':'COREA DEL SUD',
+  "DEMOCRATIC PEOPLE'S REPUBLIC OF KOREA":'COREA DEL NORD',
+  'RUSSIAN FEDERATION':'FEDERAZIONE RUSSA',
+  'FEDERATIVE REPUBLIC OF BRAZIL':'BRASILE',
+  'UNITED MEXICAN STATES':'MESSICO',
+  'COMMONWEALTH OF AUSTRALIA':'AUSTRALIA',
+  'REPUBLIC OF SOUTH AFRICA':'SUDAFRICA',
 };
 
 // Document-type input aliases → official 5-char code
@@ -2275,6 +2339,42 @@ function lookupStateCode(input) {
   const italianName = COUNTRY_ALIASES[norm] || norm;
   const code = ALLOG_STATI[italianName];
   return (code || '         ').padEnd(9);
+}
+
+// Round 31 — acceptable-country helper mirrored from host-console.html.
+// Guest inputs for birth_country / citizenship must land on a name that
+// the Alloggiati export can resolve. Without a full ALLOG_STATI table
+// on this side (the guest app doesn't run exports), we accept any input
+// that appears as a KEY or a VALUE of COUNTRY_ALIASES — both of which
+// are guaranteed resolvable by host-console's exporter.
+const _wbnbCountryAcceptSet = (() => {
+  const s = new Set();
+  for (const k of Object.keys(COUNTRY_ALIASES)) s.add(k);
+  for (const v of Object.values(COUNTRY_ALIASES)) s.add(_normKey(v));
+  return s;
+})();
+function wbnbAcceptsCountry(input) {
+  if (!input) return false;
+  return _wbnbCountryAcceptSet.has(_normKey(input));
+}
+function wbnbCountryPickerOptions() {
+  const s = new Set();
+  for (const k of Object.keys(COUNTRY_ALIASES)) s.add(k);
+  for (const v of Object.values(COUNTRY_ALIASES)) s.add(v);
+  return [...s].sort((a, b) => a.localeCompare(b));
+}
+// Populate the shared <datalist id="wbnbCountryList"> once the DOM is up.
+function _wbnbPopulateCountryDatalist() {
+  const dl = document.getElementById('wbnbCountryList');
+  if (!dl || dl.dataset.populated === '1') return;
+  dl.innerHTML = wbnbCountryPickerOptions()
+    .map(n => `<option value="${String(n).replace(/"/g, '&quot;')}"></option>`).join('');
+  dl.dataset.populated = '1';
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', _wbnbPopulateCountryDatalist);
+} else {
+  _wbnbPopulateCountryDatalist();
 }
 
 function lookupPoliceCode(cityName, prov) {
@@ -2774,6 +2874,19 @@ function checkinNext() {
     if (!birthplace) errors.push(T[lang].val_birthplace);
     if (!birthCountry) errors.push(T[lang].val_birth_country);
     if (!citizenship) errors.push(T[lang].val_citizenship);
+    // Round 31 — must resolve to a canonical country the export can use.
+    // Silent 9-blank citizenship codes are what makes Alloggiati Web
+    // reject a row after the fact ("Cittadinanza non valida").
+    if (birthCountry && !wbnbAcceptsCountry(birthCountry)) {
+      errors.push((T[lang].val_birth_country_unknown
+        || 'Country of birth "{v}" isn\'t recognized — please pick one from the list.')
+        .replace('{v}', birthCountry));
+    }
+    if (citizenship && !wbnbAcceptsCountry(citizenship)) {
+      errors.push((T[lang].val_citizenship_unknown
+        || 'Citizenship "{v}" isn\'t recognized — please pick one from the list.')
+        .replace('{v}', citizenship));
+    }
 
     // Province required only when BORN in Italy (not just Italian citizen)
     if (isItalianCountry(birthCountry)) {

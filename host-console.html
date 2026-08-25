@@ -3954,9 +3954,14 @@ async function renderUpcomingReservationsPanel() {
       matched = dated.filter(c => c.booking_code === r.booking_code);
     }
     if (matched.length === 0) {
+      // Strict inequality on the boundary: a stay departing 01 Sept and
+      // a reservation starting 01 Sept share that calendar day but don't
+      // actually overlap (guest checks out the morning the next arrives).
+      // The earlier `<=` / `>=` version attached one guest to both
+      // reservations at the boundary.
       matched = dated.filter(c =>
-        c.arrival_date <= r.checkout_date &&
-        (!c.departure_date || c.departure_date >= r.checkin_date)
+        c.arrival_date < r.checkout_date &&
+        (!c.departure_date || c.departure_date > r.checkin_date)
       );
     }
     // Group by booking_code (empty/null bucket keeps its own key so we don't
@@ -4008,10 +4013,12 @@ async function renderUpcomingReservationsPanel() {
     const codeChip = r.booking_code
       ? `<span title="${safe(hostLang === 'it' ? 'Codice prenotazione' : 'Booking code')}" style="font-family:monospace;font-size:0.68rem;color:var(--warm);background:rgba(0,91,255,0.08);border-radius:3px;padding:1px 6px;">${safe(r.booking_code)}</span>`
       : '';
+    const linkLabel = hostLang === 'it' ? 'Link Prenotazione' : 'Booking Link';
     const linkRow = guestLink ? `
-      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:8px;padding-top:8px;border-top:1px dashed rgba(107,122,144,0.15);">
-        <span style="font-family:monospace;font-size:0.7rem;color:var(--ink-soft);flex:1;min-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safe(guestLink)}</span>
-        <button type="button" onclick="copyReservationLink('${safe(guestLink)}', this)" title="${safe(hostLang === 'it' ? 'Copia link ospite' : 'Copy guest link')}"
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:8px;padding-top:8px;border-top:1px dashed rgba(107,122,144,0.15);">
+        <span style="font-size:0.62rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--warm);white-space:nowrap;">${safe(linkLabel)}</span>
+        <span style="font-family:monospace;font-size:0.7rem;color:var(--ink-soft);flex:1;min-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safe(guestLink)}</span>
+        <button type="button" onclick="copyReservationLink('${safe(guestLink)}', this)" title="${safe(hostLang === 'it' ? 'Copia il link prenotazione' : 'Copy the booking link')}"
                 style="padding:4px 10px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:0.72rem;cursor:pointer;color:var(--ink);font-family:inherit;">🔗 ${safe(hostLang === 'it' ? 'Copia' : 'Copy')}</button>
         <a href="${safe(guestLink)}" target="_blank" rel="noopener" title="${safe(hostLang === 'it' ? 'Apri come ospite' : 'Open as guest')}"
            style="padding:4px 10px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:0.72rem;color:var(--ink);text-decoration:none;">↗ ${safe(hostLang === 'it' ? 'Apri' : 'Open')}</a>

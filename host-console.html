@@ -3003,7 +3003,41 @@ const HT = {
     no_checkins: 'No check-ins yet. Share your guest link to get started!',
     doc_complete: '✓ Complete', doc_partial: '⏳ Partial', doc_missing: '✗ Missing',
     alloggiati_filed: '✓ Filed', alloggiati_pending: 'Pending',
-    btn_view: 'View', btn_delete_single: 'Delete',
+    btn_view: 'View', btn_delete_single: 'Delete', btn_edit_single: 'Edit',
+    // Round 30 — edit check-in modal (single-line values; applyLang collapses newlines)
+    edit_title: 'Edit check-in',
+    edit_intro: 'Corrections update this check-in in place. Alloggiati / PayTourist exports re-read the row on next generation.',
+    edit_save: 'Save changes',
+    edit_cancel: 'Cancel',
+    edit_saved: '✓ Check-in updated',
+    edit_no_change: 'No changes to save',
+    edit_save_blocked: '⚠ No row updated — permission denied. Run migration_round30_checkins_host_update.sql.',
+    edit_save_failed: '⚠ Save failed',
+    edit_field_missing: 'Missing required field: {name}',
+    edit_stay: 'Stay',
+    edit_personal: 'Personal details',
+    edit_document: 'Document',
+    field_booking_code: 'Booking code',
+    field_guest_type: 'Guest type',
+    field_arrival: 'Arrival date',
+    field_departure: 'Departure date',
+    field_nights: 'Nights',
+    field_surname: 'Surname',
+    field_name: 'Name',
+    field_sex: 'Sex',
+    field_dob: 'Date of birth',
+    field_place_of_birth: 'Place of birth',
+    field_birth_province: 'Italian province (2 letters, if born in Italy)',
+    field_birth_country: 'Country of birth',
+    field_citizenship: 'Citizenship',
+    field_doc_type: 'Document type',
+    field_doc_number: 'Document number',
+    field_doc_issue_place: 'Place of issue',
+    sex_m: 'Male', sex_f: 'Female',
+    gtype_single: 'Single guest', gtype_head: 'Head of family', gtype_group: 'Group leader',
+    gtype_member: 'Family member', gtype_group_member: 'Group member',
+    doc_type_passport: 'Passport', doc_type_id_card: 'ID card', doc_type_driving: 'Driving licence',
+    doc_type_none: 'None (not required)',
     // Property
     prop_basic: 'Basic Information', prop_basic_desc: 'This information will appear on the guest welcome screen.',
     prop_name: 'Property Name', prop_type: 'Property Type', prop_address: 'Street Address', prop_maps_link: 'Google Maps Link', prop_maps_hint: 'Open Google Maps, find your property, tap Share → Copy link, paste here',
@@ -3329,7 +3363,41 @@ const HT = {
     no_checkins: 'Nessun check-in ancora. Condividi il link ospiti per iniziare!',
     doc_complete: '✓ Completo', doc_partial: '⏳ Parziale', doc_missing: '✗ Mancante',
     alloggiati_filed: '✓ Inviato', alloggiati_pending: 'In attesa',
-    btn_view: 'Vedi', btn_delete_single: 'Elimina',
+    btn_view: 'Vedi', btn_delete_single: 'Elimina', btn_edit_single: 'Modifica',
+    // Round 30 — modifica check-in
+    edit_title: 'Modifica check-in',
+    edit_intro: 'Le correzioni aggiornano questo check-in. Le esportazioni Alloggiati / PayTourist rileggeranno la riga alla prossima generazione.',
+    edit_save: 'Salva modifiche',
+    edit_cancel: 'Annulla',
+    edit_saved: '✓ Check-in aggiornato',
+    edit_no_change: 'Nessuna modifica da salvare',
+    edit_save_blocked: '⚠ Nessuna riga aggiornata — permessi mancanti. Esegui migration_round30_checkins_host_update.sql.',
+    edit_save_failed: '⚠ Salvataggio fallito',
+    edit_field_missing: 'Campo obbligatorio mancante: {name}',
+    edit_stay: 'Soggiorno',
+    edit_personal: 'Dati personali',
+    edit_document: 'Documento',
+    field_booking_code: 'Codice prenotazione',
+    field_guest_type: 'Tipo ospite',
+    field_arrival: 'Data arrivo',
+    field_departure: 'Data partenza',
+    field_nights: 'Notti',
+    field_surname: 'Cognome',
+    field_name: 'Nome',
+    field_sex: 'Sesso',
+    field_dob: 'Data di nascita',
+    field_place_of_birth: 'Luogo di nascita',
+    field_birth_province: 'Provincia italiana (2 lettere, se nato in Italia)',
+    field_birth_country: 'Paese di nascita',
+    field_citizenship: 'Cittadinanza',
+    field_doc_type: 'Tipo documento',
+    field_doc_number: 'Numero documento',
+    field_doc_issue_place: 'Luogo di rilascio',
+    sex_m: 'Maschio', sex_f: 'Femmina',
+    gtype_single: 'Ospite singolo', gtype_head: 'Capofamiglia', gtype_group: 'Capogruppo',
+    gtype_member: 'Familiare', gtype_group_member: 'Membro gruppo',
+    doc_type_passport: 'Passaporto', doc_type_id_card: 'Carta d\'identità', doc_type_driving: 'Patente',
+    doc_type_none: 'Nessuno (non richiesto)',
     prop_basic: 'Informazioni Base', prop_basic_desc: 'Queste informazioni appariranno nella schermata di benvenuto.',
     prop_name: 'Nome Proprietà', prop_type: 'Tipo Proprietà', prop_address: 'Indirizzo', prop_maps_link: 'Link Google Maps', prop_maps_hint: 'Apri Google Maps, trova la tua proprietà, tocca Condividi → Copia link, incolla qui',
     prop_city: 'Città', prop_zip: 'CAP', prop_region: 'Regione', prop_cir: 'Codice CIN (ID Nazionale)', prop_cir_hint: 'Codice Identificativo Nazionale — richiesto per la segnalazione delle locazioni turistiche',
@@ -3964,6 +4032,7 @@ function renderCheckins() {
       <td data-label="">
         <div style="display:flex;gap:8px;justify-content:flex-end;padding:4px 0;">
           <button class="btn btn-secondary btn-sm" onclick="viewGuest('${c.id}')" style="min-height:36px;padding:6px 12px;">${h('btn_view')}</button>
+          <button class="btn btn-secondary btn-sm" onclick="editGuest('${c.id}')" style="min-height:36px;padding:6px 12px;color:var(--warm);border-color:rgba(0,91,255,0.25);">✏️ ${h('btn_edit_single') || 'Edit'}</button>
           <button class="btn btn-secondary btn-sm" onclick="deleteCheckin('${c.id}','${(c.surname||'').replace(/'/g,'\\\'')}')" style="color:var(--red);border-color:rgba(224,69,94,0.2);min-height:36px;padding:6px 12px;">🗑 ${h('btn_delete_single')}</button>
         </div>
       </td>
@@ -6655,6 +6724,236 @@ function viewGuest(id) {
       if (box) box.innerHTML = `<div style="font-size:0.78rem;color:#b03939;padding:8px;">${it ? '⚠ Errore caricamento foto' : '⚠ Photo load error'}</div>`;
     });
   }
+}
+
+/* ══════════════════════════════════════
+   Round 30 — Edit a check-in from the Check-in Data tab
+══════════════════════════════════════
+   Opens a modal with editable inputs for stay + personal + document
+   fields, saves via Supabase UPDATE using the Round 20.2 pattern
+   (`.select()` after the update so a 0-row result surfaces loudly
+   instead of pretending success). Alloggiati / PayTourist exports read
+   from `checkins` on next generation, so edits propagate naturally.
+
+   NOT edited here: id_photo_path / docs_status / alloggiati_status /
+   puglia_dms_status / submitted_at / property_id / is_test —
+   they're either system-owned or need their own flow. */
+
+function editGuest(id) {
+  const c = allCheckins.find(g => g.id === id);
+  if (!c) { toast('Guest not found'); return; }
+  const it = hostLang === 'it';
+  const safeAttr = s => String(s == null ? '' : s).replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  const isoDate = d => {
+    if (!d) return '';
+    // Supabase dates come back as either 'YYYY-MM-DD' or ISO string.
+    return String(d).slice(0, 10);
+  };
+
+  const sectionTitle = (txt) => `
+    <div style="font-family:'Playfair Display',serif;font-size:0.95rem;font-weight:600;color:var(--ink);margin:18px 0 8px;padding-bottom:6px;border-bottom:1.5px solid rgba(107,122,144,0.12);">${safeAttr(txt)}</div>`;
+
+  const field = (labelKey, inputHtml) => `
+    <div style="display:grid;grid-template-columns:180px 1fr;gap:12px;padding:6px 0;align-items:center;">
+      <label style="font-size:0.72rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);font-weight:500;">${safeAttr(h(labelKey))}</label>
+      <div>${inputHtml}</div>
+    </div>`;
+
+  const inputStyle = 'width:100%;padding:8px 10px;border:1px solid rgba(107,122,144,0.2);border-radius:6px;font-size:0.88rem;font-family:inherit;background:#fff;';
+
+  const selOpt = (val, txtKey, current) =>
+    `<option value="${safeAttr(val)}"${val === current ? ' selected' : ''}>${safeAttr(h(txtKey) || val)}</option>`;
+
+  const stay = `
+    ${sectionTitle(h('edit_stay'))}
+    ${field('field_booking_code',
+      `<input id="edit_booking_code" type="text" value="${safeAttr(c.booking_code || '')}" style="${inputStyle}font-family:monospace;">`)}
+    ${field('field_guest_type',
+      `<select id="edit_guest_type" style="${inputStyle}">
+        ${selOpt('single', 'gtype_single', c.guest_type)}
+        ${selOpt('head', 'gtype_head', c.guest_type)}
+        ${selOpt('group', 'gtype_group', c.guest_type)}
+        ${selOpt('member', 'gtype_member', c.guest_type)}
+        ${selOpt('group_member', 'gtype_group_member', c.guest_type)}
+      </select>`)}
+    ${field('field_arrival',
+      `<input id="edit_arrival_date" type="date" value="${safeAttr(isoDate(c.arrival_date))}" style="${inputStyle}">`)}
+    ${field('field_departure',
+      `<input id="edit_departure_date" type="date" value="${safeAttr(isoDate(c.departure_date))}" style="${inputStyle}">`)}
+    ${field('field_nights',
+      `<input id="edit_nights" type="number" min="0" max="365" value="${safeAttr(c.nights == null ? '' : c.nights)}" style="${inputStyle}"> <span style="font-size:0.72rem;color:var(--ink-soft);">${it ? '(0 = calcolo automatico)' : '(0 = auto-compute)'}</span>`)}
+  `;
+
+  const personal = `
+    ${sectionTitle(h('edit_personal'))}
+    ${field('field_surname',
+      `<input id="edit_surname" type="text" value="${safeAttr(c.surname || '')}" style="${inputStyle}text-transform:uppercase;">`)}
+    ${field('field_name',
+      `<input id="edit_name" type="text" value="${safeAttr(c.name || '')}" style="${inputStyle}text-transform:uppercase;">`)}
+    ${field('field_sex',
+      `<select id="edit_sex" style="${inputStyle}">
+        <option value="M"${c.sex === 'M' ? ' selected' : ''}>${safeAttr(h('sex_m'))}</option>
+        <option value="F"${c.sex === 'F' ? ' selected' : ''}>${safeAttr(h('sex_f'))}</option>
+      </select>`)}
+    ${field('field_dob',
+      `<input id="edit_dob" type="date" value="${safeAttr(isoDate(c.date_of_birth))}" style="${inputStyle}">`)}
+    ${field('field_place_of_birth',
+      `<input id="edit_place_of_birth" type="text" value="${safeAttr(c.place_of_birth || '')}" style="${inputStyle}">`)}
+    ${field('field_birth_province',
+      `<input id="edit_birth_province" type="text" maxlength="2" value="${safeAttr((c.birth_province || '').toUpperCase())}" style="${inputStyle}text-transform:uppercase;max-width:120px;">`)}
+    ${field('field_birth_country',
+      `<input id="edit_birth_country" type="text" value="${safeAttr(c.birth_country || '')}" style="${inputStyle}">`)}
+    ${field('field_citizenship',
+      `<input id="edit_citizenship" type="text" value="${safeAttr(c.citizenship || '')}" style="${inputStyle}">`)}
+  `;
+
+  const docSection = `
+    ${sectionTitle(h('edit_document'))}
+    ${field('field_doc_type',
+      `<select id="edit_document_type" style="${inputStyle}">
+        <option value=""${!c.document_type ? ' selected' : ''}>${safeAttr(h('doc_type_none'))}</option>
+        <option value="passport"${c.document_type === 'passport' ? ' selected' : ''}>${safeAttr(h('doc_type_passport'))}</option>
+        <option value="id_card"${c.document_type === 'id_card' ? ' selected' : ''}>${safeAttr(h('doc_type_id_card'))}</option>
+        <option value="driving"${c.document_type === 'driving' ? ' selected' : ''}>${safeAttr(h('doc_type_driving'))}</option>
+      </select>`)}
+    ${field('field_doc_number',
+      `<input id="edit_document_number" type="text" value="${safeAttr(c.document_number || '')}" style="${inputStyle}font-family:monospace;">`)}
+    ${field('field_doc_issue_place',
+      `<input id="edit_doc_issue_place" type="text" value="${safeAttr(c.doc_issue_place || '')}" style="${inputStyle}">`)}
+  `;
+
+  const existing = document.getElementById('guestEditModal');
+  if (existing) existing.remove();
+  const modalHTML = `
+    <div id="guestEditModal" style="display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;" onclick="if(event.target===this)closeGuestEditModal()">
+      <div style="background:var(--white);max-width:720px;width:100%;border-radius:14px;padding:24px 28px 22px;box-shadow:0 12px 48px rgba(0,0,0,0.25);max-height:calc(100vh - 60px);overflow-y:auto;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <div>
+            <h2 style="font-family:'Playfair Display',serif;font-weight:600;font-size:1.4rem;color:var(--ink);margin:0;">${safeAttr(h('edit_title'))}</h2>
+            <div style="font-size:0.74rem;color:var(--warm);font-family:monospace;margin-top:3px;">${safeAttr(c.surname || '')} ${safeAttr(c.name || '')}${c.booking_code ? ' · ' + safeAttr(c.booking_code) : ''}</div>
+          </div>
+          <button type="button" onclick="closeGuestEditModal()" style="background:none;border:none;font-size:1.5rem;color:var(--ink-soft);cursor:pointer;padding:4px 10px;line-height:1;">×</button>
+        </div>
+        <div style="font-size:0.78rem;color:var(--ink-soft);margin-top:6px;background:rgba(0,91,255,0.05);border-left:3px solid var(--warm);padding:8px 12px;border-radius:4px;">${safeAttr(h('edit_intro'))}</div>
+        ${stay}
+        ${personal}
+        ${docSection}
+        <div id="editGuestStatus" style="min-height:20px;margin-top:12px;font-size:0.82rem;"></div>
+        <div style="margin-top:6px;display:flex;justify-content:flex-end;gap:10px;">
+          <button type="button" onclick="closeGuestEditModal()" class="btn btn-secondary" data-h="edit_cancel">${safeAttr(h('edit_cancel'))}</button>
+          <button type="button" onclick="saveGuestEdits('${c.id}')" class="btn btn-primary" data-h="edit_save">${safeAttr(h('edit_save'))}</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', modalHTML);
+  document.body.style.overflow = 'hidden';
+}
+
+function closeGuestEditModal() {
+  const m = document.getElementById('guestEditModal');
+  if (m) m.remove();
+  document.body.style.overflow = '';
+}
+
+async function saveGuestEdits(id) {
+  const it = hostLang === 'it';
+  const statusEl = document.getElementById('editGuestStatus');
+  const setStatus = (html, tone) => {
+    if (!statusEl) return;
+    const color = tone === 'error' ? '#b03939' : tone === 'ok' ? '#2f7a44' : 'var(--ink-soft)';
+    statusEl.innerHTML = `<span style="color:${color};">${html}</span>`;
+  };
+
+  const v = (elId) => (document.getElementById(elId)?.value ?? '').trim();
+
+  // Read all fields from the form
+  const surname = v('edit_surname').toUpperCase();
+  const name = v('edit_name').toUpperCase();
+  const sex = v('edit_sex');
+  const dob = v('edit_dob');
+  const place_of_birth = v('edit_place_of_birth');
+  const citizenship = v('edit_citizenship');
+  const guest_type = v('edit_guest_type');
+  const document_type_raw = v('edit_document_type'); // '' means "none required"
+  const document_number = v('edit_document_number');
+
+  // Required-field guard (mirrors DB NOT NULL constraints so the UI
+  // gives a helpful message instead of a Postgres 23502 that reads
+  // like a bug). document_type / document_number can be empty for
+  // member-type guests, so they're NOT enforced here.
+  const missing = [];
+  if (!surname)         missing.push(h('field_surname'));
+  if (!name)            missing.push(h('field_name'));
+  if (!sex)             missing.push(h('field_sex'));
+  if (!dob)             missing.push(h('field_dob'));
+  if (!place_of_birth)  missing.push(h('field_place_of_birth'));
+  if (!citizenship)     missing.push(h('field_citizenship'));
+  if (!guest_type)      missing.push(h('field_guest_type'));
+  if (missing.length > 0) {
+    setStatus(h('edit_field_missing').replace('{name}', missing.join(', ')), 'error');
+    return;
+  }
+
+  const arrival_date   = v('edit_arrival_date') || null;
+  const departure_date = v('edit_departure_date') || null;
+  const nightsRaw = v('edit_nights');
+  let nights = nightsRaw === '' ? null : Number(nightsRaw);
+  // 0 → auto-compute from dates
+  if (nights === 0 && arrival_date && departure_date) {
+    const da = new Date(arrival_date + 'T00:00:00');
+    const dd = new Date(departure_date + 'T00:00:00');
+    if (!isNaN(da) && !isNaN(dd)) nights = Math.max(0, Math.round((dd - da) / 86400000));
+  }
+
+  const birthProv = v('edit_birth_province').toUpperCase();
+  // NOT NULL columns: document_type / document_number must be non-null.
+  // If the host clears them, we store an empty string (the guest-side
+  // ingest already does this for member types).
+  const update = {
+    booking_code: v('edit_booking_code') || null,
+    guest_type,
+    surname,
+    name,
+    sex,
+    date_of_birth: dob,
+    place_of_birth,
+    birth_province: birthProv || null,
+    birth_country: v('edit_birth_country') || null,
+    citizenship,
+    document_type: document_type_raw || '',
+    document_number: document_number || '',
+    doc_issue_place: v('edit_doc_issue_place') || null,
+    arrival_date,
+    departure_date,
+    nights,
+  };
+
+  setStatus(it ? 'Salvataggio…' : 'Saving…');
+  // Round 20.2 pattern: request the rows back so a 0-row silent success
+  // (missing RLS UPDATE policy = Round 28 trap) surfaces loudly.
+  const { data: updated, error } = await sb.from('checkins')
+    .update(update)
+    .eq('id', id)
+    .select();
+  if (error) {
+    console.error('Edit save error:', error);
+    setStatus(h('edit_save_failed') + ': ' + error.message, 'error');
+    return;
+  }
+  if (!updated || updated.length === 0) {
+    setStatus(h('edit_save_blocked'), 'error');
+    return;
+  }
+
+  // Splice the updated row back into allCheckins and re-render.
+  const row = updated[0];
+  const idx = allCheckins.findIndex(c => c.id === id);
+  if (idx > -1) allCheckins[idx] = { ...allCheckins[idx], ...row };
+  renderCheckins();
+  setStatus(h('edit_saved'), 'ok');
+  track('edit_checkin', { id, fields_updated: Object.keys(update).length });
+  // Give the host a beat to read the confirmation, then close.
+  setTimeout(closeGuestEditModal, 700);
 }
 
 // ── Round 19: per-guest lockbox helpers ─────────────────────────────

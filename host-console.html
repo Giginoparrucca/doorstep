@@ -4263,6 +4263,7 @@ function collectDomIcalFeedsIncludingBlank() {
 }
 
 async function syncIcalNow() {
+  console.log('[iCal] Sync now clicked. propertyId=', propertyId);
   if (!propertyId) { toast(h('ical_save_first')); return; }
   const resEl = document.getElementById('icalSyncResult');
   const btn = document.querySelector('button[onclick="syncIcalNow()"]');
@@ -4277,12 +4278,42 @@ async function syncIcalNow() {
     const jwt = session?.access_token;
     if (!jwt) { if (resEl) resEl.textContent = h('ical_sync_failed') + ': not signed in'; return; }
 
+    // Auto-persist any feed rows the user typed but hasn't yet clicked
+    // "Save Property Details" for. Otherwise the endpoint reads whatever
+    // is currently in properties.ical_feeds — usually [] — and the sync
+    // silently returns synced=0.
+    const currentFeeds = collectIcalFeeds();
+    const savedFeeds   = Array.isArray(propertyData?.ical_feeds) ? propertyData.ical_feeds : [];
+    const feedsChanged = JSON.stringify(currentFeeds) !== JSON.stringify(savedFeeds);
+    if (feedsChanged) {
+      console.log('[iCal] Persisting DOM feeds before sync:', currentFeeds);
+      const { data: persisted, error: pErr } = await sb.from('properties')
+        .update({ ical_feeds: currentFeeds }).eq('id', propertyId).select('ical_feeds');
+      if (pErr) {
+        if (resEl) resEl.textContent = h('ical_sync_failed') + ': ' + pErr.message;
+        return;
+      }
+      if (!persisted || persisted.length === 0) {
+        if (resEl) resEl.textContent = h('ical_sync_failed') + ': feed save blocked by permissions';
+        return;
+      }
+      propertyData = { ...(propertyData || {}), ical_feeds: currentFeeds };
+    }
+
+    if (currentFeeds.length === 0) {
+      if (resEl) resEl.innerHTML =
+        `<div style="color:#9a6b00;">⚠ ${_icalEscape(hostLang === 'it' ? 'Aggiungi almeno un feed prima di sincronizzare.' : 'Add at least one feed before syncing.')}</div>`;
+      return;
+    }
+
+    console.log('[iCal] POSTing to /api/ical-sync');
     const r = await fetch('/api/ical-sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwt },
       body: JSON.stringify({ property_id: propertyId }),
     });
     const body = await r.json().catch(() => ({}));
+    console.log('[iCal] Response status', r.status, 'body:', body);
     if (!r.ok) {
       if (resEl) resEl.textContent = h('ical_sync_failed') + ': ' + (body?.error || r.status);
       return;

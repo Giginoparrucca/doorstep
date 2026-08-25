@@ -1294,6 +1294,19 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
       </div>
 
+      <div class="form-card">
+        <div class="form-card-title" data-h="ical_title">Calendar sync (iCal)</div>
+        <div class="form-card-desc" data-h="ical_desc">Paste your Airbnb / Booking.com / Vrbo iCal export URLs. WelcomeBnB pulls upcoming reservations into your dashboard. Only dates come from these feeds — guest names and counts arrive when guests complete check-in.</div>
+        <div style="font-size:0.72rem;color:var(--ink-soft);line-height:1.5;margin-bottom:12px;" data-h="ical_where">Airbnb: Calendar → Availability → Connect calendars → Export. Booking.com: Calendar → Sync calendars. Vrbo: Calendar → Import/Export → Export calendar.</div>
+        <div id="icalFeedsList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <button type="button" class="btn btn-secondary" onclick="addIcalFeed()" data-h="ical_add">+ Add feed</button>
+          <button type="button" class="btn btn-primary" onclick="syncIcalNow()" data-h="ical_sync_now">🔄 Sync now</button>
+          <span id="icalLastSynced" style="font-size:0.74rem;color:var(--ink-soft);"></span>
+        </div>
+        <div id="icalSyncResult" style="margin-top:10px;font-size:0.82rem;color:var(--ink-soft);"></div>
+      </div>
+
       <div class="panel-actions" style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn btn-primary" onclick="saveProperty()" data-h="btn_save_property">💾 Save Property Details</button>
         <button class="btn btn-secondary" onclick="openPreviewAsGuest()" data-h="btn_preview_guest" title="Open the guest app in test mode (no analytics)">🧪 Preview as guest</button>
@@ -3109,6 +3122,34 @@ const HT = {
     template_desc: 'Send this to guests when they book. Customize as needed.',
     btn_copy_template: '📋 Copy Template',
     // Toasts
+    // Round 26 — iCal sync (single-line values; applyLang collapses newlines)
+    ical_title: 'Calendar sync (iCal)',
+    ical_desc: 'Paste your Airbnb / Booking.com / Vrbo iCal export URLs. WelcomeBnB pulls upcoming reservations into your dashboard. Only dates come from these feeds — guest names and counts arrive when guests complete check-in.',
+    ical_where: 'Airbnb: Calendar → Availability → Connect calendars → Export. Booking.com: Calendar → Sync calendars. Vrbo: Calendar → Import/Export → Export calendar.',
+    ical_platform: 'Platform',
+    ical_url: 'iCal URL',
+    ical_url_ph: 'https://www.airbnb.com/calendar/ical/…',
+    ical_label: 'Label (optional)',
+    ical_label_ph: 'e.g. Airbnb main listing',
+    ical_add: '+ Add feed',
+    ical_remove: 'Remove',
+    ical_sync_now: '🔄 Sync now',
+    ical_none: 'No feeds configured yet. Add one to start pulling reservations.',
+    ical_last_synced: 'Last synced:',
+    ical_never_synced: 'Never synced',
+    ical_syncing: 'Syncing…',
+    ical_sync_failed: 'Sync failed',
+    ical_sync_ok: 'Synced {n} reservation(s) across {feeds} feed(s). Cancelled: {c}.',
+    ical_save_first: 'Save the property first, then click Sync now.',
+    // Round 26 — Dashboard: Upcoming reservations panel
+    dash_upcoming_title: 'Upcoming reservations',
+    dash_upcoming_empty: 'No upcoming reservations in the next 60 days. Add an iCal feed in Property settings.',
+    dash_nights_one: 'night',
+    dash_nights_n: 'nights',
+    dash_checked_in: 'Checked in',
+    dash_awaiting: 'Awaiting check-in',
+    dash_guests_one: 'guest',
+    dash_guests_n: 'guests',
     toast_property_saved: 'Property details saved!', toast_rules_saved: 'House rules saved to database!',
     toast_new_property: 'Welcome! Fill in your property details to get started.',
     onboard_title: 'Welcome to WelcomeBnB!',
@@ -3399,6 +3440,34 @@ const HT = {
     template_title: 'Modello Messaggio Pre-Arrivo',
     template_desc: 'Invia questo agli ospiti quando prenotano. Personalizza come preferisci.',
     btn_copy_template: '📋 Copia Modello',
+    // Round 26 — Sync iCal
+    ical_title: 'Sincronizzazione calendario (iCal)',
+    ical_desc: 'Incolla gli URL di esportazione iCal di Airbnb / Booking.com / Vrbo. WelcomeBnB scarica le prenotazioni imminenti nella tua dashboard. Da questi feed arrivano solo le date — i nomi e il numero degli ospiti si aggiungono quando completano il check-in.',
+    ical_where: 'Airbnb: Calendario → Disponibilità → Collega calendari → Esporta. Booking.com: Calendario → Sincronizza calendari. Vrbo: Calendario → Importa/Esporta → Esporta calendario.',
+    ical_platform: 'Piattaforma',
+    ical_url: 'URL iCal',
+    ical_url_ph: 'https://www.airbnb.com/calendar/ical/…',
+    ical_label: 'Etichetta (opzionale)',
+    ical_label_ph: 'es. Airbnb annuncio principale',
+    ical_add: '+ Aggiungi feed',
+    ical_remove: 'Rimuovi',
+    ical_sync_now: '🔄 Sincronizza ora',
+    ical_none: 'Nessun feed configurato. Aggiungine uno per iniziare a importare prenotazioni.',
+    ical_last_synced: 'Ultima sincronizzazione:',
+    ical_never_synced: 'Mai sincronizzato',
+    ical_syncing: 'Sincronizzazione in corso…',
+    ical_sync_failed: 'Sincronizzazione fallita',
+    ical_sync_ok: 'Sincronizzate {n} prenotazioni su {feeds} feed. Annullate: {c}.',
+    ical_save_first: 'Salva prima la proprietà, poi clicca Sincronizza ora.',
+    // Round 26 — Dashboard: prenotazioni in arrivo
+    dash_upcoming_title: 'Prenotazioni in arrivo',
+    dash_upcoming_empty: 'Nessuna prenotazione nei prossimi 60 giorni. Aggiungi un feed iCal nelle impostazioni della proprietà.',
+    dash_nights_one: 'notte',
+    dash_nights_n: 'notti',
+    dash_checked_in: 'Check-in fatto',
+    dash_awaiting: 'In attesa di check-in',
+    dash_guests_one: 'ospite',
+    dash_guests_n: 'ospiti',
     toast_property_saved: 'Dettagli proprietà salvati!', toast_rules_saved: 'Regole salvate nel database!',
     toast_new_property: 'Benvenuto! Compila i dettagli della tua proprietà per iniziare.',
     onboard_title: 'Benvenuto su WelcomeBnB!',
@@ -3714,13 +3783,166 @@ async function renderDashboard() {
       <p style="margin:0;font-size:0.86rem;color:var(--ink-soft);">${h('dash_nothing_pending') || 'No urgent items, no guests currently staying.'}</p>
     </div>` : '';
 
+  // Round 26 — Upcoming reservations (OTA iCal sync). Rendered above the
+  // action pane so hosts see the "who's coming next" view first.
+  const upcomingPanel = await renderUpcomingReservationsPanel();
+
   el.innerHTML = `
     <div style="max-width:920px;">
+      ${upcomingPanel}
       ${urgentPanel}
       ${stayingPanel}
       ${allCaughtUp}
     </div>
   `;
+}
+
+/* ══════════════════════════════════════
+   Round 26 — Upcoming reservations panel (OTA iCal sync)
+══════════════════════════════════════
+   Reads ota_reservations for the current property, then correlates each
+   row with the checkins table by date overlap (grouped by booking_code).
+   If a matching check-in group is found → show that guest's name + count
+   with a green "Checked in" pill. Otherwise → show the OTA-provided guest
+   name if any, else "—", with an amber "Awaiting check-in" pill and no
+   count. No fabrication: iCal never carries guest counts. */
+async function renderUpcomingReservationsPanel() {
+  if (!propertyId) return '';
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const in60ISO  = new Date(Date.now() + 60 * 86400000).toISOString().slice(0, 10);
+  const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  let rows = [];
+  try {
+    const { data, error } = await sb.from('ota_reservations')
+      .select('id, platform, guest_name, checkin_date, checkout_date, reservation_url, summary')
+      .eq('property_id', propertyId)
+      .eq('entry_type', 'reservation')
+      .eq('status', 'active')
+      .is('deleted_at', null)
+      .gte('checkout_date', todayISO)
+      .lte('checkin_date', in60ISO)
+      .order('checkin_date', { ascending: true });
+    if (error) { console.warn('Upcoming reservations load failed:', error.message); return ''; }
+    rows = data || [];
+  } catch (e) {
+    console.warn('Upcoming reservations exception:', e);
+    return '';
+  }
+
+  const title = h('dash_upcoming_title');
+  const headerHtml = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <span style="font-size:1rem;">📅</span>
+      <h3 style="margin:0;font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--ink);font-weight:600;">${safe(title)}</h3>
+      <span style="font-size:0.78rem;color:var(--ink-soft);">(${rows.length})</span>
+    </div>`;
+
+  if (rows.length === 0) {
+    return `
+      <div style="margin-bottom:18px;">
+        ${headerHtml}
+        <div style="padding:16px 18px;background:var(--white);border:1px solid var(--border);border-radius:10px;font-size:0.82rem;color:var(--ink-soft);">
+          ${safe(h('dash_upcoming_empty'))}
+        </div>
+      </div>`;
+  }
+
+  // Correlate with existing checkins by date overlap. allCheckins is already
+  // scoped to this property + non-test + non-deleted (see loadPropertyData).
+  const dated = allCheckins.filter(c => c.arrival_date);
+  const isHeadType = t => t === 'single' || t === 'head' || t === 'group';
+  const platformLabel = p => (p === 'airbnb' ? 'Airbnb'
+                            : p === 'booking' ? 'Booking.com'
+                            : p === 'vrbo' ? 'Vrbo'
+                            : (p ? p[0].toUpperCase() + p.slice(1) : 'Other'));
+  // Return { color, tint } — tint is a translucent version used behind the
+  // badge label. Using a hex fallback avoids `var(--…)22` (invalid CSS).
+  const platformStyle = p => (
+    p === 'airbnb'  ? { color: '#FF5A5F', tint: 'rgba(255,90,95,0.12)' } :
+    p === 'booking' ? { color: '#003580', tint: 'rgba(0,53,128,0.12)' }  :
+    p === 'vrbo'    ? { color: '#245ABC', tint: 'rgba(36,90,188,0.12)' } :
+                      { color: '#6B7A90', tint: 'rgba(107,122,144,0.14)' }
+  );
+  const nightsOf = (a, b) => {
+    if (!a || !b) return null;
+    const da = new Date(a + 'T00:00:00'), db = new Date(b + 'T00:00:00');
+    if (isNaN(da) || isNaN(db)) return null;
+    return Math.max(0, Math.round((db - da) / 86400000));
+  };
+  const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString(hostLang === 'it' ? 'it-IT' : 'en-GB',
+    { day: '2-digit', month: 'short' }) : '—';
+
+  const rendered = rows.map(r => {
+    // Overlap: reservation [ci, co] overlaps a check-in row whose
+    // arrival <= r.checkout_date AND (departure is null OR >= r.checkin_date).
+    // (departure can be null for open-ended pre-checkins.)
+    const matched = dated.filter(c =>
+      c.arrival_date <= r.checkout_date &&
+      (!c.departure_date || c.departure_date >= r.checkin_date)
+    );
+    // Group by booking_code (empty/null bucket keeps its own key so we don't
+    // merge unrelated anonymous checkins together)
+    const groups = {};
+    for (const c of matched) {
+      const bc = c.booking_code || '_none_' + c.id;
+      (groups[bc] = groups[bc] || []).push(c);
+    }
+    const grpKeys = Object.keys(groups);
+
+    let name = null;
+    let count = null;
+    let checkedIn = false;
+
+    if (grpKeys.length > 0) {
+      // Prefer the group whose arrival lines up exactly with the reservation
+      // check-in, else fall back to whichever group has the earliest arrival
+      // within the window.
+      let bestKey = grpKeys[0];
+      for (const k of grpKeys) {
+        if (groups[k][0].arrival_date === r.checkin_date) { bestKey = k; break; }
+      }
+      const grp = groups[bestKey];
+      const head = grp.find(c => isHeadType(c.guest_type)) || grp[0];
+      const nm = `${head.surname || ''} ${head.name || ''}`.trim();
+      name = nm || null;
+      count = grp.length;
+      checkedIn = true;
+    } else {
+      name = r.guest_name || null;
+    }
+
+    const n = nightsOf(r.checkin_date, r.checkout_date);
+    const nightsLabel = n == null ? '' :
+      `${n} ${n === 1 ? h('dash_nights_one') : h('dash_nights_n')}`;
+    const guestsLabel = (count == null)
+      ? '—'
+      : `${count} ${count === 1 ? h('dash_guests_one') : h('dash_guests_n')}`;
+
+    const pill = checkedIn
+      ? `<span style="font-size:0.62rem;font-weight:600;letter-spacing:0.05em;padding:2px 8px;border-radius:999px;background:rgba(109,191,130,0.15);color:#2f7a44;white-space:nowrap;">${safe(h('dash_checked_in'))}</span>`
+      : `<span style="font-size:0.62rem;font-weight:600;letter-spacing:0.05em;padding:2px 8px;border-radius:999px;background:rgba(232,184,75,0.18);color:#9a6b00;white-space:nowrap;">${safe(h('dash_awaiting'))}</span>`;
+
+    const style = platformStyle(r.platform);
+    return `
+      <div style="background:var(--white);border:1px solid rgba(107,122,144,0.10);border-left:3px solid ${style.color};border-radius:8px;padding:10px 14px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+          <span style="font-size:0.62rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${style.color};background:${style.tint};padding:2px 8px;border-radius:4px;">${safe(platformLabel(r.platform))}</span>
+          <span style="font-weight:600;color:var(--ink);font-size:0.9rem;">${safe(fmtDate(r.checkin_date))} → ${safe(fmtDate(r.checkout_date))}</span>
+          ${nightsLabel ? `<span style="font-size:0.75rem;color:var(--ink-soft);">· ${safe(nightsLabel)}</span>` : ''}
+          ${pill}
+        </div>
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:6px;font-size:0.85rem;color:var(--ink);">
+          <span style="font-weight:500;">${safe(name || '—')}</span>
+          <span style="font-size:0.78rem;color:var(--ink-soft);">· ${safe(guestsLabel)}</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div style="margin-bottom:18px;">
+      ${headerHtml}
+      ${rendered}
+    </div>`;
 }
 
 /* ══════════════════════════════════════
@@ -3844,6 +4066,7 @@ async function saveProperty() {
     welcome_message: document.getElementById('propWelcome').value,
     host_phone: document.getElementById('propPhone').value,
     host_names: document.getElementById('propHostNames').value,
+    ical_feeds: collectIcalFeeds(),
   };
   const { error } = await sb.from('properties').update(update).eq('id', propertyId);
   if (error) { console.error('Save error:', error); toast('Error: ' + error.message); return; }
@@ -3855,6 +4078,172 @@ async function saveProperty() {
   renderPropertySwitcher();
   toast(h('toast_property_saved'));
   track('save_property', { name: document.getElementById('propName').value });
+}
+
+/* ══════════════════════════════════════
+   Round 26 — iCal calendar sync
+══════════════════════════════════════
+   Property settings editor: hosts add {platform, url, label} rows.
+   Feeds live in properties.ical_feeds (jsonb). "Sync now" POSTs to
+   /api/ical-sync with the caller's supabase JWT; the server fetches the
+   feeds (Airbnb blocks browser fetches with CORS), parses, and upserts
+   into ota_reservations. Nothing is fabricated — no iCal feed carries
+   guest counts and Airbnb doesn't even carry names. Name + count are
+   filled in from the checkins table by the dashboard panel below. */
+
+function _icalEscape(s) {
+  return String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+}
+
+function icalFeedRowHtml(feed, idx) {
+  const platform = feed?.platform || 'airbnb';
+  const url = feed?.url || '';
+  const label = feed?.label || '';
+  const opt = (val, txt) =>
+    `<option value="${val}"${val === platform ? ' selected' : ''}>${txt}</option>`;
+  return `
+    <div class="ical-feed-row" data-idx="${idx}" style="display:grid;grid-template-columns:130px 1fr 180px auto;gap:8px;align-items:end;padding:10px;background:var(--cream);border:1px solid var(--border);border-radius:8px;">
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" data-h="ical_platform">Platform</label>
+        <select class="form-select ical-platform">
+          ${opt('airbnb', 'Airbnb')}
+          ${opt('booking', 'Booking.com')}
+          ${opt('vrbo', 'Vrbo')}
+          ${opt('other', 'Other')}
+        </select>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" data-h="ical_url">iCal URL</label>
+        <input class="form-input ical-url" type="url" value="${_icalEscape(url)}" data-h-placeholder="ical_url_ph" placeholder="${h('ical_url_ph')}">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label class="form-label" data-h="ical_label">Label (optional)</label>
+        <input class="form-input ical-label" type="text" value="${_icalEscape(label)}" data-h-placeholder="ical_label_ph" placeholder="${h('ical_label_ph')}">
+      </div>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="removeIcalFeed(${idx})" style="color:var(--red);border-color:rgba(224,69,94,0.25);height:38px;" data-h="ical_remove">Remove</button>
+    </div>`;
+}
+
+function renderIcalFeeds() {
+  const list = document.getElementById('icalFeedsList');
+  if (!list) return;
+  const feeds = Array.isArray(propertyData?.ical_feeds) ? propertyData.ical_feeds : [];
+  if (feeds.length === 0) {
+    list.innerHTML = `<div style="color:var(--ink-soft);font-size:0.82rem;padding:4px 0;" data-h="ical_none">${h('ical_none')}</div>`;
+  } else {
+    list.innerHTML = feeds.map((f, i) => icalFeedRowHtml(f, i)).join('');
+  }
+  const lastEl = document.getElementById('icalLastSynced');
+  if (lastEl) {
+    if (propertyData?.ical_last_synced_at) {
+      const d = new Date(propertyData.ical_last_synced_at);
+      const stamp = d.toLocaleString(hostLang === 'it' ? 'it-IT' : 'en-GB',
+        { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+      lastEl.textContent = h('ical_last_synced') + ' ' + stamp;
+    } else {
+      lastEl.textContent = h('ical_never_synced');
+    }
+  }
+  const resEl = document.getElementById('icalSyncResult');
+  if (resEl) resEl.textContent = '';
+}
+
+function collectIcalFeeds() {
+  const list = document.getElementById('icalFeedsList');
+  if (!list) return Array.isArray(propertyData?.ical_feeds) ? propertyData.ical_feeds : [];
+  const out = [];
+  list.querySelectorAll('.ical-feed-row').forEach(row => {
+    const platform = row.querySelector('.ical-platform')?.value || 'other';
+    const url = (row.querySelector('.ical-url')?.value || '').trim();
+    const label = (row.querySelector('.ical-label')?.value || '').trim();
+    if (!url) return; // silently drop empty rows on save
+    out.push({ platform, url, label });
+  });
+  return out;
+}
+
+function addIcalFeed() {
+  // Read current DOM into an array so we don't blow away any half-typed URL.
+  const current = collectDomIcalFeedsIncludingBlank();
+  current.push({ platform: 'airbnb', url: '', label: '' });
+  propertyData = { ...(propertyData || {}), ical_feeds: current };
+  renderIcalFeeds();
+}
+
+function removeIcalFeed(idx) {
+  const current = collectDomIcalFeedsIncludingBlank();
+  current.splice(idx, 1);
+  propertyData = { ...(propertyData || {}), ical_feeds: current };
+  renderIcalFeeds();
+}
+
+// Same as collectIcalFeeds but keeps rows whose URL is empty — used when
+// the user is mid-edit and we're just re-rendering the list.
+function collectDomIcalFeedsIncludingBlank() {
+  const list = document.getElementById('icalFeedsList');
+  if (!list) return Array.isArray(propertyData?.ical_feeds) ? [...propertyData.ical_feeds] : [];
+  const out = [];
+  list.querySelectorAll('.ical-feed-row').forEach(row => {
+    out.push({
+      platform: row.querySelector('.ical-platform')?.value || 'airbnb',
+      url: row.querySelector('.ical-url')?.value || '',
+      label: row.querySelector('.ical-label')?.value || '',
+    });
+  });
+  return out;
+}
+
+async function syncIcalNow() {
+  if (!propertyId) { toast(h('ical_save_first')); return; }
+  const resEl = document.getElementById('icalSyncResult');
+  const btn = document.querySelector('button[onclick="syncIcalNow()"]');
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+  if (resEl) resEl.textContent = h('ical_syncing');
+
+  try {
+    // Round 28 lesson: silent 0-row updates are the top failure mode here.
+    // We rely on the endpoint (RLS-scoped by the caller's JWT) to write —
+    // if the caller isn't the owner, it 403s explicitly.
+    const { data: { session } } = await sb.auth.getSession();
+    const jwt = session?.access_token;
+    if (!jwt) { if (resEl) resEl.textContent = h('ical_sync_failed') + ': not signed in'; return; }
+
+    const r = await fetch('/api/ical-sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwt },
+      body: JSON.stringify({ property_id: propertyId }),
+    });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      if (resEl) resEl.textContent = h('ical_sync_failed') + ': ' + (body?.error || r.status);
+      return;
+    }
+    const synced = body.synced ?? 0;
+    const feeds = (body.per_feed || []).length;
+    const cancelled = body.cancelled ?? 0;
+    if (resEl) {
+      const msg = h('ical_sync_ok')
+        .replace('{n}', synced).replace('{feeds}', feeds).replace('{c}', cancelled);
+      const errs = (body.errors || []).map(e =>
+        `<div style="color:#b03939;">• ${_icalEscape(e.platform || '')} ${_icalEscape(e.url || '')}: ${_icalEscape(e.error || '')}</div>`
+      ).join('');
+      resEl.innerHTML = `<div style="color:var(--green);">✓ ${_icalEscape(msg)}</div>${errs}`;
+    }
+    // Refresh property_data so ical_last_synced_at updates
+    try {
+      const { data } = await sb.from('properties').select('ical_feeds, ical_last_synced_at').eq('id', propertyId).maybeSingle();
+      if (data) {
+        propertyData = { ...(propertyData || {}), ...data };
+        renderIcalFeeds();
+      }
+    } catch (_) { /* non-fatal */ }
+    // Re-render the dashboard's upcoming panel with fresh data
+    renderDashboard();
+  } catch (e) {
+    if (resEl) resEl.textContent = h('ical_sync_failed') + ': ' + (e?.message || e);
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+  }
 }
 
 /* ══════════════════════════════════════
@@ -6666,6 +7055,7 @@ function fillPropertyForm(data) {
   if (el('propWelcome')) el('propWelcome').value = data.welcome_message || '';
   if (el('propPhone')) el('propPhone').value = data.host_phone || '';
   if (el('propHostNames')) el('propHostNames').value = data.host_names || '';
+  if (typeof renderIcalFeeds === 'function') renderIcalFeeds();
   if (data.hero_image_url) {
     const preview = el('coverPhotoPreview');
     if (preview) {

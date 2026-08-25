@@ -1307,6 +1307,38 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div id="icalSyncResult" style="margin-top:10px;font-size:0.82rem;color:var(--ink-soft);"></div>
       </div>
 
+      <div class="form-card">
+        <div class="form-card-title" data-h="reminder_title">Arrival reminders</div>
+        <div class="form-card-desc" data-h="reminder_desc">Every day at 07:00 in the property's timezone, WelcomeBnB emails you a digest of guests arriving tomorrow with their unique booking links, so you can forward them by WhatsApp or email. Leave the email blank to turn reminders off.</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label" data-h="reminder_email">Reminder email</label>
+            <input class="form-input" type="email" id="propReminderEmail" placeholder="you@example.com">
+            <div class="form-hint" data-h="reminder_email_hint">Where the daily digest arrives. Use your own address.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-h="reminder_tz">Property timezone</label>
+            <select class="form-select" id="propTimezone">
+              <option value="Europe/Rome">Europe/Rome</option>
+              <option value="Europe/London">Europe/London</option>
+              <option value="Europe/Paris">Europe/Paris</option>
+              <option value="Europe/Madrid">Europe/Madrid</option>
+              <option value="Europe/Berlin">Europe/Berlin</option>
+              <option value="Europe/Amsterdam">Europe/Amsterdam</option>
+              <option value="Europe/Zurich">Europe/Zurich</option>
+              <option value="Europe/Athens">Europe/Athens</option>
+              <option value="Europe/Lisbon">Europe/Lisbon</option>
+              <option value="Europe/Warsaw">Europe/Warsaw</option>
+              <option value="America/New_York">America/New_York</option>
+              <option value="America/Los_Angeles">America/Los_Angeles</option>
+              <option value="Asia/Dubai">Asia/Dubai</option>
+              <option value="UTC">UTC</option>
+            </select>
+            <div class="form-hint" data-h="reminder_tz_hint">Used to compute "tomorrow" — reminders always fire at 07:00 local.</div>
+          </div>
+        </div>
+      </div>
+
       <div class="panel-actions" style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn btn-primary" onclick="saveProperty()" data-h="btn_save_property">💾 Save Property Details</button>
         <button class="btn btn-secondary" onclick="openPreviewAsGuest()" data-h="btn_preview_guest" title="Open the guest app in test mode (no analytics)">🧪 Preview as guest</button>
@@ -3176,6 +3208,13 @@ const HT = {
     ical_sync_failed: 'Sync failed',
     ical_sync_ok: 'Synced {n} reservation(s) across {feeds} feed(s). Cancelled: {c}.',
     ical_save_first: 'Save the property first, then click Sync now.',
+    // Round 32 — arrival reminders (single-line values; applyLang collapses newlines)
+    reminder_title: 'Arrival reminders',
+    reminder_desc: 'Every day at 07:00 in the property\'s timezone, WelcomeBnB emails you a digest of guests arriving tomorrow with their unique booking links, so you can forward them by WhatsApp or email. Leave the email blank to turn reminders off.',
+    reminder_email: 'Reminder email',
+    reminder_email_hint: 'Where the daily digest arrives. Use your own address.',
+    reminder_tz: 'Property timezone',
+    reminder_tz_hint: 'Used to compute "tomorrow" — reminders always fire at 07:00 local.',
     // Round 26 — Dashboard: Upcoming reservations panel
     dash_upcoming_title: 'Upcoming reservations',
     dash_upcoming_empty: 'No upcoming reservations in the next 60 days. Add an iCal feed in Property settings.',
@@ -3529,6 +3568,13 @@ const HT = {
     ical_sync_failed: 'Sincronizzazione fallita',
     ical_sync_ok: 'Sincronizzate {n} prenotazioni su {feeds} feed. Annullate: {c}.',
     ical_save_first: 'Salva prima la proprietà, poi clicca Sincronizza ora.',
+    // Round 32 — promemoria arrivi
+    reminder_title: 'Promemoria arrivi',
+    reminder_desc: 'Ogni giorno alle 07:00 nel fuso orario della proprietà, WelcomeBnB ti invia via email un riepilogo degli ospiti in arrivo domani con i loro link di prenotazione unici, così puoi inoltrarli per WhatsApp o email. Lascia vuota l\'email per disattivare i promemoria.',
+    reminder_email: 'Email promemoria',
+    reminder_email_hint: 'Dove arriva il riepilogo giornaliero. Usa il tuo indirizzo.',
+    reminder_tz: 'Fuso orario proprietà',
+    reminder_tz_hint: 'Usato per calcolare "domani" — i promemoria partono sempre alle 07:00 locali.',
     // Round 26 — Dashboard: prenotazioni in arrivo
     dash_upcoming_title: 'Prenotazioni in arrivo',
     dash_upcoming_empty: 'Nessuna prenotazione nei prossimi 60 giorni. Aggiungi un feed iCal nelle impostazioni della proprietà.',
@@ -4215,6 +4261,8 @@ async function saveProperty() {
     host_phone: document.getElementById('propPhone').value,
     host_names: document.getElementById('propHostNames').value,
     ical_feeds: collectIcalFeeds(),
+    reminder_email: (document.getElementById('propReminderEmail')?.value || '').trim() || null,
+    timezone: document.getElementById('propTimezone')?.value || 'Europe/Rome',
   };
   const { error } = await sb.from('properties').update(update).eq('id', propertyId);
   if (error) { console.error('Save error:', error); toast('Error: ' + error.message); return; }
@@ -7562,6 +7610,8 @@ function fillPropertyForm(data) {
   if (el('propPhone')) el('propPhone').value = data.host_phone || '';
   if (el('propHostNames')) el('propHostNames').value = data.host_names || '';
   if (typeof renderIcalFeeds === 'function') renderIcalFeeds();
+  if (el('propReminderEmail')) el('propReminderEmail').value = data.reminder_email || '';
+  if (el('propTimezone')) el('propTimezone').value = data.timezone || 'Europe/Rome';
   if (data.hero_image_url) {
     const preview = el('coverPhotoPreview');
     if (preview) {

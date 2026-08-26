@@ -81,7 +81,15 @@ export default async function handler(req, res) {
   for (const p of props) {
     const tz = p.timezone || 'Europe/Rome';
     const local = localParts(nowUTC, tz);
-    if (!force && local.hour !== REMINDER_LOCAL_HOUR) {
+    // Vercel Hobby crons are once-per-day (see vercel.json — 05:00 UTC).
+    // 05:00 UTC lands at 06:00-07:00 Europe local depending on DST, and
+    // similar mornings across most European TZs. We accept a 5-10 local
+    // window so a property in any of those zones still fires on both
+    // sides of a DST change. Anything outside the window is skipped —
+    // avoids sending "arriving tomorrow" at 22:00 local for far-off
+    // timezones. arrival_reminder_sent_at guarantees no double-send if
+    // the cron ever fires more than once per day.
+    if (!force && (local.hour < 5 || local.hour > 10)) {
       perProperty.push({ property_id: p.id, skipped: `local_hour=${local.hour}` });
       continue;
     }

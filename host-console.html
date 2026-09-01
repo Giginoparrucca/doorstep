@@ -3935,7 +3935,13 @@ async function renderUpcomingReservationsPanel() {
       .eq('entry_type', 'reservation')
       .eq('status', 'active')
       .is('deleted_at', null)
-      .gte('checkout_date', todayISO)
+      // Round 32.2 — strictly future arrivals only. The earlier filter
+      // (`checkout_date >= today`) also matched anyone still staying or
+      // arriving today, which duplicated them into Upcoming alongside
+      // Currently Staying. Today's arrivals surface in Currently Staying
+      // once the guest checks in; before that they show up here — the
+      // day-before reminder cron handles the "arriving tomorrow" heads-up.
+      .gt('checkin_date', todayISO)
       .lte('checkin_date', in60ISO)
       .order('checkin_date', { ascending: true });
     if (error) { console.warn('Upcoming reservations load failed:', error.message); return ''; }

@@ -2,6 +2,10 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     {
+      "path": "/api/ical-sync",
+      "schedule": "0 4 * * *"
+    },
+    {
       "path": "/api/send-arrival-reminders",
       "schedule": "0 5 * * *"
     }

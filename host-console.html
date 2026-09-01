@@ -1351,7 +1351,11 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         ℹ️ These rules appear in the guest app's "Rules" tab. Pick from common rules below, or add your own custom rules.
       </div>
 
-      <div style="margin-bottom:16px;">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+        <button id="rulesEditToggle" class="btn btn-secondary" onclick="toggleRulesEditMode()">✏️ <span data-h="btn_edit_list">Edit</span></button>
+      </div>
+
+      <div data-rules-edit-only style="margin-bottom:16px;display:none;">
         <div style="font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;" data-h="rules_preset_label">Quick-add common rules</div>
         <div id="presetRulesGrid" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
       </div>
@@ -1359,7 +1363,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       <div style="font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;" data-h="rules_your_rules">Your rules</div>
       <div class="edit-list" id="rulesList"></div>
 
-      <div class="panel-actions" style="margin-top:16px; display:flex; gap:10px;">
+      <div class="panel-actions" data-rules-edit-only style="margin-top:16px;display:none;gap:10px;flex-wrap:wrap;">
         <button class="btn btn-secondary" onclick="addRule()" data-h="btn_add_rule">+ Add Custom Rule</button>
         <button class="btn btn-primary" onclick="saveRules()" data-h="btn_save_rules">💾 Save Rules</button>
       </div>
@@ -1379,9 +1383,13 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <button class="panel-tab" onclick="setRecoCat('experiences',this)" data-h="tab_experiences">✨ Experiences</button>
       </div>
 
+      <div style="display:flex;justify-content:flex-end;margin:12px 0;">
+        <button id="recosEditToggle" class="btn btn-secondary" onclick="toggleRecosEditMode()">✏️ <span data-h="btn_edit_list">Edit</span></button>
+      </div>
+
       <div class="edit-list" id="recoList"></div>
 
-      <div class="panel-actions" style="margin-top:16px; display:flex; gap:10px;">
+      <div class="panel-actions" data-recos-edit-only style="margin-top:16px;display:none;gap:10px;flex-wrap:wrap;">
         <button class="btn btn-secondary" onclick="addReco()" data-h="btn_add_reco">+ Add Recommendation</button>
         <button class="btn btn-primary" onclick="saveRecos()" data-h="btn_save_recos">💾 Save</button>
       </div>
@@ -3036,6 +3044,7 @@ const HT = {
     doc_complete: '✓ Complete', doc_partial: '⏳ Partial', doc_missing: '✗ Missing',
     alloggiati_filed: '✓ Filed', alloggiati_pending: 'Pending',
     btn_view: 'View', btn_delete_single: 'Delete', btn_edit_single: 'Edit',
+    btn_edit_list: 'Edit', btn_done_editing: 'Done',
     // Round 30 — edit check-in modal (single-line values; applyLang collapses newlines)
     edit_title: 'Edit check-in',
     edit_intro: 'Corrections update this check-in in place. Alloggiati / PayTourist exports re-read the row on next generation.',
@@ -3404,6 +3413,7 @@ const HT = {
     doc_complete: '✓ Completo', doc_partial: '⏳ Parziale', doc_missing: '✗ Mancante',
     alloggiati_filed: '✓ Inviato', alloggiati_pending: 'In attesa',
     btn_view: 'Vedi', btn_delete_single: 'Elimina', btn_edit_single: 'Modifica',
+    btn_edit_list: 'Modifica', btn_done_editing: 'Fatto',
     // Round 30 — modifica check-in
     edit_title: 'Modifica check-in',
     edit_intro: 'Le correzioni aggiornano questo check-in. Le esportazioni Alloggiati / PayTourist rileggeranno la riga alla prossima generazione.',
@@ -4689,10 +4699,85 @@ function confirmDeleteReco(globalIdx) {
   renderRecos();
 }
 
+// Round 32.4 — Rules & Recommendations default to a read-only list; the
+// host clicks Edit to reveal the form + preset chips + Add/Save. Save
+// flips back to view mode automatically.
+let rulesEditMode = false;
+let recosEditMode = false;
+const _rulesSafe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+
+function _setRulesEditControls(visible) {
+  document.querySelectorAll('#panel-rules [data-rules-edit-only]').forEach(el => {
+    el.style.display = visible ? (el.classList.contains('panel-actions') ? 'flex' : 'block') : 'none';
+  });
+  const btn = document.getElementById('rulesEditToggle');
+  if (btn) {
+    const label = visible ? h('btn_done_editing') : h('btn_edit_list');
+    btn.innerHTML = (visible ? '✓ ' : '✏️ ') + `<span data-h="${visible ? 'btn_done_editing' : 'btn_edit_list'}">${_rulesSafe(label)}</span>`;
+    btn.classList.toggle('btn-primary', visible);
+    btn.classList.toggle('btn-secondary', !visible);
+  }
+}
+function toggleRulesEditMode() {
+  rulesEditMode = !rulesEditMode;
+  _setRulesEditControls(rulesEditMode);
+  renderRules();
+}
+
+function _setRecosEditControls(visible) {
+  document.querySelectorAll('#panel-recos [data-recos-edit-only]').forEach(el => {
+    el.style.display = visible ? (el.classList.contains('panel-actions') ? 'flex' : 'block') : 'none';
+  });
+  const btn = document.getElementById('recosEditToggle');
+  if (btn) {
+    const label = visible ? h('btn_done_editing') : h('btn_edit_list');
+    btn.innerHTML = (visible ? '✓ ' : '✏️ ') + `<span data-h="${visible ? 'btn_done_editing' : 'btn_edit_list'}">${_rulesSafe(label)}</span>`;
+    btn.classList.toggle('btn-primary', visible);
+    btn.classList.toggle('btn-secondary', !visible);
+  }
+}
+function toggleRecosEditMode() {
+  recosEditMode = !recosEditMode;
+  _setRecosEditControls(recosEditMode);
+  renderRecos();
+}
+
 function renderRules() {
-  document.getElementById('rulesList').innerHTML = rulesData.length === 0
-    ? `<div style="text-align:center;padding:20px;color:var(--ink-soft)">${h('rules_no_rules')}</div>`
-    : rulesData.map((r, i) => `
+  const listEl = document.getElementById('rulesList');
+  if (!listEl) return;
+  // Sync toggle visibility on every render (covers language switches and
+  // property switches).
+  _setRulesEditControls(rulesEditMode);
+
+  if (rulesData.length === 0) {
+    listEl.innerHTML = `<div style="text-align:center;padding:20px;color:var(--ink-soft)">${_rulesSafe(h('rules_no_rules'))}</div>`;
+    if (rulesEditMode) renderPresetRules();
+    return;
+  }
+
+  if (!rulesEditMode) {
+    // Read-only list — icon, current-language title, description, important pill.
+    const it = hostLang === 'it';
+    listEl.innerHTML = rulesData.map(r => {
+      const title = it ? (r.title_it || r.title_en || r.title || '') : (r.title_en || r.title_it || r.title || '');
+      const desc  = it ? (r.desc_it  || r.desc_en  || r.desc  || '') : (r.desc_en  || r.desc_it  || r.desc  || '');
+      const important = r.is_important
+        ? `<span style="background:rgba(224,90,90,0.10);color:#b03939;padding:2px 8px;border-radius:4px;font-size:0.6rem;letter-spacing:0.06em;text-transform:uppercase;font-weight:600;margin-left:8px;vertical-align:middle;">${_rulesSafe(h('rules_important') || 'Important')}</span>`
+        : '';
+      return `
+        <div style="padding:12px 14px;background:var(--white);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start;">
+          <div style="font-size:1.35rem;line-height:1;flex-shrink:0;margin-top:1px;">${_rulesSafe(r.icon || '📌')}</div>
+          <div style="flex:1;">
+            <div style="font-weight:600;font-size:0.92rem;color:var(--ink);">${_rulesSafe(title) || '<em style="color:var(--ink-soft);font-weight:400;">(empty)</em>'}${important}</div>
+            ${desc ? `<div style="font-size:0.82rem;color:var(--ink-soft);margin-top:4px;line-height:1.4;">${_rulesSafe(desc)}</div>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+    return;
+  }
+
+  // Edit mode — the original form.
+  listEl.innerHTML = rulesData.map((r, i) => `
     <div class="edit-item drag-row" data-drag-index="${i}" draggable="true" style="padding:12px;">
       <div class="edit-item-drag" title="Drag to reorder">⠿</div>
       <div class="edit-item-body" style="flex:1;">
@@ -4756,6 +4841,9 @@ async function saveRules() {
   }
   toast(h('toast_rules_saved'));
   track('save_rules', { count: rulesData.length });
+  // Round 32.4 — flip back to view mode after a successful save.
+  rulesEditMode = false;
+  renderRules();
 }
 
 /* ══════════════════════════════════════
@@ -4937,7 +5025,43 @@ function renderRecos() {
   };
   const tags = PRESET_TAGS[activeRecoCat] || PRESET_TAGS.food;
 
-  document.getElementById('recoList').innerHTML = filtered.length === 0
+  // Round 32.4 — sync the edit-mode controls (toggle button + Add/Save) on every render.
+  _setRecosEditControls(recosEditMode);
+
+  const listEl = document.getElementById('recoList');
+
+  if (!recosEditMode) {
+    // Read-only view — name, tags (as chips), description (current lang),
+    // and an address chip that opens Google Maps.
+    if (filtered.length === 0) {
+      listEl.innerHTML = `<div style="text-align:center;padding:30px;color:var(--ink-soft);font-size:0.78rem;">${_rulesSafe(h('reco_empty'))}</div>`;
+      return;
+    }
+    const it = hostLang === 'it';
+    listEl.innerHTML = filtered.map(r => {
+      const desc = it ? (r.desc_it || r.desc_en || r.desc || '') : (r.desc_en || r.desc_it || r.desc || '');
+      const activeTags = (r.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+      const tagsHtml = activeTags.length ? `
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">
+          ${activeTags.map(t => `<span style="padding:2px 8px;border-radius:4px;background:var(--cream-2);color:var(--ink-2);font-size:0.7rem;">${_rulesSafe(t)}</span>`).join('')}
+        </div>` : '';
+      const addr = r.address ? `
+        <div style="margin-top:6px;">
+          <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.address)}" target="_blank" rel="noopener"
+             style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;background:rgba(0,91,255,0.06);color:var(--warm);font-size:0.7rem;text-decoration:none;">📍 ${_rulesSafe(r.address)}</a>
+        </div>` : '';
+      return `
+        <div style="padding:12px 14px;background:var(--white);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;">
+          <div style="font-weight:600;font-size:0.95rem;color:var(--ink);">${_rulesSafe(r.name) || '<em style="color:var(--ink-soft);font-weight:400;">(empty)</em>'}</div>
+          ${desc ? `<div style="font-size:0.82rem;color:var(--ink-soft);margin-top:4px;line-height:1.4;">${_rulesSafe(desc)}</div>` : ''}
+          ${tagsHtml}
+          ${addr}
+        </div>`;
+    }).join('');
+    return;
+  }
+
+  listEl.innerHTML = filtered.length === 0
     ? `<div style="text-align:center;padding:30px;color:var(--ink-soft);font-size:0.78rem;">${h('reco_empty')}</div>`
     : filtered.map((r, i) => {
       const globalIdx = recoData.indexOf(r);
@@ -5023,6 +5147,9 @@ async function saveRecos() {
   }
   toast(h('toast_recos_saved'));
   track('save_recos', { count: recoData.length, categories: [...new Set(recoData.map(r => r.category))] });
+  // Round 32.4 — flip back to view mode after a successful save.
+  recosEditMode = false;
+  renderRecos();
 }
 
 /* ══════════════════════════════════════════════════════════════════════

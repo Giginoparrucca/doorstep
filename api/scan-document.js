@@ -124,17 +124,20 @@ Rules:
     const data = await response.json();
     if (data.error) return res.status(500).json({ error: data.error.message });
 
-    // Record api_usage. Anthropic returns usage in the response body.
+    // Record api_usage. AWAIT it: Vercel serverless would otherwise
+    // cancel the pending PostgREST POST when the handler returns.
     const u = data.usage || {};
-    recordUsage({
-      property_id: propertyId,
-      session_id: sessionId,
-      endpoint: 'scan',
-      input_tokens: (u.input_tokens || 0)
-        + (u.cache_creation_input_tokens || 0)
-        + (u.cache_read_input_tokens || 0),
-      output_tokens: u.output_tokens || 0,
-    }).catch(e => console.warn('[scan] usage insert failed:', e));
+    try {
+      await recordUsage({
+        property_id: propertyId,
+        session_id: sessionId,
+        endpoint: 'scan',
+        input_tokens: (u.input_tokens || 0)
+          + (u.cache_creation_input_tokens || 0)
+          + (u.cache_read_input_tokens || 0),
+        output_tokens: u.output_tokens || 0,
+      });
+    } catch (e) { console.warn('[scan] usage insert failed:', e); }
 
     const text = data.content?.find(c => c.type === 'text')?.text || '';
     const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();

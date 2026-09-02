@@ -329,14 +329,19 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}`;
 
       res.write(`data: ${JSON.stringify({ type: 'done', escalated, followups })}\n\n`);
       res.end();
-      // Fire-and-forget the usage row after the stream closes.
-      recordUsage({
-        property_id: propertyId,
-        session_id: sessionId,
-        endpoint: 'chat',
-        input_tokens: inputTokens,
-        output_tokens: outputTokens,
-      }).catch(e => console.warn('[chat] usage insert failed:', e));
+      // AWAIT the usage insert — Vercel serverless ends the invocation at
+      // handler return, so a fire-and-forget promise gets cancelled. The
+      // client already has its reply; the await only delays the invocation
+      // exit, not the response.
+      try {
+        await recordUsage({
+          property_id: propertyId,
+          session_id: sessionId,
+          endpoint: 'chat',
+          input_tokens: inputTokens,
+          output_tokens: outputTokens,
+        });
+      } catch (e) { console.warn('[chat] usage insert failed:', e); }
       return;
     }
 
@@ -359,17 +364,20 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}`;
       notifyTelegram(messages).catch(() => {});
     }
 
-    // Record real usage — Anthropic returns { usage: { input_tokens, output_tokens, ...} }
+    // Record real usage. Await it: Vercel serverless would otherwise
+    // cancel the pending PostgREST POST when the handler returns.
     const u = data.usage || {};
-    recordUsage({
-      property_id: propertyId,
-      session_id: sessionId,
-      endpoint: 'chat',
-      input_tokens: (u.input_tokens || 0)
-        + (u.cache_creation_input_tokens || 0)
-        + (u.cache_read_input_tokens || 0),
-      output_tokens: u.output_tokens || 0,
-    }).catch(e => console.warn('[chat] usage insert failed:', e));
+    try {
+      await recordUsage({
+        property_id: propertyId,
+        session_id: sessionId,
+        endpoint: 'chat',
+        input_tokens: (u.input_tokens || 0)
+          + (u.cache_creation_input_tokens || 0)
+          + (u.cache_read_input_tokens || 0),
+        output_tokens: u.output_tokens || 0,
+      });
+    } catch (e) { console.warn('[chat] usage insert failed:', e); }
 
     return res.status(200).json({
       reply: cleanReply || (isIT ? 'Scusa, riprova.' : 'Sorry, please try again.'),

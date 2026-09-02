@@ -1,29 +1,60 @@
 // api/chat.js — WelcomeBnB chat endpoint
-// Round 16 upgrade: Sonnet 4.5, streaming, vision (photo input), contextual
-// followups, richer system prompt, stay-context awareness.
 //
-// Backward-compatible with the old request shape:
-//   { messages, propertyContext, lang }
-// New optional fields:
-//   { stayContext, imageData, stream }
-//   - stayContext: { dayOfStay, totalNights, arrivalDate, departureDate,
-//                    groupSize, guestCountry, guestName }
-//   - imageData:   { mediaType: 'image/jpeg' | 'image/png' | 'image/webp',
-//                    data: '<base64>' }    (image accompanies the last user msg)
-//   - stream:      true → response is text/event-stream with SSE chunks
+// Round 16: Sonnet 4.5 + streaming + vision + contextual followups.
+// Round 33: origin allowlist, guest-token auth, size caps, session/property
+// rate limits, per-property monthly budget cap, api_usage recording,
+// graceful degrade to escalated=true when limited or over budget.
 //
-// Returns (non-streaming): { reply, escalated, followups: [string, string, string] }
-// Returns (streaming):     text/event-stream with chunks of:
+// Request shape (unchanged in terms of `content` fields):
+//   { messages, propertyContext, lang, stayContext?, imageData?, stream? }
+// Identity now comes from the guest token in Authorization: Bearer <token>,
+// NEVER from the body. Body-carried property_id / session_id, if any, are
+// ignored — the token payload is authoritative.
+//
+// Returns (non-streaming): { reply, escalated, followups }
+// Returns (streaming):     text/event-stream with chunks of
 //   data: {"type":"text","text":"..."}
 //   data: {"type":"done","escalated":bool,"followups":[...]}
 
+import { verifyFromAuthHeader } from './_guest-token.js';
+
+const SUPABASE_URL =
+  process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// Round 33 hard limits — hit before Anthropic is called.
+const MAX_MESSAGES     = 40;
+const MAX_BODY_BYTES   = 256 * 1024;
+const CHAT_SESSION_HOURLY_LIMIT   = 30;
+const CHAT_PROPERTY_DAILY_LIMIT   = 300;
+
 export default async function handler(req, res) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // ── Origin / CORS ────────────────────────────────────────────────
+  const origin = req.headers['origin'] || req.headers['Origin'] || '';
+  const allowed = resolveOrigin(origin);
+  if (allowed) res.setHeader('Access-Control-Allow-Origin', allowed);
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.status(allowed ? 200 : 403).end();
+  if (!allowed) return res.status(403).json({ error: 'Origin not allowed' });
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
+
+  // ── Token auth ───────────────────────────────────────────────────
+  const auth = req.headers['authorization'] || req.headers['Authorization'];
+  const v = verifyFromAuthHeader(auth);
+  if (!v.ok) return res.status(401).json({ error: 'Invalid or missing guest token' });
+  const propertyId = v.payload.p;
+  const sessionId  = v.payload.s;
+
+  // ── Size caps ────────────────────────────────────────────────────
+  let bodyBytes = 0;
+  try {
+    bodyBytes = Buffer.byteLength(JSON.stringify(req.body || {}), 'utf8');
+  } catch (_) { bodyBytes = 0; }
+  if (bodyBytes > MAX_BODY_BYTES) {
+    return res.status(413).json({ error: 'Request body too large', max_bytes: MAX_BODY_BYTES });
+  }
 
   const {
     messages,
@@ -37,9 +68,28 @@ export default async function handler(req, res) {
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).json({ error: 'messages required' });
   }
+  if (messages.length > MAX_MESSAGES) {
+    return res.status(413).json({ error: 'Too many messages', max_messages: MAX_MESSAGES });
+  }
 
   const langLabel = lang === 'it' ? 'Italian' : 'English';
   const isIT = lang === 'it';
+
+  // ── Rate limit + monthly budget ──────────────────────────────────
+  // Both are checked BEFORE any call to Anthropic. If either trips,
+  // return the graceful "concierge unavailable" reply with escalated=true,
+  // so the guest UI routes the conversation to host chat instead of
+  // rendering a broken bubble.
+  if (SERVICE_KEY) {
+    const gate = await checkChatLimits(propertyId, sessionId);
+    if (!gate.ok) {
+      console.warn('[chat] gated:', gate.reason, 'property:', propertyId, 'session:', sessionId);
+      return degradeReply(res, useStream, isIT, gate.retry_after_seconds);
+    }
+  }
+  // (If SERVICE_KEY is missing the gate is skipped rather than hard-failing —
+  //  chat still works but is unmetered. Set SUPABASE_SERVICE_ROLE_KEY in
+  //  Vercel to close this hole; a warning log is already emitted at boot.)
 
   // ── Build the stay context section ────────────────────────────────
   let stayCtx = '';
@@ -58,10 +108,6 @@ export default async function handler(req, res) {
   }
 
   // ── Fetch today's weather for the property location ──────────────
-  // Uses open-meteo.com — free, no API key, no rate limits at our scale.
-  // We pass coords from the property (if available), otherwise skip.
-  // Cached server-side via the global `globalThis.__wbnb_weather_cache`
-  // for 30 minutes per coord, so we don't hammer the API on every chat.
   let weatherCtx = '';
   try {
     const coords = extractCoordsFromContext(propertyContext);
@@ -72,10 +118,6 @@ export default async function handler(req, res) {
   } catch (e) { /* weather is decorative — never block the chat */ }
 
   // ── System prompt — TWO BLOCKS for prompt caching ─────────────────
-  // Block 1 is stable across all guests and changes rarely → cached.
-  // Block 2 contains the per-guest variables → not cached.
-  // Sonnet 4.5's cache minimum is ~1024 tokens; block 1 is comfortably above.
-
   const stableSystemBlock = `You are the AI concierge for a vacation rental in Italy. Your name is Sofia. You're warm, observant, and you actually know the place — not the kind of bland AI that reads off a brochure. You give concrete recommendations the way a well-traveled local friend would: opinionated, specific, brief.
 
 CORE TONE
@@ -155,9 +197,6 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}`;
     }
   }
 
-  // Multi-block system with cache_control on the stable block. Anthropic
-  // will cache it (cost = 10% of normal input after first hit) and serve
-  // it from cache across all guests/properties for 5 minutes per cache key.
   const requestBody = {
     model: 'claude-sonnet-4-5',
     max_tokens: 1024,
@@ -191,30 +230,25 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}`;
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache, no-transform');
       res.setHeader('Connection', 'keep-alive');
-      res.setHeader('X-Accel-Buffering', 'no'); // disable nginx buffering
+      res.setHeader('X-Accel-Buffering', 'no');
 
       const reader = upstream.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
       let fullText = '';
-      let inReply = false;     // whether we're currently inside <reply>
-      let replyBuffer = '';    // accumulating chars inside <reply> for tag detection
+      let inReply = false;
+      let replyBuffer = '';
+      let inputTokens  = 0;
+      let outputTokens = 0;
       const TAG_OPEN = '<reply>';
       const TAG_CLOSE = '</reply>';
 
-      // Process SSE chunks from Anthropic and forward only the text deltas
-      // that belong INSIDE the <reply> tag. Tags themselves are not streamed
-      // to the client.
       const flushText = (delta) => {
-        // Append delta to fullText so we can parse out tags + followups at end
         fullText += delta;
-
-        // Walk through delta char by char, deciding whether to emit
         let toEmit = '';
         let i = 0;
         while (i < delta.length) {
           if (!inReply) {
-            // Look for opening tag; buffer characters that could be part of it
             replyBuffer += delta[i];
             if (replyBuffer.length > TAG_OPEN.length) {
               replyBuffer = replyBuffer.slice(-TAG_OPEN.length);
@@ -225,18 +259,14 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}`;
             }
             i++;
           } else {
-            // Inside reply; look for closing tag
             replyBuffer += delta[i];
-            // If replyBuffer can no longer become </reply>, emit its safe prefix
             const stillCould = TAG_CLOSE.startsWith(replyBuffer);
             if (replyBuffer === TAG_CLOSE) {
               inReply = false;
               replyBuffer = '';
               i++;
-              // Anything after </reply> belongs to <followups>; we don't stream it
               break;
             } else if (!stillCould) {
-              // Flush the first char of replyBuffer; keep checking from the rest
               toEmit += replyBuffer[0];
               replyBuffer = replyBuffer.slice(1);
             }
@@ -253,8 +283,6 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}`;
           const { done, value } = await reader.read();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
-
-          // Anthropic SSE: each event is `event: <type>\ndata: <json>\n\n`
           const events = buffer.split('\n\n');
           buffer = events.pop() || '';
           for (const ev of events) {
@@ -262,6 +290,21 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}`;
             if (!dataLine) continue;
             try {
               const payload = JSON.parse(dataLine.slice(6));
+              // Capture token counts from message_start (input) and
+              // message_delta (output). Cache-hit tokens are still charged
+              // at a discount but the "did we exceed the budget" logic just
+              // sums input + output, which is the right shape for cost.
+              if (payload.type === 'message_start' && payload.message?.usage) {
+                inputTokens  = payload.message.usage.input_tokens  || 0;
+                // cache tokens are counted separately in the message_start
+                // usage object; add them so the recorded input reflects
+                // actual billable input.
+                inputTokens += payload.message.usage.cache_creation_input_tokens || 0;
+                inputTokens += payload.message.usage.cache_read_input_tokens || 0;
+              }
+              if (payload.type === 'message_delta' && payload.usage) {
+                outputTokens = payload.usage.output_tokens || outputTokens;
+              }
               if (payload.type === 'content_block_delta' && payload.delta?.type === 'text_delta') {
                 flushText(payload.delta.text || '');
               }
@@ -272,7 +315,6 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}`;
         console.error('Stream read error:', e);
       }
 
-      // Parse full text for escalation marker and followups
       const replyMatch = fullText.match(/<reply>([\s\S]*?)<\/reply>/);
       const replyText = replyMatch ? replyMatch[1].trim() : fullText.trim();
       const escalated = replyText.startsWith('[ESCALATE]');
@@ -281,13 +323,20 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}`;
         ? followupsMatch[1].split('\n').map(s => s.trim()).filter(s => s.length > 0 && s.length < 60).slice(0, 3)
         : [];
 
-      // Notify Telegram on escalation
       if (escalated && process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
         notifyTelegram(messages).catch(() => {});
       }
 
       res.write(`data: ${JSON.stringify({ type: 'done', escalated, followups })}\n\n`);
       res.end();
+      // Fire-and-forget the usage row after the stream closes.
+      recordUsage({
+        property_id: propertyId,
+        session_id: sessionId,
+        endpoint: 'chat',
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+      }).catch(e => console.warn('[chat] usage insert failed:', e));
       return;
     }
 
@@ -310,6 +359,18 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}`;
       notifyTelegram(messages).catch(() => {});
     }
 
+    // Record real usage — Anthropic returns { usage: { input_tokens, output_tokens, ...} }
+    const u = data.usage || {};
+    recordUsage({
+      property_id: propertyId,
+      session_id: sessionId,
+      endpoint: 'chat',
+      input_tokens: (u.input_tokens || 0)
+        + (u.cache_creation_input_tokens || 0)
+        + (u.cache_read_input_tokens || 0),
+      output_tokens: u.output_tokens || 0,
+    }).catch(e => console.warn('[chat] usage insert failed:', e));
+
     return res.status(200).json({
       reply: cleanReply || (isIT ? 'Scusa, riprova.' : 'Sorry, please try again.'),
       escalated,
@@ -326,6 +387,157 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}`;
     }
     return res.status(500).json({ error: 'AI service unavailable. Please try again.' });
   }
+}
+
+// ── Round 33 helpers ──────────────────────────────────────────────────
+
+// Allow the guest app and preview URLs. Rejects everything else.
+function resolveOrigin(origin) {
+  if (!origin) return null;
+  if (origin === 'https://welcomebnb.vercel.app') return origin;
+  if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return origin;
+  if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return origin;
+  if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)) return origin;
+  return null;
+}
+
+// Check session hourly + property daily limits + monthly budget. Returns
+// { ok: true } or { ok: false, reason, retry_after_seconds }.
+async function checkChatLimits(propertyId, sessionId) {
+  const now = new Date();
+  const hourAgoISO  = new Date(now.getTime() - 3600 * 1000).toISOString();
+  const dayAgoISO   = new Date(now.getTime() - 86400 * 1000).toISOString();
+  const monthStart  = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+  // A single wide fetch is cheaper than three narrow counts here.
+  // We pull the last-day's rows for this property, plus rows for this
+  // session in the last hour, plus enough token detail for the month.
+  try {
+    // 1. Property daily count (last 24h)
+    const dailyRes = await pgrestGET(
+      `api_usage?property_id=eq.${encodeURIComponent(propertyId)}` +
+      `&endpoint=eq.chat&created_at=gte.${encodeURIComponent(dayAgoISO)}` +
+      `&select=id`,
+      { headers: { Prefer: 'count=exact' } },
+    );
+    const dailyCount = readCount(dailyRes.headers.get('content-range'), dailyRes.data);
+    if (dailyCount >= CHAT_PROPERTY_DAILY_LIMIT) {
+      return { ok: false, reason: 'property_daily', retry_after_seconds: 3600 };
+    }
+
+    // 2. Session hourly count
+    if (sessionId) {
+      const hourlyRes = await pgrestGET(
+        `api_usage?session_id=eq.${encodeURIComponent(sessionId)}` +
+        `&endpoint=eq.chat&created_at=gte.${encodeURIComponent(hourAgoISO)}` +
+        `&select=id`,
+        { headers: { Prefer: 'count=exact' } },
+      );
+      const hourlyCount = readCount(hourlyRes.headers.get('content-range'), hourlyRes.data);
+      if (hourlyCount >= CHAT_SESSION_HOURLY_LIMIT) {
+        return { ok: false, reason: 'session_hourly', retry_after_seconds: 900 };
+      }
+    }
+
+    // 3. Monthly token budget
+    const capRes = await pgrestGET(
+      `properties?id=eq.${encodeURIComponent(propertyId)}` +
+      `&select=ai_monthly_token_cap`,
+    );
+    const cap = Number(capRes.data?.[0]?.ai_monthly_token_cap ?? 2_000_000);
+    const monthRes = await pgrestGET(
+      `api_usage?property_id=eq.${encodeURIComponent(propertyId)}` +
+      `&created_at=gte.${encodeURIComponent(monthStart)}` +
+      `&select=input_tokens,output_tokens`,
+    );
+    const spent = (monthRes.data || []).reduce(
+      (sum, r) => sum + (r.input_tokens || 0) + (r.output_tokens || 0), 0,
+    );
+    if (spent >= cap) {
+      return { ok: false, reason: 'monthly_budget', retry_after_seconds: 86400 };
+    }
+
+    return { ok: true };
+  } catch (e) {
+    // Fail OPEN on gate errors so a Supabase blip doesn't lock guests out.
+    // Round 33's `escalated:true` degrade only fires on positive gate matches.
+    console.warn('[chat] limit check failed, allowing request through:', e);
+    return { ok: true };
+  }
+}
+
+function readCount(rangeHeader, dataFallback) {
+  // Prefer: count=exact returns Content-Range: "0-49/1234" (or "*/1234")
+  if (rangeHeader) {
+    const m = rangeHeader.match(/\/(\d+)$/);
+    if (m) return Number(m[1]);
+  }
+  return Array.isArray(dataFallback) ? dataFallback.length : 0;
+}
+
+// Small PostgREST helper with service_role. Returns { data, headers }.
+async function pgrestGET(path, opts = {}) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: {
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      Accept: 'application/json',
+      ...(opts.headers || {}),
+    },
+  });
+  if (!r.ok) {
+    const t = await r.text().catch(() => '');
+    throw new Error(`pgrestGET ${path} → ${r.status} ${t}`);
+  }
+  const data = await r.json();
+  return { data, headers: r.headers };
+}
+
+// Insert one api_usage row. Called fire-and-forget after every successful
+// Anthropic call. Deliberately best-effort — a failed insert must not
+// break the guest UX.
+async function recordUsage(row) {
+  if (!SERVICE_KEY) return;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/api_usage`, {
+      method: 'POST',
+      headers: {
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify(row),
+    });
+    if (!r.ok) {
+      console.warn('[chat] api_usage insert failed:', r.status, await r.text().catch(() => ''));
+    }
+  } catch (e) {
+    console.warn('[chat] api_usage insert exception:', e);
+  }
+}
+
+// Send a graceful "concierge unavailable, connecting you with the host"
+// reply with escalated=true. Used for rate-limit / over-budget hits so the
+// guest UI routes to host chat instead of rendering a broken bubble.
+// Never calls Anthropic. Records NO api_usage row (this fires when we
+// deliberately skipped the AI call).
+function degradeReply(res, useStream, isIT, retryAfter) {
+  const reply = isIT
+    ? "Il concierge AI è temporaneamente non disponibile. Ti sto mettendo in contatto con l'host — risponderà qui in chat appena può."
+    : "The AI concierge is briefly unavailable. I'm connecting you with the host — they'll reply here in chat shortly.";
+  if (retryAfter) res.setHeader('Retry-After', String(retryAfter));
+  if (useStream) {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.write(`data: ${JSON.stringify({ type: 'text', text: reply })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'done', escalated: true, followups: [] })}\n\n`);
+    res.end();
+    return;
+  }
+  return res.status(200).json({ reply, escalated: true, followups: [] });
 }
 
 async function notifyTelegram(messages) {
@@ -347,22 +559,15 @@ async function notifyTelegram(messages) {
 }
 
 // ─── Weather support (Round 17) ────────────────────────────────────
-// Extract lat/lng from the property context. The host console builds
-// the context with a "Google Maps: <url>" line; we parse coords out of
-// that URL if present. Falls back to scanning for a "@lat,lng" pattern.
 function extractCoordsFromContext(ctx) {
   if (!ctx || typeof ctx !== 'string') return null;
-  // Pattern 1: Google Maps URL with @lat,lng (the most common form)
   const m1 = ctx.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
   if (m1) return { lat: parseFloat(m1[1]), lng: parseFloat(m1[2]) };
-  // Pattern 2: explicit "lat,lng" decimal pair
   const m2 = ctx.match(/(-?\d{1,2}\.\d{4,}),\s*(-?\d{1,3}\.\d{4,})/);
   if (m2) return { lat: parseFloat(m2[1]), lng: parseFloat(m2[2]) };
   return null;
 }
 
-// Server-side weather cache keyed by rounded coords. Survives between
-// requests on the same warm Vercel instance. 30-minute TTL.
 function getCachedWeather(lat, lng, isIT) {
   const key = `${lat.toFixed(2)},${lng.toFixed(2)}`;
   const now = Date.now();
@@ -380,8 +585,6 @@ function getCachedWeather(lat, lng, isIT) {
 }
 
 async function fetchOpenMeteo(lat, lng) {
-  // open-meteo.com — no API key, no rate limits at our scale.
-  // We pull current conditions + today's high/low/precip.
   const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
               `&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m` +
               `&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code` +
@@ -403,8 +606,6 @@ async function fetchOpenMeteo(lat, lng) {
   };
 }
 
-// WMO weather code → short EN/IT description. Used for the natural-
-// language summary that goes into the system prompt.
 function describeWeatherCode(code) {
   const t = (en, it) => ({ en, it });
   const map = {

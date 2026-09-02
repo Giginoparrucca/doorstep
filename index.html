@@ -1371,6 +1371,11 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let propertyId = null;
+// Round 33 — HMAC-signed guest-session token that binds every AI request
+// to a property. Minted once after propertyId resolves and re-minted when
+// bookingCode changes. Held in a module var + sessionStorage so it
+// survives page reloads within the same tab but dies with the tab.
+let _guestToken = null;
 let propertyData = null;
 let bookingCode = null;
 let existingCheckins = [];
@@ -1429,6 +1434,91 @@ function getStoredPropertyId() {
 ══════════════════════════════════════ */
 const _guestSessionId = `g_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 const _guestSessionStart = Date.now();
+
+/* ══════════════════════════════════════
+   Round 33 — Guest session token
+   Every AI request (/api/chat, /api/scan-document, R34's /api/guest-chat)
+   sends `Authorization: Bearer <token>`. The token is HMAC-signed by the
+   server so property_id + session_id come from the token payload, not
+   from the request body — an attacker can't rebind the session to
+   somebody else's property by editing the body.
+══════════════════════════════════════ */
+const _WBNB_TOKEN_KEY = 'wbnb_guest_token';
+let _mintInFlight = null;
+async function mintGuestToken(force = false) {
+  if (!propertyId) return null;
+  // Reuse a cached token from sessionStorage if it's still fresh
+  // (safety margin: 5 minutes before the 12h exp). sessionStorage dies
+  // with the tab, so a new tab always mints fresh.
+  if (!force) {
+    try {
+      const raw = sessionStorage.getItem(_WBNB_TOKEN_KEY);
+      if (raw) {
+        const obj = JSON.parse(raw);
+        const expMs = new Date(obj.expires_at).getTime();
+        const matches = obj.p === propertyId && obj.s === _guestSessionId && obj.b === (bookingCode || null);
+        if (matches && expMs > Date.now() + 5 * 60 * 1000) {
+          _guestToken = obj.token;
+          return _guestToken;
+        }
+      }
+    } catch (_) { /* fall through and re-mint */ }
+  }
+  // Collapse concurrent mints. Two initial fetches (scan + chat) on a
+  // fresh session would otherwise both fire /api/guest-token.
+  if (_mintInFlight) return _mintInFlight;
+  _mintInFlight = (async () => {
+    try {
+      const r = await fetch('/api/guest-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          property_id: propertyId,
+          session_id: _guestSessionId,
+          booking_code: bookingCode || null,
+        }),
+      });
+      if (!r.ok) { console.warn('[token] mint failed:', r.status); return null; }
+      const body = await r.json();
+      _guestToken = body.token || null;
+      try {
+        sessionStorage.setItem(_WBNB_TOKEN_KEY, JSON.stringify({
+          token: _guestToken,
+          expires_at: body.expires_at,
+          p: propertyId, s: _guestSessionId, b: bookingCode || null,
+        }));
+      } catch (_) { /* sessionStorage may be blocked; keep in-memory */ }
+      return _guestToken;
+    } catch (e) {
+      console.warn('[token] mint exception:', e);
+      return null;
+    } finally {
+      _mintInFlight = null;
+    }
+  })();
+  return _mintInFlight;
+}
+
+// Wrapper around fetch() for AI endpoints. Mints on first call, sends
+// Authorization: Bearer <token>, retries ONCE on 401 with a forced re-mint.
+async function _authedAIFetch(url, init) {
+  let token = _guestToken || await mintGuestToken(false);
+  const withAuth = (t) => ({
+    ...init,
+    headers: {
+      ...(init && init.headers ? init.headers : {}),
+      Authorization: t ? `Bearer ${t}` : undefined,
+    },
+  });
+  let resp = await fetch(url, withAuth(token));
+  if (resp.status === 401) {
+    // Token stale / server rotated secret — mint once and retry.
+    token = await mintGuestToken(true);
+    resp = await fetch(url, withAuth(token));
+  }
+  return resp;
+}
+
 let _guestCheckinStartFired = false;   // one-shot for checkin_started
 let _guestLinkOpenedFired  = false;   // one-shot for link_opened (after propertyId known)
 let _guestLastPage         = null;
@@ -1575,6 +1665,10 @@ const T = {
     scan_or_manual: 'or fill in manually below ↓',
     scan_reading: '🔍 Reading your document…',
     scan_fail: 'Could not read document. Please fill in manually below.',
+    // Round 33 — size/rate/budget error copy for the scan endpoint. Single-line so applyLang preserves them.
+    scan_too_large: 'That file is too large (max ~10 MB). Please upload a smaller photo, or fill in the fields manually below.',
+    scan_rate_limited: 'Too many scans in a short time. Please wait a moment and try again, or fill in the fields manually below.',
+    scan_budget: 'The scan quota for this property is used up for now. Please fill in the fields manually below.',
     surname_label: 'Surname', name_label: 'Name',
     sex_label: 'Sex', male: 'Male', female: 'Female',
     dob_label: 'Date of Birth',
@@ -1712,6 +1806,10 @@ const T = {
     scan_or_manual: 'oppure compila manualmente ↓',
     scan_reading: '🔍 Lettura del documento…',
     scan_fail: 'Impossibile leggere il documento. Compila manualmente qui sotto.',
+    // Round 33 — copy per errori dimensione/limite/budget dello scan. Single-line così applyLang le preserva.
+    scan_too_large: 'File troppo grande (max ~10 MB). Carica una foto più leggera o compila i campi qui sotto manualmente.',
+    scan_rate_limited: 'Troppe scansioni in poco tempo. Attendi un momento e riprova, oppure compila i campi manualmente qui sotto.',
+    scan_budget: 'La quota di scansioni per questa proprietà è esaurita per ora. Compila i campi qui sotto manualmente.',
     surname_label: 'Cognome', name_label: 'Nome',
     sex_label: 'Sesso', male: 'Maschio', female: 'Femmina',
     dob_label: 'Data di Nascita',
@@ -2073,6 +2171,9 @@ async function lookupCheckin() {
       // correctly attribute pre-lookup events to the right guest.
       if (foundCode !== bookingCode) {
         bookingCode = foundCode;
+        // Round 33 — the token payload carries booking_code; re-mint so
+        // R34's guest-chat scoping picks up the right thread.
+        mintGuestToken(true).catch(() => {});
         sb.from('analytics_events')
           .update({ booking_code: foundCode })
           .eq('session_id', _guestSessionId)
@@ -3346,11 +3447,18 @@ async function scanDocument(input) {
     // keep the real media type. The server uses is_pdf to decide whether
     // to build an image block or a document block for the API call.
     const mediaType = isPDF ? 'application/pdf' : 'image/jpeg';
-    const response = await fetch('/api/scan-document', {
+    const response = await _authedAIFetch('/api/scan-document', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image_base64: base64, media_type: mediaType, is_pdf: isPDF }),
     });
+    // Round 33 — surface size/rate/budget failures with clear guidance
+    // (guest can always fall back to manual entry). 401 is retried once
+    // inside _authedAIFetch; if it still 401s the caller drops through
+    // to the generic scan_fail path below.
+    if (response.status === 413) throw new Error(T[lang].scan_too_large || 'Document too large. Please upload a smaller image (max ~10 MB).');
+    if (response.status === 429) throw new Error(T[lang].scan_rate_limited || 'Too many scans just now. Please wait a moment or enter your details manually.');
+    if (response.status === 402) throw new Error(T[lang].scan_budget || 'Scan budget reached for this property. Please enter your details manually.');
     const result = await response.json();
     if (result.success && result.data) {
       const d = result.data;
@@ -3430,7 +3538,9 @@ async function scanDocument(input) {
     console.error('Scan error:', e);
     scanStatus.style.display = 'none';
     scanError.style.display = 'block';
-    document.getElementById('scanErrorText').textContent = T[lang].scan_fail;
+    // Round 33 — surface the specific message when we threw one (413/429/402
+    // paths), otherwise fall back to the generic scan_fail copy.
+    document.getElementById('scanErrorText').textContent = e && e.message ? e.message : T[lang].scan_fail;
   }
 }
 
@@ -3910,7 +4020,10 @@ async function sendChat() {
 
   let fullReply = '';
   try {
-    const response = await fetch('/api/chat', {
+    // Round 33 — property_id / session_id come from the token payload;
+    // never include them in the body. propertyContext + stayContext stay
+    // (they're content, not identity).
+    const response = await _authedAIFetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -4198,6 +4311,10 @@ async function init() {
       propertyId = data.id;
       propertyData = data;
       console.log('✅ Property loaded from Supabase:', data.name, 'ID:', data.id);
+      // Round 33 — mint the guest-session token as soon as we know which
+      // property this is. Non-blocking: if the network hiccups, the first
+      // AI call will lazy-mint on its own.
+      mintGuestToken(false).catch(() => {});
 
       // Populate welcome page from DB
       const d = data;

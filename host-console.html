@@ -7463,19 +7463,14 @@ async function init() {
     }
 
     if (allProperties.length === 0 && !adminPropId) {
-      // No properties for this user — try claiming a legacy unowned one, else create
-      const { data: unclaimed } = await sb.from('properties').select('*')
-        .is('owner_id', null).is('deleted_at', null).limit(1).maybeSingle();
-      if (unclaimed) {
-        await sb.from('properties').update({ owner_id: userId }).eq('id', unclaimed.id);
-        console.log('✅ Claimed unowned property:', unclaimed.name);
-        allProperties = [unclaimed];
-      } else {
-        const { data: newProp } = await sb.from('properties').insert({
-          owner_id: userId, name: 'My Property', city: '', region: '', property_type: 'apartment',
-        }).select('*').single();
-        if (newProp) { allProperties = [newProp]; }
-      }
+      // Round 33 — the legacy "claim any orphan property" branch was removed
+      // before opening self-serve signup. A fresh account must NEVER inherit
+      // an existing property's guest data, check-ins or reservations. New
+      // signups always start with a fresh empty 'My Property' row.
+      const { data: newProp } = await sb.from('properties').insert({
+        owner_id: userId, name: 'My Property', city: '', region: '', property_type: 'apartment',
+      }).select('*').single();
+      if (newProp) { allProperties = [newProp]; }
     }
 
     // Pick which property to show: persisted selection if it's still owned,

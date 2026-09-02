@@ -344,6 +344,10 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let allEvents = [];
 let allProperties = [];
+// Round 33 — api_usage aggregated per property for the current calendar
+// month. Populated by loadData(); read by renderView() to draw the
+// AI Usage card. Shape: { [property_id]: { input, output, chat, scan } }.
+let apiUsageByProp = {};
 let allRecommendations = [];
 let allCheckins = [];
 let allChatMessages = []; // Round 11.2 — guest chat texts for question-gap analysis
@@ -901,6 +905,27 @@ async function loadData() {
   const checkinCounts = {};
   allCheckins.forEach(c => { checkinCounts[c.property_id] = (checkinCounts[c.property_id] || 0) + 1; });
   allProperties.forEach(p => { p._checkin_count = checkinCounts[p.id] || 0; });
+
+  // Round 33 — aggregate api_usage for the current calendar month. Best-
+  // effort: a failure here just leaves the AI Usage card empty rather
+  // than blocking the whole admin view.
+  apiUsageByProp = {};
+  try {
+    const monthStart = new Date();
+    monthStart.setDate(1); monthStart.setHours(0,0,0,0);
+    const { data: usageRows, error: usageErr } = await sb.from('api_usage')
+      .select('property_id, endpoint, input_tokens, output_tokens')
+      .gte('created_at', monthStart.toISOString());
+    if (usageErr) console.warn('api_usage query failed (non-fatal):', usageErr.message);
+    (usageRows || []).forEach(r => {
+      const acc = apiUsageByProp[r.property_id] = apiUsageByProp[r.property_id]
+        || { input: 0, output: 0, chat: 0, scan: 0 };
+      acc.input  += (r.input_tokens  || 0);
+      acc.output += (r.output_tokens || 0);
+      if (r.endpoint === 'chat') acc.chat += 1;
+      if (r.endpoint === 'scan') acc.scan += 1;
+    });
+  } catch (e) { console.warn('api_usage aggregate exception:', e); }
 
   // Populate user dropdown
   const users = [...new Set(allEvents.filter(e => e.user_email).map(e => e.user_email))].sort();
@@ -2602,6 +2627,63 @@ function renderView() {
           </tr>`).join('')}
         </tbody>
       </table></div>`;
+
+    // ════════════════════════════════════════════════════════════════════
+    // ROUND 33 — AI USAGE (per property, current calendar month)
+    // Early warning for both abuse (guest loops the endpoint) and unit
+    // economics (a property blowing its budget = we need to raise its cap
+    // or investigate). Pricing uses public Sonnet 4.5 list rates —
+    // ballpark, not a fiscal figure. Cache-hit tokens are lumped into
+    // input in the recorded row so this over-estimates slightly; err on
+    // the side of the alarming number for an admin panel.
+    // ════════════════════════════════════════════════════════════════════
+    const _fmtNum = (n) => (n || 0).toLocaleString('en-GB');
+    const _fmtEUR = (usd) => '€' + (usd * 0.92).toFixed(2); // very rough EUR
+    // Sonnet 4.5 list prices, per 1M tokens.
+    const _pxInPerM  = 3.00;
+    const _pxOutPerM = 15.00;
+    const _rowsUsage = allProperties.map(p => {
+      const u = apiUsageByProp[p.id] || { input: 0, output: 0, chat: 0, scan: 0 };
+      const total  = u.input + u.output;
+      const cap    = Number(p.ai_monthly_token_cap || 2000000);
+      const pct    = cap > 0 ? Math.min(100, Math.round((total / cap) * 100)) : 0;
+      const costUsd = (u.input * _pxInPerM + u.output * _pxOutPerM) / 1_000_000;
+      const barColor = pct >= 90 ? 'var(--red)' : pct >= 60 ? 'var(--amber)' : 'var(--green)';
+      return { p, u, total, cap, pct, costUsd, barColor };
+    }).sort((a, b) => b.total - a.total);
+    const _grandTotal = _rowsUsage.reduce((s, r) => s + r.total, 0);
+    const _grandCost  = _rowsUsage.reduce((s, r) => s + r.costUsd, 0);
+    html += `
+      <div class="section-title">AI Usage — Current Month (${_fmtNum(_grandTotal)} tokens · ~${_fmtEUR(_grandCost)})</div>
+      <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px 6px;box-shadow:var(--shadow);margin-bottom:18px;overflow-x:auto;">
+        <div style="font-size:0.72rem;color:var(--ink-soft);margin-bottom:10px;">
+          Combined input + output tokens for /api/chat + /api/scan-document per property this month, versus each property's ai_monthly_token_cap. Cost is a rough estimate from Sonnet 4.5 list pricing (${_pxInPerM}/${_pxOutPerM} per M tokens).
+        </div>
+        <table class="data-table" style="width:100%;">
+          <thead><tr><th>Property</th><th>Chat calls</th><th>Scan calls</th><th>Tokens (in / out)</th><th>Monthly cap</th><th>Usage</th><th>Est. cost</th></tr></thead>
+          <tbody>
+            ${_rowsUsage.length === 0
+              ? '<tr><td colspan="7" style="text-align:center;padding:16px;color:var(--ink-soft);">No properties yet.</td></tr>'
+              : _rowsUsage.map(r => `
+              <tr>
+                <td><strong>${r.p.name || 'Unnamed'}</strong><br><span style="font-size:0.62rem;color:var(--ink-soft);font-family:monospace;">${r.p.id.substring(0,8)}…</span></td>
+                <td style="text-align:right;">${_fmtNum(r.u.chat)}</td>
+                <td style="text-align:right;">${_fmtNum(r.u.scan)}</td>
+                <td style="text-align:right;font-family:monospace;font-size:0.78rem;">${_fmtNum(r.u.input)} / ${_fmtNum(r.u.output)}</td>
+                <td style="text-align:right;font-family:monospace;font-size:0.78rem;">${_fmtNum(r.cap)}</td>
+                <td style="min-width:160px;">
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="flex:1;height:6px;background:var(--cream-3);border-radius:3px;overflow:hidden;">
+                      <div style="width:${r.pct}%;height:100%;background:${r.barColor};transition:width 0.2s;"></div>
+                    </div>
+                    <span style="font-size:0.72rem;color:var(--ink-soft);min-width:34px;text-align:right;">${r.pct}%</span>
+                  </div>
+                </td>
+                <td style="text-align:right;font-family:monospace;font-size:0.78rem;">$${r.costUsd.toFixed(2)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
 
     // ════════════════════════════════════════════════════════════════════
     // ROUND 12 — DATA RETENTION

@@ -317,11 +317,15 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}`;
 
       const replyMatch = fullText.match(/<reply>([\s\S]*?)<\/reply>/);
       const replyText = replyMatch ? replyMatch[1].trim() : fullText.trim();
-      const escalated = replyText.startsWith('[ESCALATE]');
+      // Round 34.1: Sofia sometimes forgets the [ESCALATE] marker even
+      // when she's clearly routing the guest to the host ("connecting
+      // you with the host…"). Detect escalation from the reply body and
+      // the user's last message too, not just the marker.
+      const lastUserMsg = extractLastUserText(messages);
+      const escalated = replyText.startsWith('[ESCALATE]')
+                     || detectEscalationIntent(replyText, lastUserMsg);
       const followupsMatch = fullText.match(/<followups>([\s\S]*?)<\/followups>/);
-      const followups = followupsMatch
-        ? followupsMatch[1].split('\n').map(s => s.trim()).filter(s => s.length > 0 && s.length < 60).slice(0, 3)
-        : [];
+      const followups = sanitizeFollowups(followupsMatch ? followupsMatch[1] : '');
 
       if (escalated && process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
         notifyTelegram(messages).catch(() => {});
@@ -352,13 +356,15 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}`;
     const rawText = data.content?.[0]?.text || '';
     const replyMatch = rawText.match(/<reply>([\s\S]*?)<\/reply>/);
     let replyText = replyMatch ? replyMatch[1].trim() : rawText.trim();
-    const escalated = replyText.startsWith('[ESCALATE]');
     const cleanReply = replyText.replace('[ESCALATE]', '').trim();
+    // Round 34.1: detect escalation from marker OR reply body OR user
+    // message content. Sofia sometimes forgets the marker.
+    const lastUserMsg = extractLastUserText(messages);
+    const escalated = replyText.startsWith('[ESCALATE]')
+                   || detectEscalationIntent(cleanReply, lastUserMsg);
 
     const followupsMatch = rawText.match(/<followups>([\s\S]*?)<\/followups>/);
-    const followups = followupsMatch
-      ? followupsMatch[1].split('\n').map(s => s.trim()).filter(s => s.length > 0 && s.length < 60).slice(0, 3)
-      : [];
+    const followups = sanitizeFollowups(followupsMatch ? followupsMatch[1] : '');
 
     if (escalated && process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
       notifyTelegram(messages).catch(() => {});
@@ -546,6 +552,76 @@ function degradeReply(res, useStream, isIT, retryAfter) {
     return;
   }
   return res.status(200).json({ reply, escalated: true, followups: [] });
+}
+
+// ─── Round 34.1: escalation detection + followup sanitizer ────────────
+// Sofia's system prompt asks her to emit `[ESCALATE]` at the very start
+// of her reply for known cases (guest asks for a human, broken appliance,
+// etc.). She's inconsistent — sometimes she writes a full "connecting you
+// with the host" reply without the marker. We back that up with reply-body
+// and user-message pattern matching so `escalated:true` is set reliably,
+// which is what makes the guest client start polling for host replies.
+
+const ESCALATION_REPLY_PATTERNS_EN = [
+  'connecting you with', 'connect you with',
+  'notify the host', 'notified the host', 'notifying the host',
+  'reach out to the host', 'reach out to your host',
+  'in touch with the host', 'in touch with your host',
+  'contacting the host', "i've alerted the host",
+  "i'm passing this to", "i'll pass this to",
+];
+const ESCALATION_REPLY_PATTERNS_IT = [
+  'ti sto mettendo in contatto', 'ti metto in contatto',
+  'ho avvisato', 'sto contattando', 'ti connetto con',
+  'avviso l\'host', 'contatterò',
+];
+const ESCALATION_USER_PATTERNS_EN = [
+  'talk to host', 'talk to the host', 'talk to a host',
+  'talk to a human', 'talk to a person', 'talk to someone',
+  'speak with the host', 'speak with a human', 'speak to host',
+  'reach the host', 'contact the host', 'call the host',
+];
+const ESCALATION_USER_PATTERNS_IT = [
+  'parla con', 'parlare con', 'voglio parlare',
+  'contatta l\'host', "chiama l'host", 'chiedi all\'host',
+  'contattare l\'host',
+];
+
+function detectEscalationIntent(replyText, userMsgText) {
+  const r = String(replyText || '').toLowerCase();
+  if (ESCALATION_REPLY_PATTERNS_EN.some(p => r.includes(p))) return true;
+  if (ESCALATION_REPLY_PATTERNS_IT.some(p => r.includes(p))) return true;
+  const u = String(userMsgText || '').toLowerCase();
+  if (ESCALATION_USER_PATTERNS_EN.some(p => u.includes(p))) return true;
+  if (ESCALATION_USER_PATTERNS_IT.some(p => u.includes(p))) return true;
+  return false;
+}
+
+function extractLastUserText(messages) {
+  if (!Array.isArray(messages)) return '';
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]?.role === 'user') {
+      const c = messages[i].content;
+      if (typeof c === 'string') return c;
+      // vision message: content is an array of blocks; find the text one
+      if (Array.isArray(c)) {
+        const t = c.find(b => b?.type === 'text');
+        if (t) return t.text || '';
+      }
+    }
+  }
+  return '';
+}
+
+// Never surface internal markers as tappable followup chips. Drop empties,
+// drop entries that are (or start with) `[SOMETHING]` — these are always
+// internal signals leaking, not questions a guest would ask.
+function sanitizeFollowups(raw) {
+  return String(raw || '')
+    .split('\n')
+    .map(s => s.replace(/\[ESCALATE\]/g, '').trim())
+    .filter(s => s.length > 0 && s.length < 60 && !/^\[/.test(s))
+    .slice(0, 3);
 }
 
 async function notifyTelegram(messages) {

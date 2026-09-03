@@ -4086,8 +4086,12 @@ async function sendChat() {
           const payload = JSON.parse(dataLine.slice(6));
           if (payload.type === 'text' && payload.text) {
             fullReply += payload.text;
-            // Render with bold markdown support
-            botBubble.innerHTML = fullReply.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            // Round 34.1: never render the [ESCALATE] internal marker
+            // even mid-stream — Sofia sometimes leaks it into the reply
+            // body. The server strips it from the recorded value; this
+            // is defense in depth for what the guest sees on the screen.
+            const displayText = fullReply.replace(/\[ESCALATE\]/g, '').trim();
+            botBubble.innerHTML = displayText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             scrollChatToBottom(false);
           } else if (payload.type === 'done') {
             escalated = !!payload.escalated;
@@ -4101,10 +4105,19 @@ async function sendChat() {
 
     botBubble.classList.remove('streaming');
 
-    // If escalated, strip the marker from the displayed text
-    if (escalated && fullReply.startsWith('[ESCALATE]')) {
-      fullReply = fullReply.replace('[ESCALATE]', '').trim();
-      botBubble.innerHTML = fullReply.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Round 34.1: strip [ESCALATE] regardless of the escalated flag.
+    // Sofia sometimes leaks it into the body; the guest must never see it.
+    fullReply = fullReply.replace(/\[ESCALATE\]/g, '').trim();
+    botBubble.innerHTML = fullReply.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+    // Round 34.1: client-side belt-and-braces — if the server didn't flag
+    // this as escalation but the reply body clearly says "connecting you
+    // with the host" (EN or IT), treat it as escalated anyway. Prevents a
+    // stuck-in-limbo state where the host has been notified but the guest
+    // client never starts polling.
+    if (!escalated && _replyImpliesEscalation(fullReply)) {
+      console.log('[chat] escalation inferred from reply body');
+      escalated = true;
     }
 
     chatHistory.push({ role: 'assistant', content: fullReply });
@@ -4133,6 +4146,24 @@ async function sendChat() {
 function sendSuggestion(text) {
   document.getElementById('chatInput').value = text;
   sendChat();
+}
+
+// Round 34.1 — client fallback for escalation detection. Mirrors the
+// server heuristic so the belt-and-braces holds up if server logic
+// somehow gets bypassed (older cached edge function, etc.).
+function _replyImpliesEscalation(text) {
+  const r = String(text || '').toLowerCase();
+  const en = [
+    'connecting you with', 'connect you with',
+    'notify the host', 'notified the host', 'notifying the host',
+    'reach out to the host', 'in touch with the host',
+    'contacting the host',
+  ];
+  const it = [
+    'ti sto mettendo in contatto', 'ti metto in contatto',
+    'ho avvisato', 'sto contattando', 'ti connetto con',
+  ];
+  return en.some(p => r.includes(p)) || it.some(p => r.includes(p));
 }
 
 function showEscalatedBanner() {

@@ -1499,6 +1499,29 @@ async function mintGuestToken(force = false) {
   return _mintInFlight;
 }
 
+// Round 34 helper — wraps /api/guest-chat. Every guest chat read + write
+// goes through this after Round 34's migration revoked anon access to
+// chat_messages. Silent noop when there's no token yet (page loads
+// before propertyId resolves).
+async function _guestChatCall(action, args) {
+  if (!propertyId) return null;
+  try {
+    const r = await _authedAIFetch('/api/guest-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, ...(args || {}) }),
+    });
+    if (!r.ok) {
+      console.warn('[guest-chat]', action, 'failed:', r.status);
+      return null;
+    }
+    return await r.json();
+  } catch (e) {
+    console.warn('[guest-chat]', action, 'exception:', e);
+    return null;
+  }
+}
+
 // Wrapper around fetch() for AI endpoints. Mints on first call, sends
 // Authorization: Bearer <token>, retries ONCE on 401 with a forced re-mint.
 async function _authedAIFetch(url, init) {
@@ -3168,9 +3191,11 @@ async function saveCurrentGuest() {
       updateSteps();
       document.getElementById('page-checkin').scrollTop = 0;
     } else {
-      // All done
-      await sb.from('chat_messages').insert({
-        property_id: propertyId, sender: 'system',
+      // All done — Round 34: routed via /api/guest-chat (service-role
+      // backed), not the anon sb client. property_id + booking_code
+      // come from the token payload on the server side.
+      await _guestChatCall('send', {
+        sender: 'system',
         message: `Check-in complete: ${savedGuests.length} guest(s) registered. Arrival: ${arrivalDate}, Departure: ${departureDate}.`
       });
       document.getElementById('checkinBtns').classList.add('hidden');
@@ -3783,12 +3808,14 @@ function addBubble(text, type) {
 
 async function saveChatMsg(sender, message) {
   if (!propertyId) { console.warn('💬 No propertyId, skipping save'); return; }
-  const row = { property_id: propertyId, sender, message };
-  if (bookingCode) row.booking_code = bookingCode;
+  // Round 34: chat writes are gated behind /api/guest-chat now (anon
+  // no longer has INSERT on chat_messages). property_id + booking_code
+  // are derived server-side from the guest token, so we only pass
+  // sender + message.
   console.log('💬 Saving chat:', sender, message.substring(0, 50));
-  const { error } = await sb.from('chat_messages').insert(row);
-  if (error) console.error('💬 Chat save FAILED:', error.message, error);
-  else console.log('💬 Chat saved OK');
+  const r = await _guestChatCall('send', { sender, message });
+  if (!r || !r.ok) console.error('💬 Chat save FAILED', r);
+  else console.log('💬 Chat saved OK', r.id);
 }
 
 // Round 16 — pending image attachment + stay context helpers
@@ -4133,34 +4160,29 @@ function startHostChatListener() {
   // Clear stale cursor
   localStorage.removeItem('wbnb_chat_seen');
 
-  // Set cursor to now (only show messages after this point)
+  // Round 34: cursor + poll routed via /api/guest-chat. The server
+  // scopes by the token payload — booking_code is respected too, so a
+  // guest with a booking code only sees messages tagged with it.
   const setCursor = async () => {
-    const { data } = await sb.from('chat_messages')
-      .select('created_at')
-      .eq('property_id', propertyId)
-      .order('created_at', { ascending: false })
-      .limit(1);
-    if (data?.[0]) localStorage.setItem('wbnb_chat_seen', data[0].created_at);
+    const h = await _guestChatCall('history', {});
+    const msgs = (h && h.messages) || [];
+    if (msgs.length > 0) {
+      localStorage.setItem('wbnb_chat_seen', msgs[msgs.length - 1].created_at);
+    } else {
+      localStorage.setItem('wbnb_chat_seen', new Date().toISOString());
+    }
   };
   setCursor();
 
   const pollForReplies = async () => {
     if (!propertyId) return;
     try {
-      const { data } = await sb.from('chat_messages')
-        .select('*')
-        .eq('property_id', propertyId)
-        .in('sender', ['host', 'system'])
-        .order('created_at', { ascending: false })
-        .limit(5);
+      const cursor = localStorage.getItem('wbnb_chat_seen') || new Date(0).toISOString();
+      const r = await _guestChatCall('poll', { since: cursor });
+      const newMsgs = (r && r.messages) || [];
+      if (newMsgs.length === 0) return;
 
-      if (!data || data.length === 0) return;
-
-      const lastSeen = localStorage.getItem('wbnb_chat_seen') || '';
-      const newMsgs = data.filter(m => m.created_at > lastSeen).reverse();
-
-      if (newMsgs.length > 0) console.log('🔄 New messages:', newMsgs.length);
-
+      console.log('🔄 New messages:', newMsgs.length);
       newMsgs.forEach(m => {
         if (m.sender === 'host') {
           console.log('🏠 Host reply:', m.message);
@@ -4177,7 +4199,8 @@ function startHostChatListener() {
         }
       });
 
-      localStorage.setItem('wbnb_chat_seen', data[0].created_at);
+      // Advance the cursor to the newest message we just handled.
+      localStorage.setItem('wbnb_chat_seen', newMsgs[newMsgs.length - 1].created_at);
 
       if (!chatEscalated && chatSubscription) {
         clearInterval(chatSubscription);
@@ -4203,12 +4226,11 @@ function startHostChatListener() {
 async function checkExistingChat() {
   if (!propertyId) return;
   try {
-    let q = sb.from('chat_messages').select('*')
-      .eq('property_id', propertyId)
-      .eq('is_test', false)
-      .is('deleted_at', null);
-    if (bookingCode) q = q.eq('booking_code', bookingCode);
-    const { data } = await q.order('created_at', { ascending: true }).limit(50);
+    // Round 34: reads go through /api/guest-chat which server-side
+    // scopes by property_id + booking_code from the token payload.
+    // Filters is_test=false + deleted_at IS NULL for us.
+    const r = await _guestChatCall('history', {});
+    const data = (r && r.messages) || [];
     if (data && data.length > 0) {
       const msgEl = document.getElementById('chatMessages');
       msgEl.innerHTML = '';

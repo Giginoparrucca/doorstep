@@ -65,6 +65,32 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 34 — Close the cross-property guest chat read leak _(2026-09-03)_
+- **Why**: Round 12.1's SELECT policy on `chat_messages` scoped anon reads to `property_id IS NOT NULL AND is_test=false AND deleted_at IS NULL` — but the actual per-property filter (`.eq('property_id', propertyId)`) lived client-side. Anyone with the anon key (which must ship in the client HTML) could open devtools and drop that filter to read every host's guest messages: names, arrival dates, lockbox codes. Survivable with two test hosts; a reportable personal-data breach the moment a real host's guests are in there.
+- **What**: revoked anon's grant on `chat_messages` entirely. All guest chat reads/writes now go through a new server endpoint `api/guest-chat.js` that runs as `SUPABASE_SERVICE_ROLE_KEY` and derives `property_id + booking_code` from the Round 33 guest-token payload — never from the request body.
+- **New**: `api/guest-chat.js` — single handler, action-dispatched
+  - `history` → most recent 50 messages for the token's property + booking-code bucket (no-code guests match `booking_code IS NULL OR ''`, Round 28 legacy), `is_test=false + deleted_at IS NULL`, ASC.
+  - `send` → INSERT one row; `sender ∈ {'guest','bot','system'}` — host writes are the host console's job, not the guest's; 4000-char message cap; **60 sends/session/hour rate limit** tracked in `api_usage` under `endpoint='chat_write'`.
+  - `poll` → host/system messages after `{since}`, max 5, same scoping.
+  - Body values for `property_id` / `booking_code` are ignored; if they disagree with the token payload, a warning is logged (attack signal for future admin review).
+  - `await`s the `api_usage` insert (R33.1 lesson: fire-and-forget promises get cancelled on Vercel serverless).
+- **New**: `migration_round34_chat_anon_lockdown.sql`
+  - Diagnostic block records the exact policies + grants snapshot pre-drop (also inlined as a comment for the git record).
+  - `DROP POLICY "Anyone insert chat"` (was: unrestricted anon INSERT — anyone in the world) and `"Guests read live chat by property"` (was: the Round 12.1 leaky SELECT).
+  - `REVOKE SELECT, INSERT, UPDATE, DELETE ON chat_messages FROM anon`.
+  - `GRANT SELECT, INSERT, UPDATE, DELETE ON chat_messages TO service_role` — the Round 28 gotcha again; SQL-editor-created tables here don't inherit defaults.
+  - **Commented rollback block** at the bottom of the file re-grants anon CRUD and re-creates the Round 12.1 SELECT policy verbatim — one copy-paste undo, per the plan's "highest-regression round of the three; make the undo one copy-paste away."
+- **Client** (`index.html`): all 5 `chat_messages` call sites now go through a shared `_guestChatCall(action, args)` wrapper on top of `_authedAIFetch` (R33). Insert at check-in completion, `saveChatMsg`, `setCursor`, `pollForReplies`, `checkExistingChat`. Same bubbles, same escalation banner, same 5s polling cadence, same `scrollChatToBottom` — pure transport swap. `sb` (anon Supabase client) is still used for `checkins`, `marketing_consents`, `analytics_events`, and the property read; those are legitimately anon-scoped and out of scope for this round.
+- **Deploy order** (matters — flipped in the wrong order the guest app breaks for ~1 minute during Vercel's rebuild): shipped `api/guest-chat.js` + client swap first (`617be4c`), waited for the endpoint to serve 401 for missing-token, then ran the migration. Vercel deploy happened before the anon grant went away, so no window of broken chat.
+- **Verified end-to-end**
+  - Anon-role probe → `ERROR 42501: permission denied for table chat_messages`. **Leak closed at Postgres, not just the client.**
+  - Host (Trullo owner) role probe → sees 185 of their own messages via `Hosts read own property chat` (unchanged). Host console unaffected.
+  - `POST /api/guest-chat` no bearer → 401.
+  - Token minted for TRULLO → `action:history` returns TRULLO's no-code bucket; `action:send sender:guest` → row inserted with `property_id=TRULLO, booking_code=null`; `action:send sender:host` → 400 "Invalid sender" (guest can't impersonate host); body carrying `property_id=OTHER` → returned messages still belonged to TRULLO (`booking_code` set was `{None}`, no cross-property leak); 4100-char message → 413 with `max_length:4000`.
+  - `api_usage` recorded the send under `endpoint='chat_write'` with `session_id=g_r34_probe1`.
+- **Not touched**: `host-console.html` chat panel (hosts read via authenticated owner-scoped RLS — untouched); `chat_messages_host_update` / `chat_messages_host_delete` / `chat_messages_admin_all` / `chat_messages_admin_update` / `Hosts read own property chat` / `Auth insert chat` all still in place; `checkins` / `marketing_consents` / `analytics_events` / property reads still go through `sb` on the anon key.
+- **Files**: `migration_round34_chat_anon_lockdown.sql`, `api/guest-chat.js`, `index.html`
+
 ### Round 33 — API endpoint hardening + kill the property-claim path _(2026-09-01)_
 - **Why**: `api/chat.js` and `api/scan-document.js` were open POST endpoints — `Access-Control-Allow-Origin: *`, no auth, no rate limit, no body cap. Anyone with devtools could loop them and burn the Anthropic key. Separately, `host-console.html init()` had a legacy "adopt any orphaned property" branch that had to go before self-serve signup opens — a new account inheriting a stranger's data would be a data-breach shape.
 - **New**: `migration_round33_api_usage.sql`

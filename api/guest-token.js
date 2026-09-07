@@ -52,7 +52,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server not configured' });
   }
 
-  const { property_id, session_id, booking_code } = req.body || {};
+  const { property_id, session_id, booking_code, is_test } = req.body || {};
   if (!property_id || typeof property_id !== 'string') {
     return res.status(400).json({ error: 'property_id required' });
   }
@@ -60,6 +60,10 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'session_id required' });
   }
   const bc = booking_code && typeof booking_code === 'string' ? booking_code : null;
+  // Round 34.4: is_test carried into the token payload so guest-chat and
+  // api_usage can tag rows without trusting the request body of a
+  // subsequent call. Coerced to a strict boolean.
+  const t = is_test === true;
 
   // Rate-limit BEFORE the DB lookup so a limited-out caller can't use
   // this endpoint as a property-existence oracle either.
@@ -100,7 +104,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Property lookup exception' });
   }
 
-  const { token, payload } = signGuestToken({ p: property_id, s: session_id, b: bc });
+  const { token, payload } = signGuestToken({ p: property_id, s: session_id, b: bc, t });
 
   // Record this mint against the rate-limit tally. NOTE: recordUsage
   // swallows insert failures with console.warn, so if the api_usage

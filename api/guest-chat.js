@@ -55,6 +55,10 @@ export default async function handler(req, res) {
   const propertyId = v.payload.p;
   const sessionId  = v.payload.s;
   const bookingCode = v.payload.b || null;  // may be null for pre-checkin
+  // Round 34.4: is_test flag from the token — a guest app opened with
+  // ?test=1 mints its token with t:true, and every write from that
+  // session gets flagged so it never surfaces in the host dashboard.
+  const isTest = v.payload.t === true;
 
   if (!SERVICE_KEY) return res.status(500).json({ error: 'Server misconfigured (service key)' });
 
@@ -74,7 +78,7 @@ export default async function handler(req, res) {
 
   try {
     if (action === 'history') return await doHistory(res, propertyId, bookingCode);
-    if (action === 'send')    return await doSend(res, propertyId, bookingCode, sessionId, body);
+    if (action === 'send')    return await doSend(res, propertyId, bookingCode, sessionId, body, isTest);
     if (action === 'poll')    return await doPoll(res, propertyId, bookingCode, body);
     return res.status(400).json({ error: 'Unknown action' });
   } catch (e) {
@@ -99,7 +103,7 @@ async function doHistory(res, propertyId, bookingCode) {
 }
 
 // ── action: send ──────────────────────────────────────────────────────
-async function doSend(res, propertyId, bookingCode, sessionId, body) {
+async function doSend(res, propertyId, bookingCode, sessionId, body, isTest) {
   const message = String(body.message || '').trim();
   const sender  = String(body.sender  || 'guest').toLowerCase();
 
@@ -130,6 +134,7 @@ async function doSend(res, propertyId, bookingCode, sessionId, body) {
     booking_code: bookingCode,
     sender,
     message,
+    is_test: isTest === true,  // Round 34.4: sourced from token payload
   };
   const insRes = await fetch(`${SUPABASE_URL}/rest/v1/chat_messages`, {
     method: 'POST',

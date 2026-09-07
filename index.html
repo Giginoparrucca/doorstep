@@ -1476,6 +1476,10 @@ async function mintGuestToken(force = false) {
           property_id: propertyId,
           session_id: _guestSessionId,
           booking_code: bookingCode || null,
+          // Round 34.4: bake the test-mode flag into the token so every
+          // downstream write (chat_messages via guest-chat, api_usage on
+          // chat/scan) inherits it without trusting the request body.
+          is_test: IS_TEST_SESSION,
         }),
       });
       if (!r.ok) { console.warn('[token] mint failed:', r.status); return null; }
@@ -3170,6 +3174,10 @@ async function saveCurrentGuest() {
       nights: nights,
       id_photo_path: idPath,
       docs_status: isMainGuest() ? (idPath ? 'complete' : 'pending') : 'not_required',
+      // Round 34.4: test-mode preview writes stay off the host dashboard.
+      // The existing loadPropertyData query filters is_test=false, so
+      // flagging here is enough — no host-side change required.
+      is_test: IS_TEST_SESSION,
     };
     // Canonical property_id / booking_code come from URL (?p/?b) or localStorage.
     // If either the in-memory or canonical source is missing the property, abort
@@ -3362,18 +3370,25 @@ async function saveMarketingConsent() {
   btn.textContent = '...';
 
   try {
-    const mainGuest = savedGuests[0] || {};
-    const canonicalPropId = getStoredPropertyId() || propertyId;
-    const canonicalBooking = getBookingCode() || bookingCode;
-    const { error } = await sb.from('marketing_consents').insert({
-      property_id: canonicalPropId,
-      booking_code: canonicalBooking || null,
-      guest_name: `${mainGuest.surname || ''} ${mainGuest.name || ''}`.trim() || null,
-      email: email || null,
-      phone: phone || null,
-      consent_text_version: 'v1',
-    });
-    if (error) throw error;
+    // Round 34.4: test-mode preview must not persist marketing consents.
+    // The table has no is_test column, so we skip the write entirely and
+    // still walk the host through the confirmation UX below.
+    if (IS_TEST_SESSION) {
+      console.log('🧪 Test mode — skipping marketing_consents insert.');
+    } else {
+      const mainGuest = savedGuests[0] || {};
+      const canonicalPropId = getStoredPropertyId() || propertyId;
+      const canonicalBooking = getBookingCode() || bookingCode;
+      const { error } = await sb.from('marketing_consents').insert({
+        property_id: canonicalPropId,
+        booking_code: canonicalBooking || null,
+        guest_name: `${mainGuest.surname || ''} ${mainGuest.name || ''}`.trim() || null,
+        email: email || null,
+        phone: phone || null,
+        consent_text_version: 'v1',
+      });
+      if (error) throw error;
+    }
 
     document.getElementById('consentFields').style.display = 'none';
     document.querySelector('#consentCard label').style.display = 'none';

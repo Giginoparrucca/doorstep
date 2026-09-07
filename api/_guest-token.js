@@ -41,14 +41,23 @@ function assertSecret() {
   }
 }
 
-// Sign a payload. Callers pass p / s / b / exp explicitly. `exp` is unix
-// seconds; if omitted, defaults to now + 12h.
-export function signGuestToken({ p, s, b = null, exp }) {
+// Sign a payload. Callers pass p / s / b / exp / t explicitly.
+//   p — property_id (required)
+//   s — session_id (required)
+//   b — booking_code (optional; null when the guest is pre-checkin)
+//   exp — unix seconds; defaults to now + 12h
+//   t — Round 34.4: isTest flag baked into the token so server-side
+//       inserts (chat_messages, api_usage) can tag rows without trusting
+//       the request body. Default false. Kept in the payload only when
+//       true (JSON stringifies it either way, but omitting on false
+//       keeps legacy round-trip tests / cached tokens indistinguishable).
+export function signGuestToken({ p, s, b = null, exp, t = false }) {
   assertSecret();
   if (!p || typeof p !== 'string') throw new Error('signGuestToken: p (property_id) required');
   if (!s || typeof s !== 'string') throw new Error('signGuestToken: s (session_id) required');
   const now = Math.floor(Date.now() / 1000);
   const payload = { p, s, b: b || null, exp: exp || (now + 12 * 3600) };
+  if (t === true) payload.t = true;
   const payloadB64 = b64urlEncode(JSON.stringify(payload));
   const sig = createHmac('sha256', SECRET).update(payloadB64).digest();
   const sigB64 = b64urlEncode(sig);

@@ -8,6 +8,7 @@
 // manual-entry fallback, so a hard error is fine here.
 
 import { verifyFromAuthHeader } from './_guest-token.js';
+import { applyCors } from './_cors.js';
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
@@ -18,13 +19,8 @@ const SCAN_SESSION_HOURLY_LIMIT = 5;
 const SCAN_PROPERTY_DAILY_LIMIT = 60;
 
 export default async function handler(req, res) {
-  // ── Origin / CORS ────────────────────────────────────────────────
-  const origin = req.headers['origin'] || req.headers['Origin'] || '';
-  const allowed = resolveOrigin(origin);
-  if (allowed) res.setHeader('Access-Control-Allow-Origin', allowed);
-  res.setHeader('Vary', 'Origin');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // Origin / CORS — Round 34.2: shared api/_cors.js.
+  const allowed = applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(allowed ? 200 : 403).end();
   if (!allowed) return res.status(403).json({ error: 'Origin not allowed' });
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -154,15 +150,6 @@ Rules:
 }
 
 // ── Round 33 helpers ──────────────────────────────────────────────────
-
-function resolveOrigin(origin) {
-  if (!origin) return null;
-  if (origin === 'https://welcomebnb.vercel.app') return origin;
-  if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return origin;
-  if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return origin;
-  if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)) return origin;
-  return null;
-}
 
 async function checkScanLimits(propertyId, sessionId) {
   const now = new Date();

@@ -30,6 +30,7 @@
 // review).
 
 import { verifyFromAuthHeader } from './_guest-token.js';
+import { applyCors } from './_cors.js';
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
@@ -41,13 +42,8 @@ const HISTORY_LIMIT = 50;
 const POLL_LIMIT    = 5;
 
 export default async function handler(req, res) {
-  // Origin allowlist (mirrors chat.js/scan-document.js).
-  const origin = req.headers['origin'] || req.headers['Origin'] || '';
-  const allowed = resolveOrigin(origin);
-  if (allowed) res.setHeader('Access-Control-Allow-Origin', allowed);
-  res.setHeader('Vary', 'Origin');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // Origin / CORS — Round 34.2: shared api/_cors.js.
+  const allowed = applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(allowed ? 200 : 403).end();
   if (!allowed) return res.status(403).json({ error: 'Origin not allowed' });
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
@@ -239,16 +235,7 @@ function readCount(rangeHeader, dataFallback) {
   return Array.isArray(dataFallback) ? dataFallback.length : 0;
 }
 
-// ── PostgREST + origin helpers (mirrors chat.js) ──────────────────────
-function resolveOrigin(origin) {
-  if (!origin) return null;
-  if (origin === 'https://welcomebnb.vercel.app') return origin;
-  if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return origin;
-  if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return origin;
-  if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)) return origin;
-  return null;
-}
-
+// ── PostgREST helper (origin lives in api/_cors.js since Round 34.2) ───
 async function pgrestGET(path, opts = {}) {
   return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     headers: {

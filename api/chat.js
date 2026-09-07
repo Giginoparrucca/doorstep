@@ -17,6 +17,7 @@
 //   data: {"type":"done","escalated":bool,"followups":[...]}
 
 import { verifyFromAuthHeader } from './_guest-token.js';
+import { applyCors } from './_cors.js';
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
@@ -29,13 +30,10 @@ const CHAT_SESSION_HOURLY_LIMIT   = 30;
 const CHAT_PROPERTY_DAILY_LIMIT   = 300;
 
 export default async function handler(req, res) {
-  // ── Origin / CORS ────────────────────────────────────────────────
-  const origin = req.headers['origin'] || req.headers['Origin'] || '';
-  const allowed = resolveOrigin(origin);
-  if (allowed) res.setHeader('Access-Control-Allow-Origin', allowed);
-  res.setHeader('Vary', 'Origin');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // Origin / CORS — Round 34.2 moved the allowlist into api/_cors.js
+  // (was byte-identical here + 3 other endpoints, and the .vercel.app
+  // regex it contained allowed every deployment on Vercel).
+  const allowed = applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(allowed ? 200 : 403).end();
   if (!allowed) return res.status(403).json({ error: 'Origin not allowed' });
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
@@ -404,16 +402,6 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}`;
 }
 
 // ── Round 33 helpers ──────────────────────────────────────────────────
-
-// Allow the guest app and preview URLs. Rejects everything else.
-function resolveOrigin(origin) {
-  if (!origin) return null;
-  if (origin === 'https://welcomebnb.vercel.app') return origin;
-  if (/^http:\/\/localhost(:\d+)?$/.test(origin)) return origin;
-  if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return origin;
-  if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)) return origin;
-  return null;
-}
 
 // Check session hourly + property daily limits + monthly budget. Returns
 // { ok: true } or { ok: false, reason, retry_after_seconds }.

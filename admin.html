@@ -2623,16 +2623,13 @@ function renderDeepDive() {
     // the side of the alarming number for an admin panel.
     // ════════════════════════════════════════════════════════════════════
     const _fmtNum = (n) => (n || 0).toLocaleString('en-GB');
-    const _fmtEUR = (usd) => '€' + (usd * 0.92).toFixed(2); // very rough EUR
-    // Sonnet 4.5 list prices, per 1M tokens.
-    const _pxInPerM  = 3.00;
-    const _pxOutPerM = 15.00;
+    const _fmtEUR = (usd) => '€' + (usd * USD_TO_EUR).toFixed(2);
     const _rowsUsage = allProperties.map(p => {
       const u = apiUsageByProp[p.id] || { input: 0, output: 0, chat: 0, scan: 0 };
       const total  = u.input + u.output;
       const cap    = Number(p.ai_monthly_token_cap || 2000000);
       const pct    = cap > 0 ? Math.min(100, Math.round((total / cap) * 100)) : 0;
-      const costUsd = (u.input * _pxInPerM + u.output * _pxOutPerM) / 1_000_000;
+      const costUsd = (u.input * SONNET_PRICE_USD_INPUT_PER_M + u.output * SONNET_PRICE_USD_OUTPUT_PER_M) / 1_000_000;
       const barColor = pct >= 90 ? 'var(--red)' : pct >= 60 ? 'var(--amber)' : 'var(--green)';
       return { p, u, total, cap, pct, costUsd, barColor };
     }).sort((a, b) => b.total - a.total);
@@ -2642,7 +2639,7 @@ function renderDeepDive() {
       <div class="section-title">AI Usage — Current Month (${_fmtNum(_grandTotal)} tokens · ~${_fmtEUR(_grandCost)})</div>
       <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px 6px;box-shadow:var(--shadow);margin-bottom:18px;overflow-x:auto;">
         <div style="font-size:0.72rem;color:var(--ink-soft);margin-bottom:10px;">
-          Combined input + output tokens for /api/chat + /api/scan-document per property this month, versus each property's ai_monthly_token_cap. Cost is a rough estimate from Sonnet 4.5 list pricing (${_pxInPerM}/${_pxOutPerM} per M tokens).
+          Combined input + output tokens for /api/chat + /api/scan-document per property this month, versus each property's ai_monthly_token_cap. Cost is a rough estimate from Sonnet 4.5 list pricing (${SONNET_PRICE_USD_INPUT_PER_M}/${SONNET_PRICE_USD_OUTPUT_PER_M} per M tokens).
         </div>
         <table class="data-table" style="width:100%;">
           <thead><tr><th>Property</th><th>Chat calls</th><th>Scan calls</th><th>Tokens (in / out)</th><th>Monthly cap</th><th>Usage</th><th>Est. cost</th></tr></thead>

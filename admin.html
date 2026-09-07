@@ -316,6 +316,11 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
       <option value="365">Last year</option>
       <option value="9999">All time</option>
     </select>
+    <!-- Round 35: default off; when on, is_test rows count toward every Pilot metric. -->
+    <label id="showTestLabel" style="display:flex;align-items:center;gap:6px;font-size:0.72rem;color:rgba(244,237,224,0.85);cursor:pointer;padding:6px 10px;border:1px solid rgba(255,255,255,0.18);border-radius:6px;user-select:none;">
+      <input type="checkbox" id="showTestToggle" onchange="toggleShowTest(this.checked)" style="cursor:pointer;">
+      <span>Show test data</span>
+    </label>
     <button class="refresh-btn" onclick="exportData('csv')" title="Export filtered events to CSV">📥 CSV</button>
     <button class="refresh-btn" onclick="exportData('json')" title="Export filtered events to JSON">📥 JSON</button>
     <button class="refresh-btn" onclick="exportAllData()" title="Download all platform data as ZIP" style="background:linear-gradient(135deg,var(--warm),var(--warm-2));color:#fff;">📦 Download all</button>
@@ -332,6 +337,12 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
 </div>
 
 <div class="container">
+  <!-- Round 35: three-tab shell. Buttons wired via inline onclick to setActiveTab. -->
+  <div id="tabsBar" style="display:flex;gap:6px;margin:0 0 14px;flex-wrap:wrap;">
+    <button data-tab="pilot"   onclick="setActiveTab('pilot')"   style="padding:8px 16px;border:1px solid var(--warm);background:var(--warm);color:#fff;border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Pilot</button>
+    <button data-tab="deepdive" onclick="setActiveTab('deepdive')" style="padding:8px 16px;border:1px solid var(--border);background:var(--white);color:var(--ink-soft);border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Deep dive</button>
+    <button data-tab="ops"     onclick="setActiveTab('ops')"     style="padding:8px 16px;border:1px solid var(--border);background:var(--white);color:var(--ink-soft);border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Ops</button>
+  </div>
   <div id="content"><div class="loading">Loading analytics…</div></div>
 </div>
 
@@ -348,6 +359,68 @@ let allProperties = [];
 // month. Populated by loadData(); read by renderView() to draw the
 // AI Usage card. Shape: { [property_id]: { input, output, chat, scan } }.
 let apiUsageByProp = {};
+
+// ─── Round 35: pilot admin rebuild ────────────────────────────────────
+// The console now runs as three tabs — Pilot (default), Deep dive, Ops.
+// Presentation-only; loadData() and every Supabase query below stay put.
+let activeTab   = 'pilot';                 // 'pilot' | 'deepdive' | 'ops'
+let showTestData = false;                  // top-bar toggle; default off
+let pilotHosts   = [];                     // fetched in loadData
+
+// Sonnet 4.5 list pricing (US$ / million tokens) — one edit here when the
+// number moves. See CHANGELOG "Round 35" for last-verified date.
+const SONNET_PRICE_USD_INPUT_PER_M  = 3.00;
+const SONNET_PRICE_USD_OUTPUT_PER_M = 15.00;
+
+// Rough EUR-per-USD used for the AI-cost card. Not a fiscal figure — the
+// accountant reconciles from Anthropic invoices, not this card.
+const USD_TO_EUR = 0.92;
+
+// Status classifier thresholds. Tunable without hunting through render
+// code. Evaluate in order — first match wins.
+const CLASSIFY_THRESHOLDS = {
+  stuckMinLinks:            3,
+  idleGuestEventWindowDays: 14,
+  healthyCompletedWindowDays: 14,
+};
+
+// Event type → human phrase for the Zone C activity feed. Unmapped
+// events are skipped rather than rendered as raw type strings.
+const EVENT_PHRASES = {
+  guest_checkin_completed: 'a guest completed check-in',
+  guest_checkin_started:   'a guest started check-in',
+  guest_link_opened:       'a guest opened the link',
+  guest_doc_scanned:       'a guest scanned a document',
+  guest_chat_escalated:    'a guest asked for the host',
+  guest_chat_message:      'a guest sent a chat message',
+  guest_reco_clicked:      'a guest opened a recommendation',
+  generate_booking:        'generated a booking link',
+  export_alloggiati:       'generated the Alloggiati export',
+  export_dms:              'generated the Puglia DMS export',
+  export_csv:              'exported a PayTourist CSV',
+  export_istat:            'exported ROSS1000 / ISTAT XML',
+  save_property:           'saved property details',
+  save_rules:              'saved house rules',
+  save_recos:              'saved recommendations',
+};
+
+function toggleShowTest(on) {
+  showTestData = !!on;
+  loadData();  // is_test filter lives inside the queries, so re-fetch.
+}
+function setActiveTab(tab) {
+  activeTab = tab;
+  const tabsBar = document.getElementById('tabsBar');
+  if (tabsBar) {
+    tabsBar.querySelectorAll('button[data-tab]').forEach(b => {
+      const isActive = b.dataset.tab === tab;
+      b.style.background = isActive ? 'var(--warm)' : 'var(--white)';
+      b.style.color      = isActive ? '#fff' : 'var(--ink-soft)';
+      b.style.borderColor = isActive ? 'var(--warm)' : 'var(--border)';
+    });
+  }
+  renderView();
+}
 let allRecommendations = [];
 let allCheckins = [];
 let allChatMessages = []; // Round 11.2 — guest chat texts for question-gap analysis
@@ -870,12 +943,18 @@ async function loadData() {
 
   // Build hidden-aware query helpers. If `showHidden` is on, no filters are
   // added — we get everything. Otherwise filter out test + soft-deleted rows.
-  const applyHiddenFilter = (q) =>
-    showHidden ? q : q.eq('is_test', false).is('deleted_at', null);
+  // Round 35 layers a second toggle on top: `showTestData` controls whether
+  // is_test rows count toward the Pilot tab metrics. It's a strict subset —
+  // showHidden overrides showTestData.
+  const applyHiddenFilter = (q) => {
+    if (showHidden) return q;
+    if (!showTestData) q = q.eq('is_test', false);
+    return q.is('deleted_at', null);
+  };
 
-  let eventsRes, propsRes, checkinsRes, recosRes, chatRes;
+  let eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes;
   try {
-    [eventsRes, propsRes, checkinsRes, recosRes, chatRes] = await Promise.all([
+    [eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes] = await Promise.all([
       applyHiddenFilter(sb.from('analytics_events').select('*').gte('created_at', since)).order('created_at', { ascending: false }).limit(10000),
       applyHiddenFilter(sb.from('properties').select('*')).order('name'),
       applyHiddenFilter(sb.from('checkins').select('id, property_id, booking_code, surname, name, guest_type, submitted_at, arrival_date, departure_date, nights, is_test, deleted_at')),
@@ -883,6 +962,8 @@ async function loadData() {
       // Round 11.2 — chat messages, last `since` window, for question-gap analysis.
       // Wrapped in catch so a failure here can't block the whole admin view.
       applyHiddenFilter(sb.from('chat_messages').select('id, property_id, booking_code, sender, message, created_at, is_test, deleted_at').gte('created_at', since)).order('created_at', { ascending: false }).limit(5000).then(r => r, err => ({ data: [], error: err })),
+      // Round 35 — pilot_hosts ledger; admin-only RLS handles the auth.
+      sb.from('pilot_hosts').select('*').order('created_at').then(r => r, err => ({ data: [], error: err })),
     ]);
   } catch (e) {
     console.error('loadData fatal:', e);
@@ -894,12 +975,16 @@ async function loadData() {
   if (chatRes && chatRes.error) {
     console.warn('chat_messages query failed (non-fatal — Question Gaps and Concierge Upsell will be empty):', chatRes.error.message || chatRes.error);
   }
+  if (pilotRes && pilotRes.error) {
+    console.warn('pilot_hosts query failed (non-fatal — Pilot tab will render empty):', pilotRes.error.message || pilotRes.error);
+  }
 
   allEvents = eventsRes.data || [];
   allProperties = propsRes.data || [];
   allRecommendations = recosRes.data || [];
   allCheckins = checkinsRes.data || [];
   allChatMessages = (chatRes && chatRes.data) || [];
+  pilotHosts = (pilotRes && pilotRes.data) || [];
 
   // Count check-ins per property
   const checkinCounts = {};
@@ -917,7 +1002,10 @@ async function loadData() {
       .select('property_id, endpoint, input_tokens, output_tokens')
       .gte('created_at', monthStart.toISOString());
     if (usageErr) console.warn('api_usage query failed (non-fatal):', usageErr.message);
+    // Round 35 — token_mint rows are administrative (0 tokens each) and
+    // must never surface in the AI-cost card or the endpoint breakdown.
     (usageRows || []).forEach(r => {
+      if (r.endpoint === 'token_mint') return;
       const acc = apiUsageByProp[r.property_id] = apiUsageByProp[r.property_id]
         || { input: 0, output: 0, chat: 0, scan: 0 };
       acc.input  += (r.input_tokens  || 0);
@@ -1558,7 +1646,20 @@ function _r14BuildEngagement(events, checkins, properties, propToEmail) {
   return { platform, propRows, silentList };
 }
 
+// ══════════════════════════════════════
+//   Round 35: tab dispatcher
+//
+//   renderView is now a thin router. The three tab renderers each own
+//   their DOM output; loadData() and every _r1*/getFiltered helper above
+//   stay put — this is presentation only.
+// ══════════════════════════════════════
 function renderView() {
+  if (activeTab === 'pilot')    return renderPilotTab();
+  if (activeTab === 'ops')      return renderOpsTab();
+  return renderDeepDive();
+}
+
+function renderDeepDive() {
   const events = getFilteredEvents();
   const selectedUser = document.getElementById('userFilter').value;
   const isUserView = selectedUser !== 'all';
@@ -2016,85 +2117,15 @@ function renderView() {
     hostRows.sort((a, b) => (b.score - a.score) || (b.sessions - a.sessions));
 
     if (hostRows.length > 0) {
-      const tierColor = { gold: '#1E7BFF', silver: '#8B9DAB', bronze: '#1E7BFF', dormant: '#6B7A90' };
-      const tierLabel = { gold: '🥇 Gold', silver: '🥈 Silver', bronze: '🥉 Bronze', dormant: '💤 Dormant' };
-
-      html += `<div class="section-title">Host Performance Leaderboard (${hostRows.length})</div>
-        <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:10px;">
-          Engagement score blends check-in completion + recommendation usage + chat activity. Use it to spot top performers, partnership candidates, and hosts who need onboarding help.
-        </div>
-        <div style="overflow-x:auto;margin-bottom:10px;">
-        <table class="data-table" style="width:100%;min-width:880px;">
-          <thead><tr>
-            <th>#</th><th>Host</th><th>Tier</th><th style="text-align:right;">Score</th>
-            <th style="text-align:right;">Props</th><th style="text-align:right;">Sessions</th>
-            <th style="text-align:right;">Compl.</th><th style="text-align:right;">Reco clicks</th>
-            <th style="text-align:right;">Chat msgs</th><th style="text-align:right;">Help reqs</th>
-            <th>Lang</th>
-          </tr></thead>
-          <tbody>
-            ${hostRows.map((r, i) => {
-              const isUnatt = r.email === '_unattributed';
-              const display = isUnatt ? '<em style="color:var(--ink-soft)">Unattributed</em>' : `<strong>${r.email.split('@')[0]}</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">${r.email}</span>`;
-              return `<tr>
-                <td style="font-weight:600;color:var(--ink-soft);">${i + 1}</td>
-                <td>${display}</td>
-                <td><span style="display:inline-block;padding:2px 8px;border-radius:10px;background:${tierColor[r.tier]}22;color:${tierColor[r.tier]};font-size:0.7rem;font-weight:600;white-space:nowrap;">${tierLabel[r.tier]}</span></td>
-                <td style="text-align:right;font-weight:600;font-family:'Playfair Display',serif;font-size:1rem;color:${r.score >= 60 ? 'var(--green)' : r.score >= 35 ? 'var(--amber)' : 'var(--ink-soft)'};">${r.score}</td>
-                <td style="text-align:right;">${r.properties}</td>
-                <td style="text-align:right;">${r.sessions}</td>
-                <td style="text-align:right;">${r.completed} <span style="color:var(--ink-soft);font-size:0.7rem;">(${r.completionRate}%)</span></td>
-                <td style="text-align:right;${r.recoClicks > 0 ? 'color:var(--warm);font-weight:500;' : ''}">${r.recoClicks}</td>
-                <td style="text-align:right;${r.chatMessages > 0 ? 'color:var(--blue);font-weight:500;' : ''}">${r.chatMessages}</td>
-                <td style="text-align:right;${r.chatEscalations > 0 ? 'color:var(--red);font-weight:500;' : ''}">${r.chatEscalations}</td>
-                <td style="font-size:0.72rem;color:var(--ink-soft);">${r.dominantLang}</td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table></div>`;
-
-      // ══════════════════════════════════════════════════════════════════════
-      // BUSINESS OPPORTUNITIES — derived signals for action
-      // ══════════════════════════════════════════════════════════════════════
-      const namedHosts = hostRows.filter(r => r.email !== '_unattributed');
-      const goldHosts    = namedHosts.filter(r => r.tier === 'gold');
-      const silverHosts  = namedHosts.filter(r => r.tier === 'silver');
-      const dormantHosts = namedHosts.filter(r => r.tier === 'dormant' && r.sessions > 0);
-      // High traffic, low conversion = "leaving money on the table"
-      const leakyHosts = namedHosts.filter(r => r.sessions >= 5 && r.completionRate < 40 && r.completed === 0);
-      // High help-request rate = candidate for managed-concierge upsell
-      const helpHeavyHosts = namedHosts.filter(r => r.sessions >= 3 && (r.chatEscalations / Math.max(1, r.sessions)) >= 0.4);
-      // Setup-incomplete properties (re-use existing setupScore from the table below)
-      const incompleteProps = allProperties.filter(p => {
-        const score = [p.wifi_name, p.host_names, p.host_phone, p.address, p.cir_code].filter(Boolean).length;
-        return score < 4;
-      });
-
-      const oppCard = (icon, title, count, body, color) => `
-        <div style="background:var(--white);border:1px solid var(--border);border-left:3px solid ${color};border-radius:var(--radius);padding:12px 14px;box-shadow:var(--shadow);">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-            <span style="font-size:1.1rem;">${icon}</span>
-            <span style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;">${title}</span>
-            <span style="margin-left:auto;font-family:'Playfair Display',serif;font-size:1.3rem;color:${color};font-weight:600;line-height:1;">${count}</span>
-          </div>
-          <div style="font-size:0.76rem;color:var(--ink-soft);line-height:1.4;">${body}</div>
-        </div>`;
-
-      html += `<div class="section-title">Business Opportunities</div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:10px;">
-          ${oppCard('🥇', 'Top hosts (premium tier)', goldHosts.length,
-            `High-engagement hosts — candidates for "Curator" badge, custom AI voice, featured listings. ${goldHosts.slice(0,3).map(h => h.email.split('@')[0]).join(', ')}${goldHosts.length > 3 ? '…' : ''}`, '#1E7BFF')}
-          ${oppCard('💡', 'Leaky funnel', leakyHosts.length,
-            `Traffic but no completed check-ins — listing optimization or photo audit could unlock revenue. ${leakyHosts.slice(0,3).map(h => h.email.split('@')[0]).join(', ')}${leakyHosts.length > 3 ? '…' : ''}`, 'var(--amber)')}
-          ${oppCard('💬', 'Concierge upsell', helpHeavyHosts.length,
-            `Guests frequently asking for human help — ideal for managed-concierge tier (paid human-in-the-loop). ${helpHeavyHosts.slice(0,3).map(h => h.email.split('@')[0]).join(', ')}${helpHeavyHosts.length > 3 ? '…' : ''}`, 'var(--blue)')}
-          ${oppCard('🛠️', 'Onboarding outreach', incompleteProps.length,
-            `Properties with &lt;80% setup completion — automated email or 1:1 onboarding reduces churn risk.`, 'var(--red)')}
-          ${oppCard('💤', 'Re-engagement', dormantHosts.length,
-            `Active hosts whose guests barely engage with the app — needs hands-on help or product education.`, '#6B7A90')}
-          ${oppCard('🎯', 'Silver hosts (mid-funnel)', silverHosts.length,
-            `Solid hosts with room to grow — small nudges (more recos, better welcome message) could promote them to Gold.`, '#8B9DAB')}
-        </div>`;
+      // Round 35: the Host Performance Leaderboard table + Business
+      // Opportunities card grid used to render here. Both were removed:
+      // the leaderboard's tier ladder was too coarse a signal for the
+      // pilot and reproduced what the Pilot tab's per-host cards show
+      // more usefully; the opportunities cards were speculative next
+      // steps rather than measurements. hostRows itself is retained
+      // because the sections below (Question Gaps, Funnel, Engagement,
+      // Concierge Intents, Recommendations Registry) still consume it
+      // via propToEmail / _r112* helpers.
 
       // ══════════════════════════════════════════════════════════════════════
       // ROUND 11.2 — QUESTION GAPS + FUNNEL DROP-OFF
@@ -2362,25 +2393,26 @@ function renderView() {
         </div>`;
 
       // ══════════════════════════════════════════════════════════════════════
-      // ROUND 11.3 — CONCIERGE UPSELL VALUE
-      // Detect bookable intents in guest chats, multiply by conservative
-      // platform-average prices. The headline number is "€X of bookable
-      // demand detected" — pitch-deck material.
+      // ROUND 35 — CONCIERGE INTENTS (was: Concierge Upsell Value)
+      //
+      // Same _r113AggregateUpsell aggregation, but every euro figure is
+      // stripped. Nothing here comes from a real transaction — the earlier
+      // "€X of detected demand" and "15% commission" numbers were pitch-
+      // deck framing, not measurements. What we can honestly report is
+      // how many guests mentioned each intent and in which properties;
+      // that's what stays.
       // ══════════════════════════════════════════════════════════════════════
       const upsell = _r113AggregateUpsell(allChatMessages || [], propToEmail);
-      const fmtEur = (n) => '€' + Math.round(n).toLocaleString('en-US');
 
       const intentRows = upsell.byIntent.length === 0
-        ? `<div style="font-size:0.78rem;color:var(--ink-soft);padding:12px;background:rgba(250,246,240,0.5);border-radius:6px;">No bookable intents detected in guest chats yet. As volume grows this card will surface concrete revenue opportunities.</div>`
+        ? `<div style="font-size:0.78rem;color:var(--ink-soft);padding:12px;background:rgba(250,246,240,0.5);border-radius:6px;">No bookable intents detected in guest chats yet. As volume grows this card will surface what guests are asking about.</div>`
         : upsell.byIntent.map(it => {
             const safeLbl = it.label.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
             return `
-              <div style="display:grid;grid-template-columns:30px 1fr 80px 90px 90px;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(107,122,144,0.06);font-size:0.84rem;">
+              <div style="display:grid;grid-template-columns:30px 1fr 100px;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(107,122,144,0.06);font-size:0.84rem;">
                 <div style="font-size:1.1rem;text-align:center;">${it.icon}</div>
                 <div style="color:var(--ink);font-weight:500;">${safeLbl}</div>
-                <div style="text-align:right;color:var(--ink-soft);">${it.count} ${it.count === 1 ? 'guest' : 'guests'}</div>
-                <div style="text-align:right;color:var(--ink-soft);font-size:0.78rem;">× ${fmtEur(it.price)}</div>
-                <div style="text-align:right;color:var(--ink);font-weight:600;">${fmtEur(it.value)}</div>
+                <div style="text-align:right;color:var(--ink);font-weight:600;">${it.count} ${it.count === 1 ? 'guest' : 'guests'}</div>
               </div>`;
           }).join('');
 
@@ -2392,7 +2424,7 @@ function renderView() {
             return `
               <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid rgba(107,122,144,0.06);font-size:0.82rem;">
                 <div style="color:var(--ink);font-weight:500;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${safeName}</div>
-                <div style="color:var(--ink-soft);font-size:0.76rem;flex-shrink:0;">${h.guests} ${h.guests === 1 ? 'guest' : 'guests'} · <strong style="color:var(--ink);">${fmtEur(h.value)}</strong></div>
+                <div style="color:var(--ink-soft);font-size:0.76rem;flex-shrink:0;">${h.guests} ${h.guests === 1 ? 'guest' : 'guests'}</div>
               </div>`;
           }).join('');
 
@@ -2410,32 +2442,28 @@ function renderView() {
               </div>`;
           }).join('');
 
-      // Pitch-deck framing — calculate a 15% concierge commission for context.
-      const commissionPct = 15;
-      const commissionValue = Math.round(upsell.totalValue * commissionPct / 100);
-
       html += `
-        <div class="section-title">Concierge Upsell Value</div>
-        <div style="background:linear-gradient(135deg,#F8FBFF 0%,#EAF3FF 100%);border:1px solid var(--border);border-left:3px solid var(--warm);border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);margin-bottom:18px;">
+        <div class="section-title">Concierge Intents</div>
+        <div style="background:var(--white);border:1px solid var(--border);border-left:3px solid var(--warm);border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);margin-bottom:18px;">
           <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:18px;line-height:1.5;">
-            Bookable services guests asked about in chat, valued at conservative platform-average prices. Each service counts <strong>once per guest</strong>, regardless of repetition. This is unmet demand the platform could capture as commission.
+            Bookable services guests brought up in chat. Each service counts <strong>once per guest</strong>, regardless of repetition. Useful for spotting which host-provided extras (transfers, tours, restaurants) guests actively ask for.
           </div>
 
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px;">
             <div style="background:var(--white);border:1px solid var(--border);border-radius:8px;padding:14px 16px;text-align:center;">
-              <div style="font-family:'Playfair Display',serif;font-size:1.9rem;color:var(--warm);font-weight:600;line-height:1;">${fmtEur(upsell.totalValue)}</div>
-              <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);margin-top:6px;font-weight:600;">Detected demand</div>
+              <div style="font-family:'Playfair Display',serif;font-size:1.9rem;color:var(--warm);font-weight:600;line-height:1;">${upsell.guestsAffected}</div>
+              <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);margin-top:6px;font-weight:600;">Guests with intent</div>
               <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:3px;">last ${(document.getElementById('timeRange') && document.getElementById('timeRange').value) || 30}d</div>
             </div>
             <div style="background:var(--white);border:1px solid var(--border);border-radius:8px;padding:14px 16px;text-align:center;">
-              <div style="font-family:'Playfair Display',serif;font-size:1.9rem;color:var(--blue);font-weight:600;line-height:1;">${upsell.guestsAffected}</div>
-              <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);margin-top:6px;font-weight:600;">Guests with intent</div>
-              <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:3px;">${upsell.hostsAffected} ${upsell.hostsAffected === 1 ? 'host' : 'hosts'} affected</div>
+              <div style="font-family:'Playfair Display',serif;font-size:1.9rem;color:var(--blue);font-weight:600;line-height:1;">${upsell.hostsAffected}</div>
+              <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);margin-top:6px;font-weight:600;">Hosts affected</div>
+              <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:3px;">at least one detected intent</div>
             </div>
             <div style="background:var(--white);border:1px solid var(--border);border-radius:8px;padding:14px 16px;text-align:center;">
-              <div style="font-family:'Playfair Display',serif;font-size:1.9rem;color:#2f7a44;font-weight:600;line-height:1;">${fmtEur(commissionValue)}</div>
-              <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);margin-top:6px;font-weight:600;">@ ${commissionPct}% commission</div>
-              <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:3px;">platform revenue est.</div>
+              <div style="font-family:'Playfair Display',serif;font-size:1.9rem;color:#2f7a44;font-weight:600;line-height:1;">${upsell.byIntent.length}</div>
+              <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);margin-top:6px;font-weight:600;">Distinct intents</div>
+              <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:3px;">unique service categories</div>
             </div>
           </div>
 
@@ -2443,19 +2471,17 @@ function renderView() {
             <div>
               <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:6px;">By service</div>
               ${upsell.byIntent.length > 0 ? `
-              <div style="display:grid;grid-template-columns:30px 1fr 80px 90px 90px;align-items:center;gap:10px;padding:0 0 6px;border-bottom:2px solid rgba(107,122,144,0.12);">
+              <div style="display:grid;grid-template-columns:30px 1fr 100px;align-items:center;gap:10px;padding:0 0 6px;border-bottom:2px solid rgba(107,122,144,0.12);">
                 <div></div>
                 <div style="font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;">Service</div>
                 <div style="font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;text-align:right;">Demand</div>
-                <div style="font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;text-align:right;">Avg price</div>
-                <div style="font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;text-align:right;">Value</div>
               </div>` : ''}
               ${intentRows}
             </div>
 
             ${upsell.byHost.length > 0 ? `
             <div>
-              <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:6px;">Top hosts by detected demand</div>
+              <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:6px;">Top hosts by detected intents</div>
               ${conciergeHostRows}
             </div>` : ''}
           </div>
@@ -2467,7 +2493,7 @@ function renderView() {
           </div>` : ''}
 
           <div style="margin-top:14px;font-size:0.68rem;color:var(--ink-soft);font-style:italic;line-height:1.5;">
-            Methodology: phrase-matching against a curated bilingual (EN/IT) dictionary of bookable services. Prices are conservative southern-Italy averages. Each service counts once per guest. Numbers undershoot rather than overstate — actual demand is likely higher (free-form requests, dialect, typos not captured).
+            Methodology: phrase-matching against a curated bilingual (EN/IT) dictionary. Each service counts once per guest. No pricing is inferred — a real revenue figure only shows up here if the pilot ledger is filled out on the Ops tab.
           </div>
         </div>`;
 
@@ -2582,51 +2608,10 @@ function renderView() {
       setTimeout(renderRecoRegistry, 0);
     }
 
-    const hostRowsExisting = allProperties.map(p => {
-      const email = p.owner_id ? (userIdToEmail[p.owner_id] || null) : null;
-      const stats = email ? (userStats[email] || { sessions: new Set(), events: 0, saves: 0, exports: 0, bookings: 0, firstSeen: null, lastSeen: null }) : { sessions: new Set(), events: 0, saves: 0, exports: 0, bookings: 0, firstSeen: null, lastSeen: null };
-      return { ...p, _email: email, _stats: stats };
-    });
-
-    const ownedEmails = new Set(hostRowsExisting.map(h => h._email).filter(Boolean));
-    const orphanedUsers = Object.entries(userStats).filter(([email]) => !ownedEmails.has(email));
-
-    html += `<div class="section-title">Hosts & Properties (${allProperties.length})</div>
-      <div style="overflow-x:auto;margin-bottom:24px;">
-      <table class="data-table" style="width:100%;">
-        <thead><tr><th>Property</th><th>Host</th><th>City</th><th>Guests</th><th>Setup</th><th>Activity</th><th>Last Active</th><th>Actions</th></tr></thead>
-        <tbody>
-          ${hostRowsExisting.sort((a, b) => (b._stats.lastSeen || '').localeCompare(a._stats.lastSeen || '')).map(p => {
-            const s = p._stats;
-            const setupScore = [p.wifi_name, p.host_names, p.host_phone, p.address, p.cir_code].filter(Boolean).length;
-            const setupPct = Math.round(setupScore / 5 * 100);
-            const setupColor = setupPct >= 80 ? 'var(--green)' : setupPct >= 40 ? 'var(--amber)' : 'var(--red)';
-            return `<tr class="${adminRowClass(p)}">
-              <td><strong>${p.name || 'Unnamed'}</strong><br><span style="font-size:0.62rem;color:var(--ink-soft);font-family:monospace;">${p.id.substring(0,8)}…</span></td>
-              <td>${p._email ? `<strong>${p._email.split('@')[0]}</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">${p._email}</span>` : `${p.host_names || '—'}<br><span style="font-size:0.65rem;color:var(--ink-soft)">${p.host_phone || 'No account'}</span>`}</td>
-              <td>${p.city || '—'}${p.region ? '<br><span style="font-size:0.65rem;color:var(--ink-soft)">' + p.region + '</span>' : ''}</td>
-              <td style="text-align:center;font-weight:600;">${p._checkin_count}</td>
-              <td style="text-align:center;"><span style="color:${setupColor};font-weight:600;">${setupPct}%</span></td>
-              <td style="font-size:0.72rem;">${s.sessions.size || 0} sess · ${s.saves || 0} saves · ${s.exports || 0} exp</td>
-              <td style="font-size:0.72rem;color:var(--ink-soft);">${s.lastSeen ? new Date(s.lastSeen).toLocaleDateString() : '—'}</td>
-              <td><div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
-                <button onclick="viewAsHost('${p.id}')" style="padding:4px 8px;background:#005BFF;color:#fff;border:none;border-radius:4px;font-size:0.65rem;cursor:pointer;white-space:nowrap;">👁 Console</button>
-                <a href="/?p=${p.id}" target="_blank" style="padding:4px 8px;background:#6B7A90;color:#fff;border-radius:4px;font-size:0.65rem;text-decoration:none;white-space:nowrap;">👁 Guest app</a>
-                ${p._email ? `<button onclick="document.getElementById('userFilter').value='${p._email}';renderView();" style="padding:4px 8px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.65rem;cursor:pointer;color:var(--warm);font-weight:500;white-space:nowrap;">📊</button>` : ''}
-                ${adminRowActions('properties', p)}
-              </div></td>
-            </tr>`;
-          }).join('') || '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--ink-soft);">No properties yet.</td></tr>'}
-          ${orphanedUsers.map(([email, s]) => `<tr style="opacity:0.55;">
-            <td style="font-style:italic;color:var(--ink-soft);">No property</td>
-            <td><strong>${email.split('@')[0]}</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">${email}</span></td>
-            <td>—</td><td style="text-align:center;">0</td><td>—</td>
-            <td style="font-size:0.72rem;">${s.sessions.size} sess · ${s.saves} saves</td>
-            <td style="font-size:0.72rem;color:var(--ink-soft);">${new Date(s.lastSeen).toLocaleDateString()}</td>
-            <td><button onclick="document.getElementById('userFilter').value='${email}';renderView();" style="padding:4px 8px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.65rem;cursor:pointer;color:var(--warm);">📊</button></td>
-          </tr>`).join('')}
-        </tbody>
-      </table></div>`;
+    // Round 35: Hosts & Properties table moved to the Ops tab
+    // (renderHostsPropertiesTable). It's the support / "view as host"
+    // path — putting it on Ops keeps Deep dive analytical rather than
+    // administrative.
 
     // ════════════════════════════════════════════════════════════════════
     // ROUND 33 — AI USAGE (per property, current calendar month)
@@ -2638,16 +2623,13 @@ function renderView() {
     // the side of the alarming number for an admin panel.
     // ════════════════════════════════════════════════════════════════════
     const _fmtNum = (n) => (n || 0).toLocaleString('en-GB');
-    const _fmtEUR = (usd) => '€' + (usd * 0.92).toFixed(2); // very rough EUR
-    // Sonnet 4.5 list prices, per 1M tokens.
-    const _pxInPerM  = 3.00;
-    const _pxOutPerM = 15.00;
+    const _fmtEUR = (usd) => '€' + (usd * USD_TO_EUR).toFixed(2);
     const _rowsUsage = allProperties.map(p => {
       const u = apiUsageByProp[p.id] || { input: 0, output: 0, chat: 0, scan: 0 };
       const total  = u.input + u.output;
       const cap    = Number(p.ai_monthly_token_cap || 2000000);
       const pct    = cap > 0 ? Math.min(100, Math.round((total / cap) * 100)) : 0;
-      const costUsd = (u.input * _pxInPerM + u.output * _pxOutPerM) / 1_000_000;
+      const costUsd = (u.input * SONNET_PRICE_USD_INPUT_PER_M + u.output * SONNET_PRICE_USD_OUTPUT_PER_M) / 1_000_000;
       const barColor = pct >= 90 ? 'var(--red)' : pct >= 60 ? 'var(--amber)' : 'var(--green)';
       return { p, u, total, cap, pct, costUsd, barColor };
     }).sort((a, b) => b.total - a.total);
@@ -2657,7 +2639,7 @@ function renderView() {
       <div class="section-title">AI Usage — Current Month (${_fmtNum(_grandTotal)} tokens · ~${_fmtEUR(_grandCost)})</div>
       <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px 6px;box-shadow:var(--shadow);margin-bottom:18px;overflow-x:auto;">
         <div style="font-size:0.72rem;color:var(--ink-soft);margin-bottom:10px;">
-          Combined input + output tokens for /api/chat + /api/scan-document per property this month, versus each property's ai_monthly_token_cap. Cost is a rough estimate from Sonnet 4.5 list pricing (${_pxInPerM}/${_pxOutPerM} per M tokens).
+          Combined input + output tokens for /api/chat + /api/scan-document per property this month, versus each property's ai_monthly_token_cap. Cost is a rough estimate from Sonnet 4.5 list pricing (${SONNET_PRICE_USD_INPUT_PER_M}/${SONNET_PRICE_USD_OUTPUT_PER_M} per M tokens).
         </div>
         <table class="data-table" style="width:100%;">
           <thead><tr><th>Property</th><th>Chat calls</th><th>Scan calls</th><th>Tokens (in / out)</th><th>Monthly cap</th><th>Usage</th><th>Est. cost</th></tr></thead>
@@ -2685,104 +2667,591 @@ function renderView() {
         </table>
       </div>`;
 
-    // ════════════════════════════════════════════════════════════════════
-    // ROUND 12 — DATA RETENTION
-    // Shows the policy, recent purge log, and a "Run preview" button so
-    // admin can see what the cron WOULD delete before the next nightly
-    // run. Live purge runs automatically at 02:00 UTC daily.
-    // ════════════════════════════════════════════════════════════════════
-    html += `
-      <div class="section-title">Data Retention</div>
-      <div id="retentionContainer" style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:18px 22px;box-shadow:var(--shadow);margin-bottom:18px;">
-        <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:14px;line-height:1.6;">
-          Automatic daily cleanup at 03:00 Europe/Rome. Personal data is deleted on a tiered schedule; aggregated analytics are preserved indefinitely for year-over-year analysis.
-        </div>
-
-        <div id="retentionLaunchStatus" style="margin-bottom:14px;">
-          <div style="font-size:0.74rem;color:var(--ink-soft);padding:8px;">Loading launch status…</div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:18px;">
-          ${[
-            { icon: '💬', label: 'Resolved chats',    days: 90, note: 'after the AI handoff back' },
-            { icon: '📁', label: 'Archived chats',    days: 30, note: 'after the host archives' },
-            { icon: '📊', label: 'Analytics events',  days: 180, note: 'aggregated to monthly totals first' },
-            { icon: '🧪', label: 'Test rows',         days: 30, note: 'across all tables' },
-            { icon: '🗑',  label: 'Soft-deleted rows', days: 30, note: 'across all tables' },
-            { icon: '📷', label: 'Document photos',   days: 30, note: 'after guest departure (Garante guidance)' },
-            { icon: '🛂', label: 'Check-in data',     days: '5 yr', note: 'Italian fiscal requirement — never auto-purged' },
-          ].map(p => `
-            <div style="background:rgba(250,246,240,0.6);border:1px solid rgba(107,122,144,0.06);border-radius:8px;padding:10px 12px;">
-              <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
-                <span style="font-size:1.05rem;">${p.icon}</span>
-                <span style="font-weight:600;color:var(--ink);font-size:0.85rem;">${p.label}</span>
-              </div>
-              <div style="font-family:'Playfair Display',serif;font-size:1.3rem;color:var(--warm);font-weight:600;line-height:1;">${typeof p.days === 'number' ? p.days + 'd' : p.days}</div>
-              <div style="font-size:0.7rem;color:var(--ink-soft);margin-top:3px;line-height:1.4;">${p.note}</div>
-            </div>
-          `).join('')}
-        </div>
-
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
-          <button onclick="runRetentionPreview()" id="retentionPreviewBtn" style="padding:8px 14px;background:var(--warm);color:#fff;border:none;border-radius:6px;font-size:0.82rem;cursor:pointer;font-family:inherit;">🔍 Run preview</button>
-          <button onclick="loadRetentionLog()" style="padding:8px 14px;background:var(--white);color:var(--ink-soft);border:1px solid var(--border);border-radius:6px;font-size:0.82rem;cursor:pointer;font-family:inherit;">↻ Refresh log</button>
-          <span style="font-size:0.72rem;color:var(--ink-soft);">Preview = dry run; nothing is deleted. The nightly cron's mode is shown above.</span>
-        </div>
-
-        <div id="retentionPreviewResult"></div>
-
-        <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin:18px 0 6px;">Recent purge runs</div>
-        <div id="retentionLogTable">
-          <div style="font-size:0.78rem;color:var(--ink-soft);padding:8px;">Loading…</div>
-        </div>
-      </div>`;
-
-    // Trigger log + launch-status fetch after innerHTML lands
-    setTimeout(loadRetentionLog, 0);
-    setTimeout(loadRetentionLaunchStatus, 0);
-
-    // ══════════════════════════════════════════════════════════════════════
-    // ROUND 14.2 — GDPR objections (chat Q&A capture)
-    // Compact card for recording right-to-object requests. The capture
-    // cron skips listed booking codes; existing rows for those codes are
-    // hard-deleted at record time.
-    // ══════════════════════════════════════════════════════════════════════
-    html += `
-      <div class="section-title">GDPR Objections (Chat Q&amp;A)</div>
-      <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:18px 22px;box-shadow:var(--shadow);margin-bottom:18px;">
-        <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:14px;line-height:1.5;">
-          When a guest emails <strong>info@welcomebnb.it</strong> objecting to anonymized chat capture (GDPR Art. 21), record their booking code here. The capture cron will skip it on future runs, and any rows already in the dataset for that booking will be deleted immediately.
-        </div>
-
-        <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;">
-          <div style="flex:1;min-width:160px;">
-            <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:4px;">Booking code</div>
-            <input id="gdprBookingCode" placeholder="TRU-XXXXXX" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.86rem;font-family:monospace;">
-          </div>
-          <div style="flex:1.5;min-width:180px;">
-            <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:4px;">Reason / note</div>
-            <input id="gdprReason" placeholder="GDPR objection email 2026-05-15" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;">
-          </div>
-          <div style="flex:1.2;min-width:160px;">
-            <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:4px;">Contact email (optional)</div>
-            <input id="gdprContact" placeholder="guest@example.com" type="email" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;">
-          </div>
-          <button id="gdprRecordBtn" onclick="recordGdprExclusion()" style="padding:8px 16px;background:#b03939;color:#fff;border:none;border-radius:6px;font-size:0.82rem;cursor:pointer;font-family:inherit;white-space:nowrap;">⛔ Record objection</button>
-        </div>
-
-        <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin:14px 0 6px;">Recorded objections</div>
-        <div id="gdprExclusionsTable">
-          <div style="font-size:0.78rem;color:var(--ink-soft);padding:8px;font-style:italic;">Loading…</div>
-        </div>
-      </div>`;
-
-    setTimeout(loadGdprExclusions, 0);
+    // Round 35: Data Retention, GDPR Objections, and the Event Log all
+    // moved to the Ops tab. They are administrative panels — cleanup
+    // policy display, GDPR exclusion capture, raw event stream — that
+    // don't belong in an analytics deep-dive.
   }
 
-  // Event log
+  document.getElementById('content').innerHTML = html;
+}
+
+/* ══════════════════════════════════════
+   ROUND 35 — PILOT TAB (default)
+
+   Zone A: 6-card scoreboard (paying hosts, pilot days, links generated,
+           check-ins completed, chat sends, AI cost so far).
+   Zone B: per-host status cards. Classifier picks Not started / Stuck /
+           Idle / Healthy; sorted with Stuck/Not started first. Clicking a
+           card sets #userFilter and switches to Deep dive.
+   Zone C: recent activity feed, most-recent 25 platform events, phrased
+           through EVENT_PHRASES (unmapped events are skipped).
+
+   Deliberate constraints:
+   - No euro figure is emitted unless it comes from api_usage tokens ×
+     SONNET_PRICE (real transactions) or pilot_hosts.amount_paid (typed
+     into the ledger by the operator).
+   - Sparklines are 14 stacked divs — no chart library, no npm dep.
+══════════════════════════════════════ */
+function renderPilotTab() {
+  // ── Property → host-email map. Same shape as renderDeepDive uses so
+  // hostShort labels stay consistent between tabs.
+  const userIdToEmail = {};
+  allEvents.forEach(e => { if (e.user_id && e.user_email) userIdToEmail[e.user_id] = e.user_email; });
+  const propToEmail = {};
+  allProperties.forEach(p => {
+    if (p.owner_id && userIdToEmail[p.owner_id]) propToEmail[p.id] = userIdToEmail[p.owner_id];
+  });
+  allEvents.forEach(e => {
+    if (e.property_id && e.user_email && !propToEmail[e.property_id]) {
+      propToEmail[e.property_id] = e.user_email;
+    }
+  });
+
+  // ── ZONE A: scoreboard ─────────────────────────────────────────────
+  const payingHosts = pilotHosts.filter(h => h.status === 'paid').length;
+  const pilotHostsInFlight = pilotHosts.filter(h => h.status === 'pilot' || h.status === 'paid');
+  const earliestStart = pilotHostsInFlight
+    .map(h => h.pilot_started_at).filter(Boolean).sort()[0];
+  const pilotDay = earliestStart
+    ? Math.max(0, Math.floor((Date.now() - new Date(earliestStart + 'T00:00:00Z').getTime()) / 86400000))
+    : null;
+
+  const linksGenerated  = allEvents.filter(e => e.event_type === 'generate_booking').length;
+  const checkinsDone    = allCheckins.length;
+  const chatSends       = (allChatMessages || []).filter(m => m.sender === 'guest').length;
+
+  // AI cost = sum of tokens × Sonnet 4.5 pricing, converted to EUR. Only
+  // input/output columns are used; token_mint rows are excluded upstream.
+  let totalInput = 0, totalOutput = 0;
+  Object.values(apiUsageByProp).forEach(a => { totalInput += a.input; totalOutput += a.output; });
+  const aiCostUsd = (totalInput  / 1e6) * SONNET_PRICE_USD_INPUT_PER_M
+                  + (totalOutput / 1e6) * SONNET_PRICE_USD_OUTPUT_PER_M;
+  const aiCostEur = aiCostUsd * USD_TO_EUR;
+
+  // Total revenue from the ledger (typed by the operator). If none, we
+  // print "—" rather than a fake €0.
+  const revenueEur = pilotHosts.reduce((s, h) => s + (Number(h.amount_paid) || 0), 0);
+
+  const scoreCards = [
+    { label: 'Paying hosts',      value: String(payingHosts),
+      sub: pilotHostsInFlight.length > 0 ? `${pilotHostsInFlight.length} in the pilot` : 'no active pilot yet' },
+    { label: 'Pilot day',         value: pilotDay !== null ? `Day ${pilotDay}` : '—',
+      sub: earliestStart ? `since ${earliestStart}` : 'no pilot start recorded' },
+    { label: 'Links generated',   value: String(linksGenerated),
+      sub: 'in the selected window' },
+    { label: 'Check-ins done',    value: String(checkinsDone),
+      sub: 'all time (excludes test)' },
+    { label: 'Guest chat sends',  value: String(chatSends),
+      sub: 'in the selected window' },
+    { label: 'AI cost this month',
+      value: aiCostUsd > 0 ? `€${aiCostEur.toFixed(2)}` : '€0.00',
+      sub: revenueEur > 0
+        ? `vs. €${revenueEur.toFixed(2)} paid` : 'no revenue recorded' },
+  ];
+
+  const zoneA = `
+    <div class="section-title">Pilot scoreboard</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:20px;">
+      ${scoreCards.map(c => `
+        <div style="background:var(--white);border:1px solid var(--border);border-radius:8px;padding:14px;">
+          <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-soft);margin-bottom:6px;">${escapeHtml(c.label)}</div>
+          <div style="font-size:1.5rem;font-weight:600;color:var(--ink);margin-bottom:4px;">${escapeHtml(c.value)}</div>
+          <div style="font-size:0.72rem;color:var(--ink-soft);">${escapeHtml(c.sub)}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  // ── ZONE B: per-host status cards ───────────────────────────────────
+  const zoneB = renderPilotHostCards(propToEmail);
+
+  // ── ZONE C: recent activity feed ────────────────────────────────────
+  const zoneC = renderPilotActivityFeed(propToEmail);
+
+  document.getElementById('content').innerHTML = zoneA + zoneB + zoneC;
+}
+
+// Zone B — one card per host. Classifier picks the status label, sparkline
+// is 14 stacked divs (last 14 days of guest activity).
+function renderPilotHostCards(propToEmail) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dayMs = 86400000;
+  const dayKey = (d) => d.toISOString().slice(0, 10);
+  const last14 = Array.from({length: 14}, (_, i) => dayKey(new Date(today.getTime() - (13 - i) * dayMs)));
+
+  const byHost = {}; // email → { properties, linksGenerated, guestEventsByDay, lastGuestEventAt, completed }
+  const ensure = (email) => {
+    if (!byHost[email]) byHost[email] = {
+      email, properties: new Set(), linksGenerated: 0, completed: 0,
+      guestEventsByDay: Object.fromEntries(last14.map(k => [k, 0])),
+      lastGuestEventAt: null,
+    };
+    return byHost[email];
+  };
+
+  // Register every host known to the ledger, even if they have no events
+  // yet — Zone B is where "hasn't started" surfaces.
+  pilotHosts.forEach(h => ensure(h.host_email));
+  // And every host that owns a property.
+  Object.values(propToEmail).forEach(e => ensure(e));
+
+  allProperties.forEach(p => {
+    const email = propToEmail[p.id];
+    if (email && byHost[email]) byHost[email].properties.add(p.id);
+  });
+
+  allEvents.forEach(e => {
+    const email = propToEmail[e.property_id] || (e.user_email || null);
+    if (!email || !byHost[email]) return;
+    if (e.event_type === 'generate_booking') byHost[email].linksGenerated++;
+    // Guest activity = anything starting with guest_
+    if (String(e.event_type || '').startsWith('guest_')) {
+      const dk = (e.created_at || '').slice(0, 10);
+      if (dk in byHost[email].guestEventsByDay) byHost[email].guestEventsByDay[dk]++;
+      if (!byHost[email].lastGuestEventAt || e.created_at > byHost[email].lastGuestEventAt) {
+        byHost[email].lastGuestEventAt = e.created_at;
+      }
+      if (e.event_type === 'guest_checkin_completed') byHost[email].completed++;
+    }
+  });
+
+  // Classifier — evaluate in order, first match wins.
+  const classify = (h) => {
+    const propCount   = h.properties.size;
+    const totalRecent = last14.reduce((s, k) => s + h.guestEventsByDay[k], 0);
+    const daysSince   = h.lastGuestEventAt
+      ? Math.floor((Date.now() - new Date(h.lastGuestEventAt).getTime()) / dayMs)
+      : Infinity;
+
+    if (propCount === 0 && h.linksGenerated === 0) {
+      return { key: 'not_started', label: 'Not started',
+        diagnosis: 'No property saved, no link generated yet.',
+        color: '#b03a3a', order: 0 };
+    }
+    if (h.linksGenerated >= CLASSIFY_THRESHOLDS.stuckMinLinks && h.completed === 0) {
+      return { key: 'stuck', label: 'Stuck',
+        diagnosis: `${h.linksGenerated} links generated, no check-in ever completed.`,
+        color: '#b03a3a', order: 1 };
+    }
+    if (daysSince > CLASSIFY_THRESHOLDS.idleGuestEventWindowDays) {
+      return { key: 'idle', label: 'Idle',
+        diagnosis: h.lastGuestEventAt
+          ? `Last guest activity ${daysSince}d ago.`
+          : 'No guest activity recorded.',
+        color: '#9a6b00', order: 2 };
+    }
+    return { key: 'healthy', label: 'Healthy',
+      diagnosis: totalRecent > 0
+        ? `${totalRecent} guest event${totalRecent === 1 ? '' : 's'} in the last 14 days.`
+        : 'Active property, quiet week.',
+      color: '#2f7d32', order: 3 };
+  };
+
+  const ledgerByEmail = {};
+  pilotHosts.forEach(h => { ledgerByEmail[h.host_email] = h; });
+
+  const cards = Object.values(byHost)
+    .filter(h => h.email && h.email !== '_unattributed')
+    .map(h => {
+      const state = classify(h);
+      const led   = ledgerByEmail[h.email] || null;
+      return { ...h, state, ledger: led };
+    })
+    .sort((a, b) => (a.state.order - b.state.order) || a.email.localeCompare(b.email));
+
+  if (cards.length === 0) {
+    return `<div class="section-title">Pilot hosts</div>
+      <div class="loading">No hosts yet. Add rows via the Ops tab's pilot_hosts editor to start tracking.</div>`;
+  }
+
+  const html = cards.map(c => {
+    const max = Math.max(1, ...last14.map(k => c.guestEventsByDay[k]));
+    const sparkline = last14.map(k => {
+      const v = c.guestEventsByDay[k];
+      const h = Math.max(2, Math.round((v / max) * 32));
+      const tint = v === 0 ? 'rgba(0,0,0,0.08)' : 'var(--warm)';
+      return `<div title="${k}: ${v}" style="width:6px;height:${h}px;background:${tint};border-radius:1px;"></div>`;
+    }).join('');
+
+    const ledger = c.ledger
+      ? `<div style="margin-top:6px;font-size:0.7rem;color:var(--ink-soft);">
+           Status: <strong style="color:var(--ink);">${escapeHtml(c.ledger.status)}</strong>
+           ${Number(c.ledger.amount_paid) > 0 ? ` · €${Number(c.ledger.amount_paid).toFixed(2)}` : ''}
+         </div>`
+      : `<div style="margin-top:6px;font-size:0.7rem;color:var(--ink-soft);">Not in ledger.</div>`;
+
+    const safeEmail = escapeHtml(c.email);
+    return `
+      <button
+        onclick="document.getElementById('userFilter').value='${safeEmail}';setActiveTab('deepdive');"
+        style="text-align:left;background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px;cursor:pointer;font-family:inherit;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px;">
+          <div style="font-weight:600;color:var(--ink);font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safeEmail}</div>
+          <span style="font-size:0.66rem;padding:2px 8px;background:${c.state.color}22;color:${c.state.color};border-radius:3px;white-space:nowrap;">${escapeHtml(c.state.label)}</span>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:2px;height:34px;margin-bottom:6px;">${sparkline}</div>
+        <div style="font-size:0.72rem;color:var(--ink-soft);line-height:1.35;">${escapeHtml(c.state.diagnosis)}</div>
+        <div style="margin-top:4px;font-size:0.68rem;color:var(--ink-soft);">
+          ${c.properties.size} propert${c.properties.size === 1 ? 'y' : 'ies'} ·
+          ${c.linksGenerated} link${c.linksGenerated === 1 ? '' : 's'} ·
+          ${c.completed} check-in${c.completed === 1 ? '' : 's'}
+        </div>
+        ${ledger}
+      </button>
+    `;
+  }).join('');
+
+  return `
+    <div class="section-title">Pilot hosts (${cards.length})</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:24px;">
+      ${html}
+    </div>
+  `;
+}
+
+// Zone C — last 25 platform events, phrased through EVENT_PHRASES.
+function renderPilotActivityFeed(propToEmail) {
+  const rows = allEvents
+    .filter(e => EVENT_PHRASES[e.event_type])
+    .slice(0, 25);
+
+  if (rows.length === 0) {
+    return `<div class="section-title">Recent activity</div>
+      <div class="loading">Nothing recent to show.</div>`;
+  }
+
+  return `
+    <div class="section-title">Recent activity</div>
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:8px;">
+      ${rows.map((e, i) => {
+        const when = new Date(e.created_at).toLocaleString();
+        const host = propToEmail[e.property_id] || e.user_email || null;
+        const hostBit = host ? ` · <span style="color:var(--ink-soft);">${escapeHtml(host)}</span>` : '';
+        return `<div style="padding:10px 14px;${i < rows.length - 1 ? 'border-bottom:1px solid var(--border);' : ''}">
+          <div style="font-size:0.82rem;color:var(--ink);">${escapeHtml(EVENT_PHRASES[e.event_type])}${hostBit}</div>
+          <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:2px;">${escapeHtml(when)}</div>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+// Small HTML escape used throughout the Pilot tab. Doesn't need to be
+// XSS-perfect (data is our own), just enough to survive a rogue "<" in a
+// user email or free-text notes field.
+function escapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/* ══════════════════════════════════════
+   ROUND 35 — OPS TAB
+
+   Everything that isn't a pilot-facing scoreboard or an analytics
+   deep-dive: the pilot_hosts editor (who's paying, what stage, notes),
+   Hosts & Properties (support path — viewAsHost must keep working),
+   Data Retention, GDPR Objections, Event Log.
+══════════════════════════════════════ */
+function renderOpsTab() {
+  // Rebuild the lightweight per-host aggregate the Hosts & Properties
+  // table wants. Same shape as renderDeepDive's version but sourced from
+  // allEvents (unfiltered) so the Ops table reflects every host, not just
+  // the current userFilter selection.
+  const userIdToEmail = {};
+  allEvents.forEach(e => { if (e.user_id && e.user_email) userIdToEmail[e.user_id] = e.user_email; });
+  const userStats = {};
+  allEvents.forEach(e => {
+    const u = e.user_email; if (!u) return;
+    if (!userStats[u]) userStats[u] = { sessions: new Set(), events: 0, saves: 0, exports: 0, bookings: 0, firstSeen: e.created_at, lastSeen: e.created_at };
+    userStats[u].events++;
+    if (e.session_id) userStats[u].sessions.add(e.session_id);
+    if (String(e.event_type || '').startsWith('save_'))   userStats[u].saves++;
+    if (String(e.event_type || '').startsWith('export_')) userStats[u].exports++;
+    if (e.event_type === 'generate_booking') userStats[u].bookings++;
+    if (e.created_at < userStats[u].firstSeen) userStats[u].firstSeen = e.created_at;
+    if (e.created_at > userStats[u].lastSeen)  userStats[u].lastSeen  = e.created_at;
+  });
+
+  const html =
+    renderPilotHostsEditor() +
+    renderHostsPropertiesTable(userStats, userIdToEmail) +
+    renderRetentionSection() +
+    renderGdprSection() +
+    renderOpsEventLog();
+
+  document.getElementById('content').innerHTML = html;
+
+  // Deferred subview loaders (same pattern the deep-dive tab uses).
+  setTimeout(loadRetentionLog, 0);
+  setTimeout(loadRetentionLaunchStatus, 0);
+  setTimeout(loadGdprExclusions, 0);
+}
+
+// ── Pilot hosts ledger editor ──────────────────────────────────────────
+// One row per host_email in pilot_hosts. Status dropdown, amount input,
+// pilot_started_at date, free-text notes. Save button uses the Round 20.2
+// pattern (.update()...select() + check returned rows length) so a silent
+// RLS block is loud instead of returning `{ data: [], error: null }`.
+function renderPilotHostsEditor() {
+  const STATUSES = ['prospect', 'pilot', 'paid', 'churned'];
+  const rowsHtml = pilotHosts.length === 0
+    ? `<tr><td colspan="6" style="text-align:center;padding:16px;color:var(--ink-soft);">No rows yet. Add one above.</td></tr>`
+    : pilotHosts.map(h => {
+        const id = escapeHtml(h.id);
+        const statusOpts = STATUSES.map(s =>
+          `<option value="${s}" ${s === h.status ? 'selected' : ''}>${s}</option>`).join('');
+        return `<tr>
+          <td style="font-size:0.8rem;font-family:monospace;">${escapeHtml(h.host_email)}</td>
+          <td>
+            <select id="pilot_status_${id}" style="padding:4px 8px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;font-family:inherit;">
+              ${statusOpts}
+            </select>
+          </td>
+          <td>
+            <input id="pilot_amount_${id}" type="number" step="0.01" min="0" value="${Number(h.amount_paid || 0)}"
+              style="width:90px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;font-family:monospace;text-align:right;">
+          </td>
+          <td>
+            <input id="pilot_started_${id}" type="date" value="${escapeHtml(h.pilot_started_at || '')}"
+              style="padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;font-family:inherit;">
+          </td>
+          <td>
+            <input id="pilot_notes_${id}" type="text" value="${escapeHtml(h.notes || '')}" placeholder="notes"
+              style="width:100%;min-width:180px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;font-family:inherit;">
+          </td>
+          <td style="white-space:nowrap;">
+            <button onclick="savePilotHost('${id}')" style="padding:4px 10px;background:var(--warm);color:#fff;border:none;border-radius:4px;font-size:0.7rem;cursor:pointer;font-family:inherit;">Save</button>
+            <button onclick="deletePilotHost('${id}', '${escapeHtml(h.host_email)}')" style="padding:4px 10px;background:transparent;color:#b03a3a;border:1px solid #b03a3a;border-radius:4px;font-size:0.7rem;cursor:pointer;font-family:inherit;margin-left:4px;">Delete</button>
+          </td>
+        </tr>`;
+      }).join('');
+
+  return `
+    <div class="section-title">Pilot hosts ledger</div>
+    <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:10px;line-height:1.5;">
+      Manual "who's paying" register — the Pilot tab reads this to compute revenue against AI cost. No billing system wired up yet, so amounts are typed in when a payment lands.
+    </div>
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;box-shadow:var(--shadow);margin-bottom:12px;">
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;">
+        <div style="flex:2;min-width:200px;">
+          <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:4px;">Host email</div>
+          <input id="newPilotEmail" type="email" placeholder="host@example.com"
+            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;font-family:inherit;">
+        </div>
+        <div style="flex:1;min-width:120px;">
+          <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:4px;">Status</div>
+          <select id="newPilotStatus" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;font-family:inherit;">
+            ${STATUSES.map(s => `<option value="${s}" ${s === 'prospect' ? 'selected' : ''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        <div style="flex:1;min-width:100px;">
+          <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:4px;">Amount (€)</div>
+          <input id="newPilotAmount" type="number" step="0.01" min="0" value="0"
+            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;font-family:monospace;text-align:right;">
+        </div>
+        <div style="flex:1;min-width:140px;">
+          <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:4px;">Pilot started</div>
+          <input id="newPilotStarted" type="date"
+            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;font-family:inherit;">
+        </div>
+        <button onclick="addPilotHost()" style="padding:8px 16px;background:var(--warm);color:#fff;border:none;border-radius:6px;font-size:0.82rem;cursor:pointer;font-family:inherit;white-space:nowrap;">+ Add host</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;margin-bottom:24px;">
+      <table class="data-table" style="width:100%;">
+        <thead><tr><th>Host</th><th>Status</th><th>Amount (€)</th><th>Pilot start</th><th>Notes</th><th>Actions</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// Round 20.2 pattern — INSERT with .select() and check the returned row.
+async function addPilotHost() {
+  const email = (document.getElementById('newPilotEmail')?.value || '').trim().toLowerCase();
+  const status = document.getElementById('newPilotStatus')?.value || 'prospect';
+  const amount = Number(document.getElementById('newPilotAmount')?.value || 0);
+  const started = document.getElementById('newPilotStarted')?.value || null;
+  if (!email) { adminToast('Enter an email first', 'error'); return; }
+
+  const row = {
+    host_email: email,
+    status,
+    amount_paid: amount,
+    pilot_started_at: started || null,
+  };
+  const { data, error } = await sb.from('pilot_hosts').insert(row).select();
+  if (error) { console.error(error); adminToast('Insert failed: ' + error.message, 'error'); return; }
+  if (!data || data.length === 0) {
+    adminToast('Insert returned 0 rows — RLS blocked the write.', 'error');
+    return;
+  }
+  adminToast('Host added', 'ok');
+  loadData();
+}
+
+async function savePilotHost(id) {
+  const status = document.getElementById(`pilot_status_${id}`)?.value;
+  const amount = Number(document.getElementById(`pilot_amount_${id}`)?.value || 0);
+  const started = document.getElementById(`pilot_started_${id}`)?.value || null;
+  const notes = document.getElementById(`pilot_notes_${id}`)?.value || null;
+
+  const patch = { status, amount_paid: amount, pilot_started_at: started || null, notes };
+  const { data, error } = await sb.from('pilot_hosts').update(patch).eq('id', id).select();
+  if (error) { console.error(error); adminToast('Save failed: ' + error.message, 'error'); return; }
+  if (!data || data.length === 0) {
+    adminToast('Update returned 0 rows — RLS blocked the write.', 'error');
+    return;
+  }
+  adminToast('Saved', 'ok');
+  loadData();
+}
+
+async function deletePilotHost(id, email) {
+  if (!confirm(`Delete pilot ledger row for ${email}?`)) return;
+  const { error } = await sb.from('pilot_hosts').delete().eq('id', id);
+  if (error) { console.error(error); adminToast('Delete failed: ' + error.message, 'error'); return; }
+  adminToast('Deleted', 'ok');
+  loadData();
+}
+
+// ── Hosts & Properties table (support path — viewAsHost() must survive) ─
+function renderHostsPropertiesTable(userStats, userIdToEmail) {
+  const hostRowsExisting = allProperties.map(p => {
+    const email = p.owner_id ? (userIdToEmail[p.owner_id] || null) : null;
+    const stats = email ? (userStats[email] || { sessions: new Set(), events: 0, saves: 0, exports: 0, bookings: 0, firstSeen: null, lastSeen: null }) : { sessions: new Set(), events: 0, saves: 0, exports: 0, bookings: 0, firstSeen: null, lastSeen: null };
+    return { ...p, _email: email, _stats: stats };
+  });
+  const ownedEmails = new Set(hostRowsExisting.map(h => h._email).filter(Boolean));
+  const orphanedUsers = Object.entries(userStats).filter(([email]) => !ownedEmails.has(email));
+
+  return `<div class="section-title">Hosts &amp; Properties (${allProperties.length})</div>
+    <div style="overflow-x:auto;margin-bottom:24px;">
+    <table class="data-table" style="width:100%;">
+      <thead><tr><th>Property</th><th>Host</th><th>City</th><th>Guests</th><th>Setup</th><th>Activity</th><th>Last Active</th><th>Actions</th></tr></thead>
+      <tbody>
+        ${hostRowsExisting.sort((a, b) => (b._stats.lastSeen || '').localeCompare(a._stats.lastSeen || '')).map(p => {
+          const s = p._stats;
+          const setupScore = [p.wifi_name, p.host_names, p.host_phone, p.address, p.cir_code].filter(Boolean).length;
+          const setupPct = Math.round(setupScore / 5 * 100);
+          const setupColor = setupPct >= 80 ? 'var(--green)' : setupPct >= 40 ? 'var(--amber)' : 'var(--red)';
+          return `<tr class="${adminRowClass(p)}">
+            <td><strong>${p.name || 'Unnamed'}</strong><br><span style="font-size:0.62rem;color:var(--ink-soft);font-family:monospace;">${p.id.substring(0,8)}…</span></td>
+            <td>${p._email ? `<strong>${p._email.split('@')[0]}</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">${p._email}</span>` : `${p.host_names || '—'}<br><span style="font-size:0.65rem;color:var(--ink-soft)">${p.host_phone || 'No account'}</span>`}</td>
+            <td>${p.city || '—'}${p.region ? '<br><span style="font-size:0.65rem;color:var(--ink-soft)">' + p.region + '</span>' : ''}</td>
+            <td style="text-align:center;font-weight:600;">${p._checkin_count}</td>
+            <td style="text-align:center;"><span style="color:${setupColor};font-weight:600;">${setupPct}%</span></td>
+            <td style="font-size:0.72rem;">${s.sessions.size || 0} sess · ${s.saves || 0} saves · ${s.exports || 0} exp</td>
+            <td style="font-size:0.72rem;color:var(--ink-soft);">${s.lastSeen ? new Date(s.lastSeen).toLocaleDateString() : '—'}</td>
+            <td><div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
+              <button onclick="viewAsHost('${p.id}')" style="padding:4px 8px;background:#005BFF;color:#fff;border:none;border-radius:4px;font-size:0.65rem;cursor:pointer;white-space:nowrap;">👁 Console</button>
+              <a href="/?p=${p.id}" target="_blank" style="padding:4px 8px;background:#6B7A90;color:#fff;border-radius:4px;font-size:0.65rem;text-decoration:none;white-space:nowrap;">👁 Guest app</a>
+              ${p._email ? `<button onclick="document.getElementById('userFilter').value='${p._email}';setActiveTab('deepdive');" style="padding:4px 8px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.65rem;cursor:pointer;color:var(--warm);font-weight:500;white-space:nowrap;">📊</button>` : ''}
+              ${adminRowActions('properties', p)}
+            </div></td>
+          </tr>`;
+        }).join('') || '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--ink-soft);">No properties yet.</td></tr>'}
+        ${orphanedUsers.map(([email, s]) => `<tr style="opacity:0.55;">
+          <td style="font-style:italic;color:var(--ink-soft);">No property</td>
+          <td><strong>${email.split('@')[0]}</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">${email}</span></td>
+          <td>—</td><td style="text-align:center;">0</td><td>—</td>
+          <td style="font-size:0.72rem;">${s.sessions.size} sess · ${s.saves} saves</td>
+          <td style="font-size:0.72rem;color:var(--ink-soft);">${new Date(s.lastSeen).toLocaleDateString()}</td>
+          <td><button onclick="document.getElementById('userFilter').value='${email}';setActiveTab('deepdive');" style="padding:4px 8px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.65rem;cursor:pointer;color:var(--warm);">📊</button></td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+}
+
+function renderRetentionSection() {
+  return `
+    <div class="section-title">Data Retention</div>
+    <div id="retentionContainer" style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:18px 22px;box-shadow:var(--shadow);margin-bottom:18px;">
+      <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:14px;line-height:1.6;">
+        Automatic daily cleanup at 03:00 Europe/Rome. Personal data is deleted on a tiered schedule; aggregated analytics are preserved indefinitely for year-over-year analysis.
+      </div>
+
+      <div id="retentionLaunchStatus" style="margin-bottom:14px;">
+        <div style="font-size:0.74rem;color:var(--ink-soft);padding:8px;">Loading launch status…</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:18px;">
+        ${[
+          { icon: '💬', label: 'Resolved chats',    days: 90, note: 'after the AI handoff back' },
+          { icon: '📁', label: 'Archived chats',    days: 30, note: 'after the host archives' },
+          { icon: '📊', label: 'Analytics events',  days: 180, note: 'aggregated to monthly totals first' },
+          { icon: '🧪', label: 'Test rows',         days: 30, note: 'across all tables' },
+          { icon: '🗑',  label: 'Soft-deleted rows', days: 30, note: 'across all tables' },
+          { icon: '📷', label: 'Document photos',   days: 30, note: 'after guest departure (Garante guidance)' },
+          { icon: '🛂', label: 'Check-in data',     days: '5 yr', note: 'Italian fiscal requirement — never auto-purged' },
+        ].map(p => `
+          <div style="background:rgba(250,246,240,0.6);border:1px solid rgba(107,122,144,0.06);border-radius:8px;padding:10px 12px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
+              <span style="font-size:1.05rem;">${p.icon}</span>
+              <span style="font-weight:600;color:var(--ink);font-size:0.85rem;">${p.label}</span>
+            </div>
+            <div style="font-family:'Playfair Display',serif;font-size:1.3rem;color:var(--warm);font-weight:600;line-height:1;">${typeof p.days === 'number' ? p.days + 'd' : p.days}</div>
+            <div style="font-size:0.7rem;color:var(--ink-soft);margin-top:3px;line-height:1.4;">${p.note}</div>
+          </div>
+        `).join('')}
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+        <button onclick="runRetentionPreview()" id="retentionPreviewBtn" style="padding:8px 14px;background:var(--warm);color:#fff;border:none;border-radius:6px;font-size:0.82rem;cursor:pointer;font-family:inherit;">🔍 Run preview</button>
+        <button onclick="loadRetentionLog()" style="padding:8px 14px;background:var(--white);color:var(--ink-soft);border:1px solid var(--border);border-radius:6px;font-size:0.82rem;cursor:pointer;font-family:inherit;">↻ Refresh log</button>
+        <span style="font-size:0.72rem;color:var(--ink-soft);">Preview = dry run; nothing is deleted. The nightly cron's mode is shown above.</span>
+      </div>
+
+      <div id="retentionPreviewResult"></div>
+
+      <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin:18px 0 6px;">Recent purge runs</div>
+      <div id="retentionLogTable">
+        <div style="font-size:0.78rem;color:var(--ink-soft);padding:8px;">Loading…</div>
+      </div>
+    </div>`;
+}
+
+function renderGdprSection() {
+  return `
+    <div class="section-title">GDPR Objections (Chat Q&amp;A)</div>
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:18px 22px;box-shadow:var(--shadow);margin-bottom:18px;">
+      <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:14px;line-height:1.5;">
+        When a guest emails <strong>info@welcomebnb.it</strong> objecting to anonymized chat capture (GDPR Art. 21), record their booking code here. The capture cron will skip it on future runs, and any rows already in the dataset for that booking will be deleted immediately.
+      </div>
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;">
+        <div style="flex:1;min-width:160px;">
+          <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:4px;">Booking code</div>
+          <input id="gdprBookingCode" placeholder="TRU-XXXXXX" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.86rem;font-family:monospace;">
+        </div>
+        <div style="flex:1.5;min-width:180px;">
+          <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:4px;">Reason / note</div>
+          <input id="gdprReason" placeholder="GDPR objection email 2026-05-15" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;">
+        </div>
+        <div style="flex:1.2;min-width:160px;">
+          <div style="font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-bottom:4px;">Contact email (optional)</div>
+          <input id="gdprContact" placeholder="guest@example.com" type="email" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;">
+        </div>
+        <button id="gdprRecordBtn" onclick="recordGdprExclusion()" style="padding:8px 16px;background:#b03939;color:#fff;border:none;border-radius:6px;font-size:0.82rem;cursor:pointer;font-family:inherit;white-space:nowrap;">⛔ Record objection</button>
+      </div>
+      <div style="font-size:0.7rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin:14px 0 6px;">Recorded objections</div>
+      <div id="gdprExclusionsTable">
+        <div style="font-size:0.78rem;color:var(--ink-soft);padding:8px;font-style:italic;">Loading…</div>
+      </div>
+    </div>`;
+}
+
+function renderOpsEventLog() {
+  const selectedUser = document.getElementById('userFilter').value;
+  const isUserView = selectedUser !== 'all';
+  const events = getFilteredEvents();
   const logEvents = events.slice(0, 200);
 
-  html += `<div class="section-title">Event Log (${logEvents.length} of ${events.length})</div>
+  return `<div class="section-title">Event Log (${logEvents.length} of ${events.length})</div>
     <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
       <button class="admin-action-btn warn" style="padding:6px 12px;font-size:0.72rem;" onclick="bulkPurgeOld('analytics_events')" title="Purge analytics events soft-deleted >30 days ago">💀 Purge old events (>30d)</button>
       <button class="admin-action-btn warn" style="padding:6px 12px;font-size:0.72rem;" onclick="bulkPurgeOld('checkins')" title="Purge checkins soft-deleted >30 days ago">💀 Purge old checkins (>30d)</button>
@@ -2807,8 +3276,6 @@ function renderView() {
           </div>`;
       }).join('')}
     </div>`;
-
-  document.getElementById('content').innerHTML = html;
 }
 
 /* ══════════════════════════════════════

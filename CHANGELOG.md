@@ -65,6 +65,32 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 34.2 — Origin allowlist hotfix + shared CORS module + mint rate limit _(2026-09-07)_
+- **Why**: three defects in Round 33's origin check surfaced during a review.
+  1. `resolveOrigin()` contained `/^https:\/\/[a-z0-9-]+\.vercel\.app$/i` — intended to allow *our* previews, but actually matched **every** deployment on Vercel. Anyone with a Vercel account could publish a page at `anything.vercel.app` and call `/api/chat` and `/api/scan-document` from a real browser with a legitimate Origin header; session rate-limits didn't bound this meaningfully because an attacker just spins fresh `session_id`s.
+  2. `api/guest-token.js` fell back to production origin on disallowed Origin instead of a 403, so a plain `curl` with no Origin header received a valid signed token — and 200 vs 404 became a **free property-existence oracle** for anyone guessing UUIDs.
+  3. `resolveOrigin` was **byte-identical** in four places, which was the mechanism that let defect 1 live in the codebase in the first place.
+- **New**: `api/_cors.js`. Single source of truth, following the `api/_guest-token.js` convention (leading underscore, ESM, no deps).
+  - Allowlist built from Vercel deployment env vars — `VERCEL_PROJECT_PRODUCTION_URL`, `VERCEL_BRANCH_URL`, `VERCEL_URL` (each normalised by prefixing `https://`) — plus the literal production origin and localhost/127.0.0.1 regexes for dev. **Zero `.vercel.app` regexes in the final code.** `grep -rn "function resolveOrigin" api/` returns exactly one hit.
+  - `applyCors(req, res)` sets `Access-Control-Allow-Origin` (only when allowed), `Vary: Origin`, `Access-Control-Allow-Methods`, and `Access-Control-Allow-Headers: Content-Type, Authorization`. Returns the resolved origin so the caller keeps its 403 decision and method allowlist in view.
+- **Hardened**: `api/chat.js` + `api/scan-document.js` + `api/guest-chat.js` + `api/guest-token.js` all import from `_cors.js`; the four local `resolveOrigin` copies are gone. `guest-token.js` additionally:
+  - Now returns 403 on disallowed Origin like the other three (no more silent fallback to prod origin).
+  - Adds `Access-Control-Allow-Headers: Content-Type, Authorization` for consistency (avoids the "confusing CORS failure later" the review flagged).
+  - Rate-limits mints at **20 per `session_id` per rolling hour** via the `api_usage` row-count pattern from `chat.js`. Records the mint with `endpoint='token_mint'` after issuance. Rate check runs **before** the property lookup so a limited-out caller can't use this endpoint as an oracle either. **Fails open** on Supabase blip so a network hiccup can't lock the app out of minting — only positive matches produce a 429.
+- **Schema** (`migration_round34_1_api_usage_endpoint.sql`, applied via MCP): widens `api_usage_endpoint_chk` from `IN ('chat','scan','chat_write')` to include `'token_mint'`. Applied **before** the code commits — recordUsage swallows insert failures with `console.warn` (Round 33.1), so a stale CHECK would silently disable the mint rate limit rather than erroring loudly. A comment at the new call site flags this trap for future refactors.
+- **Verified end-to-end**:
+  - `grep -rn "vercel\.app" api/` — no regex matches; only comments, the literal `PROD_ORIGIN` constant, and the guest-link URL in `send-arrival-reminders.js` (email body content).
+  - `grep -rn "function resolveOrigin" api/` — 1 hit, in `_cors.js`.
+  - No Origin header → 403 `{"error":"Origin not allowed"}` (was 200 + token pre-R34.2).
+  - `Origin: https://evil-thing.vercel.app` → 403.
+  - `Origin: https://welcomebnb.vercel.app` + valid body → 200 + token.
+  - Chat.js with random `.vercel.app` origin → 403 (was 200 pre-R34.2, the actual attack window).
+  - 20 rows pre-seeded for one session → 21st HTTP mint returns handler-shaped 429 `{"error":"Too many token mints…","retry_after_seconds":900}` (not Vercel edge).
+  - Real HTTP mints record correctly with `endpoint='token_mint'`; zero constraint-violation warnings in Vercel logs.
+- **Numbering note**: this is called "Round 34.1" in the plan doc; renumbered to **34.2** in commits/CHANGELOG because 34.1 was already taken by the earlier escalation-reliability hotfix. The migration file keeps the plan's requested `round34_1_` filename verbatim.
+- **Not touched**: token format (`signGuestToken` / `verifyGuestToken`), any RLS policy, the Round 34 lockdown migration.
+- **Files**: `api/_cors.js` (new), `api/chat.js`, `api/scan-document.js`, `api/guest-chat.js`, `api/guest-token.js`, `migration_round34_1_api_usage_endpoint.sql`
+
 ### Round 34 — Close the cross-property guest chat read leak _(2026-09-03)_
 - **Why**: Round 12.1's SELECT policy on `chat_messages` scoped anon reads to `property_id IS NOT NULL AND is_test=false AND deleted_at IS NULL` — but the actual per-property filter (`.eq('property_id', propertyId)`) lived client-side. Anyone with the anon key (which must ship in the client HTML) could open devtools and drop that filter to read every host's guest messages: names, arrival dates, lockbox codes. Survivable with two test hosts; a reportable personal-data breach the moment a real host's guests are in there.
 - **What**: revoked anon's grant on `chat_messages` entirely. All guest chat reads/writes now go through a new server endpoint `api/guest-chat.js` that runs as `SUPABASE_SERVICE_ROLE_KEY` and derives `property_id + booking_code` from the Round 33 guest-token payload — never from the request body.

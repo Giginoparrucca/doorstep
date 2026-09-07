@@ -2111,6 +2111,17 @@ async function lookupCheckin() {
   const loadEl = document.getElementById('lookupLoading');
   errEl.style.display = 'none';
 
+  // Round 34.3: test-mode preview must never surface real guest data.
+  // The button stays visible so the host can see the UX, but the query
+  // is short-circuited.
+  if (IS_TEST_SESSION) {
+    errEl.textContent = (lang === 'it'
+      ? 'Modalità test — la ricerca è disattivata.'
+      : 'Test mode — lookup is disabled.');
+    errEl.style.display = 'block';
+    return;
+  }
+
   if (!surname) {
     errEl.textContent = T[lang].lookup_err_surname;
     errEl.style.display = 'block';
@@ -4550,10 +4561,19 @@ async function init() {
     }
   }
 
-  // 5. Check booking code & load existing check-ins
+  // 5. Check booking code & load existing check-ins.
+  //
+  // Round 34.3: test mode (?test=1) must always render a clean slate — never
+  // load real guest data. Two ways real data leaked into a preview session
+  // before this: (1) the booking-code query below matched a live booking
+  // whose code was carried in the URL; (2) the surname-lookup fallback
+  // read a prior real guest's cached lookup from localStorage. Both are
+  // now bypassed when IS_TEST_SESSION is true. The host still gets a full
+  // check-in walkthrough for previewing the guest UX — they just start
+  // from the same blank slate a first-time guest would see.
   let foundExisting = false;
 
-  if (bookingCode && propertyId) {
+  if (!IS_TEST_SESSION && bookingCode && propertyId) {
     try {
       const { data } = await sb.from('checkins')
         .select('*')
@@ -4573,7 +4593,7 @@ async function init() {
   }
 
   // Fallback: check surname lookup from previous session
-  if (!foundExisting && propertyId) {
+  if (!IS_TEST_SESSION && !foundExisting && propertyId) {
     const lookupStr = localStorage.getItem('wbnb_lookup');
     if (lookupStr) {
       try {
@@ -4593,6 +4613,10 @@ async function init() {
         }
       } catch (e) {}
     }
+  }
+
+  if (IS_TEST_SESSION) {
+    console.log('🧪 Test mode — skipping existing check-in lookups; blank slate.');
   }
 
   // Hide loading overlay

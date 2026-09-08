@@ -4306,16 +4306,18 @@ function renderCheckins() {
       : (it ? 'ospiti' : 'guests');
     html += `
       <tr class="checkin-group-header" style="background:rgba(107,122,144,0.05);">
-        <td colspan="10" style="padding:10px 14px;position:static;background:rgba(107,122,144,0.05);box-shadow:none;white-space:normal;">
-          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-            <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
-              <span style="font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;">${it ? 'Gruppo' : 'Group'}</span>
-              <span style="font-weight:600;color:var(--ink);">${groupLabel}</span>
-              <span style="font-size:0.74rem;color:var(--ink-soft);">· ${rows.length} ${guestsWord}${arrival ? ` · ${it ? 'arrivo' : 'arrival'} ${fmtDate(arrival)}` : ''}</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              ${groupPill}${noReceiptNote}
-              ${uploadBtn}${markBtn}${groupStatusMsg}
+        <td colspan="10" style="padding:0;position:static;background:rgba(107,122,144,0.05);box-shadow:none;white-space:normal;">
+          <div style="position:sticky;left:0;padding:12px 16px;box-sizing:border-box;">
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                ${groupPill}${uploadBtn}${markBtn}${groupStatusMsg}
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span style="font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;">${it ? 'Gruppo' : 'Group'}</span>
+                <span style="font-weight:600;color:var(--ink);">${groupLabel}</span>
+                <span style="font-size:0.74rem;color:var(--ink-soft);">· ${rows.length} ${guestsWord}${arrival ? ` · ${it ? 'arrivo' : 'arrival'} ${fmtDate(arrival)}` : ''}</span>
+              </div>
+              ${noReceiptNote}
             </div>
           </div>
         </td>

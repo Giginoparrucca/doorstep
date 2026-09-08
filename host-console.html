@@ -1439,6 +1439,12 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="table-header">
           <div class="table-title" id="allCheckinsTitle" data-h="all_checkins_title">All Guest Check-ins</div>
           <div style="display:flex;gap:8px;align-items:center;">
+            <button type="button" onclick="setAllCheckinGroups(false)"
+              style="background:transparent;border:none;color:var(--ink-soft);font-size:0.76rem;cursor:pointer;font-family:inherit;padding:6px 8px;"
+              data-h="btn_expand_all">▾ Expand all</button>
+            <button type="button" onclick="setAllCheckinGroups(true)"
+              style="background:transparent;border:none;color:var(--ink-soft);font-size:0.76rem;cursor:pointer;font-family:inherit;padding:6px 8px;"
+              data-h="btn_collapse_all">▸ Collapse all</button>
             <button class="btn btn-secondary btn-sm" onclick="deleteAllCheckins()" style="color:var(--red);border-color:rgba(224,69,94,0.3);" id="btnDeleteAll" data-h="btn_delete_all">🗑 Delete All</button>
           </div>
         </div>
@@ -3294,7 +3300,7 @@ const HT = {
     toast_template_copied: 'Template copied!', toast_istat: 'ISTAT report generated!',
     // Checkin table
     all_checkins_title: 'All Guest Check-ins',
-    btn_delete_all: '🗑 Delete All',
+    btn_delete_all: '🗑 Delete All', btn_expand_all: '▾ Expand all', btn_collapse_all: '▸ Collapse all',
     delete_confirm: 'Delete record for {name}? This cannot be undone.',
     delete_all_confirm: 'Delete ALL {count} check-in records? This cannot be undone.',
     delete_all_confirm2: 'Are you sure? Type "DELETE" to confirm.',
@@ -3656,7 +3662,7 @@ const HT = {
     toast_recos_saved: 'Consigli salvati nel database!', toast_link_copied: 'Link copiato!',
     toast_template_copied: 'Modello copiato!', toast_istat: 'Report ISTAT generato!',
     all_checkins_title: 'Tutti i Check-in Ospiti',
-    btn_delete_all: '🗑 Elimina Tutto',
+    btn_delete_all: '🗑 Elimina Tutto', btn_expand_all: '▾ Espandi tutti', btn_collapse_all: '▸ Comprimi tutti',
     delete_confirm: 'Eliminare il record di {name}? Questa azione è irreversibile.',
     delete_all_confirm: 'Eliminare TUTTI i {count} record di check-in? Questa azione è irreversibile.',
     delete_all_confirm2: 'Sei sicuro? Digita "ELIMINA" per confermare.',
@@ -4223,6 +4229,51 @@ async function copyReservationLink(link, btn) {
 /* ══════════════════════════════════════
    CHECK-IN DATA TABLE — live from DB
 ══════════════════════════════════════ */
+
+// Round 36 follow-up: per-group collapse state.
+// State is stored per booking-group token in localStorage as
+// checkinGroup_<groupToken> = 'expanded' | 'collapsed'. When no explicit
+// state exists, the caller supplies the default (filed groups collapse,
+// unfiled stay expanded — actionable items win visibility).
+function isCheckinGroupCollapsed(groupToken, defaultCollapsed) {
+  try {
+    const v = localStorage.getItem('checkinGroup_' + groupToken);
+    if (v === 'expanded') return false;
+    if (v === 'collapsed') return true;
+  } catch (_) {}
+  return !!defaultCollapsed;
+}
+function toggleCheckinGroup(groupToken, ev) {
+  // Ignore clicks that originated on the group's own action controls
+  // (upload input label, mark-filed button, receipt status span). Those
+  // must keep their own behaviour, not toggle the group.
+  if (ev && ev.target && (ev.target.closest('label') || ev.target.closest('button') || ev.target.closest('a'))) return;
+  const rows = document.querySelectorAll('tr[data-checkin-group="' + groupToken + '"]');
+  if (rows.length === 0) return;
+  const isCollapsed = rows[0].style.display === 'none';
+  const next = isCollapsed ? '' : 'none';
+  rows.forEach(r => { r.style.display = next; });
+  const chev = document.querySelector('[data-group-chevron="' + groupToken + '"]');
+  if (chev) chev.textContent = isCollapsed ? '▾' : '▸';
+  try {
+    localStorage.setItem('checkinGroup_' + groupToken, isCollapsed ? 'expanded' : 'collapsed');
+  } catch (_) {}
+}
+// Convenience: expand or collapse every group at once. Used by the two
+// small link-buttons above the table.
+function setAllCheckinGroups(collapse) {
+  document.querySelectorAll('tr[data-checkin-group]').forEach(r => {
+    r.style.display = collapse ? 'none' : '';
+    const token = r.getAttribute('data-checkin-group');
+    if (token) {
+      try { localStorage.setItem('checkinGroup_' + token, collapse ? 'collapsed' : 'expanded'); } catch (_) {}
+    }
+  });
+  document.querySelectorAll('[data-group-chevron]').forEach(el => {
+    el.textContent = collapse ? '▸' : '▾';
+  });
+}
+
 function renderCheckins() {
   const it = hostLang === 'it';
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString(it?'it-IT':'en-GB') : '—';
@@ -4304,11 +4355,21 @@ function renderCheckins() {
     const guestsWord = rows.length === 1
       ? (it ? 'ospite' : 'guest')
       : (it ? 'ospiti' : 'guests');
+    // Round 36 follow-up: groups are collapsible. Default state is
+    // "filed groups collapsed, unfiled groups expanded" — the actionable
+    // ones stay visible, the done ones fold out of the way. Per-group
+    // state is persisted in localStorage so a manual expand/collapse
+    // survives a reload.
+    const collapsed = isCheckinGroupCollapsed(groupToken, allFiled);
+    const chevron = collapsed ? '▸' : '▾';
     html += `
-      <tr class="checkin-group-header" style="background:rgba(107,122,144,0.05);">
+      <tr class="checkin-group-header" style="background:rgba(107,122,144,0.05);cursor:pointer;" onclick="toggleCheckinGroup('${groupToken}', event)">
         <td colspan="10" style="padding:0;position:static;background:rgba(107,122,144,0.05);box-shadow:none;white-space:normal;">
           <div style="position:sticky;left:0;padding:12px 16px;box-sizing:border-box;">
             <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;">
+              <span data-group-chevron="${groupToken}"
+                    aria-label="${it ? 'Espandi/collassa gruppo' : 'Toggle group'}"
+                    style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;font-size:0.85rem;color:var(--ink-soft);user-select:none;">${chevron}</span>
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                 ${groupPill}${uploadBtn}${markBtn}${groupStatusMsg}
               </div>
@@ -4323,6 +4384,7 @@ function renderCheckins() {
         </td>
       </tr>`;
 
+    const hideAttr = collapsed ? ' style="display:none;"' : '';
     for (const c of rows) {
       // Small filing pill inline with the guest name so the row-level
       // status is visible even without expanding the group.
@@ -4330,7 +4392,7 @@ function renderCheckins() {
         ? `<span style="display:inline-block;font-size:0.6rem;padding:1px 6px;background:rgba(47,122,68,0.14);color:#2f7a44;border-radius:8px;font-weight:600;letter-spacing:0.04em;margin-left:6px;vertical-align:middle;">${it ? '✓' : '✓'}</span>`
         : `<span style="display:inline-block;font-size:0.6rem;padding:1px 6px;background:rgba(176,57,57,0.12);color:#b03939;border-radius:8px;font-weight:600;letter-spacing:0.04em;margin-left:6px;vertical-align:middle;" title="${it ? 'Da inviare ad Alloggiati' : 'Not filed on Alloggiati'}">${it ? '⚠' : '⚠'}</span>`;
       html += `
-        <tr>
+        <tr data-checkin-group="${groupToken}"${hideAttr}>
           <td data-label=""><strong>${c.surname} ${c.name}</strong>${rowPill}</td>
           <td data-label="${h('th_type')}">${c.guest_type}</td>
           <td data-label="${h('th_arrival')}">${fmtDate(c.arrival_date)}</td>

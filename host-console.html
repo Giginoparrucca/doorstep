@@ -1481,9 +1481,6 @@ tr:hover td { background: rgba(250,246,240,0.6); }
               <a href="https://alloggiatiweb.poliziadistato.it" target="_blank" rel="noopener" class="export-portal-link">
                 🔗 <span data-h="link_alloggiati">Open Alloggiati Web</span> ↗
               </a>
-              <a href="https://dms.puglia.it" target="_blank" rel="noopener" class="export-portal-link">
-                🔗 <span data-h="link_dms">Open Puglia DMS (SPOT Easy)</span> ↗
-              </a>
             </div>
           </div>
         </div>
@@ -1514,6 +1511,15 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <div class="export-portal-links">
               <a href="https://flussituristici.regione.veneto.it/" target="_blank" rel="noopener" class="export-portal-link">
                 🔗 <span data-h="link_ross1000_portal">Open ROSS1000 Veneto</span> ↗
+              </a>
+            </div>
+          </div>
+          <div class="export-card">
+            <h3 data-h="export_puglia_dms_title">🏛 Puglia DMS (SPOT Easy)</h3>
+            <p data-h="export_puglia_dms_desc"></p>
+            <div class="export-portal-links">
+              <a href="https://dms.puglia.it" target="_blank" rel="noopener" class="export-portal-link">
+                🔗 <span data-h="link_dms">Open Puglia DMS (SPOT Easy)</span> ↗
               </a>
             </div>
           </div>
@@ -3161,7 +3167,7 @@ const HT = {
     // Export
     export_info: 'Generate files for the Italian compliance portals, grouped by the three obligations: police (national), statistics (regional), and tourist tax (municipal). See the Compliance Guide for what each one is.',
     export_police_tourism: '🏛 Alloggiati Web — Guest File',
-    export_police_tourism_desc: 'Generates the <strong>.txt file</strong> (Alloggiati tracciato record) of every guest. Upload to Alloggiati Web → <em>Invio File</em> for the police, within <strong>24h of arrival</strong>. The same file is also accepted by Puglia <strong>SPOT Easy</strong> → <em>Carica Scheda Alloggiati</em>.',
+    export_police_tourism_desc: 'Generates the <strong>.txt file</strong> (Alloggiati tracciato record) of every guest. Upload to Alloggiati Web → <em>Invio File</em> for the police, within <strong>24h of arrival</strong>.',
     export_axis_police_tag: 'Police · National',
     export_axis_police_title: 'Guest registration',
     export_axis_police_note: 'Individual guest data to the Polizia di Stato, within 24h of arrival. Nationwide obligation.',
@@ -3175,6 +3181,8 @@ const HT = {
     export_axis_util_title: 'Your own records',
     export_monthly_summary: '📊 Monthly Summary (C/59)',
     export_monthly_summary_desc: 'A human-readable <strong>monthly breakdown by nationality</strong> (italiani / stranieri, arrivi e presenze) you can use to fill in your regional statistical portal by hand. <em>Note: not yet the ROSS1000 file format — it is a reference summary for manual entry.</em>',
+    export_puglia_dms_title: '🏛 Puglia DMS (SPOT Easy)',
+    export_puglia_dms_desc: 'Puglia hosts file tourist flow reports through <strong>SPOT Easy</strong>. Use the same <strong>Alloggiati .txt</strong> file generated in the police section above — upload it to Puglia DMS → <em>Carica Scheda Alloggiati</em>.',
     export_regional_note_title: '🗺 Your region\'s portal',
     export_regional_note_desc: 'ROSS1000 covers many regions (Veneto, Lombardia, Emilia-Romagna, Toscana, Lazio, and others); some regions use their own (Campania → Sinfonia, Trento → STU/DTU). Puglia uses its own regional flow system. Confirm yours in the Compliance Guide and enter the monthly figures there. A direct file export per region can be added once you confirm which portal you file on.',
     export_csv: '📋 Raw Data Export',
@@ -3524,7 +3532,7 @@ const HT = {
     filter_all: 'Tutte le Prenotazioni',
     export_info: 'Genera i file per i portali di conformità italiani, raggruppati per i tre obblighi: polizia (nazionale), statistica (regionale) e imposta di soggiorno (comunale). Vedi la Guida Conformità per cosa è ciascuno.',
     export_police_tourism: '🏛 Alloggiati Web — File Ospiti',
-    export_police_tourism_desc: 'Genera il <strong>file .txt</strong> (tracciato record Alloggiati) di ogni ospite. Caricalo su Alloggiati Web → <em>Invio File</em> per la polizia, entro <strong>24h dall\'arrivo</strong>. Lo stesso file è accettato anche da Puglia <strong>SPOT Easy</strong> → <em>Carica Scheda Alloggiati</em>.',
+    export_police_tourism_desc: 'Genera il <strong>file .txt</strong> (tracciato record Alloggiati) di ogni ospite. Caricalo su Alloggiati Web → <em>Invio File</em> per la polizia, entro <strong>24h dall\'arrivo</strong>.',
     export_axis_police_tag: 'Polizia · Nazionale',
     export_axis_police_title: 'Registrazione ospiti',
     export_axis_police_note: 'Dati del singolo ospite alla Polizia di Stato, entro 24h dall\'arrivo. Obbligo nazionale.',
@@ -3538,6 +3546,8 @@ const HT = {
     export_axis_util_title: 'I tuoi archivi',
     export_monthly_summary: '📊 Riepilogo Mensile (C/59)',
     export_monthly_summary_desc: 'Un <strong>riepilogo mensile per nazionalità</strong> leggibile (italiani / stranieri, arrivi e presenze) da usare per compilare a mano il portale statistico regionale. <em>Nota: non è ancora il formato file ROSS1000 — è un riepilogo di riferimento per l\'inserimento manuale.</em>',
+    export_puglia_dms_title: '🏛 Puglia DMS (SPOT Easy)',
+    export_puglia_dms_desc: 'Le strutture pugliesi comunicano i flussi turistici tramite <strong>SPOT Easy</strong>. Usa lo stesso file <strong>Alloggiati .txt</strong> generato nella sezione polizia sopra — caricalo su Puglia DMS → <em>Carica Scheda Alloggiati</em>.',
     export_regional_note_title: '🗺 Il portale della tua regione',
     export_regional_note_desc: 'ROSS1000 copre molte regioni (Veneto, Lombardia, Emilia-Romagna, Toscana, Lazio e altre); alcune regioni usano il proprio (Campania → Sinfonia, Trento → STU/DTU). La Puglia usa il proprio sistema regionale dei flussi. Verifica il tuo nella Guida Conformità e inserisci lì i dati mensili. Un export file dedicato per regione può essere aggiunto quando confermi su quale portale comunichi.',
     export_csv: '📋 Esportazione Dati',

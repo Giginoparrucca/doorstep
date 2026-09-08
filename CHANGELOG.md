@@ -65,6 +65,18 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 36.1 — Pin serverless functions to dub1 (Dublin) _(2026-09-08)_
+- **Why**: `vercel.json` had no `regions` key, so every function ran in the default region `iad1` (Washington DC, USA). The Supabase project is `eu-west-1` (Ireland). Every guest check-in, chat message and document scan was therefore a US-hosted processor call against an EU-hosted database — a third-country transfer that has to be declared in an Art. 28 GDPR processor agreement, plus a transatlantic round trip on every query.
+- **Change**: added `"regions": ["dub1"]` at the top of `vercel.json`, alongside the existing `crons` array. Chose dub1 (Dublin) over fra1 (Frankfurt) because dub1 is co-located with Supabase eu-west-1 — the transfer disappears AND query latency drops to same-region.
+- **Plan constraint**: the team is on Vercel Hobby. Hobby permits selecting a single region for serverless functions (multi-region requires Pro). Setting a single-region array is expected to work; if Vercel silently ignores it and the next deploy's response header still reads `x-vercel-id: iad1::…`, a Pro upgrade is required and the change must be reverted (this is a legal-reason config, not a nice-to-have — a half-applied version is worse than none).
+- **REMINDER_FROM**: `api/send-arrival-reminders.js` still defaults `REMINDER_FROM` to `'WelcomeBnB Reminders <onboarding@resend.dev>'` — a Resend test domain. Confirm the `REMINDER_FROM` env var is set to a verified sender in the Vercel production environment. Reminders are currently going out from a test sender if that env var is missing.
+- **Not touched**: endpoint logic, auth, RLS, migrations, cron schedules.
+- **Verify after deploy**:
+  - `curl -I https://welcomebnb.vercel.app/api/…` (any endpoint) — the `x-vercel-id` response header should read `dub1::…`, not `iad1::…`.
+  - Run a full guest check-in on the test property `c26b7de2-c0f5-4545-955f-88a778ab36b2`: document scan, chat exchange, submission. All three call Supabase from the function, so a misconfigured region shows up as timeouts.
+  - Confirm both existing cron jobs (`/api/ical-sync` at 04:00 UTC and `/api/send-arrival-reminders` at 05:00 UTC) still fire on schedule.
+- **Files**: `vercel.json`, `CHANGELOG.md`.
+
 ### Round 36 — Photo retention retighten + Alloggiati filing reminder + portal receipt slot _(2026-09-08)_
 - **Why**: The 29 April 2026 Garante note to hospitality associations clarified that TULPS art. 109 obliges hosts to identify guests and transmit their data to Alloggiati Web, but does NOT authorise retaining photocopies, scans or photographs of identity documents beyond the filing deadline. Round 15.2's 30-days-post-departure window is about six weeks past the 24-hour filing deadline on a typical stay. This round retightens the window and adds the two things that make it workable for hosts — an end-of-first-day reminder if the filing hasn't happened, and a slot to keep the portal's automatic receipt (the one artefact the Garante says stays 5 years).
 - **Not touched**: the 5-year check-in **data** retention (TULPS art. 109 fiscal requirement). Only the **image** lifecycle changes.

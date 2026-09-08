@@ -4224,27 +4224,131 @@ async function copyReservationLink(link, btn) {
    CHECK-IN DATA TABLE — live from DB
 ══════════════════════════════════════ */
 function renderCheckins() {
-  const fmtDate = (d) => d ? new Date(d).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB') : '—';
-  document.getElementById('checkinTable').innerHTML = allCheckins.map(c => `
-    <tr>
-      <td data-label=""><strong>${c.surname} ${c.name}</strong>${c.booking_code ? ' <span style="font-size:0.6rem;color:var(--warm);letter-spacing:0.05em;font-family:monospace;">'+c.booking_code+'</span>' : ''}</td>
-      <td data-label="${h('th_type')}">${c.guest_type}</td>
-      <td data-label="${h('th_arrival')}">${fmtDate(c.arrival_date)}</td>
-      <td data-label="${h('th_departure')}">${fmtDate(c.departure_date)}</td>
-      <td data-label="${h('th_birth')}">${fmtDate(c.date_of_birth)} <span style="font-size:0.72rem;color:var(--ink-soft)">${c.place_of_birth || ''}${c.birth_province && c.birth_province!=='EE' ? ' ('+c.birth_province+')' : ''}</span></td>
-      <td data-label="${h('th_citizenship')}">${c.citizenship}</td>
-      <td data-label="${h('th_document')}">${c.document_type || '—'} <span style="font-size:0.72rem;color:var(--ink-soft)">${c.document_number || ''}</span></td>
-      <td data-label="${h('th_submitted')}">${fmtDate(c.submitted_at)}</td>
-      <td data-label="${h('th_docs')}"><span class="status-badge ${c.docs_status==='complete'?'complete':c.docs_status==='not_required'?'complete':c.docs_status==='partial'?'pending':'missing'}">${c.docs_status==='complete'?'✓':c.docs_status==='not_required'?'—':c.docs_status==='partial'?'⏳':'✗'}</span></td>
-      <td data-label="">
-        <div style="display:flex;gap:8px;justify-content:flex-end;padding:4px 0;">
-          <button class="btn btn-secondary btn-sm" onclick="viewGuest('${c.id}')" style="min-height:36px;padding:6px 12px;">${h('btn_view')}</button>
-          <button class="btn btn-secondary btn-sm" onclick="editGuest('${c.id}')" style="min-height:36px;padding:6px 12px;color:var(--warm);border-color:rgba(0,91,255,0.25);">✏️ ${h('btn_edit_single') || 'Edit'}</button>
-          <button class="btn btn-secondary btn-sm" onclick="deleteCheckin('${c.id}','${(c.surname||'').replace(/'/g,'\\\'')}')" style="color:var(--red);border-color:rgba(224,69,94,0.2);min-height:36px;padding:6px 12px;">🗑 ${h('btn_delete_single')}</button>
-        </div>
-      </td>
-    </tr>
-  `).join('') || `<tr><td colspan="10" style="text-align:center;color:var(--ink-soft);padding:24px;">${h('no_checkins')}</td></tr>`;
+  const it = hostLang === 'it';
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString(it?'it-IT':'en-GB') : '—';
+  const target = document.getElementById('checkinTable');
+
+  if (allCheckins.length === 0) {
+    target.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--ink-soft);padding:24px;">${h('no_checkins')}</td></tr>`;
+    const cc0 = document.getElementById('checkinCount'); if (cc0) cc0.textContent = 0;
+    return;
+  }
+
+  // Round 36 follow-up: group rows by booking_code. Guests filed on
+  // Alloggiati travel together — one receipt covers the whole group —
+  // so the filing controls belong on a group header, not on each row.
+  // Rows without a booking_code (rare / legacy) become singleton groups.
+  const groupKey = (c) => c.booking_code || `__solo__:${c.id}`;
+  const groups = new Map();
+  for (const c of allCheckins) {
+    const k = groupKey(c);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(c);
+  }
+  // Within a group, head/group leader first, then members.
+  const roleOrder = { head: 0, group: 0, single: 0, member: 1, group_member: 1 };
+  for (const arr of groups.values()) {
+    arr.sort((a, b) => (roleOrder[a.guest_type] ?? 2) - (roleOrder[b.guest_type] ?? 2));
+  }
+
+  let html = '';
+  for (const [key, rows] of groups) {
+    const isSolo    = key.startsWith('__solo__:');
+    const bookingCode = isSolo ? null : key;
+    const propertyId  = rows[0].property_id;
+    const arrival     = rows[0].arrival_date;
+    const allFiled    = rows.every(r => r.alloggiati_status === 'filed');
+    const anyFiled    = rows.some(r => r.alloggiati_status === 'filed');
+    const anyReceipt  = rows.some(r => r.receipt_path);
+    const groupStamp  = arrival ? String(arrival).replace(/-/g, '') : new Date().toISOString().slice(0,10).replace(/-/g,'');
+    // A unique DOM id for the group's file input so multiple groups can
+    // coexist on the page without stealing each other's clicks.
+    const groupToken = isSolo ? `solo_${rows[0].id}` : `bk_${bookingCode.replace(/[^A-Za-z0-9]/g, '_')}`;
+
+    // Status pill for the group header
+    const groupPill = allFiled
+      ? `<span style="display:inline-block;font-size:0.66rem;padding:3px 10px;background:rgba(47,122,68,0.14);color:#2f7a44;border-radius:12px;font-weight:600;letter-spacing:0.04em;">${it ? '✓ Inviato Alloggiati' : '✓ Filed on Alloggiati'}</span>`
+      : anyFiled
+        ? `<span style="display:inline-block;font-size:0.66rem;padding:3px 10px;background:rgba(232,184,75,0.16);color:#9a6b00;border-radius:12px;font-weight:600;letter-spacing:0.04em;">${it ? '⚠ Parziale' : '⚠ Partial'}</span>`
+        : `<span style="display:inline-block;font-size:0.66rem;padding:3px 10px;background:rgba(176,57,57,0.12);color:#b03939;border-radius:12px;font-weight:600;letter-spacing:0.04em;">${it ? '⚠ Da inviare' : '⚠ Not filed yet'}</span>`;
+    const noReceiptNote = (allFiled && !anyReceipt)
+      ? ` <span style="font-size:0.66rem;color:#9a6b00;background:rgba(232,184,75,0.14);border-radius:8px;padding:2px 8px;">${it ? 'nessuna ricevuta caricata' : 'no receipt on file'}</span>`
+      : '';
+
+    // Group-level actions. Fan-out to every guest in the group. When the
+    // group is already filed we keep the upload input available (so a
+    // receipt can be attached after the fact) but hide the mark-without-
+    // receipt button.
+    const scopeAttr = isSolo
+      ? `data-scope="checkin" data-id="${rows[0].id}"`
+      : `data-scope="group" data-booking="${bookingCode}" data-property="${propertyId}"`;
+    const uploadBtn = `
+      <label style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--warm);color:#fff;border-radius:6px;font-size:0.78rem;cursor:pointer;font-family:inherit;position:relative;">
+        <span>${it ? '📎 Ricevuta' : '📎 Receipt'}</span>
+        <input type="file" id="receiptFileInput_${groupToken}" accept=".pdf,image/*"
+          ${scopeAttr}
+          onchange="uploadFilingReceiptFromGroup(this, '${groupStamp}')"
+          style="position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;">
+      </label>`;
+    const markBtn = allFiled ? '' : `
+      <button type="button" onclick="markGroupFiledWithoutReceipt(${isSolo ? `'checkin','${rows[0].id}'` : `'group','${bookingCode}','${propertyId}'`})"
+        style="padding:6px 12px;background:transparent;color:var(--ink-soft);border:1px solid var(--border);border-radius:6px;font-size:0.78rem;cursor:pointer;font-family:inherit;">
+        ${it ? 'Segna inviato' : 'Mark filed'}
+      </button>`;
+    const groupStatusMsg = `<span id="receiptUploadStatus_${groupToken}" style="font-size:0.72rem;color:var(--ink-soft);"></span>`;
+
+    // Group header row spans all 10 columns of the check-ins table.
+    const groupLabel = isSolo
+      ? (it ? 'Ospite senza codice' : 'Guest without booking code')
+      : `<span style="font-family:monospace;color:var(--warm);letter-spacing:0.05em;">${bookingCode}</span>`;
+    const guestsWord = rows.length === 1
+      ? (it ? 'ospite' : 'guest')
+      : (it ? 'ospiti' : 'guests');
+    html += `
+      <tr class="checkin-group-header" style="background:rgba(107,122,144,0.05);">
+        <td colspan="10" style="padding:10px 14px;">
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+              <span style="font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;">${it ? 'Gruppo' : 'Group'}</span>
+              <span style="font-weight:600;color:var(--ink);">${groupLabel}</span>
+              <span style="font-size:0.74rem;color:var(--ink-soft);">· ${rows.length} ${guestsWord}${arrival ? ` · ${it ? 'arrivo' : 'arrival'} ${fmtDate(arrival)}` : ''}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              ${groupPill}${noReceiptNote}
+              ${uploadBtn}${markBtn}${groupStatusMsg}
+            </div>
+          </div>
+        </td>
+      </tr>`;
+
+    for (const c of rows) {
+      // Small filing pill inline with the guest name so the row-level
+      // status is visible even without expanding the group.
+      const rowPill = c.alloggiati_status === 'filed'
+        ? `<span style="display:inline-block;font-size:0.6rem;padding:1px 6px;background:rgba(47,122,68,0.14);color:#2f7a44;border-radius:8px;font-weight:600;letter-spacing:0.04em;margin-left:6px;vertical-align:middle;">${it ? '✓' : '✓'}</span>`
+        : `<span style="display:inline-block;font-size:0.6rem;padding:1px 6px;background:rgba(176,57,57,0.12);color:#b03939;border-radius:8px;font-weight:600;letter-spacing:0.04em;margin-left:6px;vertical-align:middle;" title="${it ? 'Da inviare ad Alloggiati' : 'Not filed on Alloggiati'}">${it ? '⚠' : '⚠'}</span>`;
+      html += `
+        <tr>
+          <td data-label=""><strong>${c.surname} ${c.name}</strong>${rowPill}</td>
+          <td data-label="${h('th_type')}">${c.guest_type}</td>
+          <td data-label="${h('th_arrival')}">${fmtDate(c.arrival_date)}</td>
+          <td data-label="${h('th_departure')}">${fmtDate(c.departure_date)}</td>
+          <td data-label="${h('th_birth')}">${fmtDate(c.date_of_birth)} <span style="font-size:0.72rem;color:var(--ink-soft)">${c.place_of_birth || ''}${c.birth_province && c.birth_province!=='EE' ? ' ('+c.birth_province+')' : ''}</span></td>
+          <td data-label="${h('th_citizenship')}">${c.citizenship}</td>
+          <td data-label="${h('th_document')}">${c.document_type || '—'} <span style="font-size:0.72rem;color:var(--ink-soft)">${c.document_number || ''}</span></td>
+          <td data-label="${h('th_submitted')}">${fmtDate(c.submitted_at)}</td>
+          <td data-label="${h('th_docs')}"><span class="status-badge ${c.docs_status==='complete'?'complete':c.docs_status==='not_required'?'complete':c.docs_status==='partial'?'pending':'missing'}">${c.docs_status==='complete'?'✓':c.docs_status==='not_required'?'—':c.docs_status==='partial'?'⏳':'✗'}</span></td>
+          <td data-label="">
+            <div style="display:flex;gap:8px;justify-content:flex-end;padding:4px 0;">
+              <button class="btn btn-secondary btn-sm" onclick="viewGuest('${c.id}')" style="min-height:36px;padding:6px 12px;">${h('btn_view')}</button>
+              <button class="btn btn-secondary btn-sm" onclick="editGuest('${c.id}')" style="min-height:36px;padding:6px 12px;color:var(--warm);border-color:rgba(0,91,255,0.25);">✏️ ${h('btn_edit_single') || 'Edit'}</button>
+              <button class="btn btn-secondary btn-sm" onclick="deleteCheckin('${c.id}','${(c.surname||'').replace(/'/g,'\\\'')}')" style="color:var(--red);border-color:rgba(224,69,94,0.2);min-height:36px;padding:6px 12px;">🗑 ${h('btn_delete_single')}</button>
+            </div>
+          </td>
+        </tr>`;
+    }
+  }
+  target.innerHTML = html;
 
   const cc = document.getElementById('checkinCount');
   if (cc) cc.textContent = allCheckins.length;
@@ -7133,19 +7237,19 @@ function viewGuest(id) {
         ? '⚠ Nessuna ricevuta caricata — carica il PDF sotto per avere la prova di adempimento a 5 anni.'
         : '⚠ No receipt on file — upload the PDF below to have the 5-year proof of compliance.'}</div>`
     : '';
-  const receiptExplainer = it
-    ? 'Carica la ricevuta di invio prodotta dal portale Alloggiati (PDF o immagine). Il file è conservato 5 anni come prova di adempimento e non viene cancellato dal ciclo di ritenzione delle foto documento.'
-    : 'Upload the filing receipt produced by the Alloggiati portal (PDF or image). The file is kept for 5 years as proof of compliance and is exempt from the 48-hour document-photo purge.';
-  // Secondary action for the rare case where filing succeeded but no
-  // receipt PDF is available (Alloggiati portal timeout, host filed via
-  // paper, etc.). Only shown when the row isn't already marked filed —
-  // once marked filed, uploading a receipt is the only remaining action.
-  const markWithoutReceiptBtn = !isFiled
-    ? `<button type="button" onclick="markFiledWithoutReceipt('${c.id}')"
-        style="padding:8px 14px;background:transparent;color:var(--ink-soft);border:1px solid var(--border);border-radius:6px;font-size:0.78rem;cursor:pointer;font-family:inherit;">
-        ${it ? 'Segna come inviato senza ricevuta' : 'Mark filed without receipt'}
-      </button>`
-    : '';
+  // Round 36 follow-up: the filing action lives on the Check-in Data
+  // table's group header now (one action per booking-code, since
+  // Alloggiati accepts a group at a time and returns one receipt). The
+  // modal shows the resulting state only — read-only status pill,
+  // filed_at, uploaded-receipt link, and the amber "no receipt on
+  // file" nudge when applicable.
+  const filingActionHint = c.booking_code
+    ? (it
+        ? 'Per caricare la ricevuta o segnare come inviato, usa il pulsante sull\'intestazione del gruppo nella tabella Check-in — l\'azione si applica a tutti gli ospiti dello stesso codice prenotazione.'
+        : 'To upload the receipt or mark as filed, use the button on the group header in the Check-in Data table — the action applies to every guest sharing the same booking code.')
+    : (it
+        ? 'Per caricare la ricevuta o segnare come inviato, usa il pulsante sulla riga dell\'ospite nella tabella Check-in.'
+        : 'To upload the receipt or mark as filed, use the button on the guest\'s row in the Check-in Data table.');
   const filingSection = `
     ${sectionTitle(it ? 'Invio Alloggiati' : 'Alloggiati filing')}
     <div style="background:rgba(107,122,144,0.04);border-radius:8px;padding:12px 14px;">
@@ -7153,17 +7257,7 @@ function viewGuest(id) {
       ${filedAtLine}
       ${receiptViewLink}
       ${noReceiptNote}
-      <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <label style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:var(--warm);color:#fff;border-radius:6px;font-size:0.82rem;cursor:pointer;font-family:inherit;">
-          <span>${it ? '📎 Carica ricevuta' : '📎 Upload receipt'}</span>
-          <input type="file" id="receiptFileInput_${c.id}" accept=".pdf,image/*"
-            onchange="uploadFilingReceipt('${c.id}', '${c.property_id}', this)"
-            style="position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;">
-        </label>
-        ${markWithoutReceiptBtn}
-        <span id="receiptUploadStatus_${c.id}" style="font-size:0.72rem;color:var(--ink-soft);"></span>
-      </div>
-      <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:8px;line-height:1.4;">${receiptExplainer}</div>
+      <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:10px;line-height:1.4;">${filingActionHint}</div>
     </div>
   `;
 
@@ -7237,24 +7331,47 @@ function viewGuest(id) {
   }
 }
 
-// Round 36: upload a filing receipt (PDF or image) to the private
-// 'receipts' bucket, then mark the checkin as filed. Uses the Round 20.2
-// pattern (.update().select() + row-count check) so a silent RLS block
-// surfaces as a visible error instead of pretending success.
-async function uploadFilingReceipt(checkinId, propertyId, inputEl) {
+// Round 36 follow-up: filing actions now operate on a whole booking-code
+// group (all family members / group members that were filed together on
+// Alloggiati). Solo check-ins without a booking_code are treated as a
+// group of one so the same code path handles both. The group-scoped
+// upload path uploads one receipt file and fans out receipt_path,
+// filed_at and alloggiati_status='filed' to every row that shares
+// (property_id, booking_code) — the whole family goes to filed in one
+// UPDATE. Round 20.2 pattern (.update().select() + row-count check) is
+// preserved so a silent RLS block is loud, not silent-success.
+
+// Called by the group-header upload input. Reads scope + ids from the
+// input's data attributes and delegates to the underlying helper.
+async function uploadFilingReceiptFromGroup(inputEl, groupStamp) {
+  const scope = inputEl?.dataset?.scope;
+  if (scope === 'group') {
+    const bookingCode = inputEl.dataset.booking;
+    const propertyId  = inputEl.dataset.property;
+    return uploadFilingReceipt('group', { bookingCode, propertyId }, inputEl, groupStamp);
+  }
+  const checkinId = inputEl.dataset.id;
+  const row = allCheckins.find(c => c.id === checkinId);
+  return uploadFilingReceipt('checkin',
+    { checkinId, propertyId: row?.property_id }, inputEl, groupStamp);
+}
+
+async function uploadFilingReceipt(scope, ids, inputEl, groupStampFromCaller) {
   const file = inputEl?.files?.[0];
   if (!file) return;
   const it = hostLang === 'it';
-  const statusEl = document.getElementById(`receiptUploadStatus_${checkinId}`);
+  const groupToken = scope === 'group'
+    ? `bk_${ids.bookingCode.replace(/[^A-Za-z0-9]/g, '_')}`
+    : `solo_${ids.checkinId}`;
+  const statusEl = document.getElementById(`receiptUploadStatus_${groupToken}`);
   const setStatus = (txt, color) => {
     if (!statusEl) return;
     statusEl.textContent = txt;
     statusEl.style.color = color || 'var(--ink-soft)';
   };
 
-  // Reject very large files early — receipts are typically <1 MB, so 10 MB
-  // is a generous ceiling that still stops accidental uploads of the whole
-  // check-in album.
+  // 10 MB ceiling — receipts are typically <1 MB. Stops accidental
+  // uploads of a full check-in album.
   if (file.size > 10 * 1024 * 1024) {
     setStatus(it ? 'File troppo grande (>10 MB)' : 'File too large (>10 MB)', '#b03939');
     inputEl.value = '';
@@ -7263,11 +7380,13 @@ async function uploadFilingReceipt(checkinId, propertyId, inputEl) {
 
   setStatus(it ? 'Caricamento…' : 'Uploading…');
   const ext = (file.name.match(/\.([a-z0-9]{1,8})$/i)?.[1] || 'pdf').toLowerCase();
-  // Path convention: <property_id>/<checkin_id>-<yyyymmdd>.<ext>.
-  // The property_id first segment is what the RLS policy uses to check
-  // ownership — do not change without updating migration_round36 too.
-  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const path = `${propertyId}/${checkinId}-${stamp}.${ext}`;
+  // Path convention: <property_id>/<booking_or_checkin>-<stamp>.<ext>.
+  // The property_id first segment is what the receipts RLS policy uses to
+  // check ownership — do not change without updating migration_round36.
+  const stamp = groupStampFromCaller || new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const path = scope === 'group'
+    ? `${ids.propertyId}/${ids.bookingCode}-${stamp}.${ext}`
+    : `${ids.propertyId}/${ids.checkinId}-${stamp}.${ext}`;
 
   try {
     const { error: upErr } = await sb.storage.from('receipts')
@@ -7288,8 +7407,11 @@ async function uploadFilingReceipt(checkinId, propertyId, inputEl) {
     filed_at: new Date().toISOString(),
     alloggiati_status: 'filed',
   };
-  const { data, error: updErr } = await sb.from('checkins')
-    .update(patch).eq('id', checkinId).select();
+  const query = sb.from('checkins').update(patch);
+  const scoped = scope === 'group'
+    ? query.eq('property_id', ids.propertyId).eq('booking_code', ids.bookingCode)
+    : query.eq('id', ids.checkinId);
+  const { data, error: updErr } = await scoped.select();
   if (updErr) {
     console.error(updErr);
     setStatus((it ? 'Salvataggio fallito: ' : 'Save failed: ') + updErr.message, '#b03939');
@@ -7300,37 +7422,55 @@ async function uploadFilingReceipt(checkinId, propertyId, inputEl) {
     return;
   }
 
-  // Reflect the new state in the local cache so the modal re-open shows it.
-  const idx = allCheckins.findIndex(g => g.id === checkinId);
-  if (idx >= 0) allCheckins[idx] = { ...allCheckins[idx], ...patch };
+  // Mirror the patch into the local cache so the table re-renders correctly.
+  const affectedIds = new Set(data.map(r => r.id));
+  allCheckins = allCheckins.map(c => affectedIds.has(c.id) ? { ...c, ...patch } : c);
 
-  setStatus(it ? '✓ Ricevuta caricata' : '✓ Receipt uploaded', '#2f7a44');
-  toast(it ? 'Ricevuta salvata — check-in marcato come inviato.' : 'Receipt saved — check-in marked as filed.');
+  const n = data.length;
+  setStatus(it ? `✓ Ricevuta caricata · ${n} ospite${n === 1 ? '' : 'i'}` : `✓ Receipt uploaded · ${n} guest${n === 1 ? '' : 's'}`, '#2f7a44');
+  toast(it
+    ? `Ricevuta salvata — ${n} ospite${n === 1 ? '' : 'i'} marcato/i come inviato/i.`
+    : `Receipt saved — ${n} guest${n === 1 ? '' : 's'} marked as filed.`);
 
-  // Re-render the modal to show the new "filed" state and the receipt link.
-  closeGuestDetailModal();
-  viewGuest(checkinId);
+  renderCheckins();
+  renderDashboard?.();
 }
 
-// Round 36 follow-up: escape hatch for the rare case where a host filed
-// on Alloggiati but never got a receipt PDF (portal timeout, filed via
-// paper channel, etc.). Marks the row as filed and stops the day-after
-// reminder without attaching a receipt. Leaves receipt_path null so the
-// "no receipt on file" note surfaces in the modal — the host can still
-// upload the receipt later with the normal upload flow.
-async function markFiledWithoutReceipt(checkinId) {
+// Group-scoped "mark filed without receipt" — same fan-out semantics as
+// the upload path. Confirms in plain language what's given up (no
+// 5-year receipt on file); the upload flow can still attach a receipt
+// later and it backfills every row in the group.
+async function markGroupFiledWithoutReceipt(scope, arg1, arg2) {
   const it = hostLang === 'it';
-  const confirmMsg = it
-    ? 'Segnare questo check-in come inviato SENZA ricevuta?\n\nIl reminder giornaliero si fermerà, ma non ci sarà la prova di adempimento a 5 anni finché non carichi il PDF della ricevuta.'
-    : 'Mark this check-in as filed WITHOUT a receipt?\n\nThe daily reminder will stop, but you will not have the 5-year proof of compliance until you upload the receipt PDF.';
-  if (!confirm(confirmMsg)) return;
+  let count = 1;
+  let scoped;
+  if (scope === 'group') {
+    const bookingCode = arg1, propertyId = arg2;
+    count = allCheckins.filter(c => c.property_id === propertyId && c.booking_code === bookingCode).length || 1;
+    const confirmMsg = it
+      ? `Segnare ${count} ospite${count === 1 ? '' : 'i'} come inviato/i ad Alloggiati SENZA ricevuta?\n\nIl reminder giornaliero si fermerà, ma non ci sarà la prova di adempimento a 5 anni finché non carichi il PDF della ricevuta.`
+      : `Mark ${count} guest${count === 1 ? '' : 's'} as filed on Alloggiati WITHOUT a receipt?\n\nThe daily reminder will stop, but you will not have the 5-year proof of compliance until you upload the receipt PDF.`;
+    if (!confirm(confirmMsg)) return;
+    scoped = sb.from('checkins').update({}).eq('property_id', propertyId).eq('booking_code', bookingCode);
+  } else {
+    const checkinId = arg1;
+    const confirmMsg = it
+      ? 'Segnare questo check-in come inviato SENZA ricevuta?\n\nIl reminder giornaliero si fermerà, ma non ci sarà la prova di adempimento a 5 anni finché non carichi il PDF della ricevuta.'
+      : 'Mark this check-in as filed WITHOUT a receipt?\n\nThe daily reminder will stop, but you will not have the 5-year proof of compliance until you upload the receipt PDF.';
+    if (!confirm(confirmMsg)) return;
+    scoped = sb.from('checkins').update({}).eq('id', checkinId);
+  }
 
   const patch = {
     filed_at: new Date().toISOString(),
     alloggiati_status: 'filed',
   };
-  const { data, error: updErr } = await sb.from('checkins')
-    .update(patch).eq('id', checkinId).select();
+  // Postgres-JS builder pattern: we need the .update(patch) call before
+  // the .eq() chain, so rebuild the query with the patch this time.
+  const query = scope === 'group'
+    ? sb.from('checkins').update(patch).eq('property_id', arg2).eq('booking_code', arg1).select()
+    : sb.from('checkins').update(patch).eq('id', arg1).select();
+  const { data, error: updErr } = await query;
   if (updErr) {
     console.error(updErr);
     toast((it ? 'Aggiornamento fallito: ' : 'Update failed: ') + updErr.message);
@@ -7341,12 +7481,16 @@ async function markFiledWithoutReceipt(checkinId) {
     return;
   }
 
-  const idx = allCheckins.findIndex(g => g.id === checkinId);
-  if (idx >= 0) allCheckins[idx] = { ...allCheckins[idx], ...patch };
+  const affectedIds = new Set(data.map(r => r.id));
+  allCheckins = allCheckins.map(c => affectedIds.has(c.id) ? { ...c, ...patch } : c);
 
-  toast(it ? '✓ Segnato come inviato (nessuna ricevuta)' : '✓ Marked as filed (no receipt)');
-  closeGuestDetailModal();
-  viewGuest(checkinId);
+  const n = data.length;
+  toast(it
+    ? `✓ ${n} ospite${n === 1 ? '' : 'i'} segnato/i come inviato/i (nessuna ricevuta)`
+    : `✓ ${n} guest${n === 1 ? '' : 's'} marked as filed (no receipt)`);
+
+  renderCheckins();
+  renderDashboard?.();
 }
 
 /* ══════════════════════════════════════

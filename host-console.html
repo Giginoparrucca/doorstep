@@ -2990,6 +2990,7 @@ const HT = {
     t_dashboard: 'Dashboard', s_dashboard: 'What needs your attention right now',
     // Round 15 — action-board dashboard
     dash_loading: 'Loading…',
+    dashboard_loading: 'Loading dashboard…',
     dash_needs_attention: 'Needs your attention',
     dash_currently_staying: 'Currently staying',
     dash_all_caught_up: "You're all caught up",
@@ -3363,6 +3364,7 @@ const HT = {
     t_dashboard: 'Dashboard', s_dashboard: 'Cosa richiede la tua attenzione adesso',
     // Round 15 — bacheca azioni
     dash_loading: 'Caricamento…',
+    dashboard_loading: 'Caricamento dashboard…',
     dash_needs_attention: 'Richiede la tua attenzione',
     dash_currently_staying: 'Soggiornano adesso',
     dash_all_caught_up: 'Tutto in ordine',
@@ -7867,6 +7869,39 @@ document.addEventListener('keydown', (e) => {
 /* ══════════════════════════════════════
    INIT — Load everything from Supabase
 ══════════════════════════════════════ */
+// Round 36.1 follow-up: when the admin "view as host" flow lands here
+// with ?p=UUID&admin=1 but the property SELECT returns nothing (usually
+// because the current session isn't in public.admin_users — RLS blocks
+// non-admin reads of a property the user doesn't own), surface a clear
+// error instead of leaving the dashboard stuck on "Loading dashboard…".
+function showImpersonationError(propertyId, sessionEmail) {
+  const it = hostLang === 'it';
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(6,26,61,0.92);z-index:10000;display:flex;align-items:center;justify-content:center;padding:24px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;max-width:520px;width:100%;border-radius:12px;padding:26px 28px;box-shadow:0 18px 48px rgba(0,0,0,0.35);font-family:'DM Sans',sans-serif;color:#061A3D;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <span style="font-size:1.4rem;">🔒</span>
+        <h2 style="margin:0;font-size:1.15rem;font-weight:600;">${it ? 'Vista admin — impossibile caricare la proprietà' : 'Admin view — could not load property'}</h2>
+      </div>
+      <p style="margin:0 0 12px;font-size:0.9rem;line-height:1.5;color:#374151;">${it
+        ? 'La lettura della proprietà è stata bloccata da RLS. La sessione attuale non ha diritti di admin sulla tabella <code style="font-family:monospace;background:#f3f4f6;padding:1px 4px;border-radius:3px;">properties</code>.'
+        : 'The property read was blocked by RLS. The current session does not have admin rights on the <code style="font-family:monospace;background:#f3f4f6;padding:1px 4px;border-radius:3px;">properties</code> table.'}</p>
+      <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:0.8rem;line-height:1.6;">
+        <div><strong>${it ? 'Sessione' : 'Session'}:</strong> <code style="font-family:monospace;">${(sessionEmail || (it ? 'nessuna' : 'none')).replace(/[<>&]/g, '')}</code></div>
+        <div><strong>${it ? 'Proprietà richiesta' : 'Requested property'}:</strong> <code style="font-family:monospace;font-size:0.72rem;">${String(propertyId).replace(/[<>&]/g, '')}</code></div>
+      </div>
+      <p style="margin:0 0 14px;font-size:0.85rem;line-height:1.5;color:#374151;">${it
+        ? 'Cause tipiche: 1) la sessione di questa tab è di un utente diverso da quello che ha aperto l\'admin (Chrome multi-profilo / sessione scaduta); 2) l\'email della sessione non è in <code style="font-family:monospace;background:#f3f4f6;padding:1px 4px;border-radius:3px;">admin_users</code>.'
+        : 'Common causes: 1) this tab\'s session belongs to a different user than the admin tab (Chrome multi-profile / expired session); 2) the session email is not in <code style="font-family:monospace;background:#f3f4f6;padding:1px 4px;border-radius:3px;">admin_users</code>.'}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+        <button onclick="window.close()" style="padding:9px 16px;background:#fff;color:#6B7A90;border:1px solid #e5e7eb;border-radius:6px;font-size:0.85rem;cursor:pointer;font-family:inherit;">${it ? 'Chiudi' : 'Close'}</button>
+        <button onclick="sb.auth.signOut().then(() => window.location.reload())" style="padding:9px 16px;background:#b03939;color:#fff;border:none;border-radius:6px;font-size:0.85rem;cursor:pointer;font-family:inherit;">${it ? 'Esci e riprova' : 'Sign out and retry'}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
 async function init() {
   // Round 21.1: the chat cursor became per-property; clean up the old
   // global key if it's still lingering from a previous version.
@@ -7900,9 +7935,22 @@ async function init() {
   // 1. Load the FULL list of properties this user owns (Round 21 multi-property)
   try {
     if (adminPropId) {
-      // Admin mode — load just the one specified property regardless of owner
-      const res = await sb.from('properties').select('*').eq('id', adminPropId).is('deleted_at', null).single();
-      if (res.data) { allProperties = [res.data]; console.log('🔑 Admin mode — loaded property:', res.data.name); }
+      // Admin mode — load just the one specified property regardless of owner.
+      // The properties table has an admin-scoped RLS policy (is_admin()) so
+      // this succeeds when the caller's email is in public.admin_users.
+      // If the current session isn't in admin_users, RLS returns nothing and
+      // we surface a clear error instead of a blank dashboard.
+      const res = await sb.from('properties').select('*').eq('id', adminPropId).is('deleted_at', null).maybeSingle();
+      if (res.data) {
+        allProperties = [res.data];
+        console.log('🔑 Admin mode — loaded property:', res.data.name);
+      } else {
+        console.warn('🔑 Admin mode — property not readable', {
+          adminPropId, error: res.error, sessionEmail: (await sb.auth.getUser()).data?.user?.email,
+        });
+        showImpersonationError(adminPropId, (await sb.auth.getUser()).data?.user?.email);
+        return;
+      }
     } else {
       const res = await sb.from('properties').select('*')
         .eq('owner_id', userId).is('deleted_at', null)

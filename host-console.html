@@ -1581,27 +1581,31 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           <span class="export-axis-title" data-h="export_axis_tax_title">Imposta di soggiorno</span>
         </div>
         <div class="export-axis-note" data-h="export_axis_tax_note"></div>
-        <div class="export-grid">
-          <div class="export-card">
+        <div class="export-tile-h">
+          <div class="tile-body">
             <h3 data-h="export_paytourist">💶 PayTourist (Tourist Tax)</h3>
             <p data-h="export_paytourist_desc"></p>
-            <button class="btn btn-primary" onclick="exportPayTourist()" data-h="btn_gen_paytourist">📥 Generate PayTourist CSV</button>
-            <a href="#" id="paytouristPortalLink" target="_blank" rel="noopener" class="export-portal-link" style="display:none">
-              🔗 <span data-h="link_paytourist">Open PayTourist Import</span> ↗
-            </a>
             <div id="paytouristPortalHint" class="form-hint" style="display:none" data-h="paytourist_not_set">
               ℹ️ Set your PayTourist portal in property settings to show a direct link here.
             </div>
           </div>
-          <div class="export-card">
+          <div class="tile-actions">
+            <button class="btn btn-primary" onclick="exportPayTourist()" data-h="btn_gen_paytourist">📥 Generate PayTourist CSV</button>
+            <a href="#" id="paytouristPortalLink" target="_blank" rel="noopener" class="export-portal-link" style="display:none">
+              🔗 <span data-h="link_paytourist">Open PayTourist Import</span> ↗
+            </a>
+          </div>
+        </div>
+        <div class="export-tile-h">
+          <div class="tile-body">
             <h3 data-h="export_citytax_title">🧮 CityTax declaration helper</h3>
             <p data-h="export_citytax_desc"></p>
+          </div>
+          <div class="tile-actions">
             <button class="btn btn-primary" onclick="exportCityTax()" data-h="btn_gen_citytax">🧮 Compute quarterly figures</button>
-            <div class="export-portal-links">
-              <a href="https://www.comune.venezia.it/it/content/portale-ids-tourist-tax-0" target="_blank" rel="noopener" class="export-portal-link">
-                🔗 <span data-h="link_citytax">Open CityTax++ (Venezia)</span> ↗
-              </a>
-            </div>
+            <a href="https://www.comune.venezia.it/it/content/portale-ids-tourist-tax-0" target="_blank" rel="noopener" class="export-portal-link">
+              🔗 <span data-h="link_citytax">Open CityTax++ (Venezia)</span> ↗
+            </a>
           </div>
         </div>
       </div>
@@ -1612,10 +1616,12 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           <span class="export-axis-tag util" data-h="export_axis_util_tag">Utility</span>
           <span class="export-axis-title" data-h="export_axis_util_title">Your own records</span>
         </div>
-        <div class="export-grid">
-          <div class="export-card">
+        <div class="export-tile-h">
+          <div class="tile-body">
             <h3 data-h="export_csv">📋 Raw Data Export</h3>
             <p data-h="export_csv_desc"></p>
+          </div>
+          <div class="tile-actions">
             <button class="btn btn-secondary" onclick="exportCSV()" data-h="btn_dl_csv">📥 Download CSV</button>
           </div>
         </div>

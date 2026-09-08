@@ -407,6 +407,50 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 .export-portal-links { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .export-portal-links .export-portal-link { flex: 1 1 0; min-width: 180px; margin-top: 0; }
 
+/* Inline actions row — button + portal link on the same line, right of the card body.
+   Used on the Alloggiati card so the file generator and portal link live together. */
+.export-actions-inline {
+  display: flex; align-items: center; gap: 8px;
+  flex-wrap: wrap; margin-top: 4px;
+}
+.export-actions-inline .export-portal-link {
+  margin-top: 0; width: auto; padding: 8px 14px;
+}
+
+/* Compact horizontal tile — one option per row, title/desc left, actions right.
+   Used in the Tourist flow reporting axis so three regional options fit
+   the panel without stacking into tall cards. */
+.export-tile-h {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 16px;
+  box-shadow: var(--shadow-s); margin-bottom: 8px;
+}
+.export-tile-h:last-child { margin-bottom: 0; }
+.export-tile-h .tile-body { flex: 1 1 auto; min-width: 0; }
+.export-tile-h .tile-body h3 {
+  font-size: 0.88rem; font-weight: 600; margin: 0 0 2px;
+}
+.export-tile-h .tile-body p {
+  font-size: 0.76rem; color: var(--ink-soft);
+  margin: 0; line-height: 1.45; font-weight: 300;
+}
+.export-tile-h .tile-actions {
+  display: flex; align-items: center; gap: 8px;
+  flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end;
+}
+.export-tile-h .tile-actions .export-portal-link {
+  margin-top: 0; width: auto; padding: 6px 12px; font-size: 0.78rem;
+}
+.export-tile-h .tile-actions .btn { white-space: nowrap; }
+
+@media (max-width: 700px) {
+  .export-tile-h { flex-direction: column; align-items: stretch; gap: 10px; }
+  .export-tile-h .tile-actions { justify-content: flex-start; width: 100%; }
+  .export-tile-h .tile-actions .btn,
+  .export-tile-h .tile-actions .export-portal-link { flex: 1; text-align: center; justify-content: center; }
+}
+
 /* Round 23.1 — Export grouped by the three compliance axes */
 .export-axis { margin-bottom: 22px; }
 .export-axis-head {
@@ -1476,8 +1520,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           <div class="export-card" style="grid-column: span 2;">
             <h3 data-h="export_police_tourism">🏛 Alloggiati Web — Guest File</h3>
             <p data-h="export_police_tourism_desc"></p>
-            <button class="btn btn-primary" onclick="exportAlloggiati()" data-h="btn_gen_alloggiati">📥 Generate Guest File (.txt)</button>
-            <div class="export-portal-links">
+            <div class="export-actions-inline">
+              <button class="btn btn-primary" onclick="exportAlloggiati()" data-h="btn_gen_alloggiati">📥 Generate Guest File (.txt)</button>
               <a href="https://alloggiatiweb.poliziadistato.it" target="_blank" rel="noopener" class="export-portal-link">
                 🔗 <span data-h="link_alloggiati">Open Alloggiati Web</span> ↗
               </a>
@@ -1493,35 +1537,39 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           <span class="export-axis-title" data-h="export_axis_stat_title">Tourist flow reporting</span>
         </div>
         <div class="export-axis-note" data-h="export_axis_stat_note"></div>
-        <div class="export-grid">
-          <div class="export-card">
+        <div class="export-tile-h">
+          <div class="tile-body">
             <h3 data-h="export_monthly_summary">📊 Monthly Summary (C/59)</h3>
             <p data-h="export_monthly_summary_desc"></p>
-            <button class="btn btn-secondary" onclick="exportISTAT()" data-h="btn_gen_istat">📊 Generate C/59 Summary</button>
-            <div class="export-portal-links">
-              <a href="https://flussituristici.regione.veneto.it/" target="_blank" rel="noopener" class="export-portal-link">
-                🔗 <span data-h="link_ross1000">Open ROSS1000 (Veneto)</span> ↗
-              </a>
-            </div>
           </div>
-          <div class="export-card">
+          <div class="tile-actions">
+            <button class="btn btn-secondary" onclick="exportISTAT()" data-h="btn_gen_istat">📊 Generate C/59 Summary</button>
+            <a href="https://flussituristici.regione.veneto.it/" target="_blank" rel="noopener" class="export-portal-link">
+              🔗 <span data-h="link_ross1000">Open ROSS1000 (Veneto)</span> ↗
+            </a>
+          </div>
+        </div>
+        <div class="export-tile-h">
+          <div class="tile-body">
             <h3 data-h="export_ross1000_title">🗺 ROSS1000 statistical file</h3>
             <p data-h="export_ross1000_desc"></p>
-            <button class="btn btn-primary" onclick="exportRoss1000()" data-h="btn_gen_ross1000">📥 Generate ROSS1000 XML</button>
-            <div class="export-portal-links">
-              <a href="https://flussituristici.regione.veneto.it/" target="_blank" rel="noopener" class="export-portal-link">
-                🔗 <span data-h="link_ross1000_portal">Open ROSS1000 Veneto</span> ↗
-              </a>
-            </div>
           </div>
-          <div class="export-card">
+          <div class="tile-actions">
+            <button class="btn btn-primary" onclick="exportRoss1000()" data-h="btn_gen_ross1000">📥 Generate ROSS1000 XML</button>
+            <a href="https://flussituristici.regione.veneto.it/" target="_blank" rel="noopener" class="export-portal-link">
+              🔗 <span data-h="link_ross1000_portal">Open ROSS1000 Veneto</span> ↗
+            </a>
+          </div>
+        </div>
+        <div class="export-tile-h">
+          <div class="tile-body">
             <h3 data-h="export_puglia_dms_title">🏛 Puglia DMS (SPOT Easy)</h3>
             <p data-h="export_puglia_dms_desc"></p>
-            <div class="export-portal-links">
-              <a href="https://dms.puglia.it" target="_blank" rel="noopener" class="export-portal-link">
-                🔗 <span data-h="link_dms">Open Puglia DMS (SPOT Easy)</span> ↗
-              </a>
-            </div>
+          </div>
+          <div class="tile-actions">
+            <a href="https://dms.puglia.it" target="_blank" rel="noopener" class="export-portal-link">
+              🔗 <span data-h="link_dms">Open Puglia DMS (SPOT Easy)</span> ↗
+            </a>
           </div>
         </div>
       </div>

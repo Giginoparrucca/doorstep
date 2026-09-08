@@ -7105,7 +7105,47 @@ function viewGuest(id) {
     <div id="guestModalPhotoBox" style="background:rgba(107,122,144,0.04);border-radius:8px;padding:12px;text-align:center;">
       <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:8px;">${it ? 'Caricamento immagine…' : 'Loading image…'}</div>
     </div>
+    <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:6px;line-height:1.4;">
+      ${it
+        ? 'La foto viene cancellata 48 ore dopo l\'arrivo (nota Garante aprile 2026). La ricevuta di invio caricata sotto è conservata 5 anni come prova di adempimento.'
+        : 'Photo is deleted 48 hours after arrival (Garante April 2026 note). The filing receipt uploaded below is kept for 5 years as proof of compliance.'}
+    </div>
   ` : '';
+
+  // Round 36: filing receipt slot. Optional — nothing is gated on it.
+  // Uploading a file marks the guest as filed and stamps filed_at, so the
+  // day-after filing reminder stops for this row. Receipt lives in the
+  // 'receipts' storage bucket (owner-scoped RLS), 5-year retention.
+  const filedBadge = c.alloggiati_status === 'filed'
+    ? `<span style="display:inline-block;font-size:0.66rem;padding:2px 8px;background:rgba(47,122,68,0.14);color:#2f7a44;border-radius:10px;font-weight:600;letter-spacing:0.04em;">${it ? '✓ Inviato Alloggiati' : '✓ Filed on Alloggiati'}</span>`
+    : `<span style="display:inline-block;font-size:0.66rem;padding:2px 8px;background:rgba(176,57,57,0.12);color:#b03939;border-radius:10px;font-weight:600;letter-spacing:0.04em;">${it ? '⚠ Da inviare' : '⚠ Not filed yet'}</span>`;
+  const filedAtLine = c.filed_at
+    ? `<div style="font-size:0.72rem;color:var(--ink-soft);margin-top:4px;">${it ? 'Inviato il' : 'Filed at'}: ${safe(fmtDT(c.filed_at))}</div>`
+    : '';
+  const receiptViewLink = c.receipt_path
+    ? `<div id="guestModalReceiptBox" style="margin-top:8px;font-size:0.78rem;color:var(--ink-soft);">${it ? 'Caricamento ricevuta…' : 'Loading receipt…'}</div>`
+    : '';
+  const receiptExplainer = it
+    ? 'Carica la ricevuta di invio prodotta dal portale Alloggiati (PDF o immagine). Il file è conservato 5 anni come prova di adempimento e non viene cancellato dal ciclo di ritenzione delle foto documento.'
+    : 'Upload the filing receipt produced by the Alloggiati portal (PDF or image). The file is kept for 5 years as proof of compliance and is exempt from the 48-hour document-photo purge.';
+  const filingSection = `
+    ${sectionTitle(it ? 'Invio Alloggiati' : 'Alloggiati filing')}
+    <div style="background:rgba(107,122,144,0.04);border-radius:8px;padding:12px 14px;">
+      <div>${filedBadge}</div>
+      ${filedAtLine}
+      ${receiptViewLink}
+      <div style="margin-top:12px;">
+        <label style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:var(--warm);color:#fff;border-radius:6px;font-size:0.82rem;cursor:pointer;font-family:inherit;">
+          <span>${it ? '📎 Carica ricevuta' : '📎 Upload receipt'}</span>
+          <input type="file" id="receiptFileInput_${c.id}" accept=".pdf,image/*"
+            onchange="uploadFilingReceipt('${c.id}', '${c.property_id}', this)"
+            style="position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;">
+        </label>
+        <span id="receiptUploadStatus_${c.id}" style="margin-left:10px;font-size:0.72rem;color:var(--ink-soft);"></span>
+      </div>
+      <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:8px;line-height:1.4;">${receiptExplainer}</div>
+    </div>
+  `;
 
   const metaSection = `
     ${sectionTitle(it ? 'Sistema' : 'System')}
@@ -7130,6 +7170,7 @@ function viewGuest(id) {
         ${personalSection}
         ${docSection}
         ${photoSection}
+        ${filingSection}
         ${metaSection}
         <div style="margin-top:18px;display:flex;justify-content:flex-end;">
           <button onclick="closeGuestDetailModal()" style="padding:10px 22px;background:var(--warm);color:#fff;border:none;border-radius:6px;font-size:0.86rem;cursor:pointer;font-family:inherit;">${it ? 'Chiudi' : 'Close'}</button>
@@ -7158,6 +7199,97 @@ function viewGuest(id) {
       if (box) box.innerHTML = `<div style="font-size:0.78rem;color:#b03939;padding:8px;">${it ? '⚠ Errore caricamento foto' : '⚠ Photo load error'}</div>`;
     });
   }
+
+  // Round 36: signed URL for the filing receipt (private 'receipts' bucket).
+  if (c.receipt_path) {
+    sb.storage.from('receipts').createSignedUrl(c.receipt_path, 300).then(({ data, error }) => {
+      const box = document.getElementById('guestModalReceiptBox');
+      if (!box) return;
+      if (error || !data?.signedUrl) {
+        box.innerHTML = `<span style="color:#b03939;">${it ? '⚠ Ricevuta non leggibile' : '⚠ Receipt not readable'}</span>`;
+        return;
+      }
+      box.innerHTML = `📄 <a href="${data.signedUrl}" target="_blank" rel="noopener" style="color:#005BFF;text-decoration:underline;">${it ? 'Apri ricevuta caricata (link valido 5 min)' : 'Open uploaded receipt (link valid 5 min)'}</a>`;
+    }).catch(() => {
+      const box = document.getElementById('guestModalReceiptBox');
+      if (box) box.innerHTML = `<span style="color:#b03939;">${it ? '⚠ Errore ricevuta' : '⚠ Receipt error'}</span>`;
+    });
+  }
+}
+
+// Round 36: upload a filing receipt (PDF or image) to the private
+// 'receipts' bucket, then mark the checkin as filed. Uses the Round 20.2
+// pattern (.update().select() + row-count check) so a silent RLS block
+// surfaces as a visible error instead of pretending success.
+async function uploadFilingReceipt(checkinId, propertyId, inputEl) {
+  const file = inputEl?.files?.[0];
+  if (!file) return;
+  const it = hostLang === 'it';
+  const statusEl = document.getElementById(`receiptUploadStatus_${checkinId}`);
+  const setStatus = (txt, color) => {
+    if (!statusEl) return;
+    statusEl.textContent = txt;
+    statusEl.style.color = color || 'var(--ink-soft)';
+  };
+
+  // Reject very large files early — receipts are typically <1 MB, so 10 MB
+  // is a generous ceiling that still stops accidental uploads of the whole
+  // check-in album.
+  if (file.size > 10 * 1024 * 1024) {
+    setStatus(it ? 'File troppo grande (>10 MB)' : 'File too large (>10 MB)', '#b03939');
+    inputEl.value = '';
+    return;
+  }
+
+  setStatus(it ? 'Caricamento…' : 'Uploading…');
+  const ext = (file.name.match(/\.([a-z0-9]{1,8})$/i)?.[1] || 'pdf').toLowerCase();
+  // Path convention: <property_id>/<checkin_id>-<yyyymmdd>.<ext>.
+  // The property_id first segment is what the RLS policy uses to check
+  // ownership — do not change without updating migration_round36 too.
+  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const path = `${propertyId}/${checkinId}-${stamp}.${ext}`;
+
+  try {
+    const { error: upErr } = await sb.storage.from('receipts')
+      .upload(path, file, { upsert: true, contentType: file.type || 'application/octet-stream' });
+    if (upErr) {
+      console.error('receipt upload failed', upErr);
+      setStatus((it ? 'Upload fallito: ' : 'Upload failed: ') + (upErr.message || upErr), '#b03939');
+      return;
+    }
+  } catch (e) {
+    console.error(e);
+    setStatus((it ? 'Errore upload: ' : 'Upload error: ') + String(e), '#b03939');
+    return;
+  }
+
+  const patch = {
+    receipt_path: path,
+    filed_at: new Date().toISOString(),
+    alloggiati_status: 'filed',
+  };
+  const { data, error: updErr } = await sb.from('checkins')
+    .update(patch).eq('id', checkinId).select();
+  if (updErr) {
+    console.error(updErr);
+    setStatus((it ? 'Salvataggio fallito: ' : 'Save failed: ') + updErr.message, '#b03939');
+    return;
+  }
+  if (!data || data.length === 0) {
+    setStatus(it ? 'Aggiornamento bloccato (RLS)' : 'Update blocked (RLS)', '#b03939');
+    return;
+  }
+
+  // Reflect the new state in the local cache so the modal re-open shows it.
+  const idx = allCheckins.findIndex(g => g.id === checkinId);
+  if (idx >= 0) allCheckins[idx] = { ...allCheckins[idx], ...patch };
+
+  setStatus(it ? '✓ Ricevuta caricata' : '✓ Receipt uploaded', '#2f7a44');
+  toast(it ? 'Ricevuta salvata — check-in marcato come inviato.' : 'Receipt saved — check-in marked as filed.');
+
+  // Re-render the modal to show the new "filed" state and the receipt link.
+  closeGuestDetailModal();
+  viewGuest(checkinId);
 }
 
 /* ══════════════════════════════════════
@@ -7844,7 +7976,7 @@ setTimeout(() => setHostLang('it'), 200);
         <li style="margin:4px 0;"><strong>Chat with the AI assistant or guests</strong> — deleted 90 days after the conversation is resolved, or 30 days after you archive it.</li>
         <li style="margin:4px 0;"><strong>App usage data</strong> (which pages were opened, which recommendations were tapped) — kept for 180 days, then anonymized into monthly totals before deletion.</li>
         <li style="margin:4px 0;"><strong>Guest check-in data</strong> (name, document number, dates of stay) — kept for 5 years per Italian law (TULPS art. 109; Alloggiati Web).</li>
-        <li style="margin:4px 0;"><strong>Document photos</strong> (passport / ID images) — kept until 30 days after the guest's departure, then permanently deleted. Italian law requires retention of the data, not the image; longer retention has been flagged by the Garante as disproportionate.</li>
+        <li style="margin:4px 0;"><strong>Document photos</strong> (passport / ID images) — kept for <strong>48 hours after arrival</strong>, then permanently deleted. Following the Italian Garante's April 2026 clarification: TULPS art. 109 requires transmitting the data to Alloggiati Web, not retaining copies of the document image. The Alloggiati filing receipt (if you upload it) is kept for 5 years as proof of compliance.</li>
         <li style="margin:4px 0;"><strong>Property setup data</strong> (rules, recommendations, welcome message) — kept while your account is active.</li>
       </ul>
 
@@ -7871,7 +8003,7 @@ setTimeout(() => setHostLang('it'), 200);
         <li style="margin:4px 0;"><strong>Chat con l'assistente AI o con gli ospiti</strong> — cancellate 90 giorni dopo la chiusura della conversazione, o 30 giorni dopo che le hai archiviate.</li>
         <li style="margin:4px 0;"><strong>Dati di utilizzo dell'app</strong> (pagine aperte, consigli cliccati) — conservati per 180 giorni, poi anonimizzati in totali mensili prima della cancellazione.</li>
         <li style="margin:4px 0;"><strong>Dati di check-in degli ospiti</strong> (nome, numero documento, date soggiorno) — conservati per 5 anni come previsto dalla normativa italiana (TULPS art. 109; Alloggiati Web).</li>
-        <li style="margin:4px 0;"><strong>Foto del documento</strong> (immagini di passaporto / carta d'identità) — conservate fino a 30 giorni dopo la partenza dell'ospite, poi cancellate definitivamente. La legge italiana richiede la conservazione dei dati, non dell'immagine; una conservazione più lunga è stata segnalata dal Garante come sproporzionata.</li>
+        <li style="margin:4px 0;"><strong>Foto del documento</strong> (immagini di passaporto / carta d'identità) — conservate per <strong>48 ore dall'arrivo</strong>, poi cancellate definitivamente. Segue la nota del Garante di aprile 2026: l'art. 109 TULPS impone la trasmissione dei dati ad Alloggiati Web, non la conservazione della copia del documento. La ricevuta di invio Alloggiati (se caricata) è conservata 5 anni come prova di adempimento.</li>
         <li style="margin:4px 0;"><strong>Dati di setup dell'immobile</strong> (regole, consigli, messaggio di benvenuto) — conservati finché il tuo account è attivo.</li>
       </ul>
 

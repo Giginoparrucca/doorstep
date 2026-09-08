@@ -461,6 +461,35 @@ function adminToast(msg, type) {
   t._timer = setTimeout(() => t.classList.remove('show'), 2500);
 }
 
+// Copy a UUID (or any string) to the clipboard and toast. Used by the
+// property-id cells in the Hosts & Properties and AI Usage tables so
+// operators can grab a full uuid without expanding a truncated span.
+function copyToClipboard(value, label) {
+  const v = String(value || '');
+  const done = () => adminToast((label || 'ID') + ' copied', 'success');
+  const fail = () => adminToast('Copy failed — select and Cmd/Ctrl+C', 'error');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(v).then(done, fail);
+    return;
+  }
+  // Fallback for older browsers / http:// contexts.
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = v; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    done();
+  } catch (_) { fail(); }
+}
+// Render a truncated uuid pill that copies the full value on click.
+function copyableId(uuid, label) {
+  const safe = String(uuid || '').replace(/'/g, "\\'");
+  const short = String(uuid || '').substring(0, 8);
+  const title = label ? `${label}: ${uuid}` : `Full id: ${uuid}`;
+  return `<button type="button" onclick="event.stopPropagation();copyToClipboard('${safe}', '${(label||'').replace(/'/g, "\\'")}')" title="${title.replace(/"/g, '&quot;')}"
+    style="background:none;border:none;padding:0;margin:0;font:inherit;color:var(--ink-soft);font-family:monospace;font-size:0.62rem;cursor:pointer;text-decoration:underline dotted;">${short}… 📋</button>`;
+}
+
 // Toggle visibility of test+deleted rows in admin tables.
 function toggleShowHidden(checked) {
   showHidden = !!checked;
@@ -2648,7 +2677,7 @@ function renderDeepDive() {
               ? '<tr><td colspan="7" style="text-align:center;padding:16px;color:var(--ink-soft);">No properties yet.</td></tr>'
               : _rowsUsage.map(r => `
               <tr>
-                <td><strong>${r.p.name || 'Unnamed'}</strong><br><span style="font-size:0.62rem;color:var(--ink-soft);font-family:monospace;">${r.p.id.substring(0,8)}…</span></td>
+                <td><strong>${r.p.name || 'Unnamed'}</strong><br>${copyableId(r.p.id, 'Property id')}</td>
                 <td style="text-align:right;">${_fmtNum(r.u.chat)}</td>
                 <td style="text-align:right;">${_fmtNum(r.u.scan)}</td>
                 <td style="text-align:right;font-family:monospace;font-size:0.78rem;">${_fmtNum(r.u.input)} / ${_fmtNum(r.u.output)}</td>
@@ -3141,7 +3170,7 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
           const setupPct = Math.round(setupScore / 5 * 100);
           const setupColor = setupPct >= 80 ? 'var(--green)' : setupPct >= 40 ? 'var(--amber)' : 'var(--red)';
           return `<tr class="${adminRowClass(p)}">
-            <td><strong>${p.name || 'Unnamed'}</strong><br><span style="font-size:0.62rem;color:var(--ink-soft);font-family:monospace;">${p.id.substring(0,8)}…</span></td>
+            <td><strong>${p.name || 'Unnamed'}</strong><br>${copyableId(p.id, 'Property id')}</td>
             <td>${p._email ? `<strong>${p._email.split('@')[0]}</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">${p._email}</span>` : `${p.host_names || '—'}<br><span style="font-size:0.65rem;color:var(--ink-soft)">${p.host_phone || 'No account'}</span>`}</td>
             <td>${p.city || '—'}${p.region ? '<br><span style="font-size:0.65rem;color:var(--ink-soft)">' + p.region + '</span>' : ''}</td>
             <td style="text-align:center;font-weight:600;">${p._checkin_count}</td>

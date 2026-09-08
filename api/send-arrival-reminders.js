@@ -366,6 +366,7 @@ function renderFilingHTML(property, yesterday, count) {
   const propName = esc(property.name || 'your property');
   const link = HOST_CONSOLE_URL;
   const guestWord = count === 1 ? 'guest' : 'guests';
+  const themPronoun = count === 1 ? 'them' : 'each of them';
   return `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#061A3D;">
       <h2 style="margin:0 0 6px;font-size:20px;">Filing reminder — ${propName}</h2>
@@ -378,8 +379,14 @@ function renderFilingHTML(property, yesterday, count) {
       <p style="margin:0 0 16px;">
         <a href="${esc(link)}" style="display:inline-block;background:#005BFF;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;">Open host console</a>
       </p>
+      <p style="margin:0 0 8px;font-weight:600;">How to mark ${themPronoun} filed</p>
+      <ol style="margin:0 0 16px 18px;padding:0;color:#374151;font-size:14px;line-height:1.55;">
+        <li>Go to <strong>Check-in Data</strong> in the host console.</li>
+        <li>Click <strong>View</strong> on the guest's row.</li>
+        <li>In the <strong>Alloggiati filing</strong> section, either upload the receipt PDF (recommended — kept 5 years as proof) or use <em>Mark filed without receipt</em> if a receipt isn't available.</li>
+      </ol>
       <p style="margin:20px 0 0;color:#6B7A90;font-size:12px;">
-        Sent by WelcomeBnB · after you upload the Alloggiati receipt for a guest, this reminder stops for that guest. Turn off all reminders by clearing the "reminder email" field in Property settings.
+        Sent by WelcomeBnB · once a guest is marked as filed, this reminder stops for that guest. Turn off all reminders by clearing the "reminder email" field in Property settings.
       </p>
     </div>`;
 }

@@ -7116,7 +7116,8 @@ function viewGuest(id) {
   // Uploading a file marks the guest as filed and stamps filed_at, so the
   // day-after filing reminder stops for this row. Receipt lives in the
   // 'receipts' storage bucket (owner-scoped RLS), 5-year retention.
-  const filedBadge = c.alloggiati_status === 'filed'
+  const isFiled = c.alloggiati_status === 'filed';
+  const filedBadge = isFiled
     ? `<span style="display:inline-block;font-size:0.66rem;padding:2px 8px;background:rgba(47,122,68,0.14);color:#2f7a44;border-radius:10px;font-weight:600;letter-spacing:0.04em;">${it ? '✓ Inviato Alloggiati' : '✓ Filed on Alloggiati'}</span>`
     : `<span style="display:inline-block;font-size:0.66rem;padding:2px 8px;background:rgba(176,57,57,0.12);color:#b03939;border-radius:10px;font-weight:600;letter-spacing:0.04em;">${it ? '⚠ Da inviare' : '⚠ Not filed yet'}</span>`;
   const filedAtLine = c.filed_at
@@ -7125,23 +7126,42 @@ function viewGuest(id) {
   const receiptViewLink = c.receipt_path
     ? `<div id="guestModalReceiptBox" style="margin-top:8px;font-size:0.78rem;color:var(--ink-soft);">${it ? 'Caricamento ricevuta…' : 'Loading receipt…'}</div>`
     : '';
+  // If they marked filed but never uploaded a receipt, nudge them —
+  // gently — so the 5-year compliance record isn't left empty.
+  const noReceiptNote = (isFiled && !c.receipt_path)
+    ? `<div style="margin-top:8px;font-size:0.72rem;color:#9a6b00;background:rgba(232,184,75,0.12);border-radius:6px;padding:6px 10px;">${it
+        ? '⚠ Nessuna ricevuta caricata — carica il PDF sotto per avere la prova di adempimento a 5 anni.'
+        : '⚠ No receipt on file — upload the PDF below to have the 5-year proof of compliance.'}</div>`
+    : '';
   const receiptExplainer = it
     ? 'Carica la ricevuta di invio prodotta dal portale Alloggiati (PDF o immagine). Il file è conservato 5 anni come prova di adempimento e non viene cancellato dal ciclo di ritenzione delle foto documento.'
     : 'Upload the filing receipt produced by the Alloggiati portal (PDF or image). The file is kept for 5 years as proof of compliance and is exempt from the 48-hour document-photo purge.';
+  // Secondary action for the rare case where filing succeeded but no
+  // receipt PDF is available (Alloggiati portal timeout, host filed via
+  // paper, etc.). Only shown when the row isn't already marked filed —
+  // once marked filed, uploading a receipt is the only remaining action.
+  const markWithoutReceiptBtn = !isFiled
+    ? `<button type="button" onclick="markFiledWithoutReceipt('${c.id}')"
+        style="padding:8px 14px;background:transparent;color:var(--ink-soft);border:1px solid var(--border);border-radius:6px;font-size:0.78rem;cursor:pointer;font-family:inherit;">
+        ${it ? 'Segna come inviato senza ricevuta' : 'Mark filed without receipt'}
+      </button>`
+    : '';
   const filingSection = `
     ${sectionTitle(it ? 'Invio Alloggiati' : 'Alloggiati filing')}
     <div style="background:rgba(107,122,144,0.04);border-radius:8px;padding:12px 14px;">
       <div>${filedBadge}</div>
       ${filedAtLine}
       ${receiptViewLink}
-      <div style="margin-top:12px;">
+      ${noReceiptNote}
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <label style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:var(--warm);color:#fff;border-radius:6px;font-size:0.82rem;cursor:pointer;font-family:inherit;">
           <span>${it ? '📎 Carica ricevuta' : '📎 Upload receipt'}</span>
           <input type="file" id="receiptFileInput_${c.id}" accept=".pdf,image/*"
             onchange="uploadFilingReceipt('${c.id}', '${c.property_id}', this)"
             style="position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;">
         </label>
-        <span id="receiptUploadStatus_${c.id}" style="margin-left:10px;font-size:0.72rem;color:var(--ink-soft);"></span>
+        ${markWithoutReceiptBtn}
+        <span id="receiptUploadStatus_${c.id}" style="font-size:0.72rem;color:var(--ink-soft);"></span>
       </div>
       <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:8px;line-height:1.4;">${receiptExplainer}</div>
     </div>
@@ -7288,6 +7308,43 @@ async function uploadFilingReceipt(checkinId, propertyId, inputEl) {
   toast(it ? 'Ricevuta salvata — check-in marcato come inviato.' : 'Receipt saved — check-in marked as filed.');
 
   // Re-render the modal to show the new "filed" state and the receipt link.
+  closeGuestDetailModal();
+  viewGuest(checkinId);
+}
+
+// Round 36 follow-up: escape hatch for the rare case where a host filed
+// on Alloggiati but never got a receipt PDF (portal timeout, filed via
+// paper channel, etc.). Marks the row as filed and stops the day-after
+// reminder without attaching a receipt. Leaves receipt_path null so the
+// "no receipt on file" note surfaces in the modal — the host can still
+// upload the receipt later with the normal upload flow.
+async function markFiledWithoutReceipt(checkinId) {
+  const it = hostLang === 'it';
+  const confirmMsg = it
+    ? 'Segnare questo check-in come inviato SENZA ricevuta?\n\nIl reminder giornaliero si fermerà, ma non ci sarà la prova di adempimento a 5 anni finché non carichi il PDF della ricevuta.'
+    : 'Mark this check-in as filed WITHOUT a receipt?\n\nThe daily reminder will stop, but you will not have the 5-year proof of compliance until you upload the receipt PDF.';
+  if (!confirm(confirmMsg)) return;
+
+  const patch = {
+    filed_at: new Date().toISOString(),
+    alloggiati_status: 'filed',
+  };
+  const { data, error: updErr } = await sb.from('checkins')
+    .update(patch).eq('id', checkinId).select();
+  if (updErr) {
+    console.error(updErr);
+    toast((it ? 'Aggiornamento fallito: ' : 'Update failed: ') + updErr.message);
+    return;
+  }
+  if (!data || data.length === 0) {
+    toast(it ? 'Aggiornamento bloccato (RLS)' : 'Update blocked (RLS)');
+    return;
+  }
+
+  const idx = allCheckins.findIndex(g => g.id === checkinId);
+  if (idx >= 0) allCheckins[idx] = { ...allCheckins[idx], ...patch };
+
+  toast(it ? '✓ Segnato come inviato (nessuna ricevuta)' : '✓ Marked as filed (no receipt)');
   closeGuestDetailModal();
   viewGuest(checkinId);
 }

@@ -407,16 +407,6 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 .export-portal-links { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .export-portal-links .export-portal-link { flex: 1 1 0; min-width: 180px; margin-top: 0; }
 
-/* Inline actions row — button + portal link on the same line, right of the card body.
-   Used on the Alloggiati card so the file generator and portal link live together. */
-.export-actions-inline {
-  display: flex; align-items: center; gap: 8px;
-  flex-wrap: wrap; margin-top: 4px;
-}
-.export-actions-inline .export-portal-link {
-  margin-top: 0; width: auto; padding: 8px 14px;
-}
-
 /* Compact horizontal tile — one option per row, title/desc left, actions right.
    Used in the Tourist flow reporting axis so three regional options fit
    the panel without stacking into tall cards. */
@@ -1516,16 +1506,16 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           <span class="export-axis-title" data-h="export_axis_police_title">Guest registration</span>
         </div>
         <div class="export-axis-note" data-h="export_axis_police_note"></div>
-        <div class="export-grid">
-          <div class="export-card" style="grid-column: span 2;">
+        <div class="export-tile-h">
+          <div class="tile-body">
             <h3 data-h="export_police_tourism">🏛 Alloggiati Web — Guest File</h3>
             <p data-h="export_police_tourism_desc"></p>
-            <div class="export-actions-inline">
-              <button class="btn btn-primary" onclick="exportAlloggiati()" data-h="btn_gen_alloggiati">📥 Generate Guest File (.txt)</button>
-              <a href="https://alloggiatiweb.poliziadistato.it" target="_blank" rel="noopener" class="export-portal-link">
-                🔗 <span data-h="link_alloggiati">Open Alloggiati Web</span> ↗
-              </a>
-            </div>
+          </div>
+          <div class="tile-actions">
+            <button class="btn btn-primary" onclick="exportAlloggiati()" data-h="btn_gen_alloggiati">📥 Generate Guest File (.txt)</button>
+            <a href="https://alloggiatiweb.poliziadistato.it" target="_blank" rel="noopener" class="export-portal-link">
+              🔗 <span data-h="link_alloggiati">Open Alloggiati Web</span> ↗
+            </a>
           </div>
         </div>
       </div>

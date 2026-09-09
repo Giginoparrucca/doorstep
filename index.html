@@ -3194,18 +3194,24 @@ async function saveCurrentGuest() {
     record.property_id = canonicalPropId;
     if (canonicalBooking) record.booking_code = canonicalBooking;
 
-    // Round 36.2 — if the property has rotating codes enabled, stamp the
-    // booking's rotating code onto this row. Reuse any code already
-    // present on an existing checkin or a previously-saved guest of the
-    // same booking; otherwise generate a fresh 4-digit code on the head-
-    // of-family / single-guest / group-leader insert. Members leave it
-    // null and inherit from the head via _resolveLockboxCodes on read.
-    if (propertyData?.rotating_lockbox_enabled === true) {
+    // Round 36.2 / 36.2.1 — if the property has rotating codes enabled,
+    // stamp the booking's rotating code onto this row so it matches what
+    // the host sees on the dashboard. Priority:
+    //   1. reservationKeyboxCode — fetched at load from the ota_reservations
+    //      row via the get_reservation_keybox RPC. This is the authoritative
+    //      source when the booking came from iCal sync.
+    //   2. any code already saved on a prior guest of this booking.
+    //   3. random 4-digit fallback for direct bookings without an OTA row.
+    // Members leave keybox_code null and inherit via _resolveLockboxCodes.
+    if (propertyData?.rotating_lockbox_enabled === true
+        || propertyData?.use_per_guest_lockbox === true) {
       const priorCode = (existingCheckins || [])
         .concat(savedGuests || [])
         .map(c => c && c.keybox_code)
         .find(v => v && String(v).trim());
-      if (priorCode) {
+      if (reservationKeyboxCode) {
+        record.keybox_code = reservationKeyboxCode;
+      } else if (priorCode) {
         record.keybox_code = String(priorCode).trim();
       } else if (isMainGuest()) {
         record.keybox_code = String(Math.floor(1000 + Math.random() * 9000));
@@ -4469,6 +4475,10 @@ async function init() {
       }
       // Round 36.2: dual lockbox codes are rendered by refreshLockboxDisplay().
       refreshLockboxDisplay();
+      // Round 36.2.1: pull the rotating code assigned to this booking on
+      // the ota_reservations row (if any). Non-blocking; refreshLockboxDisplay
+      // re-runs when the RPC resolves.
+      fetchReservationKeybox();
 
       // Update i18n translations with DB data
       T.en.welcome_title = `Welcome to<br><em>${d.name}</em>`;
@@ -4739,10 +4749,37 @@ function showResetToast(msg) {
   }, 6000);
 }
 
-// Round 19 / 36.2: resolve the codes to show this guest.
+// Round 36.2.1 — cached rotating code from the ota_reservations row that
+// backs this guest's booking. Populated by fetchReservationKeybox() at
+// load time (best-effort, silent on failure). Used as the primary
+// rotating source in _resolveLockboxCodes so the code the host sees on
+// their dashboard is the same one the guest sees, and it appears even
+// before the guest has completed check-in.
+let reservationKeyboxCode = '';
+
+async function fetchReservationKeybox() {
+  const pid  = getStoredPropertyId() || propertyId;
+  const bc   = getBookingCode() || bookingCode;
+  if (!pid || !bc) return;
+  try {
+    const { data, error } = await sb.rpc('get_reservation_keybox', {
+      p_property_id: pid, p_booking_code: bc,
+    });
+    if (error) { console.warn('[keybox] rpc failed:', error.message); return; }
+    if (data && typeof data === 'string') {
+      reservationKeyboxCode = data.trim();
+      refreshLockboxDisplay();
+    }
+  } catch (e) { /* non-fatal */ }
+}
+
+// Round 19 / 36.2 / 36.2.1: resolve the codes to show this guest.
 // Fixed code: property.keybox_code, shown only when show_fixed_lockbox_to_guest.
-// Rotating code: from the head-of-family checkin row (keybox_code), shown
-// only when rotating_lockbox_enabled AND show_rotating_lockbox_to_guest.
+// Rotating code: prefer the reservation's keybox_code (R36.2.1 —
+// generated at booking-link time so the host and guest see the same
+// value), else fall back to the head-of-family checkin row's
+// keybox_code. Shown only when rotating_lockbox_enabled AND
+// show_rotating_lockbox_to_guest.
 // Legacy behaviour: a property with the pre-R36.2 use_per_guest_lockbox
 // flag still opts into rotating; the show_ flags default to true when not
 // present in the row.
@@ -4756,13 +4793,16 @@ function _resolveLockboxCodes(propData) {
 
   if (show_fixed) out.fixed = (propData.keybox_code || '').trim();
 
-  if (rotating_enabled && show_rotating
-      && Array.isArray(existingCheckins) && existingCheckins.length > 0) {
-    const head = existingCheckins.find(c =>
-      c.guest_type === 'single' || c.guest_type === 'head' || c.guest_type === 'group'
-    ) || existingCheckins[0];
-    if (head && head.keybox_code && head.keybox_code.trim()) {
-      out.rotating = head.keybox_code.trim();
+  if (rotating_enabled && show_rotating) {
+    if (reservationKeyboxCode) {
+      out.rotating = reservationKeyboxCode;
+    } else if (Array.isArray(existingCheckins) && existingCheckins.length > 0) {
+      const head = existingCheckins.find(c =>
+        c.guest_type === 'single' || c.guest_type === 'head' || c.guest_type === 'group'
+      ) || existingCheckins[0];
+      if (head && head.keybox_code && head.keybox_code.trim()) {
+        out.rotating = head.keybox_code.trim();
+      }
     }
   }
   return out;

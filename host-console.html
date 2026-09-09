@@ -4031,7 +4031,7 @@ async function renderUpcomingReservationsPanel() {
   let rows = [];
   try {
     const { data, error } = await sb.from('ota_reservations')
-      .select('id, platform, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code')
+      .select('id, platform, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code')
       .eq('property_id', propertyId)
       .eq('entry_type', 'reservation')
       .eq('status', 'active')
@@ -4179,6 +4179,12 @@ async function renderUpcomingReservationsPanel() {
     const codeChip = r.booking_code
       ? `<span title="${safe(hostLang === 'it' ? 'Codice prenotazione' : 'Booking code')}" style="font-family:monospace;font-size:0.68rem;color:var(--warm);background:rgba(0,91,255,0.08);border-radius:3px;padding:1px 6px;">${safe(r.booking_code)}</span>`
       : '';
+    // Round 36.2.1 — rotating lockbox code (from the reservation) shown
+    // as an amber chip beside the booking code so the host can program
+    // the lockbox before the guest arrives.
+    const kbChip = r.keybox_code
+      ? `<span title="${safe(hostLang === 'it' ? 'Codice lockbox rotante' : 'Rotating lockbox code')}" style="font-family:monospace;font-size:0.68rem;font-weight:600;color:#9a6b00;background:rgba(232,184,75,0.16);border-radius:3px;padding:1px 6px;">🔐 ${safe(r.keybox_code)}</span>`
+      : '';
     const linkLabel = hostLang === 'it' ? 'Link Prenotazione' : 'Booking Link';
     const linkRow = guestLink ? `
       <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:8px;padding-top:8px;border-top:1px dashed rgba(107,122,144,0.15);">
@@ -4201,6 +4207,7 @@ async function renderUpcomingReservationsPanel() {
           <span style="font-weight:500;">${safe(name || '—')}</span>
           <span style="font-size:0.78rem;color:var(--ink-soft);">· ${safe(guestsLabel)}</span>
           ${codeChip}
+          ${kbChip}
         </div>
         ${linkRow}
       </div>`;
@@ -4220,8 +4227,6 @@ async function renderUpcomingReservationsPanel() {
 // so subsequent renders / iCal syncs keep the same value — never
 // regenerated, or the link the host already shared would break.
 async function ensureReservationBookingCodes(rows) {
-  const missing = (rows || []).filter(r => !r.booking_code);
-  if (missing.length === 0) return rows;
   const propInit = (propertyData?.name || 'DS').replace(/[^A-Za-z]/g, '').substring(0, 3).toUpperCase() || 'DS';
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const rand6 = () => {
@@ -4229,15 +4234,31 @@ async function ensureReservationBookingCodes(rows) {
     for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
     return s;
   };
-  for (const r of missing) {
-    const code = `${propInit}-${rand6()}`;
+  const rand4 = () => String(Math.floor(1000 + Math.random() * 9000));
+  // Round 36.2.1 — every booking link gets a rotating 4-digit lockbox code
+  // stamped on the reservation itself, when the property opts in. That way
+  // the host sees the code the moment the booking exists (upcoming panel),
+  // not only after the guest has completed check-in. Legacy
+  // use_per_guest_lockbox is still respected so old properties don't
+  // regress silently.
+  const rotating = propertyData?.rotating_lockbox_enabled === true
+                || propertyData?.use_per_guest_lockbox === true;
+
+  for (const r of (rows || [])) {
+    const patch = {};
+    if (!r.booking_code) patch.booking_code = `${propInit}-${rand6()}`;
+    if (rotating && !r.keybox_code) patch.keybox_code = rand4();
+    if (Object.keys(patch).length === 0) continue;
     // Round 20.2 pattern: .select() after update so a silent-0-rows
-    // permission block surfaces in the console instead of leaving us
-    // with a phantom code the DB doesn't have.
+    // permission block surfaces in the console instead of leaving us with
+    // a phantom code the DB doesn't have.
     const { data, error } = await sb.from('ota_reservations')
-      .update({ booking_code: code }).eq('id', r.id).select('id, booking_code');
-    if (error) { console.warn('[ota] booking_code assign failed:', error.message); continue; }
-    if (data && data[0]) r.booking_code = data[0].booking_code;
+      .update(patch).eq('id', r.id).select('id, booking_code, keybox_code');
+    if (error) { console.warn('[ota] reservation code assign failed:', error.message); continue; }
+    if (data && data[0]) {
+      r.booking_code = data[0].booking_code;
+      r.keybox_code  = data[0].keybox_code;
+    }
   }
   return rows;
 }

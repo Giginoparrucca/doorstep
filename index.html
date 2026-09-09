@@ -853,10 +853,7 @@ body.tab-chat #privacyLink {
           <div class="home-card-value" id="checkinTime">&nbsp;</div>
           <div class="home-card-sub" id="accessMethod">&nbsp;</div>
         </div>
-        <div class="home-card-lockbox-inline" id="lockboxCodeRow" style="display:none">
-          <span class="home-card-lockbox-label" data-i18n="lockbox_label">Code</span>
-          <span class="home-card-lockbox-code" id="lockboxCodeValue">—</span>
-        </div>
+        <div id="lockboxCodesWrap" style="display:none;flex-direction:column;gap:6px;"></div>
       </div>
       <div class="home-card-text" id="checkinInstructionsText" style="display:none"></div>
     </div>
@@ -1660,6 +1657,8 @@ const T = {
     checkin_instructions_title: 'How to find us',
     checkout_instructions_title: 'When you leave',
     lockbox_label: 'Code',
+    lockbox_label_fixed: 'Fixed',
+    lockbox_label_rotating: 'Guest code',
     // Round 19.1 — Home sections + card labels
     section_arriving: 'Arriving',
     section_staying: 'Staying',
@@ -1804,6 +1803,8 @@ const T = {
     checkin_instructions_title: 'Come trovarci',
     checkout_instructions_title: 'Quando parti',
     lockbox_label: 'Codice',
+    lockbox_label_fixed: 'Fisso',
+    lockbox_label_rotating: 'Ospite',
     // Round 19.1 — Home sections + card labels
     section_arriving: 'Arrivo',
     section_staying: 'Soggiorno',
@@ -3193,6 +3194,24 @@ async function saveCurrentGuest() {
     record.property_id = canonicalPropId;
     if (canonicalBooking) record.booking_code = canonicalBooking;
 
+    // Round 36.2 — if the property has rotating codes enabled, stamp the
+    // booking's rotating code onto this row. Reuse any code already
+    // present on an existing checkin or a previously-saved guest of the
+    // same booking; otherwise generate a fresh 4-digit code on the head-
+    // of-family / single-guest / group-leader insert. Members leave it
+    // null and inherit from the head via _resolveLockboxCodes on read.
+    if (propertyData?.rotating_lockbox_enabled === true) {
+      const priorCode = (existingCheckins || [])
+        .concat(savedGuests || [])
+        .map(c => c && c.keybox_code)
+        .find(v => v && String(v).trim());
+      if (priorCode) {
+        record.keybox_code = String(priorCode).trim();
+      } else if (isMainGuest()) {
+        record.keybox_code = String(Math.floor(1000 + Math.random() * 9000));
+      }
+    }
+
     console.log(`💾 Saving guest ${currentGuestIdx+1}/${totalGuests}:`, JSON.stringify(record));
     const { data, error } = await sb.from('checkins').insert(record);
     if (error) {
@@ -4440,7 +4459,6 @@ async function init() {
       // lockbox row based on whether the host has filled them in.
       const ciInst = (d.checkin_instructions || '').trim();
       const coInst = (d.checkout_instructions || '').trim();
-      const lockboxCode = _resolveLockboxCode(d);
       if (el('checkinInstructionsText')) {
         el('checkinInstructionsText').textContent = ciInst;
         el('checkinInstructionsText').style.display = ciInst ? 'block' : 'none';
@@ -4449,8 +4467,8 @@ async function init() {
         el('checkoutInstructionsText').textContent = coInst;
         el('checkoutInstructionsText').style.display = coInst ? 'block' : 'none';
       }
-      if (el('lockboxCodeValue')) el('lockboxCodeValue').textContent = lockboxCode || '—';
-      if (el('lockboxCodeRow')) el('lockboxCodeRow').style.display = lockboxCode ? 'flex' : 'none';
+      // Round 36.2: dual lockbox codes are rendered by refreshLockboxDisplay().
+      refreshLockboxDisplay();
 
       // Update i18n translations with DB data
       T.en.welcome_title = `Welcome to<br><em>${d.name}</em>`;
@@ -4721,36 +4739,68 @@ function showResetToast(msg) {
   }, 6000);
 }
 
-// Round 19: pick the lockbox code to show this guest. If the property
-// opted into per-guest codes, prefer the head-of-family's keybox_code.
-// Otherwise (or if the head row has none), fall back to the property's
-// default keybox_code. Returns '' if nothing is configured.
-function _resolveLockboxCode(propData) {
-  if (!propData) return '';
-  const usePerGuest = propData.use_per_guest_lockbox === true;
-  if (usePerGuest && Array.isArray(existingCheckins) && existingCheckins.length > 0) {
+// Round 19 / 36.2: resolve the codes to show this guest.
+// Fixed code: property.keybox_code, shown only when show_fixed_lockbox_to_guest.
+// Rotating code: from the head-of-family checkin row (keybox_code), shown
+// only when rotating_lockbox_enabled AND show_rotating_lockbox_to_guest.
+// Legacy behaviour: a property with the pre-R36.2 use_per_guest_lockbox
+// flag still opts into rotating; the show_ flags default to true when not
+// present in the row.
+function _resolveLockboxCodes(propData) {
+  const out = { fixed: '', rotating: '' };
+  if (!propData) return out;
+  const rotating_enabled = propData.rotating_lockbox_enabled === true
+                        || propData.use_per_guest_lockbox === true;
+  const show_fixed    = propData.show_fixed_lockbox_to_guest    !== false;
+  const show_rotating = propData.show_rotating_lockbox_to_guest !== false;
+
+  if (show_fixed) out.fixed = (propData.keybox_code || '').trim();
+
+  if (rotating_enabled && show_rotating
+      && Array.isArray(existingCheckins) && existingCheckins.length > 0) {
     const head = existingCheckins.find(c =>
       c.guest_type === 'single' || c.guest_type === 'head' || c.guest_type === 'group'
     ) || existingCheckins[0];
     if (head && head.keybox_code && head.keybox_code.trim()) {
-      return head.keybox_code.trim();
+      out.rotating = head.keybox_code.trim();
     }
   }
-  return (propData.keybox_code || '').trim();
+  return out;
 }
 
-// Refresh the home-tab lockbox row after existingCheckins changes
-// (welcome-back lookup, surname lookup, etc.). Called from multiple
-// places so the per-guest code shows up as soon as we know who the
-// guest is. The check-in card itself is always visible — only the
-// lockbox row toggles based on whether a code is available.
+// Legacy single-value wrapper — kept so any older caller doesn't crash.
+// Returns rotating when configured, else fixed.
+function _resolveLockboxCode(propData) {
+  const { fixed, rotating } = _resolveLockboxCodes(propData);
+  return rotating || fixed || '';
+}
+
+// Refresh the home-tab lockbox area. Renders one row per code that is
+// (a) configured and (b) toggled visible to the guest. Zero rows → the
+// whole wrap is hidden.
 function refreshLockboxDisplay() {
   if (!propertyData) return;
-  const code = _resolveLockboxCode(propertyData);
-  const row = document.getElementById('lockboxCodeRow');
-  const val = document.getElementById('lockboxCodeValue');
-  if (val) val.textContent = code || '—';
-  if (row) row.style.display = code ? 'flex' : 'none';
+  const wrap = document.getElementById('lockboxCodesWrap');
+  if (!wrap) return;
+  const { fixed, rotating } = _resolveLockboxCodes(propertyData);
+  const dict = (T && T[lang]) || (T && T.en) || {};
+  const lbl = dict.lockbox_label || 'Code';
+  const fixedLbl = dict.lockbox_label_fixed || (lang === 'it' ? 'Fisso' : 'Fixed');
+  const rotLbl   = dict.lockbox_label_rotating || (lang === 'it' ? 'Ospite' : 'Guest code');
+  const rows = [];
+  const bothVisible = fixed && rotating;
+  if (fixed) rows.push(`
+    <div class="home-card-lockbox-inline">
+      <span class="home-card-lockbox-label">${bothVisible ? fixedLbl : lbl}</span>
+      <span class="home-card-lockbox-code">${fixed}</span>
+    </div>`);
+  if (rotating) rows.push(`
+    <div class="home-card-lockbox-inline">
+      <span class="home-card-lockbox-label">${bothVisible ? rotLbl : lbl}</span>
+      <span class="home-card-lockbox-code">${rotating}</span>
+    </div>`);
+  wrap.innerHTML = rows.join('');
+  wrap.style.display = rows.length ? 'flex' : 'none';
 }
 
 // Round 19.5 — show test-mode banner if we're in preview mode.

@@ -1240,16 +1240,24 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label" data-h="prop_keybox">Keybox Code</label>
+            <label class="form-label" data-h="prop_keybox">Fixed lockbox code</label>
             <input class="form-input" type="text" value="" id="propKeybox">
-            <div class="form-hint" data-h="prop_keybox_hint">Default code shown to guests. Override per-booking below if rotating codes between guests.</div>
+            <div class="form-hint" data-h="prop_keybox_hint">The code that stays the same across guests (e.g. building entrance). Leave blank if you don't have one.</div>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;font-size:0.82rem;margin-top:8px;">
+              <input type="checkbox" id="propShowFixedLockboxToGuest" style="width:18px;height:18px;cursor:pointer;">
+              <span data-h="prop_show_fixed_lockbox">Show fixed code in the guest app</span>
+            </label>
           </div>
           <div class="form-group full">
-            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;font-size:0.86rem;">
-              <input type="checkbox" id="propUsePerGuestLockbox" onchange="onTogglePerGuestLockbox()" style="width:18px;height:18px;cursor:pointer;">
-              <span data-h="prop_per_guest_lockbox">Use a different lockbox code for each guest</span>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;font-size:0.86rem;font-weight:600;">
+              <input type="checkbox" id="propRotatingLockboxEnabled" onchange="onToggleRotatingLockbox()" style="width:18px;height:18px;cursor:pointer;">
+              <span data-h="prop_rotating_lockbox">Use a rotating code that changes per guest</span>
             </label>
-            <div class="form-hint" data-h="prop_per_guest_lockbox_hint" style="margin-left:28px;">When on, you'll set a code per booking in the Check-ins tab. If you don't set one for a booking, the default above is used as fallback.</div>
+            <div class="form-hint" data-h="prop_rotating_lockbox_hint" style="margin-left:28px;">When on, every new check-in gets a fresh 4-digit code automatically. You can overwrite it per booking in the Check-in Data tab.</div>
+            <label id="propShowRotatingLockboxWrap" style="display:none;align-items:center;gap:10px;cursor:pointer;user-select:none;font-size:0.82rem;margin-top:8px;margin-left:28px;">
+              <input type="checkbox" id="propShowRotatingLockboxToGuest" style="width:18px;height:18px;cursor:pointer;">
+              <span data-h="prop_show_rotating_lockbox">Show rotating code in the guest app</span>
+            </label>
           </div>
         </div>
       </div>
@@ -3142,9 +3150,14 @@ const HT = {
     prop_type: 'Property type', prop_type_hint: 'Helps with platform analytics and audience-aware suggestions.',
     prop_times: 'Check-in / Check-out', prop_times_desc: 'Times and access instructions for your guests.',
     prop_checkin_time: 'Check-in Time', prop_checkout_time: 'Check-out Time',
-    prop_access: 'Access Method', prop_keybox: 'Keybox Code', prop_keybox_hint: 'Default code shown to guests. Override per-booking below if rotating codes between guests.',
-    prop_per_guest_lockbox: 'Use a different lockbox code for each guest',
-    prop_per_guest_lockbox_hint: "When on, you'll set a code per booking in the Check-ins tab. If you don't set one for a booking, the default above is used as fallback.",
+    prop_access: 'Access Method', prop_keybox: 'Fixed lockbox code', prop_keybox_hint: "The code that stays the same across guests (e.g. building entrance). Leave blank if you don't have one.",
+    prop_show_fixed_lockbox: 'Show fixed code in the guest app',
+    prop_rotating_lockbox: 'Use a rotating code that changes per guest',
+    prop_rotating_lockbox_hint: 'When on, every new check-in gets a fresh 4-digit code automatically. You can overwrite it per booking in the Check-in Data tab.',
+    prop_show_rotating_lockbox: 'Show rotating code in the guest app',
+    // Legacy keys kept so an older DOM (pre-hard-refresh) still resolves.
+    prop_per_guest_lockbox: 'Use a rotating code that changes per guest',
+    prop_per_guest_lockbox_hint: 'When on, every new check-in gets a fresh 4-digit code automatically. You can overwrite it per booking in the Check-in Data tab.',
     prop_instructions: 'Arrival & Departure Instructions',
     prop_checkin_inst: 'Check-in instructions',
     prop_checkin_inst_hint: "Step-by-step instructions for arrival. Write in your preferred language — guests can use their browser's translate feature if needed (long-press on iOS, three-dot menu on Android).",
@@ -3513,9 +3526,13 @@ const HT = {
     prop_type: 'Tipo di immobile', prop_type_hint: 'Aiuta con le statistiche di piattaforma e i suggerimenti mirati al pubblico.',
     prop_times: 'Check-in / Check-out', prop_times_desc: 'Orari e istruzioni di accesso per gli ospiti.',
     prop_checkin_time: 'Orario Check-in', prop_checkout_time: 'Orario Check-out',
-    prop_access: 'Metodo di Accesso', prop_keybox: 'Codice Lockbox', prop_keybox_hint: 'Codice predefinito mostrato agli ospiti. Sovrascrivilo per prenotazione qui sotto se ruoti i codici tra ospiti.',
-    prop_per_guest_lockbox: 'Usa un codice lockbox diverso per ogni ospite',
-    prop_per_guest_lockbox_hint: 'Quando attivo, imposterai un codice per prenotazione nella scheda Check-in. Se non lo imposti per una prenotazione, viene usato il codice predefinito sopra.',
+    prop_access: 'Metodo di Accesso', prop_keybox: 'Codice fisso', prop_keybox_hint: "Il codice che non cambia tra ospiti (es. portone d'ingresso). Lascia vuoto se non ne hai uno.",
+    prop_show_fixed_lockbox: "Mostra il codice fisso nell'app ospite",
+    prop_rotating_lockbox: 'Usa un codice rotante che cambia per ogni ospite',
+    prop_rotating_lockbox_hint: 'Quando attivo, ogni nuovo check-in riceve automaticamente un codice a 4 cifre. Puoi sovrascriverlo per prenotazione nella scheda Dati Check-in.',
+    prop_show_rotating_lockbox: "Mostra il codice rotante nell'app ospite",
+    prop_per_guest_lockbox: 'Usa un codice rotante che cambia per ogni ospite',
+    prop_per_guest_lockbox_hint: 'Quando attivo, ogni nuovo check-in riceve automaticamente un codice a 4 cifre. Puoi sovrascriverlo per prenotazione nella scheda Dati Check-in.',
     prop_instructions: 'Istruzioni di Arrivo e Partenza',
     prop_checkin_inst: 'Istruzioni di check-in',
     prop_checkin_inst_hint: "Istruzioni passo-passo per l'arrivo. Scrivi nella tua lingua preferita — gli ospiti possono usare la traduzione automatica del browser (tieni premuto su iOS, menu a tre punti su Android).",
@@ -4508,7 +4525,13 @@ async function saveProperty() {
     checkout_time: document.getElementById('propCheckoutFrom').value + '-' + document.getElementById('propCheckoutTo').value,
     access_method: document.getElementById('propAccess').value,
     keybox_code: document.getElementById('propKeybox').value,
-    use_per_guest_lockbox: !!document.getElementById('propUsePerGuestLockbox')?.checked,
+    show_fixed_lockbox_to_guest:    !!document.getElementById('propShowFixedLockboxToGuest')?.checked,
+    rotating_lockbox_enabled:       !!document.getElementById('propRotatingLockboxEnabled')?.checked,
+    show_rotating_lockbox_to_guest: !!document.getElementById('propShowRotatingLockboxToGuest')?.checked,
+    // Round 36.2: mirror the new toggle back onto use_per_guest_lockbox so a
+    // rollback to older client bundles keeps the same behaviour. Safe to
+    // remove once every deployed client reads only the new field.
+    use_per_guest_lockbox: !!document.getElementById('propRotatingLockboxEnabled')?.checked,
     checkin_instructions: document.getElementById('propCheckinInstructions')?.value || null,
     checkout_instructions: document.getElementById('propCheckoutInstructions')?.value || null,
     transport_info: document.getElementById('propTransportInfo')?.value || null,
@@ -7299,7 +7322,11 @@ function viewGuest(id) {
 
   // Round 19: per-guest lockbox code. Only shown when the property has
   // opted into per-guest codes. Inline-editable with a Generate button.
-  const perGuestLockbox = propertyData?.use_per_guest_lockbox === true;
+  // Round 36.2 — rotating_lockbox_enabled is the current source of truth;
+  // the legacy use_per_guest_lockbox is still respected for properties
+  // that predate the migration.
+  const perGuestLockbox = propertyData?.rotating_lockbox_enabled === true
+                       || propertyData?.use_per_guest_lockbox === true;
   const lockboxRow = perGuestLockbox ? (() => {
     const fallbackHint = c.keybox_code
       ? ''
@@ -7314,7 +7341,7 @@ function viewGuest(id) {
                 style="padding:6px 12px;border:none;background:var(--warm);color:#fff;border-radius:6px;font-size:0.74rem;cursor:pointer;white-space:nowrap;">${it ? 'Salva' : 'Save'}</button>
       </div>
       ${fallbackHint}`;
-    return field(it ? 'Codice lockbox' : 'Lockbox code', lockboxCell);
+    return field(it ? 'Codice rotante' : 'Rotating code', lockboxCell);
   })() : '';
 
   // Body sections
@@ -7892,16 +7919,17 @@ async function saveGuestEdits(id) {
   setTimeout(closeGuestEditModal, 700);
 }
 
-// ── Round 19: per-guest lockbox helpers ─────────────────────────────
-// Called when the toggle in property settings changes. For now it's a
-// no-op visual hook — the per-guest field appears inside the guest
-// detail modal, which is always re-rendered with current state on open.
-// Function exists so we can extend (e.g. show a banner in the check-ins
-// list) without changing wiring.
-function onTogglePerGuestLockbox() {
-  // intentionally minimal — the modal reads propertyData.use_per_guest_lockbox
-  // at open time, so this currently has no side effects to apply.
+// ── Round 19 / 36.2: rotating lockbox helpers ────────────────────────
+// Called when the "rotating code enabled" checkbox flips. Hides the
+// dependent "show rotating to guest" sub-toggle when the parent is off,
+// so the host doesn't see a control that has no effect.
+function onToggleRotatingLockbox() {
+  const enabled = !!document.getElementById('propRotatingLockboxEnabled')?.checked;
+  const wrap = document.getElementById('propShowRotatingLockboxWrap');
+  if (wrap) wrap.style.display = enabled ? 'flex' : 'none';
 }
+// Preserve the old name for anything (auto-save, tests) that still calls it.
+const onTogglePerGuestLockbox = onToggleRotatingLockbox;
 
 // Generate a random 4-digit code into the input identified by id.
 // 4 digits is the most common mechanical-lockbox length. The host still
@@ -8315,7 +8343,12 @@ function fillPropertyForm(data) {
   if (el('propCheckoutTo')) el('propCheckoutTo').value = coParts[1] || '10:00';
   if (el('propAccess')) el('propAccess').value = data.access_method || 'Self check-in · Keybox';
   if (el('propKeybox')) el('propKeybox').value = data.keybox_code || '';
-  if (el('propUsePerGuestLockbox')) el('propUsePerGuestLockbox').checked = !!data.use_per_guest_lockbox;
+  // Round 36.2 dual lockbox flags. Defaults keep behaviour identical when
+  // a row hasn't been touched yet: rotating is off unless the property
+  // opted in; both "show to guest" default to true.
+  if (el('propShowFixedLockboxToGuest'))    el('propShowFixedLockboxToGuest').checked    = data.show_fixed_lockbox_to_guest    !== false;
+  if (el('propRotatingLockboxEnabled'))     el('propRotatingLockboxEnabled').checked     = !!data.rotating_lockbox_enabled;
+  if (el('propShowRotatingLockboxToGuest')) el('propShowRotatingLockboxToGuest').checked = data.show_rotating_lockbox_to_guest !== false;
   if (el('propCheckinInstructions')) el('propCheckinInstructions').value = data.checkin_instructions || '';
   if (el('propCheckoutInstructions')) el('propCheckoutInstructions').value = data.checkout_instructions || '';
   if (el('propTransportInfo')) el('propTransportInfo').value = data.transport_info || '';
@@ -8325,7 +8358,7 @@ function fillPropertyForm(data) {
   if (el('propTaxRate')) el('propTaxRate').value = (data.tax_rate_eur ?? '');
   if (el('propTaxMaxNights')) el('propTaxMaxNights').value = (data.tax_max_nights ?? '');
   if (el('propTaxExemptAge')) el('propTaxExemptAge').value = (data.tax_exempt_under_age ?? '');
-  onTogglePerGuestLockbox(); // refresh check-ins list visibility of per-guest field
+  onToggleRotatingLockbox(); // sync the "show rotating" sub-toggle visibility with the parent
   if (el('propWifiName')) el('propWifiName').value = data.wifi_name || '';
   if (el('propWifiPass')) el('propWifiPass').value = data.wifi_password || '';
   if (el('propWelcome')) el('propWelcome').value = data.welcome_message || '';

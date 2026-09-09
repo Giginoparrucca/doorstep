@@ -3819,6 +3819,10 @@ function showPanel(id, btn) {
   if (id === 'qrlink') initQRPanel();
   if (id === 'compliance') renderCompliance();
   if (id === 'property') renderDismissedList();
+  // Round 36.2.2 — reopening the Dashboard re-fetches upcoming reservations
+  // and their freshly-stamped rotating codes, so the host doesn't need to
+  // hard-refresh after changing settings elsewhere.
+  if (id === 'dashboard') renderDashboard();
   // Round 25: re-apply read-only lock after a panel re-renders its buttons
   if (typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled) {
     setTimeout(() => setConsoleReadOnly(true), 0);
@@ -4179,12 +4183,24 @@ async function renderUpcomingReservationsPanel() {
     const codeChip = r.booking_code
       ? `<span title="${safe(hostLang === 'it' ? 'Codice prenotazione' : 'Booking code')}" style="font-family:monospace;font-size:0.68rem;color:var(--warm);background:rgba(0,91,255,0.08);border-radius:3px;padding:1px 6px;">${safe(r.booking_code)}</span>`
       : '';
-    // Round 36.2.1 — rotating lockbox code (from the reservation) shown
-    // as an amber chip beside the booking code so the host can program
-    // the lockbox before the guest arrives.
-    const kbChip = r.keybox_code
-      ? `<span title="${safe(hostLang === 'it' ? 'Codice lockbox rotante' : 'Rotating lockbox code')}" style="font-family:monospace;font-size:0.68rem;font-weight:600;color:#9a6b00;background:rgba(232,184,75,0.16);border-radius:3px;padding:1px 6px;">🔐 ${safe(r.keybox_code)}</span>`
-      : '';
+    // Round 36.2.1/.2 — rotating lockbox code as an inline editable amber
+    // input beside the booking code. Host can change it before the guest
+    // arrives and the change fans out to any check-ins that already share
+    // this booking_code. Hidden when the property isn't using rotating codes.
+    const rotatingOn = propertyData?.rotating_lockbox_enabled === true
+                    || propertyData?.use_per_guest_lockbox === true;
+    const kbChip = rotatingOn ? `
+      <span title="${safe(hostLang === 'it' ? 'Codice lockbox rotante' : 'Rotating lockbox code')}"
+        style="display:inline-flex;align-items:center;gap:4px;font-size:0.68rem;color:#9a6b00;background:rgba(232,184,75,0.16);border-radius:3px;padding:1px 4px 1px 6px;">
+        🔐
+        <input type="text" value="${safe(r.keybox_code || '')}" placeholder="—" maxlength="20"
+          data-reservation-id="${safe(r.id)}"
+          data-property-id="${safe(propertyId)}"
+          data-booking-code="${safe(r.booking_code || '')}"
+          onchange="saveReservationKeybox(this)"
+          onclick="this.select()"
+          style="width:60px;font-family:monospace;font-weight:600;color:#9a6b00;background:transparent;border:none;border-bottom:1px dashed rgba(154,107,0,0.4);padding:0 2px;text-align:center;font-size:0.72rem;outline:none;">
+      </span>` : '';
     const linkLabel = hostLang === 'it' ? 'Link Prenotazione' : 'Booking Link';
     const linkRow = guestLink ? `
       <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:8px;padding-top:8px;border-top:1px dashed rgba(107,122,144,0.15);">
@@ -4413,6 +4429,32 @@ function renderCheckins() {
     // survives a reload.
     const collapsed = isCheckinGroupCollapsed(groupToken, allFiled);
     const chevron = collapsed ? '▸' : '▾';
+    // Round 36.2.2 — inline rotating-code input on the group header so the
+    // host can edit it from the list without opening every guest modal.
+    // Value is read from any check-in row's keybox_code in the group (head
+    // of family first, otherwise any row); the save handler fans out to
+    // every row + the matching ota_reservations record.
+    const rotatingOnHere = propertyData?.rotating_lockbox_enabled === true
+                        || propertyData?.use_per_guest_lockbox === true;
+    let groupKeybox = '';
+    if (rotatingOnHere) {
+      const head = rows.find(r => r.guest_type === 'single' || r.guest_type === 'head' || r.guest_type === 'group')
+                || rows.find(r => (r.keybox_code || '').trim())
+                || rows[0];
+      groupKeybox = (head && head.keybox_code || '').trim();
+    }
+    const keyboxInput = rotatingOnHere && !isSolo ? `
+      <span title="${it ? 'Codice lockbox rotante — modifica e premi Tab' : 'Rotating lockbox code — edit and press Tab'}"
+        style="display:inline-flex;align-items:center;gap:4px;font-size:0.68rem;color:#9a6b00;background:rgba(232,184,75,0.16);border-radius:3px;padding:1px 4px 1px 6px;"
+        onclick="event.stopPropagation()">
+        🔐
+        <input type="text" value="${(groupKeybox || '').replace(/"/g, '&quot;')}" placeholder="—" maxlength="20"
+          data-property-id="${rows[0].property_id}"
+          data-booking-code="${bookingCode || ''}"
+          onchange="saveReservationKeybox(this)"
+          onclick="event.stopPropagation();this.select()"
+          style="width:70px;font-family:monospace;font-weight:600;color:#9a6b00;background:transparent;border:none;border-bottom:1px dashed rgba(154,107,0,0.4);padding:0 2px;text-align:center;font-size:0.75rem;outline:none;">
+      </span>` : '';
     html += `
       <tr class="checkin-group-header" style="background:rgba(107,122,144,0.05);cursor:pointer;" onclick="toggleCheckinGroup('${groupToken}', event)">
         <td colspan="10" style="padding:0;position:static;background:rgba(107,122,144,0.05);box-shadow:none;white-space:normal;">
@@ -4429,6 +4471,7 @@ function renderCheckins() {
                 <span style="font-weight:600;color:var(--ink);">${groupLabel}</span>
                 <span style="font-size:0.74rem;color:var(--ink-soft);">· ${rows.length} ${guestsWord}${arrival ? ` · ${it ? 'arrivo' : 'arrival'} ${fmtDate(arrival)}` : ''}</span>
               </div>
+              ${keyboxInput}
               ${noReceiptNote}
             </div>
           </div>
@@ -7966,6 +8009,53 @@ function generateLockboxCode(inputId) {
 
 // Save a per-guest lockbox code. Empty string → NULL in DB (falls back
 // to property's default code on the guest side).
+// Round 36.2.2 — write a new rotating code from one of the inline
+// dashboard/check-in inputs. Sends the value both to the ota_reservations
+// row (if the input names one) and to every checkins row that shares
+// the same (property_id, booking_code) — so a guest who already checked
+// in gets the new code, and one who hasn't yet gets it via the
+// reservation row. Round 20.2 pattern (.update().select()).
+async function saveReservationKeybox(inputEl) {
+  const it = hostLang === 'it';
+  const value = (inputEl.value || '').trim();
+  const patchValue = value === '' ? null : value;
+  const reservationId = inputEl.dataset.reservationId || null;
+  const bookingCode   = inputEl.dataset.bookingCode   || null;
+  const propId        = inputEl.dataset.propertyId    || propertyId;
+  let touchedReservation = false;
+  let touchedCheckins = 0;
+  try {
+    if (reservationId) {
+      const { data, error } = await sb.from('ota_reservations')
+        .update({ keybox_code: patchValue }).eq('id', reservationId).select('id');
+      if (error) { throw error; }
+      touchedReservation = !!(data && data.length);
+    }
+    if (bookingCode && propId) {
+      const { data } = await sb.from('checkins')
+        .update({ keybox_code: patchValue })
+        .eq('property_id', propId).eq('booking_code', bookingCode).select('id');
+      if (Array.isArray(data)) {
+        touchedCheckins = data.length;
+        const ids = new Set(data.map(r => r.id));
+        if (Array.isArray(allCheckins)) {
+          allCheckins = allCheckins.map(c => ids.has(c.id) ? { ...c, keybox_code: patchValue } : c);
+        }
+      }
+    }
+    if (!touchedReservation && !touchedCheckins) {
+      toast(it ? 'Nessuna riga aggiornata (RLS?)' : 'No row updated (RLS?)');
+      return;
+    }
+    toast(it ? '✓ Codice rotante salvato' : '✓ Rotating code saved');
+    inputEl.style.borderBottomColor = '#2f7a44';
+    setTimeout(() => { inputEl.style.borderBottomColor = 'rgba(154,107,0,0.4)'; }, 1200);
+  } catch (e) {
+    console.error('saveReservationKeybox failed:', e);
+    toast((it ? 'Salvataggio fallito: ' : 'Save failed: ') + (e?.message || e));
+  }
+}
+
 async function saveGuestLockbox(checkinId, inputId) {
   const input = document.getElementById(inputId);
   if (!input) return;

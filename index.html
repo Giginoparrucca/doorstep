@@ -3276,7 +3276,8 @@ async function saveCurrentGuest() {
     //      row via the get_reservation_keybox RPC. This is the authoritative
     //      source when the booking came from iCal sync.
     //   2. any code already saved on a prior guest of this booking.
-    //   3. random 4-digit fallback for direct bookings without an OTA row.
+    //   3. random fallback for direct bookings without an OTA row —
+    //      Round 36.2.5 uses the host's chosen length (4..8 digits).
     // Members leave keybox_code null and inherit via _resolveLockboxCodes.
     if (propertyData?.rotating_lockbox_enabled === true
         || propertyData?.use_per_guest_lockbox === true) {
@@ -3289,7 +3290,11 @@ async function saveCurrentGuest() {
       } else if (priorCode) {
         record.keybox_code = String(priorCode).trim();
       } else if (isMainGuest()) {
-        record.keybox_code = String(Math.floor(1000 + Math.random() * 9000));
+        const rawLen = Number(propertyData?.rotating_lockbox_length);
+        const codeLen = Math.max(4, Math.min(8, Number.isFinite(rawLen) ? Math.floor(rawLen) || 4 : 4));
+        let s = '';
+        for (let i = 0; i < codeLen; i++) s += Math.floor(Math.random() * 10);
+        record.keybox_code = s;
       }
     }
 

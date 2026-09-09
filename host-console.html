@@ -1253,7 +1253,18 @@ tr:hover td { background: rgba(250,246,240,0.6); }
               <input type="checkbox" id="propRotatingLockboxEnabled" onchange="onToggleRotatingLockbox()" style="width:18px;height:18px;cursor:pointer;">
               <span data-h="prop_rotating_lockbox">Use a rotating code that changes per guest</span>
             </label>
-            <div class="form-hint" data-h="prop_rotating_lockbox_hint" style="margin-left:28px;">When on, every new check-in gets a fresh 4-digit code automatically. You can overwrite it per booking in the Check-in Data tab.</div>
+            <div class="form-hint" data-h="prop_rotating_lockbox_hint" style="margin-left:28px;">When on, every new check-in gets a fresh code automatically. You choose the code length (4–8 digits) to match your lockbox. You can overwrite it per booking in the Check-in Data tab.</div>
+            <div id="propRotatingLockboxLengthWrap" style="display:none;align-items:center;gap:10px;margin-top:8px;margin-left:28px;font-size:0.82rem;">
+              <label for="propRotatingLockboxLength" data-h="prop_rotating_lockbox_length">Code length</label>
+              <select id="propRotatingLockboxLength" class="form-input" style="width:auto;padding:4px 8px;">
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+              </select>
+              <span data-h="prop_rotating_lockbox_length_hint" style="color:var(--ink-soft);">digits</span>
+            </div>
             <label id="propShowRotatingLockboxWrap" style="display:none;align-items:center;gap:10px;cursor:pointer;user-select:none;font-size:0.82rem;margin-top:8px;margin-left:28px;">
               <input type="checkbox" id="propShowRotatingLockboxToGuest" style="width:18px;height:18px;cursor:pointer;">
               <span data-h="prop_show_rotating_lockbox">Show rotating code in the guest app</span>
@@ -3153,11 +3164,13 @@ const HT = {
     prop_access: 'Access Method', prop_keybox: 'Fixed lockbox code', prop_keybox_hint: "The code that stays the same across guests (e.g. building entrance). Leave blank if you don't have one.",
     prop_show_fixed_lockbox: 'Show fixed code in the guest app',
     prop_rotating_lockbox: 'Use a rotating code that changes per guest',
-    prop_rotating_lockbox_hint: 'When on, every new check-in gets a fresh 4-digit code automatically. You can overwrite it per booking in the Check-in Data tab.',
+    prop_rotating_lockbox_hint: 'When on, every new check-in gets a fresh code automatically. You choose the code length (4–8 digits) to match your lockbox. You can overwrite it per booking in the Check-in Data tab.',
+    prop_rotating_lockbox_length: 'Code length',
+    prop_rotating_lockbox_length_hint: 'digits',
     prop_show_rotating_lockbox: 'Show rotating code in the guest app',
     // Legacy keys kept so an older DOM (pre-hard-refresh) still resolves.
     prop_per_guest_lockbox: 'Use a rotating code that changes per guest',
-    prop_per_guest_lockbox_hint: 'When on, every new check-in gets a fresh 4-digit code automatically. You can overwrite it per booking in the Check-in Data tab.',
+    prop_per_guest_lockbox_hint: 'When on, every new check-in gets a fresh code automatically. You choose the code length (4–8 digits) to match your lockbox. You can overwrite it per booking in the Check-in Data tab.',
     prop_instructions: 'Arrival & Departure Instructions',
     prop_checkin_inst: 'Check-in instructions',
     prop_checkin_inst_hint: "Step-by-step instructions for arrival. Write in your preferred language — guests can use their browser's translate feature if needed (long-press on iOS, three-dot menu on Android).",
@@ -3529,10 +3542,12 @@ const HT = {
     prop_access: 'Metodo di Accesso', prop_keybox: 'Codice fisso', prop_keybox_hint: "Il codice che non cambia tra ospiti (es. portone d'ingresso). Lascia vuoto se non ne hai uno.",
     prop_show_fixed_lockbox: "Mostra il codice fisso nell'app ospite",
     prop_rotating_lockbox: 'Usa un codice rotante che cambia per ogni ospite',
-    prop_rotating_lockbox_hint: 'Quando attivo, ogni nuovo check-in riceve automaticamente un codice a 4 cifre. Puoi sovrascriverlo per prenotazione nella scheda Dati Check-in.',
+    prop_rotating_lockbox_hint: 'Quando attivo, ogni nuovo check-in riceve automaticamente un codice. Scegli la lunghezza del codice (4–8 cifre) in base al tuo lockbox. Puoi sovrascriverlo per prenotazione nella scheda Dati Check-in.',
+    prop_rotating_lockbox_length: 'Lunghezza codice',
+    prop_rotating_lockbox_length_hint: 'cifre',
     prop_show_rotating_lockbox: "Mostra il codice rotante nell'app ospite",
     prop_per_guest_lockbox: 'Usa un codice rotante che cambia per ogni ospite',
-    prop_per_guest_lockbox_hint: 'Quando attivo, ogni nuovo check-in riceve automaticamente un codice a 4 cifre. Puoi sovrascriverlo per prenotazione nella scheda Dati Check-in.',
+    prop_per_guest_lockbox_hint: 'Quando attivo, ogni nuovo check-in riceve automaticamente un codice. Scegli la lunghezza del codice (4–8 cifre) in base al tuo lockbox. Puoi sovrascriverlo per prenotazione nella scheda Dati Check-in.',
     prop_instructions: 'Istruzioni di Arrivo e Partenza',
     prop_checkin_inst: 'Istruzioni di check-in',
     prop_checkin_inst_hint: "Istruzioni passo-passo per l'arrivo. Scrivi nella tua lingua preferita — gli ospiti possono usare la traduzione automatica del browser (tieni premuto su iOS, menu a tre punti su Android).",
@@ -3822,7 +3837,16 @@ function showPanel(id, btn) {
   // Round 36.2.2 — reopening the Dashboard re-fetches upcoming reservations
   // and their freshly-stamped rotating codes, so the host doesn't need to
   // hard-refresh after changing settings elsewhere.
-  if (id === 'dashboard') renderDashboard();
+  // Round 36.2.5 — also refresh the in-memory checkins cache: newly-added
+  // group members and the "reopened" flag's implicit self-clear (see the
+  // Upcoming panel's stale-flag override) both depend on fresh submitted_at
+  // values, and the cache would otherwise stay stuck at page-load state.
+  if (id === 'dashboard') { refreshCheckinsCache().then(renderDashboard); }
+  // Round 36.2.4 — same idempotency on Check-in Data so a code edited
+  // from the dashboard shows up when the host switches to the list.
+  if (id === 'checkins' && typeof renderCheckins === 'function') {
+    refreshCheckinsCache().then(renderCheckins);
+  }
   // Round 25: re-apply read-only lock after a panel re-renders its buttons
   if (typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled) {
     setTimeout(() => setConsoleReadOnly(true), 0);
@@ -4069,16 +4093,19 @@ async function renderUpcomingReservationsPanel() {
     : (hostLang === 'it' ? 'mai' : 'never');
   const syncBtnLabel = hostLang === 'it' ? '🔄 Sincronizza' : '🔄 Sync now';
   const lastSyncedLabel = hostLang === 'it' ? 'Ultima sync:' : 'Last sync:';
-  const headerHtml = `
+  // Round 36.2.5 — the header count is filled in after the row map so it
+  // reflects visible rows (some may be hidden as "already staying").
+  const buildHeader = (visibleCount) => `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
       <span style="font-size:1rem;">📅</span>
       <h3 style="margin:0;font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--ink);font-weight:600;">${safe(title)}</h3>
-      <span style="font-size:0.78rem;color:var(--ink-soft);">(${rows.length})</span>
+      <span style="font-size:0.78rem;color:var(--ink-soft);">(${visibleCount})</span>
       <span style="flex:1;"></span>
       <span style="font-size:0.72rem;color:var(--ink-soft);">${lastSyncedLabel} ${safe(lastSyncedTxt)}</span>
       <button type="button" onclick="syncCalendarsFromDashboard(this)"
         style="padding:6px 12px;background:var(--warm);color:#fff;border:none;border-radius:6px;font-size:0.76rem;cursor:pointer;font-family:inherit;">${syncBtnLabel}</button>
     </div>`;
+  const headerHtml = buildHeader(rows.length);
 
   if (rows.length === 0) {
     return `
@@ -4134,6 +4161,16 @@ async function renderUpcomingReservationsPanel() {
         (!c.departure_date || c.departure_date > r.checkin_date)
       );
     }
+    // Round 36.2.5 — hide the row from Upcoming when the guest has already
+    // arrived (early walk-in, or the OTA row's checkin_date drifted past
+    // the guest's actual arrival). That guest belongs to "Currently
+    // staying" on the dashboard, and showing them in both places is what
+    // hosts see as a duplicate.
+    const guestAlreadyArrived = matched.some(c =>
+      c.arrival_date && c.arrival_date <= todayISO &&
+      (!c.departure_date || c.departure_date >= todayISO)
+    );
+    if (guestAlreadyArrived) return '';
     // Group by booking_code (empty/null bucket keeps its own key so we don't
     // merge unrelated anonymous checkins together)
     const groups = {};
@@ -4193,13 +4230,14 @@ async function renderUpcomingReservationsPanel() {
       <span title="${safe(hostLang === 'it' ? 'Codice lockbox rotante' : 'Rotating lockbox code')}"
         style="display:inline-flex;align-items:center;gap:4px;font-size:0.68rem;color:#9a6b00;background:rgba(232,184,75,0.16);border-radius:3px;padding:1px 4px 1px 6px;">
         🔐
-        <input type="text" value="${safe(r.keybox_code || '')}" placeholder="—" maxlength="20"
+        <input type="text" value="${safe(r.keybox_code || '')}" placeholder="—" maxlength="8"
+          inputmode="numeric" pattern="[0-9]*"
           data-reservation-id="${safe(r.id)}"
           data-property-id="${safe(propertyId)}"
           data-booking-code="${safe(r.booking_code || '')}"
           onchange="saveReservationKeybox(this)"
           onclick="this.select()"
-          style="width:60px;font-family:monospace;font-weight:600;color:#9a6b00;background:transparent;border:none;border-bottom:1px dashed rgba(154,107,0,0.4);padding:0 2px;text-align:center;font-size:0.72rem;outline:none;">
+          style="width:90px;font-family:monospace;font-weight:600;color:#9a6b00;background:transparent;border:none;border-bottom:1px dashed rgba(154,107,0,0.4);padding:0 2px;text-align:center;font-size:0.72rem;outline:none;">
       </span>` : '';
     const linkLabel = hostLang === 'it' ? 'Link Prenotazione' : 'Booking Link';
     // Round 36.2.3 — "Reopen check-in" button, shown only when there's at
@@ -4208,8 +4246,24 @@ async function renderUpcomingReservationsPanel() {
     const groupCheckins = Array.isArray(allCheckins)
       ? allCheckins.filter(c => c.property_id === propertyId && r.booking_code && c.booking_code === r.booking_code)
       : [];
-    const alreadyReopened = r.checkin_reopened_at
-      || groupCheckins.some(c => c.checkin_reopened_at);
+    // Round 36.2.5 — the reopen flag persists in the DB until it's
+    // actively cleared, and the guest side runs as anon (no UPDATE
+    // policy on ota_reservations/checkins), so the flag never actually
+    // clears from that clear-on-batch-complete path. Treat the flag as
+    // stale — i.e. NOT reopened — once at least one check-in on this
+    // booking has been submitted AFTER the flag was stamped. The next
+    // insert from the guest is exactly the "success" we're looking for.
+    const _reopenStamps = groupCheckins
+      .map(c => c.checkin_reopened_at)
+      .concat(r.checkin_reopened_at ? [r.checkin_reopened_at] : [])
+      .filter(Boolean);
+    const _latestReopenStamp = _reopenStamps.length
+      ? _reopenStamps.reduce((a, b) => a > b ? a : b)
+      : null;
+    const _newerSubmissionExists = _latestReopenStamp
+      ? groupCheckins.some(c => c.submitted_at && c.submitted_at > _latestReopenStamp)
+      : false;
+    const alreadyReopened = !!_latestReopenStamp && !_newerSubmissionExists;
     const reopenBtn = (r.booking_code && groupCheckins.length > 0 && !alreadyReopened) ? `
       <button type="button" onclick="reopenCheckinForBooking('booking', '${safe(r.booking_code)}', '${safe(propertyId)}')"
         title="${safe(hostLang === 'it' ? 'Permetti all\'ospite di aggiungere altri membri del gruppo' : 'Let the guest add more group members')}"
@@ -4242,12 +4296,23 @@ async function renderUpcomingReservationsPanel() {
         </div>
         ${linkRow}
       </div>`;
-  }).join('');
-
+  }).filter(Boolean);
+  // Round 36.2.5 — visible count reflects rows the host will actually see
+  // (arrived guests are hidden above), and a fully-hidden list becomes
+  // the same empty-state as "no upcoming reservations".
+  if (rendered.length === 0) {
+    return `
+      <div style="margin-bottom:18px;">
+        ${buildHeader(0)}
+        <div style="padding:16px 18px;background:var(--white);border:1px solid var(--border);border-radius:10px;font-size:0.82rem;color:var(--ink-soft);">
+          ${safe(h('dash_upcoming_empty'))}
+        </div>
+      </div>`;
+  }
   return `
     <div style="margin-bottom:18px;">
-      ${headerHtml}
-      ${rendered}
+      ${buildHeader(rendered.length)}
+      ${rendered.join('')}
     </div>`;
 }
 
@@ -4265,20 +4330,21 @@ async function ensureReservationBookingCodes(rows) {
     for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
     return s;
   };
-  const rand4 = () => String(Math.floor(1000 + Math.random() * 9000));
-  // Round 36.2.1 — every booking link gets a rotating 4-digit lockbox code
-  // stamped on the reservation itself, when the property opts in. That way
-  // the host sees the code the moment the booking exists (upcoming panel),
-  // not only after the guest has completed check-in. Legacy
-  // use_per_guest_lockbox is still respected so old properties don't
-  // regress silently.
+  // Round 36.2.1 — every booking link gets a rotating lockbox code stamped
+  // on the reservation itself when the property opts in, so the host sees
+  // it the moment the booking exists (upcoming panel), not only after the
+  // guest has completed check-in.
+  // Round 36.2.5 — length is per property (rotating_lockbox_length, 4..8).
+  // Legacy use_per_guest_lockbox is still respected so old properties
+  // don't regress silently.
   const rotating = propertyData?.rotating_lockbox_enabled === true
                 || propertyData?.use_per_guest_lockbox === true;
+  const codeLen = _rotatingCodeLength();
 
   for (const r of (rows || [])) {
     const patch = {};
     if (!r.booking_code) patch.booking_code = `${propInit}-${rand6()}`;
-    if (rotating && !r.keybox_code) patch.keybox_code = rand4();
+    if (rotating && !r.keybox_code) patch.keybox_code = _randRotatingCode(codeLen);
     if (Object.keys(patch).length === 0) continue;
     // Round 20.2 pattern: .select() after update so a silent-0-rows
     // permission block surfaces in the console instead of leaving us with
@@ -4432,7 +4498,18 @@ function renderCheckins() {
     // isn't already set on any row of this group. Solo (walk-in) rows
     // reopen the single checkin_id; group rows fan out to ota_reservations
     // + every checkins row sharing the booking_code.
-    const anyReopened = rows.some(r => r.checkin_reopened_at);
+    // Round 36.2.5 — the flag persists in the DB until it's actively
+    // cleared, and the guest-side clear can be silently blocked by RLS.
+    // Treat the group as no-longer-reopened once a check-in has been
+    // submitted after the latest reopen stamp.
+    const _rowStamps = rows.map(r => r.checkin_reopened_at).filter(Boolean);
+    const _latestGroupReopenStamp = _rowStamps.length
+      ? _rowStamps.reduce((a, b) => a > b ? a : b)
+      : null;
+    const _newerGroupSubmission = _latestGroupReopenStamp
+      ? rows.some(r => r.submitted_at && r.submitted_at > _latestGroupReopenStamp)
+      : false;
+    const anyReopened = !!_latestGroupReopenStamp && !_newerGroupSubmission;
     const reopenBtn = anyReopened ? `
       <span style="padding:6px 12px;background:rgba(232,184,75,0.14);color:#9a6b00;border-radius:6px;font-size:0.72rem;font-family:inherit;">🔓 ${it ? 'Riaperto — l\'ospite può aggiungere altri' : 'Reopened — guest can add more'}</span>
     ` : `
@@ -4476,12 +4553,13 @@ function renderCheckins() {
         style="display:inline-flex;align-items:center;gap:4px;font-size:0.68rem;color:#9a6b00;background:rgba(232,184,75,0.16);border-radius:3px;padding:1px 4px 1px 6px;"
         onclick="event.stopPropagation()">
         🔐
-        <input type="text" value="${(groupKeybox || '').replace(/"/g, '&quot;')}" placeholder="—" maxlength="20"
+        <input type="text" value="${(groupKeybox || '').replace(/"/g, '&quot;')}" placeholder="—" maxlength="8"
+          inputmode="numeric" pattern="[0-9]*"
           data-property-id="${rows[0].property_id}"
           data-booking-code="${bookingCode || ''}"
           onchange="saveReservationKeybox(this)"
           onclick="event.stopPropagation();this.select()"
-          style="width:70px;font-family:monospace;font-weight:600;color:#9a6b00;background:transparent;border:none;border-bottom:1px dashed rgba(154,107,0,0.4);padding:0 2px;text-align:center;font-size:0.75rem;outline:none;">
+          style="width:100px;font-family:monospace;font-weight:600;color:#9a6b00;background:transparent;border:none;border-bottom:1px dashed rgba(154,107,0,0.4);padding:0 2px;text-align:center;font-size:0.75rem;outline:none;">
       </span>` : '';
     html += `
       <tr class="checkin-group-header" style="background:rgba(107,122,144,0.05);cursor:pointer;" onclick="toggleCheckinGroup('${groupToken}', event)">
@@ -4620,6 +4698,13 @@ async function saveProperty() {
     show_fixed_lockbox_to_guest:    !!document.getElementById('propShowFixedLockboxToGuest')?.checked,
     rotating_lockbox_enabled:       !!document.getElementById('propRotatingLockboxEnabled')?.checked,
     show_rotating_lockbox_to_guest: !!document.getElementById('propShowRotatingLockboxToGuest')?.checked,
+    // Round 36.2.5 — persist the host's chosen code length (4..8). The
+    // DB CHECK will reject anything outside that range, so clamp on read.
+    rotating_lockbox_length:        (() => {
+      const raw = Number(document.getElementById('propRotatingLockboxLength')?.value);
+      const n = Number.isFinite(raw) ? Math.floor(raw) : 4;
+      return Math.max(4, Math.min(8, n || 4));
+    })(),
     // Round 36.2: mirror the new toggle back onto use_per_guest_lockbox so a
     // rollback to older client bundles keeps the same behaviour. Safe to
     // remove once every deployed client reads only the new field.
@@ -8019,18 +8104,32 @@ function onToggleRotatingLockbox() {
   const enabled = !!document.getElementById('propRotatingLockboxEnabled')?.checked;
   const wrap = document.getElementById('propShowRotatingLockboxWrap');
   if (wrap) wrap.style.display = enabled ? 'flex' : 'none';
+  // Round 36.2.5 — the length picker is only meaningful when rotating is on.
+  const lenWrap = document.getElementById('propRotatingLockboxLengthWrap');
+  if (lenWrap) lenWrap.style.display = enabled ? 'flex' : 'none';
 }
 // Preserve the old name for anything (auto-save, tests) that still calls it.
 const onTogglePerGuestLockbox = onToggleRotatingLockbox;
 
-// Generate a random 4-digit code into the input identified by id.
-// 4 digits is the most common mechanical-lockbox length. The host still
-// has to physically program the lockbox; this just saves them thinking
-// of a number.
+// Round 36.2.5 — generate a random N-digit code where N is the property's
+// configured rotating_lockbox_length (default 4, capped 4..8). The host
+// still has to physically program the lockbox; this just saves them
+// thinking of a number.
+function _rotatingCodeLength() {
+  const raw = Number(propertyData?.rotating_lockbox_length);
+  const n = Number.isFinite(raw) ? Math.floor(raw) : 4;
+  return Math.max(4, Math.min(8, n || 4));
+}
+function _randRotatingCode(len) {
+  const n = Math.max(4, Math.min(8, Number(len) || 4));
+  let s = '';
+  for (let i = 0; i < n; i++) s += Math.floor(Math.random() * 10);
+  return s;
+}
 function generateLockboxCode(inputId) {
   const el = document.getElementById(inputId);
   if (!el) return;
-  const code = String(Math.floor(1000 + Math.random() * 9000));
+  const code = _randRotatingCode(_rotatingCodeLength());
   el.value = code;
   el.focus();
 }
@@ -8130,6 +8229,13 @@ async function saveReservationKeybox(inputEl) {
     toast(it ? '✓ Codice rotante salvato' : '✓ Rotating code saved');
     inputEl.style.borderBottomColor = '#2f7a44';
     setTimeout(() => { inputEl.style.borderBottomColor = 'rgba(154,107,0,0.4)'; }, 1200);
+    // Round 36.2.4 — mirror the edit into the other view. renderCheckins
+    // re-reads allCheckins (already patched above); renderDashboard
+    // re-fetches ota_reservations (which now has the new code). Both are
+    // cheap and safe to call regardless of which panel is currently
+    // visible — they only touch their own DOM.
+    if (typeof renderCheckins === 'function') renderCheckins();
+    if (typeof renderDashboard === 'function') renderDashboard();
   } catch (e) {
     console.error('saveReservationKeybox failed:', e);
     toast((it ? 'Salvataggio fallito: ' : 'Save failed: ') + (e?.message || e));
@@ -8473,6 +8579,20 @@ async function addProperty() {
 
 // Round 21: load (or reload) all data scoped to the currently-selected
 // propertyId. Extracted from init() so switching properties can re-run it.
+// Round 36.2.5 — lightweight partial reload of just the checkins cache.
+// Called from showPanel on Dashboard / Check-in Data so we pick up new
+// guest submissions since page load without refetching everything.
+// Best-effort: on failure we leave the previous cache in place.
+async function refreshCheckinsCache() {
+  if (!propertyId) return;
+  try {
+    const { data } = await sb.from('checkins').select('*')
+      .eq('property_id', propertyId).eq('is_test', false).is('deleted_at', null)
+      .order('submitted_at', { ascending: false });
+    if (Array.isArray(data)) allCheckins = data;
+  } catch (e) { console.warn('refreshCheckinsCache failed:', e); }
+}
+
 async function loadPropertyData() {
   if (!propertyId) return;
   // Reset per-property in-memory state so nothing leaks across a switch
@@ -8540,6 +8660,13 @@ function fillPropertyForm(data) {
   if (el('propShowFixedLockboxToGuest'))    el('propShowFixedLockboxToGuest').checked    = data.show_fixed_lockbox_to_guest    !== false;
   if (el('propRotatingLockboxEnabled'))     el('propRotatingLockboxEnabled').checked     = !!data.rotating_lockbox_enabled;
   if (el('propShowRotatingLockboxToGuest')) el('propShowRotatingLockboxToGuest').checked = data.show_rotating_lockbox_to_guest !== false;
+  // Round 36.2.5 — restore the rotating-code length picker; the DB
+  // CHECK guarantees 4..8, but clamp anyway to survive old rows.
+  if (el('propRotatingLockboxLength')) {
+    const raw = Number(data.rotating_lockbox_length);
+    const n = Number.isFinite(raw) ? Math.floor(raw) : 4;
+    el('propRotatingLockboxLength').value = String(Math.max(4, Math.min(8, n || 4)));
+  }
   if (el('propCheckinInstructions')) el('propCheckinInstructions').value = data.checkin_instructions || '';
   if (el('propCheckoutInstructions')) el('propCheckoutInstructions').value = data.checkout_instructions || '';
   if (el('propTransportInfo')) el('propTransportInfo').value = data.transport_info || '';

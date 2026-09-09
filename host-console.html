@@ -4041,11 +4041,22 @@ async function renderUpcomingReservationsPanel() {
   rows = await ensureReservationBookingCodes(rows);
 
   const title = h('dash_upcoming_title');
+  const lastSyncedISO = propertyData?.ical_last_synced_at;
+  const lastSyncedTxt = lastSyncedISO
+    ? new Date(lastSyncedISO).toLocaleString(hostLang === 'it' ? 'it-IT' : 'en-GB',
+        { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+    : (hostLang === 'it' ? 'mai' : 'never');
+  const syncBtnLabel = hostLang === 'it' ? '🔄 Sincronizza' : '🔄 Sync now';
+  const lastSyncedLabel = hostLang === 'it' ? 'Ultima sync:' : 'Last sync:';
   const headerHtml = `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
       <span style="font-size:1rem;">📅</span>
       <h3 style="margin:0;font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--ink);font-weight:600;">${safe(title)}</h3>
       <span style="font-size:0.78rem;color:var(--ink-soft);">(${rows.length})</span>
+      <span style="flex:1;"></span>
+      <span style="font-size:0.72rem;color:var(--ink-soft);">${lastSyncedLabel} ${safe(lastSyncedTxt)}</span>
+      <button type="button" onclick="syncCalendarsFromDashboard(this)"
+        style="padding:6px 12px;background:var(--warm);color:#fff;border:none;border-radius:6px;font-size:0.76rem;cursor:pointer;font-family:inherit;">${syncBtnLabel}</button>
     </div>`;
 
   if (rows.length === 0) {
@@ -4639,6 +4650,64 @@ function collectDomIcalFeedsIncludingBlank() {
     });
   });
   return out;
+}
+
+// Dashboard shortcut for syncing calendars. Same endpoint + auth flow
+// as the full syncIcalNow (which lives on the Property Details page and
+// hangs on DOM elements only available there). This variant reads the
+// property's saved feeds as-is, hits /api/ical-sync, toasts the outcome,
+// and re-renders the dashboard so the upcoming panel refreshes.
+async function syncCalendarsFromDashboard(btn) {
+  const it = hostLang === 'it';
+  if (!propertyId) {
+    toast(it ? 'Salva prima la proprietà' : h('ical_save_first'));
+    return;
+  }
+  const originalLabel = btn ? btn.textContent : null;
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.textContent = it ? '🔄 Sincronizzo…' : '🔄 Syncing…'; }
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const jwt = session?.access_token;
+    if (!jwt) { toast(it ? 'Sessione scaduta — accedi di nuovo' : 'Not signed in'); return; }
+    const feeds = Array.isArray(propertyData?.ical_feeds) ? propertyData.ical_feeds : [];
+    if (feeds.length === 0) {
+      toast(it ? 'Nessun feed configurato — vai in Dettagli proprietà' : 'No iCal feeds — add one in Property details');
+      return;
+    }
+    const r = await fetch('/api/ical-sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwt },
+      body: JSON.stringify({ property_id: propertyId }),
+    });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      toast((it ? 'Sync fallito: ' : 'Sync failed: ') + (body?.error || r.status));
+      return;
+    }
+    const synced = body.synced ?? 0;
+    const cancelled = body.cancelled ?? 0;
+    const errCount = (body.errors || []).length;
+    if (errCount > 0) {
+      toast(it
+        ? `⚠ ${synced} sincronizzate, ${errCount} errore(i) — controlla Dettagli proprietà`
+        : `⚠ ${synced} synced, ${errCount} error(s) — check Property details`);
+    } else {
+      toast(it
+        ? `✓ ${synced} prenotazioni sincronizzate, ${cancelled} cancellate`
+        : `✓ ${synced} reservations synced, ${cancelled} cancelled`);
+    }
+    // Refresh cached property + re-render dashboard so the upcoming panel
+    // picks up the freshly upserted rows.
+    try {
+      const { data } = await sb.from('properties').select('ical_feeds, ical_last_synced_at').eq('id', propertyId).maybeSingle();
+      if (data) propertyData = { ...(propertyData || {}), ...data };
+    } catch (_) { /* non-fatal */ }
+    renderDashboard();
+  } catch (e) {
+    toast((it ? 'Errore sync: ' : 'Sync error: ') + (e?.message || e));
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; if (originalLabel) btn.textContent = originalLabel; }
+  }
 }
 
 async function syncIcalNow() {

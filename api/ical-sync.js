@@ -338,7 +338,18 @@ function vEventToRow(ev, propertyId, platform) {
   const summary = ev.SUMMARY || '';
   const description = ev.DESCRIPTION || '';
 
-  const isBlock = /not available|blocked|closed - not available|closed \(/i.test(summary);
+  // Round 36.2 fix: Booking.com's iCal export uses "CLOSED - Not available"
+  // as the SUMMARY for every event, including real paid reservations — the
+  // platform simply does not expose guest info in iCal. So the generic
+  // "closed/not available" → block rule mis-classifies EVERY Booking.com
+  // reservation as a block, and the host dashboard (which filters to
+  // entry_type='reservation') never shows any of them. For Booking.com,
+  // treat every event as a reservation. Airbnb and Vrbo do distinguish
+  // ("Reserved" or a guest name for real bookings, "Airbnb (Not available)"
+  // or similar for host-set blocks), so keep the regex behaviour there.
+  const isBlock = platform === 'booking'
+    ? false
+    : /not available|blocked|closed - not available|closed \(/i.test(summary);
   const entry_type = isBlock ? 'block' : 'reservation';
   const status = /^CANCELLED$/i.test(ev.STATUS || '') ? 'cancelled' : 'active';
 

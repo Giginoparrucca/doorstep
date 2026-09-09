@@ -1394,13 +1394,13 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div id="presetRulesGrid" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
       </div>
 
-      <div style="font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;" data-h="rules_your_rules">Your rules</div>
-      <div class="edit-list" id="rulesList"></div>
-
-      <div class="panel-actions" data-rules-edit-only style="margin-top:16px;display:none;gap:10px;flex-wrap:wrap;">
+      <div class="panel-actions" data-rules-edit-only style="margin:0 0 12px;display:none;gap:10px;flex-wrap:wrap;">
         <button class="btn btn-secondary" onclick="addRule()" data-h="btn_add_rule">+ Add Custom Rule</button>
         <button class="btn btn-primary" onclick="saveRules()" data-h="btn_save_rules">💾 Save Rules</button>
       </div>
+
+      <div style="font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;" data-h="rules_your_rules">Your rules</div>
+      <div class="edit-list" id="rulesList"></div>
     </div>
 
     <!-- ════════════ RECOMMENDATIONS ════════════ -->
@@ -1421,12 +1421,12 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <button id="recosEditToggle" class="btn btn-secondary" onclick="toggleRecosEditMode()">✏️ <span data-h="btn_edit_list">Edit</span></button>
       </div>
 
-      <div class="edit-list" id="recoList"></div>
-
-      <div class="panel-actions" data-recos-edit-only style="margin-top:16px;display:none;gap:10px;flex-wrap:wrap;">
+      <div class="panel-actions" data-recos-edit-only style="margin:0 0 12px;display:none;gap:10px;flex-wrap:wrap;">
         <button class="btn btn-secondary" onclick="addReco()" data-h="btn_add_reco">+ Add Recommendation</button>
         <button class="btn btn-primary" onclick="saveRecos()" data-h="btn_save_recos">💾 Save</button>
       </div>
+
+      <div class="edit-list" id="recoList"></div>
     </div>
 
     <!-- ════════════ CHECK-IN DATA ════════════ -->
@@ -4829,9 +4829,13 @@ function renderPresetRules() {
 
 function addPresetRule(idx) {
   const p = PRESET_RULES[idx];
-  rulesData.push({ ...p });
+  // Prepend so the new rule appears at the top of "Your rules" — the
+  // preset buttons and the edit toolbar are already at the top, so a
+  // fresh entry that lands below them is visible without scrolling.
+  rulesData.unshift({ ...p });
   renderRules();
   renderPresetRules();
+  document.getElementById('rulesList')?.firstElementChild?.scrollIntoView({ block: 'center', behavior: 'smooth' });
 }
 
 // Generic drag-and-drop reordering for in-memory arrays rendered in a
@@ -5108,8 +5112,13 @@ function renderRules() {
 }
 
 function addRule() {
-  rulesData.push({ icon: '📌', title_en: '', title_it: '', desc_en: '', desc_it: '', is_important: false });
+  rulesData.unshift({ icon: '📌', title_en: '', title_it: '', desc_en: '', desc_it: '', is_important: false });
   renderRules();
+  // Focus the first input of the freshly-added blank row so the host
+  // can start typing straight away.
+  const first = document.getElementById('rulesList')?.firstElementChild;
+  first?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  first?.querySelector('input, textarea')?.focus();
 }
 
 async function saveRules() {
@@ -5416,8 +5425,11 @@ function toggleRecoTag(idx, tag, btn) {
 }
 
 function addReco() {
-  recoData.push({ category: activeRecoCat, name: '', desc_en: '', desc_it: '', tags: '', address: '' });
+  recoData.unshift({ category: activeRecoCat, name: '', desc_en: '', desc_it: '', tags: '', address: '' });
   renderRecos();
+  const first = document.getElementById('recoList')?.firstElementChild;
+  first?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  first?.querySelector('input, textarea')?.focus();
 }
 
 async function saveRecos() {

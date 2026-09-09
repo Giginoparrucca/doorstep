@@ -2010,9 +2010,10 @@ function goTo(page) {
 /* ══════════════════════════════════════
    RETURNING GUEST — Welcome Back State
 ══════════════════════════════════════ */
-// Round 36.2.3 — small header banner shown to a guest whose booking's
-// check-in has been reopened by the host. Doesn't hide the check-in
-// form; the form is used to add the remaining group members.
+// Round 36.2.3 — banner + read-only summary cards shown to a guest whose
+// booking's check-in has been reopened by the host. Doesn't hide the
+// check-in form; the form picks up from guest N+1 with the numbering
+// offset applied in updateSteps.
 function showReopenedBanner(alreadyCount) {
   const it = lang === 'it';
   const wrap = document.getElementById('checkinIntro');
@@ -2020,14 +2021,46 @@ function showReopenedBanner(alreadyCount) {
   const msg = it
     ? `L'host ha riaperto il check-in. Ci sono già <strong>${alreadyCount}</strong> ospite/i registrato/i — aggiungi qui i restanti.`
     : `The host has reopened check-in. <strong>${alreadyCount}</strong> guest${alreadyCount === 1 ? '' : 's'} already registered — please add the remaining ones here.`;
-  // Prepend a compact amber banner into the intro so it's visible right
-  // above the guest-count picker. Idempotent — replaces any prior banner.
+
   const existing = document.getElementById('checkinReopenBanner');
   if (existing) existing.remove();
+
   const banner = document.createElement('div');
   banner.id = 'checkinReopenBanner';
-  banner.style.cssText = 'background:rgba(232,184,75,0.16);border:1px solid rgba(232,184,75,0.35);color:#9a6b00;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:0.82rem;line-height:1.4;';
-  banner.innerHTML = '🔓 ' + msg;
+  banner.style.cssText = 'background:rgba(232,184,75,0.10);border:1px solid rgba(232,184,75,0.35);border-radius:10px;padding:12px 14px;margin-bottom:14px;';
+
+  // Read-only summary cards for guests already checked in. Mirrors the
+  // welcome-back cards but tucked inside the banner so the check-in form
+  // stays right below.
+  const cardsHtml = (existingCheckins || []).map(g => {
+    const isMain = ['single', 'head', 'group'].includes(g.guest_type);
+    const roleLabel = isMain
+      ? (it ? 'Ospite principale' : 'Main guest')
+      : (it ? 'Familiare' : 'Companion');
+    const prov = g.birth_province && g.birth_province !== 'EE' ? ` (${g.birth_province})` : '';
+    return `
+      <div style="background:var(--white);border:1px solid var(--cream-3);border-radius:8px;padding:10px 12px;margin-top:8px;${isMain ? 'border-left:3px solid var(--warm);' : ''}">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:2px;">
+          <div style="font-weight:600;font-size:0.82rem;color:var(--ink);">${(g.surname || '') + ' ' + (g.name || '')}</div>
+          <div style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--warm);font-weight:500;">${roleLabel}</div>
+        </div>
+        <div style="font-size:0.66rem;color:var(--ink-soft);line-height:1.55;">
+          ${g.sex === 'F' ? '♀' : '♂'} · ${g.date_of_birth || '—'} · ${g.place_of_birth || '—'}${prov}
+          ${g.citizenship ? ` · ${g.citizenship}` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  const nextIdx = alreadyCount + 1;
+  const continueLine = it
+    ? `Il prossimo ospite sarà <strong>Ospite ${nextIdx}</strong>.`
+    : `The next guest will be <strong>Guest ${nextIdx}</strong>.`;
+
+  banner.innerHTML = `
+    <div style="color:#9a6b00;font-size:0.82rem;line-height:1.4;">🔓 ${msg}</div>
+    <div style="margin-top:2px;">${cardsHtml}</div>
+    <div style="margin-top:10px;color:#9a6b00;font-size:0.76rem;line-height:1.4;">${continueLine}</div>`;
+
   wrap.parentElement.insertBefore(banner, wrap);
 }
 
@@ -2986,15 +3019,21 @@ function updateSteps() {
 
   // Guest counter
   const counter = document.getElementById('guestCounter');
-  if (checkinStep === 2 && totalGuests > 1) {
+  if (checkinStep === 2 && (totalGuests > 1 || isReopenedCheckin)) {
     counter.style.display = 'block';
+    // Round 36.2.3 — in the reopened flow, offset the displayed guest
+    // number by the count already registered so it reads "Guest 4 of 6"
+    // instead of "Guest 1 of 3". Progress bar covers the whole booking.
+    const offset = isReopenedCheckin ? (existingCheckins?.length || 0) : 0;
+    const shownIdx   = offset + currentGuestIdx + 1;
+    const shownTotal = offset + totalGuests;
     document.getElementById('guestCounterText').textContent =
-      `${T[lang].guest_x_of_y} ${currentGuestIdx+1} ${T[lang].of_word} ${totalGuests}`;
+      `${T[lang].guest_x_of_y} ${shownIdx} ${T[lang].of_word} ${shownTotal}`;
     document.getElementById('guestCounterHint').textContent =
-      savedGuests.length > 0
-        ? `${savedGuests.length} ${T[lang].review_saved}`
+      (offset + savedGuests.length) > 0
+        ? `${offset + savedGuests.length} ${T[lang].review_saved}`
         : T[lang].review_fill;
-    document.getElementById('guestProgressBar').style.width = `${((currentGuestIdx+1)/totalGuests)*100}%`;
+    document.getElementById('guestProgressBar').style.width = `${(shownIdx/shownTotal)*100}%`;
   } else {
     counter.style.display = 'none';
   }

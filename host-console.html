@@ -4035,7 +4035,7 @@ async function renderUpcomingReservationsPanel() {
   let rows = [];
   try {
     const { data, error } = await sb.from('ota_reservations')
-      .select('id, platform, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code')
+      .select('id, platform, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code, checkin_reopened_at')
       .eq('property_id', propertyId)
       .eq('entry_type', 'reservation')
       .eq('status', 'active')
@@ -4202,6 +4202,20 @@ async function renderUpcomingReservationsPanel() {
           style="width:60px;font-family:monospace;font-weight:600;color:#9a6b00;background:transparent;border:none;border-bottom:1px dashed rgba(154,107,0,0.4);padding:0 2px;text-align:center;font-size:0.72rem;outline:none;">
       </span>` : '';
     const linkLabel = hostLang === 'it' ? 'Link Prenotazione' : 'Booking Link';
+    // Round 36.2.3 — "Reopen check-in" button, shown only when there's at
+    // least one existing check-in on this booking (nothing to reopen
+    // otherwise) and the flag isn't already set (avoid double-stamping).
+    const groupCheckins = Array.isArray(allCheckins)
+      ? allCheckins.filter(c => c.property_id === propertyId && r.booking_code && c.booking_code === r.booking_code)
+      : [];
+    const alreadyReopened = r.checkin_reopened_at
+      || groupCheckins.some(c => c.checkin_reopened_at);
+    const reopenBtn = (r.booking_code && groupCheckins.length > 0 && !alreadyReopened) ? `
+      <button type="button" onclick="reopenCheckinForBooking('booking', '${safe(r.booking_code)}', '${safe(propertyId)}')"
+        title="${safe(hostLang === 'it' ? 'Permetti all\'ospite di aggiungere altri membri del gruppo' : 'Let the guest add more group members')}"
+        style="padding:4px 10px;background:rgba(232,184,75,0.14);border:1px solid rgba(232,184,75,0.4);border-radius:6px;font-size:0.72rem;cursor:pointer;color:#9a6b00;font-family:inherit;font-weight:500;">🔓 ${safe(hostLang === 'it' ? 'Riapri check-in' : 'Reopen check-in')}</button>` : '';
+    const reopenedNote = alreadyReopened ? `
+      <span style="font-size:0.68rem;color:#9a6b00;background:rgba(232,184,75,0.14);border-radius:6px;padding:2px 8px;">${safe(hostLang === 'it' ? '🔓 In attesa — l\'ospite può aggiungere altri' : '🔓 Waiting — guest can add more')}</span>` : '';
     const linkRow = guestLink ? `
       <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:8px;padding-top:8px;border-top:1px dashed rgba(107,122,144,0.15);">
         <span style="font-size:0.62rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--warm);white-space:nowrap;">${safe(linkLabel)}</span>
@@ -4210,6 +4224,7 @@ async function renderUpcomingReservationsPanel() {
                 style="padding:4px 10px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:0.72rem;cursor:pointer;color:var(--ink);font-family:inherit;">🔗 ${safe(hostLang === 'it' ? 'Copia' : 'Copy')}</button>
         <a href="${safe(guestLink)}" target="_blank" rel="noopener" title="${safe(hostLang === 'it' ? 'Apri come ospite' : 'Open as guest')}"
            style="padding:4px 10px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:0.72rem;color:var(--ink);text-decoration:none;">↗ ${safe(hostLang === 'it' ? 'Apri' : 'Open')}</a>
+        ${reopenBtn}${reopenedNote}
       </div>` : '';
     return `
       <div style="background:var(--white);border:1px solid rgba(107,122,144,0.10);border-left:3px solid ${style.color};border-radius:8px;padding:10px 14px;margin-bottom:8px;">
@@ -4413,6 +4428,19 @@ function renderCheckins() {
         style="padding:6px 12px;background:transparent;color:var(--ink-soft);border:1px solid var(--border);border-radius:6px;font-size:0.78rem;cursor:pointer;font-family:inherit;">
         ${it ? 'Segna inviato' : 'Mark filed'}
       </button>`;
+    // Round 36.2.3 — "Reopen check-in" per group. Shown when the flag
+    // isn't already set on any row of this group. Solo (walk-in) rows
+    // reopen the single checkin_id; group rows fan out to ota_reservations
+    // + every checkins row sharing the booking_code.
+    const anyReopened = rows.some(r => r.checkin_reopened_at);
+    const reopenBtn = anyReopened ? `
+      <span style="padding:6px 12px;background:rgba(232,184,75,0.14);color:#9a6b00;border-radius:6px;font-size:0.72rem;font-family:inherit;">🔓 ${it ? 'Riaperto — l\'ospite può aggiungere altri' : 'Reopened — guest can add more'}</span>
+    ` : `
+      <button type="button" onclick="reopenCheckinForBooking(${isSolo ? `'checkin','${rows[0].id}'` : `'booking','${bookingCode}','${rows[0].property_id}'`})"
+        style="padding:6px 12px;background:transparent;color:#9a6b00;border:1px solid rgba(232,184,75,0.4);border-radius:6px;font-size:0.78rem;cursor:pointer;font-family:inherit;">
+        🔓 ${it ? 'Riapri check-in' : 'Reopen check-in'}
+      </button>
+    `;
     const groupStatusMsg = `<span id="receiptUploadStatus_${groupToken}" style="font-size:0.72rem;color:var(--ink-soft);"></span>`;
 
     // Group header row spans all 10 columns of the check-ins table.
@@ -4464,7 +4492,7 @@ function renderCheckins() {
                     aria-label="${it ? 'Espandi/collassa gruppo' : 'Toggle group'}"
                     style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;font-size:0.85rem;color:var(--ink-soft);user-select:none;">${chevron}</span>
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                ${groupPill}${uploadBtn}${markBtn}${groupStatusMsg}
+                ${groupPill}${uploadBtn}${markBtn}${reopenBtn}${groupStatusMsg}
               </div>
               <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                 <span style="font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;">${it ? 'Gruppo' : 'Group'}</span>
@@ -8009,6 +8037,58 @@ function generateLockboxCode(inputId) {
 
 // Save a per-guest lockbox code. Empty string → NULL in DB (falls back
 // to property's default code on the guest side).
+// Round 36.2.3 — reopen a booking's check-in so the guest can add more
+// members. Stamps checkin_reopened_at on the ota_reservations row (if a
+// booking_code is present and matches one) and on every checkins row
+// that shares the (property_id, booking_code) pair. For a walk-in with
+// no booking_code we fall back to stamping just that single checkin id.
+// The flag is cleared automatically when the guest submits the next
+// check-in row.
+async function reopenCheckinForBooking(scope, arg1, arg2) {
+  const it = hostLang === 'it';
+  const confirmMsg = it
+    ? 'Riaprire il check-in per questa prenotazione?\n\nL\'ospite potrà aggiungere altri membri del gruppo aprendo di nuovo il link.'
+    : 'Reopen check-in for this booking?\n\nThe guest will be able to add more group members by opening the link again.';
+  if (!confirm(confirmMsg)) return;
+  const stamp = new Date().toISOString();
+  let touched = 0;
+  try {
+    if (scope === 'booking') {
+      const bookingCode = arg1, propId = arg2;
+      const { data: rd } = await sb.from('ota_reservations')
+        .update({ checkin_reopened_at: stamp })
+        .eq('property_id', propId).eq('booking_code', bookingCode).select('id');
+      touched += (rd || []).length;
+      const { data: cd } = await sb.from('checkins')
+        .update({ checkin_reopened_at: stamp })
+        .eq('property_id', propId).eq('booking_code', bookingCode).select('id');
+      touched += (cd || []).length;
+      if (Array.isArray(allCheckins) && cd) {
+        const ids = new Set(cd.map(r => r.id));
+        allCheckins = allCheckins.map(c => ids.has(c.id) ? { ...c, checkin_reopened_at: stamp } : c);
+      }
+    } else {
+      const checkinId = arg1;
+      const { data } = await sb.from('checkins')
+        .update({ checkin_reopened_at: stamp }).eq('id', checkinId).select('id');
+      touched += (data || []).length;
+      if (Array.isArray(allCheckins) && data && data.length) {
+        allCheckins = allCheckins.map(c => c.id === checkinId ? { ...c, checkin_reopened_at: stamp } : c);
+      }
+    }
+    if (!touched) {
+      toast(it ? 'Nessuna riga aggiornata (RLS?)' : 'No row updated (RLS?)');
+      return;
+    }
+    toast(it ? '🔓 Check-in riaperto — condividi di nuovo il link con l\'ospite' : '🔓 Check-in reopened — reshare the link with the guest');
+    renderCheckins();
+    if (typeof renderDashboard === 'function') renderDashboard();
+  } catch (e) {
+    console.error('reopenCheckinForBooking failed:', e);
+    toast((it ? 'Errore: ' : 'Error: ') + (e?.message || e));
+  }
+}
+
 // Round 36.2.2 — write a new rotating code from one of the inline
 // dashboard/check-in inputs. Sends the value both to the ota_reservations
 // row (if the input names one) and to every checkins row that shares

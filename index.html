@@ -1376,6 +1376,11 @@ let _guestToken = null;
 let propertyData = null;
 let bookingCode = null;
 let existingCheckins = [];
+// Round 36.2.3 — set true when the host has reopened the booking's
+// check-in so more members can be added. Suppresses the welcome-back
+// lock, forces new guests into member/group_member roles, and clears
+// the reopen flag on successful insert.
+let isReopenedCheckin = false;
 
 // One-time migration of legacy localStorage keys from the old `doorstep_*`
 // prefix to the current `wbnb_*` prefix. Kept so returning users with
@@ -2005,6 +2010,27 @@ function goTo(page) {
 /* ══════════════════════════════════════
    RETURNING GUEST — Welcome Back State
 ══════════════════════════════════════ */
+// Round 36.2.3 — small header banner shown to a guest whose booking's
+// check-in has been reopened by the host. Doesn't hide the check-in
+// form; the form is used to add the remaining group members.
+function showReopenedBanner(alreadyCount) {
+  const it = lang === 'it';
+  const wrap = document.getElementById('checkinIntro');
+  if (!wrap) return;
+  const msg = it
+    ? `L'host ha riaperto il check-in. Ci sono già <strong>${alreadyCount}</strong> ospite/i registrato/i — aggiungi qui i restanti.`
+    : `The host has reopened check-in. <strong>${alreadyCount}</strong> guest${alreadyCount === 1 ? '' : 's'} already registered — please add the remaining ones here.`;
+  // Prepend a compact amber banner into the intro so it's visible right
+  // above the guest-count picker. Idempotent — replaces any prior banner.
+  const existing = document.getElementById('checkinReopenBanner');
+  if (existing) existing.remove();
+  const banner = document.createElement('div');
+  banner.id = 'checkinReopenBanner';
+  banner.style.cssText = 'background:rgba(232,184,75,0.16);border:1px solid rgba(232,184,75,0.35);color:#9a6b00;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:0.82rem;line-height:1.4;';
+  banner.innerHTML = '🔓 ' + msg;
+  wrap.parentElement.insertBefore(banner, wrap);
+}
+
 function showWelcomeBackState(checkins) {
   const mainGuest = checkins.find(c => ['single','head','group'].includes(c.guest_type)) || checkins[0];
   const guestName = mainGuest ? `${mainGuest.name}` : '';
@@ -2899,6 +2925,12 @@ function autoDetectProvince() {
 }
 
 function isMainGuest() {
+  // Round 36.2.3 — when the host has reopened the check-in, we already
+  // have a head-of-family in existingCheckins, so no new guest submitted
+  // in this session should be treated as the "main" one. That skips the
+  // document scan, doc-number, and doc-issue-place fields for every new
+  // entry, and pushes their guest_type to member / group_member below.
+  if (isReopenedCheckin) return false;
   // First guest is always the main guest (needs document)
   return currentGuestIdx === 0;
 }
@@ -3137,7 +3169,11 @@ async function saveCurrentGuest() {
 
     // Determine Alloggiati guest type code
     let guestType;
-    if (currentGuestIdx === 0) {
+    if (isReopenedCheckin) {
+      // Round 36.2.3 — reopened flow: head already exists in the DB,
+      // every guest added here is a family/group member.
+      guestType = 'group_member';
+    } else if (currentGuestIdx === 0) {
       guestType = selectedGuestType === 'single' ? 'single' : selectedGuestType === 'group' ? 'group' : 'head';
     } else {
       guestType = selectedGuestType === 'group' ? 'group_member' : 'member';
@@ -3263,6 +3299,33 @@ async function saveCurrentGuest() {
         guest_type: selectedGuestType,
         nights: nights,
       });
+
+      // Round 36.2.3 — clear the reopen flag on ota_reservations and on
+      // every checkin row of this booking so the next visit locks back
+      // into the welcome-back state. Best-effort; a failure here just
+      // means the host sees "🔓 Reopened" for another day and can retry.
+      if (isReopenedCheckin && canonicalPropId && canonicalBooking) {
+        try {
+          await sb.from('ota_reservations')
+            .update({ checkin_reopened_at: null })
+            .eq('property_id', canonicalPropId)
+            .eq('booking_code', canonicalBooking);
+          await sb.from('checkins')
+            .update({ checkin_reopened_at: null })
+            .eq('property_id', canonicalPropId)
+            .eq('booking_code', canonicalBooking);
+        } catch (e) { console.warn('reopen flag clear failed:', e); }
+      } else if (isReopenedCheckin && canonicalPropId && !canonicalBooking) {
+        // Walk-in / solo case — clear on the specific existing checkin ids
+        try {
+          const ids = (existingCheckins || []).map(c => c.id).filter(Boolean);
+          if (ids.length) {
+            await sb.from('checkins')
+              .update({ checkin_reopened_at: null })
+              .in('id', ids);
+          }
+        } catch (e) { console.warn('reopen flag clear (solo) failed:', e); }
+      }
     }
   } catch (err) {
     console.error('Save error:', err);
@@ -4629,8 +4692,29 @@ async function init() {
         existingCheckins = data;
         foundExisting = true;
         console.log(`✅ Found ${data.length} existing check-ins for booking ${bookingCode}`);
-        showWelcomeBackState(data);
-        refreshLockboxDisplay();
+        // Round 36.2.3 — if the host has reopened the check-in, don't lock
+        // the guest into the "already checked in" state. Any reopened row
+        // on the booking (or a reopened matching ota_reservations row)
+        // qualifies.
+        let reopened = data.some(c => c.checkin_reopened_at);
+        if (!reopened) {
+          try {
+            const { data: resData } = await sb.from('ota_reservations')
+              .select('checkin_reopened_at')
+              .eq('property_id', propertyId).eq('booking_code', bookingCode)
+              .maybeSingle();
+            if (resData && resData.checkin_reopened_at) reopened = true;
+          } catch (_) { /* non-fatal */ }
+        }
+        if (reopened) {
+          console.log('🔓 Booking check-in has been reopened by the host — allowing more guests');
+          isReopenedCheckin = true;
+          showReopenedBanner(data.length);
+          refreshLockboxDisplay();
+        } else {
+          showWelcomeBackState(data);
+          refreshLockboxDisplay();
+        }
       }
     } catch (e) { console.log('No existing check-ins found'); }
   }
@@ -4651,8 +4735,15 @@ async function init() {
         if (data && data.length > 0) {
           existingCheckins = data;
           foundExisting = true;
-          showWelcomeBackState(data);
-          refreshLockboxDisplay();
+          const reopened = data.some(c => c.checkin_reopened_at);
+          if (reopened) {
+            isReopenedCheckin = true;
+            showReopenedBanner(data.length);
+            refreshLockboxDisplay();
+          } else {
+            showWelcomeBackState(data);
+            refreshLockboxDisplay();
+          }
         }
       } catch (e) {}
     }

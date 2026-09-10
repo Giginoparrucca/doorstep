@@ -180,10 +180,26 @@ body { display: flex; overflow: hidden; }
 
 .content { flex: 1; padding: 24px 28px 40px; }
 
-/* Round 37.1 — consistent action row at the bottom of every panel.
-   On desktop it flows naturally at the end of content; on mobile the
-   media query below turns it into a full-width bottom stripe. */
-.panel-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--border); }
+/* Round 37.2 — action buttons follow the scroll so the host can
+   always reach them. Desktop: floating pill pinned top-right,
+   under the sticky main-header. Mobile: full-width strip fixed
+   to the bottom. Only the active .panel's actions render — inactive
+   panels are display:none and their fixed children don't paint. */
+.panel-actions {
+  position: fixed;
+  top: 88px;
+  right: 28px;
+  z-index: 90;
+  display: flex; gap: 8px; flex-wrap: wrap;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  max-width: min(560px, calc(100vw - 340px));
+  justify-content: flex-end;
+}
+.panel-actions .btn { flex: 0 0 auto; }
 
 /* ── PANELS ── */
 .panel { display: none; }
@@ -607,15 +623,25 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   /* Sidebar items — bigger touch targets */
   .sidebar-item { padding: 12px 18px; font-size: 0.9rem; min-height: 44px; }
 
-  /* Round 37.1 — action buttons live at the natural bottom of the
-     page, in-flow. The old sticky-bottom bar covered mid-viewport
-     content and looked misplaced when the last card was short. */
+  /* Round 37.2 — mobile action bar: fixed at the bottom, full width,
+     always in reach. .content grows a bottom padding to keep the
+     last card from being trapped underneath. */
   .panel-actions {
-    padding: 14px 0 4px; margin-top: 20px;
+    position: fixed;
+    top: auto; right: 0; bottom: 0; left: 0;
+    z-index: 40;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    margin: 0;
+    background: var(--cream);
     border-top: 1px solid var(--border);
-    display: flex; gap: 10px; flex-wrap: wrap;
+    border-radius: 0;
+    box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.06);
+    display: flex; gap: 8px; flex-wrap: nowrap; overflow-x: auto;
+    max-width: none;
+    justify-content: flex-start;
   }
-  .panel-actions .btn { flex: 1 1 140px; justify-content: center; min-height: 52px; font-size: 0.92rem; }
+  .panel-actions .btn { flex: 1 1 0; min-width: 96px; justify-content: center; min-height: 48px; font-size: 0.88rem; padding: 10px 12px; }
+  .content { padding-bottom: 90px; }
 }
 .mobile-toggle {
   display: none; align-items: center; justify-content: center;

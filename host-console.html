@@ -4741,6 +4741,16 @@ async function deleteAllCheckins() {
 ══════════════════════════════════════ */
 async function saveProperty() {
   if (!propertyId) { toast('No property found!'); return false; }
+  // Round 37.3 — capture the previous rotating-code length so a length
+  // change can trigger regeneration of every dashboard-visible code
+  // after the save lands. Read from propertyData (last-known DB truth),
+  // not the form, so a same-session second save doesn't re-trigger.
+  const _prevRotatingLen = (() => {
+    const raw = Number(propertyData?.rotating_lockbox_length);
+    return Number.isFinite(raw) ? Math.max(4, Math.min(8, Math.floor(raw) || 4)) : 4;
+  })();
+  const _prevRotatingOn = propertyData?.rotating_lockbox_enabled === true
+                       || propertyData?.use_per_guest_lockbox === true;
   const update = {
     name: document.getElementById('propName').value,
     address: document.getElementById('propAddress').value,
@@ -4797,7 +4807,132 @@ async function saveProperty() {
   renderPropertySwitcher();
   toast(h('toast_property_saved'));
   track('save_property', { name: document.getElementById('propName').value });
+
+  // Round 37.3 — if the rotating-code length actually changed while
+  // rotating is on, re-issue codes for every dashboard-visible booking
+  // (current + upcoming). Async and best-effort; failures are surfaced
+  // via toast but don't fail the save itself.
+  const newRotatingOn = update.rotating_lockbox_enabled === true;
+  const newLen = update.rotating_lockbox_length;
+  if (newRotatingOn && _prevRotatingOn && Number.isFinite(newLen) && newLen !== _prevRotatingLen) {
+    regenerateRotatingCodesForLengthChange(_prevRotatingLen, newLen).catch(e =>
+      console.warn('regenerateRotatingCodesForLengthChange failed:', e)
+    );
+  }
   return true;
+}
+
+// Round 37.3 — walk every dashboard-visible booking (current +
+// upcoming) and re-issue its rotating code at the new length. One code
+// per booking (booking_code groups the head + members), applied to
+// both ota_reservations and every checkins row sharing the pair
+// (property_id, booking_code). Best-effort per row; a partial failure
+// leaves the DB in a mixed state but the toast reports what happened.
+async function regenerateRotatingCodesForLengthChange(oldLen, newLen) {
+  const it = hostLang === 'it';
+  const todayISO = new Date().toISOString().slice(0, 10);
+  // Fetch reservations we still want the host to see on the dashboard
+  // (checkout today or later). Only rows that already have a code
+  // qualify — an empty slot gets its first code on the next render via
+  // ensureReservationBookingCodes, which reads the new length itself.
+  let resRows = [];
+  try {
+    const { data, error } = await sb.from('ota_reservations')
+      .select('id, booking_code, checkout_date, keybox_code')
+      .eq('property_id', propertyId)
+      .is('deleted_at', null)
+      .not('keybox_code', 'is', null)
+      .gte('checkout_date', todayISO);
+    if (error) throw error;
+    resRows = data || [];
+  } catch (e) {
+    console.warn('regenerate: fetch ota_reservations failed:', e);
+    toast(it ? 'Rigenerazione codici fallita' : 'Code regeneration failed');
+    return;
+  }
+  // Walk-in / no-OTA bookings live only in the checkins table. Include
+  // any group whose head has a code and hasn't departed yet.
+  const walkInHeads = (allCheckins || []).filter(c =>
+    c.property_id === propertyId
+    && c.keybox_code
+    && (c.guest_type === 'single' || c.guest_type === 'head' || c.guest_type === 'group')
+    && (!c.departure_date || c.departure_date >= todayISO)
+  );
+
+  // Build the target set: one entry per booking_code (from OTA), plus
+  // one per walk-in group not covered by any OTA row.
+  const targets = new Map(); // key = `${propertyId}::${booking_code || 'walkin_' + checkinId}` → { newCode, resId?, bookingCode?, walkinCheckinId? }
+  const newCode = () => {
+    let s = ''; for (let i = 0; i < newLen; i++) s += Math.floor(Math.random() * 10); return s;
+  };
+  for (const r of resRows) {
+    const key = `bk::${r.booking_code || r.id}`;
+    if (!targets.has(key)) {
+      targets.set(key, { newCode: newCode(), resId: r.id, bookingCode: r.booking_code || null });
+    }
+  }
+  for (const c of walkInHeads) {
+    const key = c.booking_code ? `bk::${c.booking_code}` : `walkin::${c.id}`;
+    if (targets.has(key)) continue;
+    targets.set(key, { newCode: newCode(), resId: null, bookingCode: c.booking_code || null, walkinCheckinId: c.booking_code ? null : c.id });
+  }
+
+  if (targets.size === 0) {
+    toast(it ? `Lunghezza aggiornata (${newLen} cifre). Nessun codice esistente da rigenerare.` : `Length updated (${newLen} digits). No existing codes to reissue.`);
+    return;
+  }
+
+  let ok = 0, fail = 0;
+  for (const t of targets.values()) {
+    try {
+      if (t.resId) {
+        const { data, error } = await sb.from('ota_reservations')
+          .update({ keybox_code: t.newCode })
+          .eq('id', t.resId).select('id');
+        if (error) throw error;
+        if (!data || data.length === 0) throw new Error('no rows updated (RLS?)');
+      }
+      if (t.bookingCode) {
+        const { data, error } = await sb.from('checkins')
+          .update({ keybox_code: t.newCode })
+          .eq('property_id', propertyId)
+          .eq('booking_code', t.bookingCode)
+          .select('id');
+        if (error) throw error;
+        if (Array.isArray(allCheckins) && data) {
+          const ids = new Set(data.map(x => x.id));
+          allCheckins = allCheckins.map(c => ids.has(c.id) ? { ...c, keybox_code: t.newCode } : c);
+        }
+      } else if (t.walkinCheckinId) {
+        const { data, error } = await sb.from('checkins')
+          .update({ keybox_code: t.newCode })
+          .eq('id', t.walkinCheckinId).select('id');
+        if (error) throw error;
+        if (Array.isArray(allCheckins) && data && data.length) {
+          allCheckins = allCheckins.map(c => c.id === t.walkinCheckinId ? { ...c, keybox_code: t.newCode } : c);
+        }
+      }
+      ok++;
+    } catch (e) {
+      console.warn('regenerate: booking failed', t, e);
+      fail++;
+    }
+  }
+
+  // Refresh the visible views so the new codes appear right away.
+  if (typeof renderDashboard === 'function') renderDashboard();
+  if (typeof renderCheckins  === 'function') renderCheckins();
+
+  if (fail === 0) {
+    toast(it
+      ? `✓ ${ok} codici rigenerati a ${newLen} cifre`
+      : `✓ ${ok} codes reissued at ${newLen} digits`);
+  } else {
+    toast(it
+      ? `${ok} rigenerati, ${fail} falliti — vedi console`
+      : `${ok} reissued, ${fail} failed — see console`);
+  }
+  track('regenerate_rotating_codes', { old_len: oldLen, new_len: newLen, ok, fail });
 }
 
 /* ══════════════════════════════════════

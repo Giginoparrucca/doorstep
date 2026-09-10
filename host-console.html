@@ -4846,7 +4846,7 @@ async function deleteAllCheckins() {
   if (typed !== 'DELETE' && typed !== 'ELIMINA') { toast(h('deletion_cancelled')); return; }
 
   const { error } = await sb.from('checkins').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-  if (error) { console.error(error); toast('Error deleting records'); return; }
+  if (error) { console.error(error); toast((hostLang === 'it' ? 'Errore: ' : 'Error: ') + error.message); return; }
 
   allCheckins = [];
   renderCheckins();
@@ -5696,24 +5696,57 @@ function addRule() {
 
 async function saveRules() {
   if (!propertyId) return;
-  await sb.from('rules').delete().eq('property_id', propertyId);
-  const rows = rulesData.map((r, i) => ({
-    property_id: propertyId,
-    icon: r.icon,
-    title_en: r.title_en || r.title || '',
-    title_it: r.title_it || '',
-    desc_en: r.desc_en || r.desc || '',
-    desc_it: r.desc_it || '',
-    is_important: r.is_important || false,
-    sort_order: i,
-  }));
+  const it = hostLang === 'it';
+  // Round 37.4 — the previous flow did DELETE-then-INSERT with no
+  // visibility on either half. Two failure modes bit us:
+  //   (a) The insert fails with a real DB error (a hostile character
+  //       in the title, a size violation) and the host sees a generic
+  //       "Error saving rules!" toast with no clue why. Now the DB
+  //       message is surfaced.
+  //   (b) A row the host added but never typed into (empty title_en)
+  //       reaches the insert. title_en is NOT NULL — the empty string
+  //       satisfies that, but shipping empty rows is silent junk we
+  //       shouldn't send. Filter first, then insert.
+  const rows = rulesData
+    .map((r, i) => ({
+      property_id: propertyId,
+      icon: (r.icon && String(r.icon).trim()) || '📌',
+      title_en: (r.title_en ?? r.title ?? '').toString().trim(),
+      title_it: (r.title_it ?? '').toString().trim(),
+      desc_en:  (r.desc_en  ?? r.desc  ?? '').toString(),
+      desc_it:  (r.desc_it  ?? '').toString(),
+      is_important: !!r.is_important,
+      sort_order: i,
+    }))
+    // Drop fully-empty rows the host added and never filled — no title,
+    // no description, either language. Anything with even one field
+    // typed is kept.
+    .filter(r => r.title_en || r.title_it || r.desc_en || r.desc_it);
+
+  // Delete first; check the result. RLS or a network issue can silently
+  // fail the whole save otherwise.
+  const del = await sb.from('rules').delete().eq('property_id', propertyId).select('id');
+  if (del.error) {
+    console.error('rules delete failed:', del.error);
+    toast((it ? 'Impossibile ripulire le regole precedenti: ' : 'Could not clear old rules: ') + del.error.message);
+    return;
+  }
   if (rows.length > 0) {
-    const { error } = await sb.from('rules').insert(rows);
-    if (error) { console.error(error); toast('Error saving rules!'); return; }
+    const ins = await sb.from('rules').insert(rows).select('id');
+    if (ins.error) {
+      console.error('rules insert failed:', ins.error);
+      toast((it ? 'Salvataggio fallito: ' : 'Save failed: ') + ins.error.message);
+      return;
+    }
+    if (!ins.data || ins.data.length < rows.length) {
+      // Not necessarily broken (RLS could allow the insert but hide
+      // the select), but surface it so a silent partial save doesn't
+      // hide.
+      console.warn('rules insert returned fewer rows than sent:', ins.data?.length, 'vs', rows.length);
+    }
   }
   toast(h('toast_rules_saved'));
-  track('save_rules', { count: rulesData.length });
-  // Round 32.4 — flip back to view mode after a successful save.
+  track('save_rules', { count: rows.length });
   rulesEditMode = false;
   renderRules();
 }
@@ -6007,24 +6040,45 @@ function addReco() {
 
 async function saveRecos() {
   if (!propertyId) return;
-  await sb.from('recommendations').delete().eq('property_id', propertyId);
-  const rows = recoData.map((r, i) => ({
-    property_id: propertyId,
-    category: r.category || r.cat || 'food',
-    name: r.name,
-    desc_en: r.desc_en || r.desc || '',
-    desc_it: r.desc_it || '',
-    tags: r.tags || '',
-    address: r.address || '',
-    sort_order: i,
-  }));
+  const it = hostLang === 'it';
+  // Round 37.4 — same tightening as saveRules. Extra guard here:
+  // recommendations.name is NOT NULL, so a fresh row with no name
+  // would have blown up the INSERT and lost every reco after the
+  // DELETE. Filter empty rows before we touch the DB.
+  const rows = recoData
+    .map((r, i) => ({
+      property_id: propertyId,
+      category: (r.category || r.cat || 'food').toString(),
+      name: (r.name ?? '').toString().trim(),
+      desc_en: (r.desc_en ?? r.desc ?? '').toString(),
+      desc_it: (r.desc_it ?? '').toString(),
+      tags: (r.tags ?? '').toString(),
+      address: (r.address ?? '').toString(),
+      sort_order: i,
+    }))
+    // Drop entries that are just a category with no actual place —
+    // name is the only NOT NULL that a fresh row doesn't fill in.
+    .filter(r => r.name);
+
+  const del = await sb.from('recommendations').delete().eq('property_id', propertyId).select('id');
+  if (del.error) {
+    console.error('recos delete failed:', del.error);
+    toast((it ? 'Impossibile ripulire le raccomandazioni precedenti: ' : 'Could not clear old recommendations: ') + del.error.message);
+    return;
+  }
   if (rows.length > 0) {
-    const { error } = await sb.from('recommendations').insert(rows);
-    if (error) { console.error(error); toast('Error saving!'); return; }
+    const ins = await sb.from('recommendations').insert(rows).select('id');
+    if (ins.error) {
+      console.error('recos insert failed:', ins.error);
+      toast((it ? 'Salvataggio fallito: ' : 'Save failed: ') + ins.error.message);
+      return;
+    }
+    if (!ins.data || ins.data.length < rows.length) {
+      console.warn('recos insert returned fewer rows than sent:', ins.data?.length, 'vs', rows.length);
+    }
   }
   toast(h('toast_recos_saved'));
-  track('save_recos', { count: recoData.length, categories: [...new Set(recoData.map(r => r.category))] });
-  // Round 32.4 — flip back to view mode after a successful save.
+  track('save_recos', { count: rows.length, categories: [...new Set(rows.map(r => r.category))] });
   recosEditMode = false;
   renderRecos();
 }
@@ -8401,7 +8455,7 @@ async function sendHostReply() {
   if (code && code !== '_no_code') row.booking_code = code;
 
   const { error } = await sb.from('chat_messages').insert(row);
-  if (error) { toast('Error sending message'); return; }
+  if (error) { console.error('host chat send failed:', error); toast((hostLang === 'it' ? 'Errore nell\'invio del messaggio: ' : 'Message send failed: ') + error.message); return; }
 
   input.value = '';
   loadHostChat();

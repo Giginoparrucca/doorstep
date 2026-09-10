@@ -1114,6 +1114,17 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
         <button onclick="document.getElementById('onboardingBanner').style.display='none'" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:1rem;color:var(--ink-soft);cursor:pointer;opacity:0.5;">✕</button>
       </div>
+
+      <!-- Round 36.3 — view-only by default. Edit unlocks the form and
+           swaps in Save + Cancel; matches the House Rules pattern. -->
+      <div id="propertyEditActions" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        <span id="propertyReadOnlyHint" style="font-size:0.72rem;color:var(--ink-soft);margin-right:auto;" data-h="prop_readonly_hint">View mode — click Edit to change these details.</span>
+        <button type="button" id="propertyCancelBtn" class="btn btn-secondary" onclick="cancelPropertyEdit()" style="display:none;"><span data-h="btn_cancel_edit">Cancel</span></button>
+        <button type="button" id="propertySaveBtn" class="btn btn-primary" onclick="savePropertyEdit()" style="display:none;">💾 <span data-h="btn_save_property">Save Property Details</span></button>
+        <button type="button" id="propertyEditBtn" class="btn btn-secondary" onclick="startPropertyEdit()">✏️ <span data-h="btn_edit_list">Edit</span></button>
+      </div>
+
+      <fieldset id="propertyFormBody" disabled style="border:0;padding:0;margin:0;min-width:0;">
       <div class="form-card">
         <div class="form-card-title" data-h="prop_cover">Cover Photo</div>
         <div class="form-card-desc" data-h="prop_cover_desc">This photo appears as the hero image on the guest welcome screen.</div>
@@ -1392,8 +1403,9 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
       </div>
 
+      </fieldset>
+
       <div class="panel-actions" style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button class="btn btn-primary" onclick="saveProperty()" data-h="btn_save_property">💾 Save Property Details</button>
         <button class="btn btn-secondary" onclick="openPreviewAsGuest()" data-h="btn_preview_guest" title="Open the guest app in test mode (no analytics)">🧪 Preview as guest</button>
       </div>
     </div>
@@ -3117,7 +3129,8 @@ const HT = {
     doc_complete: '✓ Complete', doc_partial: '⏳ Partial', doc_missing: '✗ Missing',
     alloggiati_filed: '✓ Filed', alloggiati_pending: 'Pending',
     btn_view: 'View', btn_delete_single: 'Delete', btn_edit_single: 'Edit',
-    btn_edit_list: 'Edit', btn_done_editing: 'Done',
+    btn_edit_list: 'Edit', btn_done_editing: 'Done', btn_cancel_edit: 'Cancel',
+    prop_readonly_hint: 'View mode — click Edit to change these details.',
     // Round 30 — edit check-in modal (single-line values; applyLang collapses newlines)
     edit_title: 'Edit check-in',
     edit_intro: 'Corrections update this check-in in place. Alloggiati / PayTourist exports re-read the row on next generation.',
@@ -3496,7 +3509,8 @@ const HT = {
     doc_complete: '✓ Completo', doc_partial: '⏳ Parziale', doc_missing: '✗ Mancante',
     alloggiati_filed: '✓ Inviato', alloggiati_pending: 'In attesa',
     btn_view: 'Vedi', btn_delete_single: 'Elimina', btn_edit_single: 'Modifica',
-    btn_edit_list: 'Modifica', btn_done_editing: 'Fatto',
+    btn_edit_list: 'Modifica', btn_done_editing: 'Fatto', btn_cancel_edit: 'Annulla',
+    prop_readonly_hint: 'Modalità visualizzazione — clicca Modifica per aggiornare i dettagli.',
     // Round 30 — modifica check-in
     edit_title: 'Modifica check-in',
     edit_intro: 'Le correzioni aggiornano questo check-in. Le esportazioni Alloggiati / PayTourist rileggeranno la riga alla prossima generazione.',
@@ -3833,7 +3847,12 @@ function showPanel(id, btn) {
   document.getElementById('sidebarOverlay').classList.remove('show');
   if (id === 'qrlink') initQRPanel();
   if (id === 'compliance') renderCompliance();
-  if (id === 'property') renderDismissedList();
+  if (id === 'property') {
+    renderDismissedList();
+    // Round 36.3 — opening Property Details always starts in view mode.
+    // Cancel restores the form from propertyData and hides Save/Cancel.
+    cancelPropertyEdit();
+  }
   // Round 36.2.2 — reopening the Dashboard re-fetches upcoming reservations
   // and their freshly-stamped rotating codes, so the host doesn't need to
   // hard-refresh after changing settings elsewhere.
@@ -4680,7 +4699,7 @@ async function deleteAllCheckins() {
    PROPERTY EDITOR — save to DB
 ══════════════════════════════════════ */
 async function saveProperty() {
-  if (!propertyId) { toast('No property found!'); return; }
+  if (!propertyId) { toast('No property found!'); return false; }
   const update = {
     name: document.getElementById('propName').value,
     address: document.getElementById('propAddress').value,
@@ -4728,7 +4747,7 @@ async function saveProperty() {
     timezone: document.getElementById('propTimezone')?.value || 'Europe/Rome',
   };
   const { error } = await sb.from('properties').update(update).eq('id', propertyId);
-  if (error) { console.error('Save error:', error); toast('Error: ' + error.message); return; }
+  if (error) { console.error('Save error:', error); toast('Error: ' + error.message); return false; }
   propertyData = { ...propertyData, ...update };
   // Round 21: keep allProperties + switcher in sync after a save (name/city
   // may have changed, which the switcher displays)
@@ -4737,6 +4756,7 @@ async function saveProperty() {
   renderPropertySwitcher();
   toast(h('toast_property_saved'));
   track('save_property', { name: document.getElementById('propName').value });
+  return true;
 }
 
 /* ══════════════════════════════════════
@@ -5191,6 +5211,55 @@ function confirmDeleteReco(globalIdx) {
   if (!window.confirm(msg)) return;
   recoData.splice(globalIdx, 1);
   renderRecos();
+}
+
+// Round 36.3 — Property Details default to view-only, matching the
+// House Rules / Recommendations pattern. Click Edit → the form fieldset
+// is enabled and Save/Cancel appear. Save writes and flips back to
+// view; Cancel restores the last known propertyData into the form.
+let propertyEditMode = false;
+function _setPropertyEditControls(editing) {
+  const fs = document.getElementById('propertyFormBody');
+  if (fs) fs.disabled = !editing;
+  // The cover-photo upload zone is a plain <div onclick=…>, so a disabled
+  // fieldset doesn't gate its click; gate pointer events explicitly.
+  const zone = document.getElementById('coverPhotoZone');
+  if (zone) {
+    zone.style.pointerEvents = editing ? '' : 'none';
+    zone.style.opacity = editing ? '' : '0.85';
+  }
+  const editBtn = document.getElementById('propertyEditBtn');
+  const saveBtn = document.getElementById('propertySaveBtn');
+  const cancelBtn = document.getElementById('propertyCancelBtn');
+  const hint = document.getElementById('propertyReadOnlyHint');
+  if (editBtn)   editBtn.style.display   = editing ? 'none' : '';
+  if (saveBtn)   saveBtn.style.display   = editing ? '' : 'none';
+  if (cancelBtn) cancelBtn.style.display = editing ? '' : 'none';
+  if (hint)      hint.style.display      = editing ? 'none' : '';
+}
+function startPropertyEdit() {
+  propertyEditMode = true;
+  _setPropertyEditControls(true);
+  // Round 25: an admin viewer without _adminEditEnabled must stay locked
+  // even when the host-side edit toggle fires.
+  if (typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled) {
+    setTimeout(() => setConsoleReadOnly(true), 0);
+  }
+}
+function cancelPropertyEdit() {
+  propertyEditMode = false;
+  if (propertyData) {
+    try { fillPropertyForm(propertyData); } catch (e) { console.warn('cancelPropertyEdit refill failed:', e); }
+  }
+  _setPropertyEditControls(false);
+}
+async function savePropertyEdit() {
+  const ok = await saveProperty();
+  // saveProperty returns falsy / throws on failure — stay in edit mode so
+  // the host can retry after fixing whatever the toast complained about.
+  if (ok === false) return;
+  propertyEditMode = false;
+  _setPropertyEditControls(false);
 }
 
 // Round 32.4 — Rules & Recommendations default to a read-only list; the
@@ -8543,6 +8612,10 @@ async function switchProperty(propId) {
   localStorage.setItem('wbnb_host_selected_property', propId);
 
   fillPropertyForm(target);
+  // Round 36.3 — switching properties starts fresh in view mode so a
+  // half-typed edit on the old property doesn't leak into the new one.
+  propertyEditMode = false;
+  _setPropertyEditControls(false);
   renderPropertySwitcher();
   await loadPropertyData();
   refreshChatBadge(); // Round 21.1: show this property's own unread state

@@ -146,7 +146,11 @@ body { display: flex; overflow: hidden; }
 .sidebar-user-role { font-size: 0.55rem; color: rgba(255,255,255,0.55); }
 
 /* ── MAIN CONTENT ── */
-.main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+/* Round 37.1 — overflow-x: hidden here (and on <body>) stops accidental
+   horizontal scroll on mobile when a nested element bleeds past the
+   viewport. Tables that must scroll horizontally live inside their own
+   .table-wrap with overflow-x: auto, so they still work. */
+.main { flex: 1; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; min-width: 0; }
 
 .main-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -175,6 +179,11 @@ body { display: flex; overflow: hidden; }
 .btn-sm { padding: 5px 10px; font-size: 0.75rem; }
 
 .content { flex: 1; padding: 24px 28px 40px; }
+
+/* Round 37.1 — consistent action row at the bottom of every panel.
+   On desktop it flows naturally at the end of content; on mobile the
+   media query below turns it into a full-width bottom stripe. */
+.panel-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--border); }
 
 /* ── PANELS ── */
 .panel { display: none; }
@@ -598,14 +607,15 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   /* Sidebar items — bigger touch targets */
   .sidebar-item { padding: 12px 18px; font-size: 0.9rem; min-height: 44px; }
 
-  /* Sticky save buttons at bottom */
+  /* Round 37.1 — action buttons live at the natural bottom of the
+     page, in-flow. The old sticky-bottom bar covered mid-viewport
+     content and looked misplaced when the last card was short. */
   .panel-actions {
-    position: sticky; bottom: 0; z-index: 20;
-    background: var(--cream); border-top: 1px solid var(--border);
-    padding: 12px 0; margin: 16px -10px 0; padding-left: 10px; padding-right: 10px;
-    display: flex; gap: 10px;
+    padding: 14px 0 4px; margin-top: 20px;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 10px; flex-wrap: wrap;
   }
-  .panel-actions .btn { flex: 1; justify-content: center; min-height: 52px; font-size: 0.92rem; }
+  .panel-actions .btn { flex: 1 1 140px; justify-content: center; min-height: 52px; font-size: 0.92rem; }
 }
 .mobile-toggle {
   display: none; align-items: center; justify-content: center;
@@ -1116,13 +1126,11 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       </div>
 
       <!-- Round 36.3 — view-only by default. Edit unlocks the form and
-           swaps in Save + Cancel; matches the House Rules pattern. -->
-      <div id="propertyEditActions" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
-        <span id="propertyReadOnlyHint" style="font-size:0.72rem;color:var(--ink-soft);margin-right:auto;" data-h="prop_readonly_hint">View mode — click Edit to change these details.</span>
-        <button type="button" id="propertyCancelBtn" class="btn btn-secondary" onclick="cancelPropertyEdit()" style="display:none;"><span data-h="btn_cancel_edit">Cancel</span></button>
-        <button type="button" id="propertySaveBtn" class="btn btn-primary" onclick="savePropertyEdit()" style="display:none;">💾 <span data-h="btn_save_property">Save Property Details</span></button>
-        <button type="button" id="propertyEditBtn" class="btn btn-secondary" onclick="startPropertyEdit()">✏️ <span data-h="btn_edit_list">Edit</span></button>
-      </div>
+           swaps in Save + Cancel; matches the House Rules pattern.
+           Round 37.1 — the read-only hint stays here at the top; the
+           action buttons themselves live in a single .panel-actions row
+           at the bottom of the panel, alongside Preview. -->
+      <div id="propertyReadOnlyHint" style="font-size:0.78rem;color:var(--ink-soft);background:var(--cream-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px;" data-h="prop_readonly_hint">View mode — click Edit to change these details.</div>
 
       <fieldset id="propertyFormBody" disabled style="border:0;padding:0;margin:0;min-width:0;">
       <div class="form-card">
@@ -1410,8 +1418,14 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
       </fieldset>
 
-      <div class="panel-actions" style="display:flex;gap:10px;flex-wrap:wrap;">
-        <button class="btn btn-secondary" onclick="openPreviewAsGuest()" data-h="btn_preview_guest" title="Open the guest app in test mode (no analytics)">🧪 Preview as guest</button>
+      <!-- Round 37.1 — one action row at the bottom, in flow. The Edit
+           button toggles the fieldset above; Save + Cancel appear in
+           edit mode; Preview stays visible in both. -->
+      <div class="panel-actions">
+        <button type="button" id="propertyEditBtn" class="btn btn-secondary" onclick="startPropertyEdit()">✏️ <span data-h="btn_edit_list">Edit</span></button>
+        <button type="button" id="propertySaveBtn" class="btn btn-primary" onclick="savePropertyEdit()" style="display:none;">💾 <span data-h="btn_save_property">Save Property Details</span></button>
+        <button type="button" id="propertyCancelBtn" class="btn btn-secondary" onclick="cancelPropertyEdit()" style="display:none;"><span data-h="btn_cancel_edit">Cancel</span></button>
+        <button type="button" class="btn btn-secondary" onclick="openPreviewAsGuest()" data-h="btn_preview_guest" title="Open the guest app in test mode (no analytics)">🧪 Preview as guest</button>
       </div>
     </div>
 
@@ -1421,22 +1435,20 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         ℹ️ These rules appear in the guest app's "Rules" tab. Pick from common rules below, or add your own custom rules.
       </div>
 
-      <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
-        <button id="rulesEditToggle" class="btn btn-secondary" onclick="toggleRulesEditMode()">✏️ <span data-h="btn_edit_list">Edit</span></button>
-      </div>
-
       <div data-rules-edit-only style="margin-bottom:16px;display:none;">
         <div style="font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;" data-h="rules_preset_label">Quick-add common rules</div>
         <div id="presetRulesGrid" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
       </div>
 
-      <div class="panel-actions" data-rules-edit-only style="margin:0 0 12px;display:none;gap:10px;flex-wrap:wrap;">
-        <button class="btn btn-secondary" onclick="addRule()" data-h="btn_add_rule">+ Add Custom Rule</button>
-        <button class="btn btn-primary" onclick="saveRules()" data-h="btn_save_rules">💾 Save Rules</button>
-      </div>
-
       <div style="font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;" data-h="rules_your_rules">Your rules</div>
       <div class="edit-list" id="rulesList"></div>
+
+      <!-- Round 37.1 — single action row at the bottom, in flow. -->
+      <div class="panel-actions">
+        <button id="rulesEditToggle" class="btn btn-secondary" onclick="toggleRulesEditMode()">✏️ <span data-h="btn_edit_list">Edit</span></button>
+        <button class="btn btn-secondary" onclick="addRule()" data-h="btn_add_rule" data-rules-edit-only style="display:none;">+ Add Custom Rule</button>
+        <button class="btn btn-primary" onclick="saveRules()" data-h="btn_save_rules" data-rules-edit-only style="display:none;">💾 Save Rules</button>
+      </div>
     </div>
 
     <!-- ════════════ RECOMMENDATIONS ════════════ -->
@@ -1453,16 +1465,14 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <button class="panel-tab" onclick="setRecoCat('experiences',this)" data-h="tab_experiences">✨ Experiences</button>
       </div>
 
-      <div style="display:flex;justify-content:flex-end;margin:12px 0;">
-        <button id="recosEditToggle" class="btn btn-secondary" onclick="toggleRecosEditMode()">✏️ <span data-h="btn_edit_list">Edit</span></button>
-      </div>
-
-      <div class="panel-actions" data-recos-edit-only style="margin:0 0 12px;display:none;gap:10px;flex-wrap:wrap;">
-        <button class="btn btn-secondary" onclick="addReco()" data-h="btn_add_reco">+ Add Recommendation</button>
-        <button class="btn btn-primary" onclick="saveRecos()" data-h="btn_save_recos">💾 Save</button>
-      </div>
-
       <div class="edit-list" id="recoList"></div>
+
+      <!-- Round 37.1 — single action row at the bottom, in flow. -->
+      <div class="panel-actions">
+        <button id="recosEditToggle" class="btn btn-secondary" onclick="toggleRecosEditMode()">✏️ <span data-h="btn_edit_list">Edit</span></button>
+        <button class="btn btn-secondary" onclick="addReco()" data-h="btn_add_reco" data-recos-edit-only style="display:none;">+ Add Recommendation</button>
+        <button class="btn btn-primary" onclick="saveRecos()" data-h="btn_save_recos" data-recos-edit-only style="display:none;">💾 Save</button>
+      </div>
     </div>
 
     <!-- ════════════ CHECK-IN DATA ════════════ -->
@@ -5275,8 +5285,10 @@ let recosEditMode = false;
 const _rulesSafe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
 
 function _setRulesEditControls(visible) {
+  // Round 37.1 — toggle back to the element's CSS default rather than
+  // guessing 'block' vs 'flex'; buttons stay inline-flex from .btn.
   document.querySelectorAll('#panel-rules [data-rules-edit-only]').forEach(el => {
-    el.style.display = visible ? (el.classList.contains('panel-actions') ? 'flex' : 'block') : 'none';
+    el.style.display = visible ? '' : 'none';
   });
   const btn = document.getElementById('rulesEditToggle');
   if (btn) {
@@ -5293,8 +5305,9 @@ function toggleRulesEditMode() {
 }
 
 function _setRecosEditControls(visible) {
+  // Round 37.1 — same treatment as _setRulesEditControls.
   document.querySelectorAll('#panel-recos [data-recos-edit-only]').forEach(el => {
-    el.style.display = visible ? (el.classList.contains('panel-actions') ? 'flex' : 'block') : 'none';
+    el.style.display = visible ? '' : 'none';
   });
   const btn = document.getElementById('recosEditToggle');
   if (btn) {

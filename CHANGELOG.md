@@ -65,6 +65,37 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 37 (redux) — Universal, per-property tourist-tax configuration _(2026-09-10)_
+- **Supersedes the earlier "shared comune rulesets" pass on the same day.** The premise there was wrong: rules that live in a central table make the operator a research bottleneck for every new comune and shift liability onto the wrong party. The host is *responsabile d'imposta*; the values in their declaration must be theirs. Comune-shared configuration is out.
+- **Migration `migration_round37_tax_config.sql`** — additive on `properties`:
+  - `tax_max_nights_basis` (`per_stay` | `per_person_per_month` | `per_person_per_year`), default `per_stay` + CHECK.
+  - `tax_max_total_eur numeric` — optional per-person euro cap per stay.
+  - `tax_rules jsonb NOT NULL DEFAULT '[]'` — ordered list of `{ id, label, when, effect }`.
+  - `tax_declared_exemptions jsonb NOT NULL DEFAULT '[]'` — host-labelled documented exemptions.
+  - `tax_source_note text` — the host's own citation (delibera + date).
+  - `tax_verified_at date` — when the host last checked it.
+  - `checkins.tax_declared_flags jsonb NOT NULL DEFAULT '[]'` — retained from the previous pass.
+  - The three legacy columns (`tax_rate_eur`, `tax_max_nights`, `tax_exempt_under_age`) keep their semantics; a property with only those three behaves exactly as it did in Round 24.
+  - `api_usage.endpoint` CHECK widened to accept `'tax_parse'`.
+- **Data migration:** the previous pass's Verona values were copied into both Marco Polo properties' own per-property columns; `tax_ruleset_id` nulled. The shared `tax_rulesets` table is no longer read anywhere; the seed row remains in the DB as history.
+- **New pure `computeGuestTax(checkin, cfg, context)`** — no DOM, no I/O. `_normalizeTaxCfg(propertyData)` folds the three legacy fields into an implicit `age_max: N-1 → exempt` rule so there is exactly one code path. Rules match on `age_min/max` (at arrival), `group_size_min/max` (derived from the booking, never entered), `date_from/to` (MM-DD, wraps the new year), `nights_min`. Effects: `exempt`, `percent_off`, `fixed_rate`. Best-single stacking. Declared exemptions never auto-apply and beat every rule when the host has ticked the box. `tax_max_total_eur` clamps the final amount.
+- **17-case verification passing.** Verona age boundaries 14/15/25/26 (exempt/reduced/reduced/full), guest turning 15 mid-stay charged at arrival age, 6-night stay reporting 4 taxable + 2 over-cap separately from rule-exempt, seasonal `11-01 → 03-31` rule matching December and February but not June, group size 26 gets 20% while 25 does not, declared exemption beating a percent match, and legacy-only regression (Trullo) unchanged.
+- **`exportCityTax()` refactored** around the new engine. Splits the old lump `exemptNights` counter into three distinct figures — taxable, rule-exempt, over-cap. Growing a per-guest breakdown table, `tax_source_note` and `tax_verified_at` cited above totals. Unused `guestsCount` gone.
+- **Property panel rebuilt in three disclosed layers:**
+  - **Layer 1 (always visible):** rate, cap + basis picker, exempt-under-age, optional per-person euro cap.
+  - **Layer 2 (collapsed):** rules render as readable sentences with inline inputs — `Guests aged [15] to [25] → [20% off] · [Label] · ✕`. Add-rule picker: age band / group size / season / length of stay.
+  - **Layer 3 (collapsed):** host-labelled documented exemptions with a "requires documentation" toggle.
+  - Below all three: `tax_source_note` (free text) + `tax_verified_at` with a "Mark today" button.
+  - **Live preview** — 2 adults + 1 child aged 10 + 1 aged 20, 5 nights arriving today. Recomputes on every keystroke. This is what catches a mis-entered rule before it hits the export.
+- **Guest detail modal** — one checkbox per `tax_declared_exemptions` entry, warning badge on those `requires_documentation`. Ticking PATCHes `tax_declared_flags` via the Round 20.2 `.select()`-after-update pattern.
+- **Two ways to avoid the empty form:**
+  - **Copy from another property** — dropdown of the host's other properties; copies VALUES into the current form. Multi-property hosts in one comune configure once.
+  - **Draft from delibera** — new endpoint `api/parse-tax-delibera.js`. Host JWT auth like `api/ical-sync.js` (not the guest token). CORS via `api/_cors.js`. 40 KB body cap, 10 calls/hour rate limit via `api_usage.endpoint = 'tax_parse'`. Asks Claude for a strict JSON shape; the response is **shape-validated server-side** — every key we don't recognise is dropped, every numeric field clamped — before it goes back to the host. Returns `confidence` and `unhandled_parts`. Nothing saves until the host presses the "Apply to configuration" button in the modal and then Save in the property form.
+  - **Widened api_usage endpoint CHECK first**: Round 34.1 made `recordUsage` swallow insert failures with `console.warn`, so a constraint miss would silently disable the rate limit rather than erroring. Migration applied before the endpoint file lands.
+- **Retired without a table drop:** the shared `tax_rulesets` table and its `properties.tax_ruleset_id` FK are no longer read anywhere in code. The tables and columns stay in the DB unless explicitly rolled back — history is safer than a mid-pilot destructive migration.
+- **admin.html:** the Ops-tab "Tourist tax rulesets" card is gone; tax config authoring lives in the host console. The `taxRulesets` state, fetch, and render function are removed.
+- **Files:** `migration_round37_tax_config.sql`, `api/parse-tax-delibera.js`, `host-console.html`, `admin.html`, `CHANGELOG.md`. `index.html` untouched.
+
 ### Round 37 — Tourist tax rulesets per comune _(2026-09-10)_
 - **Why**: the three tourist-tax columns on `properties` (`tax_rate_eur`, `tax_max_nights`, `tax_exempt_under_age`) encode exactly one shape — flat rate, one cap, one age exemption. Real comuni don't fit it. Verona has 20% reductions for youth 15–25 and over-70s plus a group-size band, and its cap dropped from 5 to 4 nights on 2024-05-09. On the old model, Verona hosts were overcharging youth and elderly guests by €0.70 a night. Chieti reduces (not exempts) under-14s. Each comune has its own declaration categories. Rules had to become data.
 - **Two design decisions drive the schema**:

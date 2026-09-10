@@ -366,7 +366,6 @@ let apiUsageByProp = {};
 let activeTab   = 'pilot';                 // 'pilot' | 'deepdive' | 'ops'
 let showTestData = false;                  // top-bar toggle; default off
 let pilotHosts   = [];                     // fetched in loadData
-let taxRulesets  = [];                     // Round 37 — fetched in loadData
 
 // Sonnet 4.5 list pricing (US$ / million tokens) — one edit here when the
 // number moves. See CHANGELOG "Round 35" for last-verified date.
@@ -982,9 +981,9 @@ async function loadData() {
     return q.is('deleted_at', null);
   };
 
-  let eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes, rulesetsRes;
+  let eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes;
   try {
-    [eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes, rulesetsRes] = await Promise.all([
+    [eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes] = await Promise.all([
       applyHiddenFilter(sb.from('analytics_events').select('*').gte('created_at', since)).order('created_at', { ascending: false }).limit(10000),
       applyHiddenFilter(sb.from('properties').select('*')).order('name'),
       applyHiddenFilter(sb.from('checkins').select('id, property_id, booking_code, surname, name, guest_type, submitted_at, arrival_date, departure_date, nights, is_test, deleted_at')),
@@ -994,10 +993,7 @@ async function loadData() {
       applyHiddenFilter(sb.from('chat_messages').select('id, property_id, booking_code, sender, message, created_at, is_test, deleted_at').gte('created_at', since)).order('created_at', { ascending: false }).limit(5000).then(r => r, err => ({ data: [], error: err })),
       // Round 35 — pilot_hosts ledger; admin-only RLS handles the auth.
       sb.from('pilot_hosts').select('*').order('created_at').then(r => r, err => ({ data: [], error: err })),
-      // Round 37 — tax_rulesets reference data. Everyone with authenticated
-      // JWT can read (shared across comune), so no admin-only wrapper here.
-      sb.from('tax_rulesets').select('*').order('comune').order('valid_from', { ascending: false })
-        .then(r => r, err => ({ data: [], error: err })),
+      // Round 37 (redux) — tax config is per-property; nothing shared to fetch here.
     ]);
   } catch (e) {
     console.error('loadData fatal:', e);
@@ -1012,9 +1008,6 @@ async function loadData() {
   if (pilotRes && pilotRes.error) {
     console.warn('pilot_hosts query failed (non-fatal — Pilot tab will render empty):', pilotRes.error.message || pilotRes.error);
   }
-  if (rulesetsRes && rulesetsRes.error) {
-    console.warn('tax_rulesets query failed (non-fatal — Rulesets card will render empty):', rulesetsRes.error.message || rulesetsRes.error);
-  }
 
   allEvents = eventsRes.data || [];
   allProperties = propsRes.data || [];
@@ -1022,7 +1015,6 @@ async function loadData() {
   allCheckins = checkinsRes.data || [];
   allChatMessages = (chatRes && chatRes.data) || [];
   pilotHosts = (pilotRes && pilotRes.data) || [];
-  taxRulesets = (rulesetsRes && rulesetsRes.data) || [];
 
   // Count check-ins per property
   const checkinCounts = {};
@@ -3015,9 +3007,10 @@ function renderOpsTab() {
     if (e.created_at > userStats[u].lastSeen)  userStats[u].lastSeen  = e.created_at;
   });
 
+  // Round 37 (redux) — tax_rulesets is retired. Configuration is now
+  // per-property JSONB set by the host directly.
   const html =
     renderPilotHostsEditor() +
-    renderTaxRulesetsCard() +
     renderHostsPropertiesTable(userStats, userIdToEmail) +
     renderRetentionSection() +
     renderGdprSection() +
@@ -3134,65 +3127,9 @@ async function addPilotHost() {
   loadData();
 }
 
-// ── Round 37 — Tax rulesets card ───────────────────────────────────────
-// Read-only view of what's currently enabled per comune, plus a
-// property-linkage count. Actual ruleset authoring stays in SQL (a
-// wrong ruleset produces a confident-wrong filing in the host's name —
-// too risky for a click-through form). Assignment is via
-// `properties.tax_ruleset_id`; the Hosts & Properties table shows
-// which properties are linked.
-function renderTaxRulesetsCard() {
-  const rulesets = Array.isArray(taxRulesets) ? taxRulesets : [];
-  const props = Array.isArray(allProperties) ? allProperties : [];
-  const linkedCount = (rulesetId) => props.filter(p => p.tax_ruleset_id === rulesetId).length;
-  const rowsHtml = rulesets.length === 0
-    ? `<tr><td colspan="7" style="text-align:center;padding:16px;color:var(--ink-soft);">No rulesets seeded yet. Add via SQL (a wrong ruleset files wrong in the host's name).</td></tr>`
-    : rulesets.map(r => {
-        const rules = Array.isArray(r.rules) ? r.rules : [];
-        const ruleSummary = rules.map(rr => {
-          const e = rr.effect || {};
-          if (e.type === 'exempt') return `${escapeHtml(rr.id)}: exempt`;
-          if (e.type === 'percent_off') return `${escapeHtml(rr.id)}: −${Number(e.value||0)}%`;
-          if (e.type === 'fixed_rate') return `${escapeHtml(rr.id)}: €${Number(e.value||0).toFixed(2)}`;
-          return escapeHtml(rr.id);
-        }).join(' · ') || '—';
-        const capTxt = r.max_nights == null ? 'no cap'
-          : `${r.max_nights} (${r.max_nights_basis === 'per_person_per_month' ? 'per person/month' : 'per stay'})`;
-        return `<tr>
-          <td style="font-size:0.82rem;font-weight:600;">${escapeHtml(r.comune)}${r.provincia ? ` <span style="color:var(--ink-soft);font-weight:400;">(${escapeHtml(r.provincia)})</span>` : ''}</td>
-          <td style="font-size:0.78rem;">${escapeHtml(r.structure_type)}</td>
-          <td style="font-size:0.78rem;font-family:monospace;text-align:right;">€ ${Number(r.base_rate_eur).toFixed(2)}</td>
-          <td style="font-size:0.78rem;">${escapeHtml(capTxt)}</td>
-          <td style="font-size:0.72rem;line-height:1.5;">${ruleSummary}</td>
-          <td style="font-size:0.78rem;font-family:monospace;text-align:center;">${escapeHtml(String(r.valid_from || '—'))}${r.valid_to ? ' → ' + escapeHtml(String(r.valid_to)) : ''}</td>
-          <td style="font-size:0.78rem;text-align:center;">${linkedCount(r.id)}</td>
-        </tr>`;
-      }).join('');
-
-  return `
-    <div class="section-title">Tourist tax rulesets</div>
-    <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:10px;line-height:1.5;">
-      Read-only. Rulesets are shared reference data across every host in a comune. Authoring stays in SQL — a wrong ruleset files wrong in the host's name — via <code>migration_round37_tax_rulesets.sql</code> and a seed file per comune.
-      Link a property to a ruleset by setting <code>properties.tax_ruleset_id</code>; unlinked properties fall back to the three legacy columns.
-    </div>
-    <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;box-shadow:var(--shadow);margin-bottom:20px;overflow-x:auto;">
-      <table style="width:100%;border-collapse:collapse;font-family:inherit;">
-        <thead>
-          <tr style="text-align:left;border-bottom:1px solid var(--border);font-size:0.7rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-soft);">
-            <th style="padding:6px 8px;">Comune</th>
-            <th style="padding:6px 8px;">Structure</th>
-            <th style="padding:6px 8px;text-align:right;">Base rate</th>
-            <th style="padding:6px 8px;">Cap</th>
-            <th style="padding:6px 8px;">Rules</th>
-            <th style="padding:6px 8px;text-align:center;">Valid</th>
-            <th style="padding:6px 8px;text-align:center;">Properties</th>
-          </tr>
-        </thead>
-        <tbody>${rowsHtml}</tbody>
-      </table>
-    </div>
-  `;
-}
+// Round 37 (redux) — the shared tax_rulesets Ops card is retired.
+// Tax configuration is per-property now, edited by the host in the
+// Property panel of the host console. No admin-level authoring here.
 
 async function savePilotHost(id) {
   const status = document.getElementById(`pilot_status_${id}`)?.value;

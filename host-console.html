@@ -1314,21 +1314,26 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       <div class="form-card">
         <div class="form-card-title" data-h="prop_tax_title">Tourist Tax Configuration</div>
         <div class="form-card-desc" data-h="prop_tax_desc">Used by the tourist-tax declaration helper in Export. Enter the values from your comune's tourist-tax resolution (delibera). Leave empty if your comune doesn't levy a tourist tax.</div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label" data-h="prop_tax_rate">Rate (€ per person per night)</label>
-            <input class="form-input" type="number" min="0" step="0.01" placeholder="e.g., 2.00" id="propTaxRate">
+        <!-- Round 37 — either a linked comune ruleset (read-only, admin-managed) or the legacy three fields. -->
+        <div id="propTaxRulesetView" style="display:none;"></div>
+        <div id="propTaxLegacyFields">
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label" data-h="prop_tax_rate">Rate (€ per person per night)</label>
+              <input class="form-input" type="number" min="0" step="0.01" placeholder="e.g., 2.00" id="propTaxRate">
+            </div>
+            <div class="form-group">
+              <label class="form-label" data-h="prop_tax_max_nights">Max taxable consecutive nights</label>
+              <input class="form-input" type="number" min="0" placeholder="e.g., 5  (0 = no cap)" id="propTaxMaxNights">
+              <div class="form-hint" data-h="prop_tax_max_nights_hint">Many comuni only charge the first N consecutive nights per guest.</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" data-h="prop_tax_exempt_age">Exempt under age</label>
+              <input class="form-input" type="number" min="0" placeholder="e.g., 14  (empty = none)" id="propTaxExemptAge">
+              <div class="form-hint" data-h="prop_tax_exempt_age_hint">Guests strictly under this age are exempt. Other exemptions vary — verify against your delibera.</div>
+            </div>
           </div>
-          <div class="form-group">
-            <label class="form-label" data-h="prop_tax_max_nights">Max taxable consecutive nights</label>
-            <input class="form-input" type="number" min="0" placeholder="e.g., 5  (0 = no cap)" id="propTaxMaxNights">
-            <div class="form-hint" data-h="prop_tax_max_nights_hint">Many comuni only charge the first N consecutive nights per guest.</div>
-          </div>
-          <div class="form-group">
-            <label class="form-label" data-h="prop_tax_exempt_age">Exempt under age</label>
-            <input class="form-input" type="number" min="0" placeholder="e.g., 14  (empty = none)" id="propTaxExemptAge">
-            <div class="form-hint" data-h="prop_tax_exempt_age_hint">Guests strictly under this age are exempt. Other exemptions vary — verify against your delibera.</div>
-          </div>
+          <div class="form-hint" style="margin-top:12px;" data-h="prop_tax_request_ruleset">Your comune has bands the three fields above can't capture (reductions by age or group size, resident/disability exemptions)? Ask us to add a ruleset for your comune — we verify against the delibera before enabling it.</div>
         </div>
       </div>
 
@@ -6597,15 +6602,25 @@ function exportRoss1000() {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   CITYTAX — Tourist-tax declaration helper  (Round 24)
+   CITYTAX — Tourist-tax declaration helper  (Round 24; Round 37 refactor)
    Computes the quarterly figures a host types into CityTax++ in
-   "declarative" mode: taxable overnights, exempt overnights, guests, and
-   amount due. No file (CityTax's automatic-mode TBPRES.xls is login-gated
-   per-comune). Applies the comune's rate / max-taxable-nights / exempt-age
-   from the property's Tourist Tax Configuration.
+   "declarative" mode: taxable overnights, rule-exempt overnights,
+   over-cap overnights, guests, and amount due — plus a per-guest
+   breakdown table naming the rule applied. No file (CityTax's
+   automatic-mode TBPRES.xls is login-gated per-comune).
+
+   Two paths:
+     - property has tax_ruleset_id → use computeGuestTax(ruleset)
+     - otherwise                    → legacy three-column fallback
+   The legacy path is preserved verbatim so properties without a
+   ruleset (Trullo Verde Ulivo, Claudio House, Hidden Hamlet, Bedda
+   Matri) keep producing the same output they always have.
 ══════════════════════════════════════════════════════════════════════ */
 
-// Guest age at arrival (years), or null if DOB missing
+// Guest age at arrival (years), or null if DOB missing.
+// Anchored explicitly at the arrival date, not at check-in submission
+// or per night. Verona and Chieti both pin the age assessment to the
+// stay's first day.
 function _ageAtArrival(c) {
   if (!c.date_of_birth || !c.arrival_date) return null;
   const dob = new Date(String(c.date_of_birth).split('T')[0]);
@@ -6617,94 +6632,399 @@ function _ageAtArrival(c) {
   return age;
 }
 
+// Round 37 — pure function. No DOM, no I/O. `checkin` and `ruleset`
+// are the data; `context` carries { nightsInPeriod, groupSize,
+// declaredFlags } — all the situational inputs a rule can depend on.
+//
+// Returns:
+//   {
+//     guest: 'Surname Name',
+//     nights_in_period: <int>,           // nights of this stay inside the tax period
+//     taxable_nights:   <int>,           // after cap, after rule
+//     over_cap_nights:  <int>,           // dropped by max_nights
+//     rule_exempt_nights: <int>,         // dropped because a rule exempted the guest
+//     rule_applied:      <ruleObj|null>, // the single best rule that fired
+//     effective_rate:    <number>,       // per-night euro rate after % / fixed
+//     amount:            <number>,       // rounded to 2dp
+//     requires_documentation: <bool>,    // any declared rule fired
+//   }
+//
+// Rule evaluation:
+//   1. Every rule whose `when` matches is a candidate.
+//   2. Among candidates, apply the single most favourable effect
+//      (best_single). exempt beats any percentage; among percentages
+//      the highest wins; fixed_rate compared by resulting rate.
+//   3. `declared` conditions never auto-apply — only when the host has
+//      explicitly flagged that guest via tax_declared_flags.
+function computeGuestTax(checkin, ruleset, context) {
+  const c = checkin || {};
+  const rs = ruleset || {};
+  const ctx = context || {};
+  const guestName = `${(c.surname || '').trim()} ${(c.name || '').trim()}`.trim() || '—';
+  const nightsInPeriod = Math.max(0, Math.floor(Number(ctx.nightsInPeriod) || 0));
+  const groupSize = Math.max(0, Math.floor(Number(ctx.groupSize) || 0));
+  const declared = new Set(Array.isArray(ctx.declaredFlags) ? ctx.declaredFlags : []);
+  const baseRate = Number(rs.base_rate_eur);
+  const cap = (rs.max_nights == null || rs.max_nights === 0) ? null : Math.max(0, Math.floor(rs.max_nights));
+
+  // No period overlap → nothing to report for this guest.
+  if (nightsInPeriod <= 0 || !Number.isFinite(baseRate)) {
+    return {
+      guest: guestName, nights_in_period: 0, taxable_nights: 0,
+      over_cap_nights: 0, rule_exempt_nights: 0,
+      rule_applied: null, effective_rate: baseRate, amount: 0,
+      requires_documentation: false,
+    };
+  }
+
+  // Cap first — over-cap nights are neither taxable nor rule-exempt.
+  const nightsAfterCap = cap == null ? nightsInPeriod : Math.min(nightsInPeriod, cap);
+  const overCap = nightsInPeriod - nightsAfterCap;
+
+  // Collect matching rules.
+  const age = _ageAtArrival(c);
+  const rules = Array.isArray(rs.rules) ? rs.rules : [];
+  const matches = [];
+  for (const r of rules) {
+    if (!r || !r.when || !r.effect) continue;
+    const w = r.when;
+    // Age band. If a rule mentions age at all and the guest's DOB is
+    // missing, the rule cannot be shown to apply — do not guess.
+    const mentionsAge = (w.age_min != null || w.age_max != null);
+    if (mentionsAge) {
+      if (age == null) continue;
+      if (w.age_min != null && age < w.age_min) continue;
+      if (w.age_max != null && age > w.age_max) continue;
+    }
+    // Group size band.
+    if (w.group_size_min != null && groupSize < w.group_size_min) continue;
+    if (w.group_size_max != null && groupSize > w.group_size_max) continue;
+    // Declared flag — never auto-applies.
+    if (w.declared && !declared.has(w.declared)) continue;
+    matches.push(r);
+  }
+
+  // Score each match by resulting effective rate; lowest rate wins.
+  const scoreRule = (r) => {
+    const e = r.effect || {};
+    if (e.type === 'exempt') return { rate: 0, exempt: true };
+    if (e.type === 'percent_off') {
+      const pct = Math.max(0, Math.min(100, Number(e.value) || 0));
+      return { rate: baseRate * (1 - pct / 100), exempt: false };
+    }
+    if (e.type === 'fixed_rate') return { rate: Math.max(0, Number(e.value) || 0), exempt: false };
+    return { rate: baseRate, exempt: false };
+  };
+
+  const stacking = rs.stacking || 'best_single';
+  let bestRule = null;
+  let bestScore = { rate: baseRate, exempt: false };
+  if (stacking === 'best_single') {
+    for (const r of matches) {
+      const s = scoreRule(r);
+      if (bestRule == null || s.rate < bestScore.rate || (s.exempt && !bestScore.exempt)) {
+        bestRule = r; bestScore = s;
+      }
+    }
+  }
+
+  const effectiveRate = bestScore.rate;
+  const isExempt = !!bestScore.exempt;
+  const taxable = isExempt ? 0 : nightsAfterCap;
+  const ruleExempt = isExempt ? nightsAfterCap : 0;
+  const amount = Math.round(taxable * effectiveRate * 100) / 100;
+  const requiresDoc = !!(bestRule && bestRule.requires_documentation);
+
+  return {
+    guest: guestName,
+    nights_in_period: nightsInPeriod,
+    taxable_nights: taxable,
+    over_cap_nights: overCap,
+    rule_exempt_nights: ruleExempt,
+    rule_applied: bestRule,
+    effective_rate: effectiveRate,
+    amount,
+    requires_documentation: requiresDoc,
+  };
+}
+
+// Nights of the stay that fall inside [qStartStr, qEndStr].
+function _nightsInsideQuarter(c, qStartStr, qEndStr) {
+  const a = (c.arrival_date || '').split('T')[0];
+  const d = (c.departure_date || '').split('T')[0];
+  if (!a) return 0;
+  let nights = c.nights || (d ? Math.max(0, (new Date(d) - new Date(a)) / 86400000) : 1);
+  nights = Math.round(nights);
+  if (nights <= 0) return 0;
+  let inQuarter = 0;
+  for (let i = 0; i < nights; i++) {
+    const night = new Date(a); night.setDate(night.getDate() + i);
+    const ns = night.toISOString().slice(0, 10);
+    if (ns >= qStartStr && ns <= qEndStr) inQuarter++;
+  }
+  return inQuarter;
+}
+
+// Bilingual label for a rule (falls back gracefully if only one side
+// is filled).
+function _ruleLabel(rule, it) {
+  if (!rule) return '';
+  return (it ? rule.label_it : rule.label_en) || rule.label_it || rule.label_en || rule.id || '';
+}
+
+// Group size for a booking, resolved from allCheckins by
+// (property_id, booking_code). A walk-in with no booking_code counts
+// as its own party; keep the count at least 1 so a rule keyed on
+// group_size_min: 1 still matches.
+function _groupSizeFor(c) {
+  if (!Array.isArray(allCheckins)) return 1;
+  if (c.booking_code) {
+    const n = allCheckins.filter(x =>
+      x.property_id === c.property_id && x.booking_code === c.booking_code
+    ).length;
+    return Math.max(1, n);
+  }
+  return 1;
+}
+
+// Round 37 — persist a declared tax flag on a single check-in row.
+// Uses the Round 20.2 pattern (.select() after .update()) so a silent
+// RLS block surfaces in the console instead of leaving the guest
+// looking un-flagged when the DB never accepted the write.
+async function toggleTaxDeclaredFlag(inputEl) {
+  const it = hostLang === 'it';
+  const id = inputEl?.dataset?.checkinId;
+  const flag = inputEl?.dataset?.declaredFlag;
+  if (!id || !flag) return;
+  const row = (allCheckins || []).find(c => c.id === id) || null;
+  const cur = Array.isArray(row?.tax_declared_flags) ? row.tax_declared_flags.slice() : [];
+  const idx = cur.indexOf(flag);
+  const next = inputEl.checked ? (idx === -1 ? cur.concat([flag]) : cur) : cur.filter(f => f !== flag);
+  const originalChecked = inputEl.checked;
+  inputEl.disabled = true;
+  try {
+    const { data, error } = await sb.from('checkins')
+      .update({ tax_declared_flags: next })
+      .eq('id', id).select('id');
+    if (error) throw error;
+    if (!data || data.length === 0) throw new Error('no rows updated (permission?)');
+    if (row) row.tax_declared_flags = next;
+    toast(it ? '✓ Salvato' : '✓ Saved');
+  } catch (e) {
+    console.error('toggleTaxDeclaredFlag failed:', e);
+    inputEl.checked = !originalChecked;
+    toast((it ? 'Salvataggio fallito: ' : 'Save failed: ') + (e?.message || e));
+  } finally {
+    inputEl.disabled = false;
+  }
+}
+
+// Round 37 — Property panel: show either the linked ruleset (read
+// only, admin-managed) or the legacy three inputs. The legacy fields
+// remain untouched for hosts whose comune doesn't have a ruleset yet.
+function renderTaxRulesetPanel() {
+  const view = document.getElementById('propTaxRulesetView');
+  const legacy = document.getElementById('propTaxLegacyFields');
+  if (!view || !legacy) return;
+  const rs = propertyData?._tax_ruleset;
+  if (!rs) {
+    view.style.display = 'none';
+    view.innerHTML = '';
+    legacy.style.display = '';
+    return;
+  }
+  const it = hostLang === 'it';
+  const esc = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const capBasis = rs.max_nights_basis === 'per_person_per_month'
+    ? (it ? 'per persona / mese' : 'per person / month')
+    : (it ? 'per soggiorno' : 'per stay');
+  const capTxt = rs.max_nights == null
+    ? (it ? 'nessun limite' : 'no cap')
+    : `${rs.max_nights} (${capBasis})`;
+  const rules = Array.isArray(rs.rules) ? rs.rules : [];
+  const rulesHtml = rules.map(r => {
+    const label = esc((it ? r.label_it : r.label_en) || r.label_en || r.label_it || r.id);
+    const e = r.effect || {};
+    let effect = '';
+    if (e.type === 'exempt') effect = it ? 'esente' : 'exempt';
+    else if (e.type === 'percent_off') effect = `−${Number(e.value || 0)}%`;
+    else if (e.type === 'fixed_rate') effect = `€ ${Number(e.value || 0).toFixed(2)}`;
+    const doc = r.requires_documentation
+      ? ` <span style="font-size:0.66rem;color:#9a6b00;background:rgba(232,184,75,0.14);border-radius:4px;padding:1px 6px;">${esc(it ? 'documentazione' : 'documentation')}</span>`
+      : '';
+    return `<li style="margin:4px 0;line-height:1.35;"><span style="font-weight:500;">${label}</span> <span style="color:var(--ink-soft);">— ${esc(effect)}</span>${doc}</li>`;
+  }).join('');
+  const linkedTitle = it
+    ? `Regolamento del Comune di ${esc(rs.comune)}${rs.provincia ? ' (' + esc(rs.provincia) + ')' : ''}`
+    : `${esc(rs.comune)}${rs.provincia ? ' (' + esc(rs.provincia) + ')' : ''} ruleset`;
+  view.innerHTML = `
+    <div style="padding:14px 16px;background:var(--cream);border:1px solid var(--border);border-radius:10px;">
+      <div style="font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--warm);font-weight:600;margin-bottom:6px;">${esc(it ? 'Regolamento collegato' : 'Linked ruleset')}</div>
+      <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:var(--ink);font-weight:600;margin-bottom:8px;">${linkedTitle}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:16px;font-size:0.86rem;color:var(--ink);margin-bottom:10px;">
+        <div><span style="color:var(--ink-soft);">${esc(it ? 'Tariffa base' : 'Base rate')}:</span> € ${Number(rs.base_rate_eur).toFixed(2)} ${esc(it ? '/ persona / notte' : '/ person / night')}</div>
+        <div><span style="color:var(--ink-soft);">${esc(it ? 'Notti max' : 'Cap')}:</span> ${esc(capTxt)}</div>
+      </div>
+      <div style="font-size:0.82rem;color:var(--ink);margin-bottom:6px;">${esc(it ? 'Regole applicate ai singoli ospiti:' : 'Rules applied per guest:')}</div>
+      <ul style="margin:0 0 10px 18px;padding:0;font-size:0.82rem;color:var(--ink);">${rulesHtml}</ul>
+      ${rs.source_citation ? `<div style="font-size:0.72rem;color:var(--ink-soft);line-height:1.4;">${esc(it ? 'Fonte' : 'Source')}: ${esc(rs.source_citation)}</div>` : ''}
+      ${rs.verified_at ? `<div style="font-size:0.72rem;color:var(--ink-soft);">${esc(it ? 'Verificata il' : 'Verified')}: ${esc(rs.verified_at)}</div>` : ''}
+      <div style="margin-top:8px;font-size:0.72rem;color:var(--ink-soft);">${esc(it ? 'Il regolamento è condiviso da tutti gli host del comune. Per correzioni contattaci — verifichiamo la delibera prima di aggiornarla.' : 'Rulesets are shared across all hosts in the comune. Contact us for corrections — we verify against the delibera before updating.')}</div>
+    </div>`;
+  view.style.display = '';
+  legacy.style.display = 'none';
+}
+
 function exportCityTax() {
   if (allCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato' : 'No data!'); return; }
-  const rate = propertyData?.tax_rate_eur;
-  if (rate == null) {
+  const ruleset = propertyData?._tax_ruleset || null; // resolved at loadPropertyData
+  const legacyRate = propertyData?.tax_rate_eur;
+  if (!ruleset && legacyRate == null) {
     toast(hostLang === 'it'
       ? '⚠ Imposta la configurazione imposta di soggiorno in Dettagli Proprietà'
       : '⚠ Set the Tourist Tax Configuration in Property Details');
     return;
   }
-  const maxNights = propertyData?.tax_max_nights || 0; // 0 = no cap
-  const exemptAge = propertyData?.tax_exempt_under_age; // null = none
 
   // Choose quarter (default current). Format YYYY-Q[1-4].
   const now = new Date();
-  const curQ = Math.floor(now.getMonth()/3) + 1;
+  const curQ = Math.floor(now.getMonth() / 3) + 1;
   const input = (prompt(hostLang === 'it'
     ? 'Trimestre (AAAA-T, es. 2026-2):'
     : 'Quarter (YYYY-Q, e.g. 2026-2):', `${now.getFullYear()}-${curQ}`) || '').trim();
   const qm = input.match(/^(\d{4})-([1-4])$/);
   if (!qm) { if (input !== '') toast(hostLang === 'it' ? 'Formato non valido' : 'Invalid format'); return; }
   const qy = Number(qm[1]); const q = Number(qm[2]);
-  const qStart = new Date(qy, (q-1)*3, 1);
-  const qEnd = new Date(qy, q*3, 0); // last day of quarter
-  const qStartStr = qStart.toISOString().slice(0,10);
-  const qEndStr = qEnd.toISOString().slice(0,10);
-
-  // For each guest, count nights falling within the quarter, apply the
-  // consecutive-night cap counting only nights inside the tax period, and
-  // split taxable vs exempt.
-  let taxableNights = 0, exemptNights = 0, guestsCount = 0, arrivalsCount = 0;
-  allCheckins.forEach(c => {
-    const a = (c.arrival_date || '').split('T')[0];
-    const d = (c.departure_date || '').split('T')[0];
-    if (!a) return;
-    // Nights span [arrival, departure); if no departure, use nights field
-    let nights = c.nights || (d ? Math.max(0, (new Date(d) - new Date(a)) / 86400000) : 1);
-    nights = Math.round(nights);
-    if (nights <= 0) return;
-    // Clip the stay's nights to those within the quarter
-    let inQuarter = 0;
-    for (let i = 0; i < nights; i++) {
-      const night = new Date(a); night.setDate(night.getDate() + i);
-      const ns = night.toISOString().slice(0,10);
-      if (ns >= qStartStr && ns <= qEndStr) inQuarter++;
-    }
-    if (inQuarter === 0) return;
-    arrivalsCount++;
-    guestsCount++;
-    // Apply max taxable consecutive nights cap, counting only in-period nights
-    const taxablePer = maxNights > 0 ? Math.min(inQuarter, maxNights) : inQuarter;
-    const age = _ageAtArrival(c);
-    const isExempt = (exemptAge != null && age != null && age < exemptAge);
-    if (isExempt) {
-      exemptNights += inQuarter;
-    } else {
-      taxableNights += taxablePer;
-      // nights beyond the cap are neither taxable nor "exempt" by rule —
-      // count them as exempt-from-tax for the host's reference
-      exemptNights += (inQuarter - taxablePer);
-    }
-  });
-
-  const due = (taxableNights * rate);
+  const qStart = new Date(qy, (q - 1) * 3, 1);
+  const qEnd = new Date(qy, q * 3, 0); // last day of quarter
+  const qStartStr = qStart.toISOString().slice(0, 10);
+  const qEndStr = qEnd.toISOString().slice(0, 10);
   const it = hostLang === 'it';
-  const lines = [
-    it ? `RIEPILOGO IMPOSTA DI SOGGIORNO — da inserire in CityTax++` : `TOURIST TAX SUMMARY — to enter in CityTax++`,
-    `${it ? 'Struttura' : 'Property'}: ${propertyData?.name || ''}`,
-    `${it ? 'Trimestre' : 'Quarter'}: ${qy}-Q${q}  (${qStartStr} → ${qEndStr})`,
-    ``,
-    `${it ? 'Tariffa' : 'Rate'}: € ${Number(rate).toFixed(2)} ${it ? 'per persona/notte' : 'per person/night'}`,
-    `${it ? 'Notti max tassabili' : 'Max taxable nights'}: ${maxNights || (it ? 'nessun limite' : 'no cap')}`,
-    `${it ? 'Esenti sotto i' : 'Exempt under age'}: ${exemptAge != null ? exemptAge : (it ? 'n/d' : 'n/a')}`,
-    ``,
-    `${it ? 'Arrivi nel trimestre' : 'Arrivals in quarter'}: ${arrivalsCount}`,
-    `${it ? 'Pernottamenti TASSABILI' : 'TAXABLE overnights'}: ${taxableNights}`,
-    `${it ? 'Pernottamenti esenti/oltre soglia' : 'Exempt / over-cap overnights'}: ${exemptNights}`,
-    ``,
-    `${it ? 'IMPORTO DOVUTO' : 'AMOUNT DUE'}: € ${due.toFixed(2)}`,
-    ``,
-    it ? '⚠ Verifica sempre contro la delibera del tuo comune. Esenzioni diverse'
-       : '⚠ Always verify against your comune\'s resolution. Exemptions other',
-    it ? '  dall\'età (disabili, ecc.) vanno gestite manualmente.'
-       : '  than age (disabled, etc.) must be handled manually.',
-  ];
-  // Show on screen (alert) AND offer a text download for the host's records
-  alert(lines.join('\n'));
-  downloadFile(`citytax_${qy}-Q${q}.txt`, lines.join('\n'));
-  track('export_citytax', { quarter: `${qy}-Q${q}`, taxableNights, due });
+
+  // Build one row per guest whose stay overlaps the quarter.
+  const rows = [];
+  let taxableNights = 0, ruleExemptNights = 0, overCapNights = 0;
+  let due = 0, anyDocs = false;
+
+  if (ruleset) {
+    for (const c of allCheckins) {
+      const inQuarter = _nightsInsideQuarter(c, qStartStr, qEndStr);
+      if (inQuarter === 0) continue;
+      const declared = Array.isArray(c.tax_declared_flags) ? c.tax_declared_flags : [];
+      const groupSize = _groupSizeFor(c);
+      const r = computeGuestTax(c, ruleset, {
+        nightsInPeriod: inQuarter, groupSize, declaredFlags: declared,
+      });
+      rows.push(r);
+      taxableNights   += r.taxable_nights;
+      ruleExemptNights += r.rule_exempt_nights;
+      overCapNights   += r.over_cap_nights;
+      due += r.amount;
+      if (r.requires_documentation) anyDocs = true;
+    }
+  } else {
+    // Legacy fallback — preserve pre-Round-37 output shape for hosts
+    // without a linked ruleset.
+    const rate = Number(legacyRate);
+    const maxNights = propertyData?.tax_max_nights || 0;
+    const exemptAge = propertyData?.tax_exempt_under_age;
+    for (const c of allCheckins) {
+      const inQuarter = _nightsInsideQuarter(c, qStartStr, qEndStr);
+      if (inQuarter === 0) continue;
+      const taxablePer = maxNights > 0 ? Math.min(inQuarter, maxNights) : inQuarter;
+      const age = _ageAtArrival(c);
+      const legacyExempt = (exemptAge != null && age != null && age < exemptAge);
+      const guest = `${(c.surname || '').trim()} ${(c.name || '').trim()}`.trim() || '—';
+      const r = legacyExempt
+        ? { guest, nights_in_period: inQuarter, taxable_nights: 0, over_cap_nights: 0,
+            rule_exempt_nights: inQuarter, rule_applied: null,
+            effective_rate: rate, amount: 0, requires_documentation: false }
+        : { guest, nights_in_period: inQuarter, taxable_nights: taxablePer,
+            over_cap_nights: inQuarter - taxablePer, rule_exempt_nights: 0,
+            rule_applied: null, effective_rate: rate,
+            amount: Math.round(taxablePer * rate * 100) / 100,
+            requires_documentation: false };
+      rows.push(r);
+      taxableNights   += r.taxable_nights;
+      ruleExemptNights += r.rule_exempt_nights;
+      overCapNights   += r.over_cap_nights;
+      due += r.amount;
+    }
+  }
+
+  due = Math.round(due * 100) / 100;
+
+  // Build the plain-text summary. Kept downloadable so it drops into
+  // the host's declaration folder unchanged.
+  const lines = [];
+  lines.push(it ? 'RIEPILOGO IMPOSTA DI SOGGIORNO — da inserire in CityTax++' : 'TOURIST TAX SUMMARY — to enter in CityTax++');
+  lines.push(`${it ? 'Struttura' : 'Property'}: ${propertyData?.name || ''}`);
+  lines.push(`${it ? 'Trimestre' : 'Quarter'}: ${qy}-Q${q}  (${qStartStr} → ${qEndStr})`);
+  lines.push('');
+  if (ruleset) {
+    lines.push(`${it ? 'Comune' : 'Comune'}: ${ruleset.comune}${ruleset.provincia ? ` (${ruleset.provincia})` : ''}`);
+    lines.push(`${it ? 'Tariffa base' : 'Base rate'}: € ${Number(ruleset.base_rate_eur).toFixed(2)} ${it ? 'per persona/notte' : 'per person/night'}`);
+    lines.push(`${it ? 'Notti max tassabili' : 'Max taxable nights'}: ${ruleset.max_nights ?? (it ? 'nessun limite' : 'no cap')} (${ruleset.max_nights_basis === 'per_person_per_month' ? (it ? 'per persona al mese' : 'per person / month') : (it ? 'per soggiorno' : 'per stay')})`);
+  } else {
+    lines.push(`${it ? 'Tariffa' : 'Rate'}: € ${Number(legacyRate).toFixed(2)} ${it ? 'per persona/notte' : 'per person/night'}`);
+    lines.push(`${it ? 'Notti max tassabili' : 'Max taxable nights'}: ${propertyData?.tax_max_nights || (it ? 'nessun limite' : 'no cap')}`);
+    lines.push(`${it ? 'Esenti sotto i' : 'Exempt under age'}: ${propertyData?.tax_exempt_under_age != null ? propertyData.tax_exempt_under_age : (it ? 'n/d' : 'n/a')}`);
+  }
+  lines.push('');
+  lines.push(`${it ? 'Ospiti nel trimestre' : 'Guests in quarter'}: ${rows.length}`);
+  lines.push(`${it ? 'Pernottamenti TASSABILI' : 'TAXABLE overnights'}: ${taxableNights}`);
+  lines.push(`${it ? 'Pernottamenti esenti per regola' : 'Rule-exempt overnights'}: ${ruleExemptNights}`);
+  lines.push(`${it ? 'Pernottamenti oltre soglia' : 'Over-cap overnights'}: ${overCapNights}`);
+  lines.push('');
+  lines.push(`${it ? 'IMPORTO DOVUTO' : 'AMOUNT DUE'}: € ${due.toFixed(2)}`);
+  lines.push('');
+  // Per-guest breakdown — the host is responsabile d'imposta and a
+  // bare total is useless if the comune asks for the working.
+  lines.push(it ? '── DETTAGLIO PER OSPITE ──' : '── PER-GUEST BREAKDOWN ──');
+  lines.push([
+    it ? 'Ospite' : 'Guest',
+    it ? 'Notti trim.' : 'Nights',
+    it ? 'Tassabili' : 'Taxable',
+    it ? 'Oltre soglia' : 'Over cap',
+    it ? 'Esente per regola' : 'Rule-exempt',
+    it ? 'Regola' : 'Rule',
+    it ? 'Tariffa €' : 'Rate €',
+    it ? 'Importo €' : 'Amount €',
+    it ? 'Doc' : 'Doc',
+  ].join(' | '));
+  for (const r of rows) {
+    lines.push([
+      r.guest,
+      r.nights_in_period,
+      r.taxable_nights,
+      r.over_cap_nights,
+      r.rule_exempt_nights,
+      _ruleLabel(r.rule_applied, it) || (it ? 'tariffa piena' : 'full rate'),
+      Number(r.effective_rate).toFixed(2),
+      Number(r.amount).toFixed(2),
+      r.requires_documentation ? '⚠' : '',
+    ].join(' | '));
+  }
+  lines.push('');
+  if (ruleset && ruleset.source_citation) {
+    lines.push(`${it ? 'Fonte' : 'Source'}: ${ruleset.source_citation}`);
+    if (ruleset.verified_at) lines.push(`${it ? 'Verificata il' : 'Verified'}: ${ruleset.verified_at}`);
+  }
+  if (anyDocs) {
+    lines.push('');
+    lines.push(it
+      ? '⚠ Alcune esenzioni richiedono documentazione (residenza, disabilità, ecc.). Conservare copia agli atti.'
+      : '⚠ Some exemptions require documentation (residency, disability, etc.). Keep a copy on file.');
+  }
+  lines.push('');
+  lines.push(it
+    ? '⚠ Verifica sempre contro la delibera del tuo comune prima di depositare la dichiarazione.'
+    : '⚠ Always verify against your comune\'s resolution before filing the declaration.');
+
+  const text = lines.join('\n');
+  alert(text);
+  downloadFile(`citytax_${qy}-Q${q}.txt`, text);
+  track('export_citytax', { quarter: `${qy}-Q${q}`, taxableNights, due, ruleset_id: ruleset?.id || null });
   toast(it ? 'Riepilogo imposta generato!' : 'Tax summary generated!');
 }
 
@@ -7683,6 +8003,40 @@ function viewGuest(id) {
     </div>
   `;
 
+  // Round 37 — declared-flag section. Shown only when the property has
+  // a linked ruleset that defines at least one `declared` rule (e.g.
+  // resident_comune, disability). Ticking a box PATCHes tax_declared_flags
+  // on this check-in; the export applies the corresponding rule. Auto
+  // application never happens — documentation must be retained.
+  const _taxRs = propertyData?._tax_ruleset;
+  const _declaredRules = (Array.isArray(_taxRs?.rules) ? _taxRs.rules : [])
+    .filter(r => r && r.when && r.when.declared && r.effect);
+  const _currentFlags = Array.isArray(c.tax_declared_flags) ? c.tax_declared_flags : [];
+  const taxSection = _declaredRules.length ? `
+    ${sectionTitle(it ? 'Imposta di soggiorno' : 'Tourist tax')}
+    <div style="background:rgba(107,122,144,0.04);border-radius:8px;padding:12px 14px;">
+      <div style="font-size:0.78rem;color:var(--ink);margin-bottom:8px;">${safe(it ? 'Dichiarazioni con documentazione — spunta solo se hai la prova agli atti:' : 'Documented declarations — tick only when you retain the proof:')}</div>
+      ${_declaredRules.map(r => {
+        const flag = r.when.declared;
+        const checked = _currentFlags.includes(flag) ? 'checked' : '';
+        const label = safe((it ? r.label_it : r.label_en) || r.label_en || r.label_it || flag);
+        const effect = r.effect.type === 'exempt'
+          ? (it ? 'esente' : 'exempt')
+          : (r.effect.type === 'percent_off' ? `−${Number(r.effect.value||0)}%` : `€ ${Number(r.effect.value||0).toFixed(2)}`);
+        return `
+          <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;cursor:pointer;font-size:0.82rem;">
+            <input type="checkbox" ${checked} data-checkin-id="${safe(c.id)}" data-declared-flag="${safe(flag)}"
+                   onchange="toggleTaxDeclaredFlag(this)" style="margin-top:3px;width:16px;height:16px;cursor:pointer;">
+            <span>
+              <span style="font-weight:500;color:var(--ink);">${label}</span>
+              <span style="color:var(--ink-soft);"> — ${safe(effect)}</span>
+              <span style="display:block;font-size:0.68rem;color:#9a6b00;margin-top:2px;">${safe(it ? '⚠ Richiede documentazione conservata dall\'host' : '⚠ Requires documentation retained by the host')}</span>
+            </span>
+          </label>`;
+      }).join('')}
+    </div>
+  ` : '';
+
   const metaSection = `
     ${sectionTitle(it ? 'Sistema' : 'System')}
     ${field(it ? 'Inviato il' : 'Submitted at', safe(fmtDT(c.submitted_at)))}
@@ -7707,6 +8061,7 @@ function viewGuest(id) {
         ${docSection}
         ${photoSection}
         ${filingSection}
+        ${taxSection}
         ${metaSection}
         <div style="margin-top:18px;display:flex;justify-content:flex-end;">
           <button onclick="closeGuestDetailModal()" style="padding:10px 22px;background:var(--warm);color:#fff;border:none;border-radius:6px;font-size:0.86rem;cursor:pointer;font-family:inherit;">${it ? 'Chiudi' : 'Close'}</button>
@@ -8695,11 +9050,23 @@ async function loadPropertyData() {
       .order('created_at', { ascending: false }).limit(50);
     if (data) allChats = data;
   } catch (e) {}
+  // Round 37 — resolve the linked tax ruleset (if any). Reference data,
+  // small and shared; cache it on propertyData so exportCityTax and the
+  // Property panel read the same thing.
+  try {
+    if (propertyData?.tax_ruleset_id) {
+      const { data } = await sb.from('tax_rulesets').select('*').eq('id', propertyData.tax_ruleset_id).maybeSingle();
+      propertyData = { ...propertyData, _tax_ruleset: data || null };
+    } else {
+      propertyData = { ...propertyData, _tax_ruleset: null };
+    }
+  } catch (e) { console.warn('tax_ruleset load failed:', e); }
 
   renderDashboard();
   renderCheckins();
   renderRules();
   renderRecos();
+  renderTaxRulesetPanel();
   startHostChatSubscription();
   refreshChatBadge(); // Round 21.1: reflect this property's unread state
 }

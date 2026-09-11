@@ -1655,6 +1655,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="export-axis-head">
           <span class="export-axis-tag police" data-h="export_axis_police_tag">Police · National</span>
           <span class="export-axis-title" data-h="export_axis_police_title">Guest registration</span>
+          <span style="flex:1;"></span>
+          <span class="host-portal-slot" data-portal-tile="axis.police"></span>
         </div>
         <div class="export-axis-note" data-h="export_axis_police_note"></div>
         <div class="export-tile-h">
@@ -1667,7 +1669,6 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <a href="https://alloggiatiweb.poliziadistato.it" target="_blank" rel="noopener" class="export-portal-link">
               🔗 <span data-h="link_alloggiati">Open Alloggiati Web</span> ↗
             </a>
-            <span class="host-portal-slot" data-portal-tile="export.alloggiati"></span>
           </div>
         </div>
       </div>
@@ -1677,6 +1678,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="export-axis-head">
           <span class="export-axis-tag stat" data-h="export_axis_stat_tag">Statistics · Regional</span>
           <span class="export-axis-title" data-h="export_axis_stat_title">Tourist flow reporting</span>
+          <span style="flex:1;"></span>
+          <span class="host-portal-slot" data-portal-tile="axis.stats"></span>
         </div>
         <div class="export-axis-note" data-h="export_axis_stat_note"></div>
         <div class="export-tile-h">
@@ -1686,7 +1689,6 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           </div>
           <div class="tile-actions">
             <button class="btn btn-secondary" onclick="exportISTAT()" data-h="btn_gen_istat">📊 Generate C/59 Summary</button>
-            <span class="host-portal-slot" data-portal-tile="export.istat"></span>
           </div>
         </div>
         <div class="export-tile-h">
@@ -1699,7 +1701,6 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <a href="https://flussituristici.regione.veneto.it/" target="_blank" rel="noopener" class="export-portal-link">
               🔗 <span data-h="link_ross1000_portal">Open ROSS1000 Veneto</span> ↗
             </a>
-            <span class="host-portal-slot" data-portal-tile="export.ross1000"></span>
           </div>
         </div>
         <div class="export-tile-h">
@@ -1711,7 +1712,6 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <a href="https://dms.puglia.it" target="_blank" rel="noopener" class="export-portal-link">
               🔗 <span data-h="link_dms">Open Puglia DMS (SPOT Easy)</span> ↗
             </a>
-            <span class="host-portal-slot" data-portal-tile="export.puglia_dms"></span>
           </div>
         </div>
       </div>
@@ -1721,6 +1721,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="export-axis-head">
           <span class="export-axis-tag tax" data-h="export_axis_tax_tag">Tourist Tax · Municipal</span>
           <span class="export-axis-title" data-h="export_axis_tax_title">Imposta di soggiorno</span>
+          <span style="flex:1;"></span>
+          <span class="host-portal-slot" data-portal-tile="axis.tax"></span>
         </div>
         <div class="export-axis-note" data-h="export_axis_tax_note"></div>
         <div class="export-tile-h">
@@ -1736,7 +1738,6 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <a href="#" id="paytouristPortalLink" target="_blank" rel="noopener" class="export-portal-link" style="display:none">
               🔗 <span data-h="link_paytourist">Open PayTourist Import</span> ↗
             </a>
-            <span class="host-portal-slot" data-portal-tile="export.paytourist"></span>
           </div>
         </div>
         <div class="export-tile-h">
@@ -1749,7 +1750,6 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <a href="https://www.comune.venezia.it/it/content/portale-ids-tourist-tax-0" target="_blank" rel="noopener" class="export-portal-link">
               🔗 <span data-h="link_citytax">Open CityTax++ (Venezia)</span> ↗
             </a>
-            <span class="host-portal-slot" data-portal-tile="export.citytax"></span>
           </div>
         </div>
       </div>
@@ -1759,6 +1759,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="export-axis-head">
           <span class="export-axis-tag util" data-h="export_axis_util_tag">Utility</span>
           <span class="export-axis-title" data-h="export_axis_util_title">Your own records</span>
+          <span style="flex:1;"></span>
+          <span class="host-portal-slot" data-portal-tile="axis.util"></span>
         </div>
         <div class="export-tile-h">
           <div class="tile-body">
@@ -1767,7 +1769,6 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           </div>
           <div class="tile-actions">
             <button class="btn btn-secondary" onclick="exportCSV()" data-h="btn_dl_csv">📥 Download CSV</button>
-            <span class="host-portal-slot" data-portal-tile="export.csv"></span>
           </div>
         </div>
       </div>
@@ -5890,19 +5891,20 @@ function renderCompliance() {
   const sections = ['police', 'stats', 'tax'].map(key => {
     const s = c[key];
     const meta = s.meta.map(m => `<span class="cmp-meta-item"><strong>${m[0]}:</strong> ${m[1]}</span>`).join('');
+    // Round 37.5.1 — axis-level portal slot. Shared with Export via the
+    // same axis.<key> id, so setting it once shows on both panels.
     return `
       <div class="form-card">
-        <span class="cmp-axis-tag ${axisClass[key]}">${s.tag}</span>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;">
+          <span class="cmp-axis-tag ${axisClass[key]}">${s.tag}</span>
+          <span style="flex:1;"></span>
+          <span class="host-portal-slot" data-portal-tile="axis.${key}"></span>
+        </div>
         <div class="form-card-title">${s.title}</div>
         <div class="cmp-meta">${meta}</div>
         <details class="cmp-acc">
           <summary>${lang === 'it' ? 'Dettagli e link' : 'Details & links'}</summary>
-          <div class="cmp-acc-body">${s.body}
-            <div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              <span style="font-size:0.72rem;color:var(--ink-soft);">${lang === 'it' ? 'Il tuo portale:' : 'Your portal:'}</span>
-              <span class="host-portal-slot" data-portal-tile="compliance.${key}"></span>
-            </div>
-          </div>
+          <div class="cmp-acc-body">${s.body}</div>
         </details>
       </div>`;
   }).join('');
@@ -7811,41 +7813,33 @@ function exportCityTax() {
    from Export or Compliance without entering the property Edit flow.
 ══════════════════════════════════════════════════════════════════════ */
 
-// Curated defaults per tile: the label that pre-fills the modal so
-// hosts don't have to think of one, and a short helper prompt telling
-// them which portal they're setting for that tile. Keys match the
-// data-portal-tile attributes in the HTML.
+// Round 37.5.1 — one custom portal per COMPLIANCE AXIS (Guest
+// registration, Tourist flow, Imposta di soggiorno, Your own records),
+// shared between Export and Compliance so the host sets it once and
+// sees it in both places. Old per-tile keys (export.alloggiati,
+// compliance.police, …) that a Round 37.5 pilot may have written are
+// still readable from the DB but no longer rendered anywhere.
 const HOST_PORTAL_TILES = {
-  'export.alloggiati':   { defaultLabel: { en: 'My Alloggiati portal',           it: 'Il mio portale Alloggiati' },
-                           hint:          { en: "Regional Questura Alloggiati Web, if it differs from the national default.",
-                                             it: 'Portale Alloggiati Web regionale, se diverso dal default nazionale.' } },
-  'export.istat':        { defaultLabel: { en: 'My C/59 comune portal',          it: 'Il mio portale C/59 del comune' },
-                           hint:          { en: 'Where you file the monthly C/59 summary. Comune-specific.',
-                                             it: 'Dove depositi il riepilogo mensile C/59. Varia per comune.' } },
-  'export.ross1000':     { defaultLabel: { en: 'My regional flow portal',        it: 'Portale flussi turistici regionale' },
-                           hint:          { en: 'ROSS1000 lookalike for your Region — Turismo5, Stat.-er, Puglia SPOT, etc.',
-                                             it: 'Portale flussi turistici della tua Regione (Turismo5, Stat.-er, SPOT Puglia, ecc.).' } },
-  'export.puglia_dms':   { defaultLabel: { en: 'My Puglia SPOT entry',           it: 'Il mio ingresso SPOT Puglia' },
-                           hint:          { en: 'Alternative sub-portal your area uses, if different from dms.puglia.it.',
-                                             it: 'Sub-portale alternativo se diverso da dms.puglia.it.' } },
-  'export.paytourist':   { defaultLabel: { en: 'My PayTourist import',           it: 'Il mio import PayTourist' },
-                           hint:          { en: 'Direct link if the PayTourist subdomain field in Property Details isn\'t enough.',
-                                             it: 'Link diretto se il sottodominio PayTourist nei Dettagli Proprietà non basta.' } },
-  'export.citytax':      { defaultLabel: { en: 'My tourist-tax portal',          it: 'Portale imposta di soggiorno' },
-                           hint:          { en: "Your comune's tourist-tax declaration portal.",
-                                             it: 'Portale del tuo comune per la dichiarazione dell\'imposta di soggiorno.' } },
-  'export.csv':          { defaultLabel: { en: 'My records folder',              it: 'La mia cartella archivio' },
-                           hint:          { en: 'Optional — any URL you use for archiving raw exports (Drive, Dropbox…).',
-                                             it: 'Opzionale — un URL dove archivi gli export (Drive, Dropbox…).' } },
-  'compliance.police':   { defaultLabel: { en: 'My police portal',               it: 'Il mio portale Polizia' },
-                           hint:          { en: 'Regional Alloggiati Web or your Questura portal.',
-                                             it: 'Alloggiati Web regionale o portale della Questura.' } },
-  'compliance.stats':    { defaultLabel: { en: 'My regional stats portal',       it: 'Portale statistico regionale' },
-                           hint:          { en: 'Regional tourist-flow filing portal.',
-                                             it: 'Portale regionale per la dichiarazione dei flussi turistici.' } },
-  'compliance.tax':      { defaultLabel: { en: 'My tourist-tax portal',          it: 'Portale imposta di soggiorno' },
-                           hint:          { en: "Your comune's tourist-tax portal.",
-                                             it: 'Portale del comune per l\'imposta di soggiorno.' } },
+  'axis.police': {
+    defaultLabel: { en: 'My guest-registration portal',      it: 'Il mio portale registrazione ospiti' },
+    hint:         { en: 'One link for guest registration — usually Alloggiati Web national, or a regional Questura equivalent.',
+                    it: 'Un link per la registrazione ospiti — di solito Alloggiati Web nazionale o l\'equivalente regionale della Questura.' },
+  },
+  'axis.stats': {
+    defaultLabel: { en: 'My tourist-flow portal',            it: 'Il mio portale flussi turistici' },
+    hint:         { en: 'One link for the tourist-flow / statistical filing — ROSS1000 Veneto, Turismo5, SPOT Easy Puglia, Stat.-er, etc.',
+                    it: 'Un link per la dichiarazione dei flussi turistici — ROSS1000 Veneto, Turismo5, SPOT Easy Puglia, Stat.-er, ecc.' },
+  },
+  'axis.tax': {
+    defaultLabel: { en: 'My tourist-tax portal',             it: 'Portale imposta di soggiorno' },
+    hint:         { en: "One link for imposta di soggiorno — your comune's declaration portal or PayTourist subdomain.",
+                    it: 'Un link per l\'imposta di soggiorno — portale del comune o sottodominio PayTourist.' },
+  },
+  'axis.util': {
+    defaultLabel: { en: 'My records folder',                 it: 'La mia cartella archivio' },
+    hint:         { en: 'Optional — anywhere you archive the raw exports (Drive, Dropbox, your accountant\'s upload page).',
+                    it: 'Opzionale — dove archivi gli export (Drive, Dropbox, la pagina di caricamento del commercialista).' },
+  },
 };
 
 // Ensure a pasted URL is safe to render as href. Accepts an origin

@@ -989,8 +989,11 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       <div style="text-align:center;margin-top:8px;">
         <a onclick="forgotPassword()" style="font-size:0.72rem;color:var(--warm);cursor:pointer;text-decoration:underline;" data-h="login_forgot">Forgot password?</a>
       </div>
-      <div class="login-toggle" id="authToggle">
-        <span data-h="login_no_account">Don't have an account?</span> <a onclick="toggleAuthMode()" data-h="login_create_link">Create one</a>
+      <!-- Round 38 — invite-only. Sign-up removed here and gated at the
+           Supabase project level (Authentication → Providers → Email
+           → "Allow new users to sign up" OFF). -->
+      <div style="text-align:center;margin-top:16px;font-size:0.72rem;color:var(--ink-soft);line-height:1.5;" data-h="login_invite_only">
+        Access is by invitation. Contact <a href="mailto:info@welcomebnb.it" style="color:var(--warm);">info@welcomebnb.it</a> to join the pilot.
       </div>
     </div>
   </div>
@@ -1516,6 +1519,20 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       </div>
 
       </fieldset>
+
+      <!-- Round 38 — Guest privacy notice preview + empty-field warning.
+           Sits OUTSIDE the disabled fieldset so it stays interactive
+           in view mode: this is a read/preview surface, not something
+           the host edits inline. -->
+      <div class="form-card">
+        <div class="form-card-title" data-h="prop_privacy_title">Guest privacy notice</div>
+        <div class="form-card-desc" data-h="prop_privacy_desc">Generated from your property details. Under GDPR you are the data controller (titolare del trattamento) — guests are shown this notice, and can download a copy.</div>
+        <div id="propPrivacyWarnings" style="display:none;background:rgba(232,184,75,0.14);border:1px solid rgba(232,184,75,0.4);color:#7d5e10;padding:10px 12px;border-radius:8px;font-size:0.82rem;margin-bottom:10px;"></div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          <button type="button" class="btn btn-secondary" onclick="openHostPrivacyPreview()"><span data-h="prop_privacy_preview_btn">🔍 Preview as guest</span></button>
+          <button type="button" class="btn btn-secondary" onclick="downloadHostPrivacyNotice()"><span data-h="prop_privacy_download_btn">⬇ Download HTML</span></button>
+        </div>
+      </div>
 
       <!-- Round 37.1 — one action row at the bottom, in flow. The Edit
            button toggles the fieldset above; Save + Cancel appear in
@@ -2132,7 +2149,10 @@ async function renderDismissedList() {
 }
 let allChats = [];
 let hostLang = 'it';
-let isSignUp = false;
+// Round 38 — sign-up flow removed. Access is by invitation only.
+// The real gate is the Supabase project setting; this const is here so
+// stale references (if any survive) still evaluate rather than throw.
+const isSignUp = false;
 
 /* ══════════════════════════════════════
    ANALYTICS — event tracking
@@ -2976,15 +2996,9 @@ sb.auth.onAuthStateChange(async (event, session) => {
   }
 });
 
-function toggleAuthMode() {
-  isSignUp = !isSignUp;
-  document.getElementById('authBtn').textContent = isSignUp ? h('login_create') : h('login_signin');
-  document.getElementById('authToggle').innerHTML = isSignUp
-    ? `${h('login_has_account')} <a onclick="toggleAuthMode()">${h('login_signin_link')}</a>`
-    : `${h('login_no_account')} <a onclick="toggleAuthMode()">${h('login_create_link')}</a>`;
-  document.getElementById('loginError').classList.remove('show');
-}
-
+// Round 38 — sign-up is gone. Access is by invitation. toggleAuthMode
+// used to flip between sign-in and create-account; there is no
+// create-account branch to flip into any more.
 async function handleAuth() {
   const email = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value;
@@ -2995,44 +3009,29 @@ async function handleAuth() {
   if (password.length < 6) { errEl.textContent = h('login_err_password'); errEl.classList.add('show'); return; }
 
   btn.disabled = true;
-  btn.textContent = isSignUp ? h('login_creating') : h('login_signing_in');
+  btn.textContent = h('login_signing_in');
   errEl.classList.remove('show');
 
   try {
-    let result;
-    if (isSignUp) {
-      result = await sb.auth.signUp({ email, password });
-    } else {
-      result = await sb.auth.signInWithPassword({ email, password });
-    }
-
+    const result = await sb.auth.signInWithPassword({ email, password });
     if (result.error) {
       errEl.textContent = result.error.message;
       errEl.classList.add('show');
       btn.disabled = false;
-      btn.textContent = isSignUp ? h('login_create') : h('login_signin');
+      btn.textContent = h('login_signin');
       return;
     }
 
-    if (isSignUp && result.data?.user?.identities?.length === 0) {
-      errEl.textContent = h('login_err_exists');
-      errEl.classList.add('show');
-      btn.disabled = false;
-      btn.textContent = h('login_create');
-      return;
-    }
-
-    // Success
     _trackUserId = result.data?.user?.id || null;
     _trackEmail = result.data?.user?.email || null;
-    track(isSignUp ? 'signup' : 'login', { email: _trackEmail });
+    track('login', { email: _trackEmail });
     document.getElementById('loginOverlay').classList.add('hidden');
     init();
   } catch (e) {
     errEl.textContent = h('login_err_connection');
     errEl.classList.add('show');
     btn.disabled = false;
-    btn.textContent = isSignUp ? h('login_create') : h('login_signin');
+    btn.textContent = h('login_signin');
   }
 }
 
@@ -3122,13 +3121,12 @@ const HT = {
     switcher_add: 'Add property',
     switcher_switched: 'Now managing',
     switcher_add_prompt: 'Name for the new property:',
-    login_signin: 'Sign In', login_create: 'Create Account',
-    login_signing_in: 'Signing in…', login_creating: 'Creating account…',
-    login_no_account: 'Don\'t have an account?', login_create_link: 'Create one', login_forgot: 'Forgot password?',
-    login_has_account: 'Already have an account?', login_signin_link: 'Sign in',
+    login_signin: 'Sign In',
+    login_invite_only: 'Access is by invitation. Contact <a href="mailto:info@welcomebnb.it" style="color:var(--warm);">info@welcomebnb.it</a> to join the pilot.',
+    login_signing_in: 'Signing in…',
+    login_forgot: 'Forgot password?',
     login_err_fields: 'Please fill in both fields',
     login_err_password: 'Password must be at least 6 characters',
-    login_err_exists: 'An account with this email already exists. Try signing in.',
     login_err_connection: 'Connection error. Please try again.',
     sidebar_dashboard: 'Dashboard', sidebar_property: 'Property Details', sidebar_rules: 'House Rules',
     sidebar_recos: 'Recommendations', sidebar_checkins: 'Check-in Data', sidebar_export: 'Export & Compliance',
@@ -3322,6 +3320,10 @@ const HT = {
     prop_beds_available_hint: 'Total sleeping capacity (for statistical reporting).',
     prop_tax_title: 'Tourist Tax Configuration',
     prop_tax_desc: "Used by the tourist-tax declaration helper in Export. Enter the values from your comune's tourist-tax resolution (delibera). Leave empty if your comune doesn't levy a tourist tax.",
+    prop_privacy_title: 'Guest privacy notice',
+    prop_privacy_desc: 'Generated from your property details. Under GDPR you are the data controller (titolare del trattamento) — guests are shown this notice, and can download a copy.',
+    prop_privacy_preview_btn: '🔍 Preview as guest',
+    prop_privacy_download_btn: '⬇ Download HTML',
     prop_tax_rate: 'Rate (€ per person per night)',
     prop_tax_max_nights: 'Max taxable nights',
     prop_tax_max_nights_hint: 'Many comuni only charge the first N nights per stay (or per person per month).',
@@ -3528,13 +3530,12 @@ const HT = {
     switcher_add: 'Aggiungi struttura',
     switcher_switched: 'Ora gestisci',
     switcher_add_prompt: 'Nome della nuova struttura:',
-    login_signin: 'Accedi', login_create: 'Crea Account',
-    login_signing_in: 'Accesso in corso…', login_creating: 'Creazione account…',
-    login_no_account: 'Non hai un account?', login_create_link: 'Creane uno', login_forgot: 'Password dimenticata?',
-    login_has_account: 'Hai già un account?', login_signin_link: 'Accedi',
+    login_signin: 'Accedi',
+    login_invite_only: 'L\'accesso è su invito. Contatta <a href="mailto:info@welcomebnb.it" style="color:var(--warm);">info@welcomebnb.it</a> per partecipare al programma pilota.',
+    login_signing_in: 'Accesso in corso…',
+    login_forgot: 'Password dimenticata?',
     login_err_fields: 'Compila entrambi i campi',
     login_err_password: 'La password deve essere di almeno 6 caratteri',
-    login_err_exists: 'Esiste già un account con questa email. Prova ad accedere.',
     login_err_connection: 'Errore di connessione. Riprova.',
     sidebar_dashboard: 'Dashboard', sidebar_property: 'Dettagli Proprietà', sidebar_rules: 'Regole della Casa',
     sidebar_recos: 'Consigli', sidebar_checkins: 'Dati Check-in', sidebar_export: 'Export & Conformità',
@@ -3723,6 +3724,10 @@ const HT = {
     prop_beds_available_hint: 'Capacità ricettiva totale (per la rilevazione statistica).',
     prop_tax_title: 'Configurazione Imposta di Soggiorno',
     prop_tax_desc: 'Usata dall\'assistente dichiarazione in Export. Inserisci i valori dalla delibera del tuo comune sull\'imposta di soggiorno. Lascia vuoto se il tuo comune non applica l\'imposta.',
+    prop_privacy_title: 'Informativa privacy per gli ospiti',
+    prop_privacy_desc: 'Generata dai dettagli della tua proprietà. Ai sensi del GDPR sei il titolare del trattamento — gli ospiti visualizzano questa informativa e possono scaricarne copia.',
+    prop_privacy_preview_btn: '🔍 Anteprima come ospite',
+    prop_privacy_download_btn: '⬇ Scarica HTML',
     prop_tax_rate: 'Tariffa (€ per persona a notte)',
     prop_tax_max_nights: 'Notti max tassabili',
     prop_tax_basis_stay: 'per soggiorno',
@@ -3960,16 +3965,12 @@ function setHostLang(l) {
     const el = document.getElementById(id);
     if (el) el.textContent = h(key);
   });
-  // Update login form if visible
+  // Round 38 — login-only form. No sign-up branch to relabel.
   const authBtn = document.getElementById('authBtn');
-  if (authBtn && !authBtn.disabled) {
-    authBtn.textContent = isSignUp ? h('login_create') : h('login_signin');
-  }
-  const authToggle = document.getElementById('authToggle');
+  if (authBtn && !authBtn.disabled) authBtn.textContent = h('login_signin');
+  const authToggle = document.getElementById('authToggle'); // legacy id kept alive so setHostLang doesn't crash on old DOM
   if (authToggle) {
-    authToggle.innerHTML = isSignUp
-      ? `${h('login_has_account')} <a onclick="toggleAuthMode()">${h('login_signin_link')}</a>`
-      : `${h('login_no_account')} <a onclick="toggleAuthMode()">${h('login_create_link')}</a>`;
+    authToggle.innerHTML = '';
   }
   // Re-render dynamic content
   renderDashboard();
@@ -7313,6 +7314,205 @@ function _taxCfgSlug(prefix) {
 // inline inputs. We generate a fresh HTML block on every render so the
 // draft array is the single source of truth — dataset indices point
 // into it.
+/* ══════════════════════════════════════════════════════════════════════
+   Round 38 · Host-side preview of the guest privacy notice.
+   ─────────────────────────────────────────────────────────────────────
+   Under GDPR the host is titolare del trattamento; the notice is the
+   host's, not WelcomeBnB's. The host must see what their guests are
+   shown and be told which placeholder fields are empty on this
+   property — an empty host_email means a guest has no route to
+   exercise Art. 15 rights. Templates duplicate the same source of
+   truth as index.html because there's no shared bundler.
+══════════════════════════════════════════════════════════════════════ */
+function _hostPrivacyEsc(s) {
+  return String(s == null ? '' : s).replace(/[<>&"']/g, c =>
+    ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function _hostPrivacySlug(s) {
+  return String(s || 'property').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'property';
+}
+function _hostPrivacyTokens(prop, isIT) {
+  const p = prop || {};
+  const hostNameRaw = (p.host_names && p.host_names.trim()) || (p.name && p.name.trim()) || '';
+  const propNameRaw = (p.name && p.name.trim()) || '';
+  const addressParts = [p.address, p.zip, p.city].map(x => (x || '').toString().trim()).filter(Boolean);
+  const addressRaw = addressParts.join(', ');
+  const cinRaw   = (p.cir_code && p.cir_code.trim()) || ''; // properties.cir_code holds the CIN
+  const emailRaw = (p.host_email && p.host_email.trim()) || '';
+  const phoneRaw = (p.host_phone && p.host_phone.trim()) || '';
+  const dateStr = new Date().toLocaleDateString(isIT ? 'it-IT' : 'en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+  const hostName = hostNameRaw ? _hostPrivacyEsc(hostNameRaw) : '';
+  const propName = propNameRaw ? _hostPrivacyEsc(propNameRaw) : (isIT ? '(struttura non specificata)' : '(property not set)');
+  const address  = addressRaw  ? ', ' + _hostPrivacyEsc(addressRaw) : '';
+  const cin      = cinRaw      ? ', CIN ' + _hostPrivacyEsc(cinRaw) : '';
+  const contactBits = [];
+  if (emailRaw) contactBits.push('<a href="mailto:' + _hostPrivacyEsc(emailRaw) + '" style="color:#005BFF;">' + _hostPrivacyEsc(emailRaw) + '</a>');
+  if (phoneRaw) contactBits.push(_hostPrivacyEsc(phoneRaw));
+  const contactBlock = contactBits.length
+    ? `<p style="margin:6px 0 0;font-size:0.78rem;color:#6B7A90;">${_hostPrivacyEsc(isIT ? 'Contatti:' : 'Contact:')} ${contactBits.join(' &mdash; ')}</p>`
+    : '';
+  const rightsHowTo = emailRaw
+    ? (isIT
+        ? `Per esercitarli scriva a <a href="mailto:${_hostPrivacyEsc(emailRaw)}" style="color:#005BFF;">${_hostPrivacyEsc(emailRaw)}</a>. Rispondiamo entro 30 giorni.`
+        : `To exercise them, write to <a href="mailto:${_hostPrivacyEsc(emailRaw)}" style="color:#005BFF;">${_hostPrivacyEsc(emailRaw)}</a>. We respond within 30 days.`)
+    : (isIT
+        ? 'Per esercitarli contatti il titolare del trattamento indicato al punto 1. Rispondiamo entro 30 giorni.'
+        : 'To exercise them, contact the data controller named in Section 1. We respond within 30 days.');
+  return {
+    HOST_NAME:        hostName || _hostPrivacyEsc(isIT ? '(host non specificato)' : '(host not set)'),
+    PROPERTY_NAME:    propName,
+    PROPERTY_ADDRESS: address,
+    CIN:              cin,
+    CONTACT_BLOCK:    contactBlock,
+    RIGHTS_HOWTO:     rightsHowTo,
+    DATE:             _hostPrivacyEsc(dateStr),
+  };
+}
+function _hostPrivacyFill(tpl, tokens) {
+  return tpl.replace(/\{\{([A-Z_]+)\}\}/g, (_, k) => (k in tokens ? tokens[k] : ''));
+}
+
+// Same template shape as index.html — kept in sync manually because
+// there's no build/bundle step.
+const HOST_PRIVACY_TPL_IT = `
+<section>
+<h3 style="font-size:1.02rem;margin:0 0 4px;font-weight:600;">INFORMATIVA SUL TRATTAMENTO DEI DATI PERSONALI</h3>
+<p style="margin:0 0 12px;font-style:italic;font-size:0.78rem;color:#6B7A90;">ai sensi degli artt. 13 e 14 del Regolamento (UE) 2016/679</p>
+<h4 style="font-size:0.9rem;margin:14px 0 4px;font-weight:600;">1. Titolare del trattamento</h4>
+<p style="margin:0 0 6px;">{{HOST_NAME}}, gestore della struttura ricettiva {{PROPERTY_NAME}}{{PROPERTY_ADDRESS}}{{CIN}}.</p>
+{{CONTACT_BLOCK}}
+<h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">2. Quali dati raccogliamo</h4>
+<p style="margin:0 0 10px;">Dati di identificazione: nome, cognome, sesso, data e luogo di nascita, cittadinanza, tipo, numero e luogo di rilascio del documento di identità. Dati relativi al soggiorno: date di arrivo e partenza, numero di notti, codice prenotazione, composizione del gruppo. Immagine del documento di identità, se caricata durante il check-in online. Comunicazioni: i messaggi scambiati tramite la chat dell'applicazione. Indirizzo e-mail, se prestato il consenso a comunicazioni promozionali.</p>
+<h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">3. Perché trattiamo i dati e su quale base giuridica</h4>
+<p style="margin:0 0 10px;">Comunicazione dei dati degli alloggiati alla Questura tramite il Portale Alloggiati Web &mdash; obbligo legale, art. 6.1.c GDPR e art. 109 TULPS. Comunicazioni statistiche ai portali regionali &mdash; obbligo legale, art. 6.1.c GDPR. Determinazione e riscossione dell'imposta di soggiorno &mdash; obbligo legale, art. 6.1.c GDPR. Gestione del soggiorno, informazioni pratiche, assistenza e servizio di concierge &mdash; esecuzione del contratto, art. 6.1.b GDPR. Invio di comunicazioni promozionali &mdash; consenso, art. 6.1.a GDPR, revocabile in ogni momento.</p>
+<p style="margin:0 0 10px;">Il conferimento dei dati per le prime tre finalità è obbligatorio per legge: in loro assenza non è possibile ospitarLa. Il consenso promozionale è facoltativo e il rifiuto non ha alcuna conseguenza sul soggiorno.</p>
+<h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">4. Per quanto tempo conserviamo i dati</h4>
+<p style="margin:0 0 10px;">Dati di identificazione e soggiorno: 5 anni, per obbligo di legge. Ricevute di trasmissione ai portali: 5 anni, per obbligo di legge. Immagine del documento di identità: 48 ore dall'arrivo, poi cancellazione automatica. Messaggi in chat: 90 giorni dalla chiusura della conversazione. Dati statistici di utilizzo: 180 giorni, poi aggregazione anonima. Consenso promozionale e indirizzo e-mail: fino a revoca.</p>
+<p style="margin:0 0 10px;">L'immagine del documento viene cancellata automaticamente decorso il tempo necessario alla comunicazione alle autorità. Conserviamo il dato, non l'immagine, in conformità alla nota del Garante per la protezione dei dati personali dell'aprile 2026.</p>
+<h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">5. Miglioramento del servizio</h4>
+<p style="margin:0 0 10px;">Al termine della conversazione, i messaggi scambiati con l'assistente possono essere utilizzati in forma anonimizzata per migliorare il servizio. Nome, codice prenotazione, date esatte, telefono, e-mail e numeri di documento vengono rimossi automaticamente prima della conservazione. Può opporsi a questo utilizzo comunicandolo prima della fine del soggiorno.</p>
+<h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">6. A chi comunichiamo i dati</h4>
+<p style="margin:0 0 10px;">Autorità pubbliche: Questura tramite il Portale Alloggiati Web, enti regionali per le comunicazioni statistiche, Comune per l'imposta di soggiorno.</p>
+<p style="margin:0 0 10px;">Responsabile del trattamento: WelcomeBnB, che fornisce la piattaforma tecnologica utilizzata per la raccolta dei dati, sulla base di un accordo ai sensi dell'art. 28 GDPR.</p>
+<p style="margin:0 0 10px;">Sub-responsabili incaricati dal responsabile: Supabase (banca dati e archiviazione, Unione Europea &mdash; Irlanda); Vercel (infrastruttura applicativa, Unione Europea &mdash; Irlanda); Anthropic (assistente conversazionale e lettura automatica del documento, Stati Uniti); Resend (invio e-mail, Stati Uniti).</p>
+<p style="margin:0 0 10px;">I trasferimenti verso gli Stati Uniti avvengono sulla base di clausole contrattuali tipo e/o di decisioni di adeguatezza applicabili. I dati non sono oggetto di diffusione né di vendita a terzi.</p>
+<h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">7. Processo decisionale automatizzato</h4>
+<p style="margin:0 0 10px;">I dati del documento possono essere estratti automaticamente da un sistema di lettura ottica, al solo fine di precompilare il modulo. Il risultato è sempre verificabile e modificabile. Non viene adottata alcuna decisione automatizzata che produca effetti giuridici nei Suoi confronti.</p>
+<h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">8. I Suoi diritti</h4>
+<p style="margin:0 0 10px;">Lei ha diritto di chiedere l'accesso ai dati, la rettifica, la cancellazione, la limitazione o l'opposizione al trattamento, nonché la portabilità dei dati (artt. 15&ndash;22 GDPR), e di revocare in ogni momento il consenso promozionale. Tali diritti non si estendono ai dati che siamo tenuti a conservare per obbligo di legge, che non possono essere cancellati prima della scadenza dei termini.</p>
+<p style="margin:0 0 10px;">{{RIGHTS_HOWTO}}</p>
+<p style="margin:0 0 10px;">Ha inoltre diritto di proporre reclamo al Garante per la protezione dei dati personali (<a href="https://www.garanteprivacy.it" target="_blank" rel="noopener" style="color:#005BFF;">www.garanteprivacy.it</a>).</p>
+<p style="margin:14px 0 0;font-style:italic;font-size:0.76rem;color:#6B7A90;">Ultimo aggiornamento: {{DATE}}</p>
+</section>`;
+
+const HOST_PRIVACY_TPL_EN = `
+<section>
+<h3 style="font-size:1.02rem;margin:0 0 4px;font-weight:600;">PRIVACY NOTICE</h3>
+<p style="margin:0 0 12px;font-style:italic;font-size:0.78rem;color:#6B7A90;">pursuant to Articles 13 and 14 of Regulation (EU) 2016/679</p>
+<h4 style="font-size:0.9rem;margin:14px 0 4px;font-weight:600;">1. Data controller</h4>
+<p style="margin:0 0 6px;">{{HOST_NAME}}, operator of {{PROPERTY_NAME}}{{PROPERTY_ADDRESS}}{{CIN}}.</p>
+{{CONTACT_BLOCK}}
+<h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">2. What we collect</h4>
+<p style="margin:0 0 10px;">Identification data: first name, surname, sex, date and place of birth, citizenship, identity document type, number and place of issue. Stay data: arrival and departure dates, number of nights, booking reference, composition of the party. Image of your identity document, if uploaded during online check-in. Messages exchanged through the in-app chat. Email address, where you have consented to promotional communications.</p>
+<h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">3. Why we process it, and on what legal basis</h4>
+<p style="margin:0 0 10px;">Reporting guest data to the Italian State Police via the Alloggiati Web portal &mdash; legal obligation, Art. 6(1)(c) GDPR and Art. 109 TULPS. Statistical reporting to regional authorities &mdash; legal obligation, Art. 6(1)(c). Calculating and collecting the tourist tax &mdash; legal obligation, Art. 6(1)(c). Managing your stay, practical information, assistance and concierge service &mdash; performance of a contract, Art. 6(1)(b). Sending promotional communications &mdash; consent, Art. 6(1)(a), withdrawable at any time.</p>
+<p style="margin:0 0 10px;">Providing data for the first three purposes is required by law: without it we cannot accommodate you. Marketing consent is optional and refusing has no effect on your stay.</p>
+<h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">4. How long we keep it</h4>
+<p style="margin:0 0 10px;">Identification and stay data: 5 years, legal requirement. Portal filing receipts: 5 years, legal requirement. Image of your identity document: 48 hours after arrival, then automatically deleted. Chat messages: 90 days after the conversation is closed. Usage statistics: 180 days, then anonymised. Marketing consent and email: until withdrawn.</p>
+<p style="margin:0 0 10px;">The document image is deleted automatically once the time needed to report to the authorities has passed. We keep the data, not the image, in line with the Italian Data Protection Authority's April 2026 guidance.</p>
+<h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">5. Improving our service</h4>
+<p style="margin:0 0 10px;">After your conversation ends, messages exchanged with the assistant may be used in anonymised form to improve the service. Your name, booking code, exact dates, phone, email and document numbers are removed automatically before storage. You can object to this use by telling us before the end of your stay.</p>
+<h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">6. Who we share it with</h4>
+<p style="margin:0 0 10px;">Public authorities: the State Police via the Alloggiati Web portal, regional statistical bodies, and the municipality for the tourist tax.</p>
+<p style="margin:0 0 10px;">Processor: WelcomeBnB, which provides the technology platform used to collect the data, under an Article 28 GDPR agreement.</p>
+<p style="margin:0 0 10px;">Sub-processors engaged by the processor: Supabase (database and storage, European Union &mdash; Ireland); Vercel (application infrastructure, European Union &mdash; Ireland); Anthropic (conversational assistant and document text recognition, United States); Resend (email delivery, United States).</p>
+<p style="margin:0 0 10px;">Transfers to the United States take place on the basis of standard contractual clauses and/or applicable adequacy decisions. Your data is never sold or publicly disclosed.</p>
+<h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">7. Automated processing</h4>
+<p style="margin:0 0 10px;">Document data may be extracted automatically by optical character recognition, solely to pre-fill the form. The result is always visible and editable. No automated decision producing legal effects is taken about you.</p>
+<h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">8. Your rights</h4>
+<p style="margin:0 0 10px;">You may request access, rectification, erasure, restriction, or object to processing, and request data portability (Articles 15&ndash;22 GDPR). You may withdraw marketing consent at any time. These rights do not extend to data we are legally required to retain, which cannot be deleted before the statutory period expires.</p>
+<p style="margin:0 0 10px;">{{RIGHTS_HOWTO}}</p>
+<p style="margin:0 0 10px;">You also have the right to lodge a complaint with the Italian Data Protection Authority, the Garante per la protezione dei dati personali (<a href="https://www.garanteprivacy.it" target="_blank" rel="noopener" style="color:#005BFF;">www.garanteprivacy.it</a>).</p>
+<p style="margin:14px 0 0;font-style:italic;font-size:0.76rem;color:#6B7A90;">Last updated: {{DATE}}</p>
+</section>`;
+
+function renderHostPrivacyNotice(prop, isIT) {
+  return _hostPrivacyFill(isIT ? HOST_PRIVACY_TPL_IT : HOST_PRIVACY_TPL_EN, _hostPrivacyTokens(prop, isIT));
+}
+function buildHostPrivacyDownloadHTML(prop) {
+  const it = renderHostPrivacyNotice(prop, true);
+  const en = renderHostPrivacyNotice(prop, false);
+  const propName = _hostPrivacyEsc(prop?.name || 'Property');
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Informativa privacy · ${propName}</title>
+<style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#061A3D;max-width:760px;margin:0 auto;padding:32px 24px;line-height:1.55;}h1{font-family:'Playfair Display',Georgia,serif;font-size:22px;margin:0 0 10px;}h3{font-size:16px;margin:0 0 4px;font-weight:600;}h4{font-size:14px;margin:14px 0 4px;font-weight:600;}p{margin:0 0 10px;font-size:13px;}a{color:#005BFF;}section{margin-bottom:26px;padding-bottom:22px;border-bottom:1px solid #e5e7eb;}section:last-of-type{border-bottom:0;}.footer{margin-top:24px;color:#6B7A90;font-size:11px;}</style>
+</head><body><h1>Informativa privacy &middot; Privacy notice</h1><p style="color:#6B7A90;font-size:12px;">${propName}</p>${it}${en}<p class="footer">Generato da WelcomeBnB per conto del titolare del trattamento. Copia fornita all'ospite ai sensi dell'art. 13 GDPR. &middot; Generated by WelcomeBnB on behalf of the data controller.</p></body></html>`;
+}
+
+// Warning banner — the empty-field list. Runs whenever the Property
+// panel is rendered / the language switches.
+function _updatePropPrivacyWarnings() {
+  const box = document.getElementById('propPrivacyWarnings');
+  if (!box) return;
+  const it = hostLang === 'it';
+  const missing = [];
+  const p = propertyData || {};
+  if (!(p.host_email && String(p.host_email).trim())) missing.push(it ? 'e-mail del titolare (necessaria per esercitare l\'art. 15 GDPR)' : 'host email (guests need it to exercise Art. 15 rights)');
+  if (!(p.host_phone && String(p.host_phone).trim())) missing.push(it ? 'telefono del titolare' : 'host phone');
+  if (!(p.cir_code && String(p.cir_code).trim())) missing.push(it ? 'CIN' : 'CIN');
+  if (!(p.host_names && String(p.host_names).trim())) missing.push(it ? 'nome del titolare del trattamento' : 'host name');
+  if (missing.length === 0) {
+    box.style.display = 'none';
+    box.innerHTML = '';
+    return;
+  }
+  const items = missing.map(m => `<li style="margin:2px 0;">${_hostPrivacyEsc(m)}</li>`).join('');
+  const head = it ? '⚠ Alcuni campi usati dall\'informativa sono vuoti — le righe corrispondenti vengono omesse dall\'informativa mostrata all\'ospite:' : '⚠ Some fields used by the notice are empty — the corresponding lines are dropped from what the guest sees:';
+  box.innerHTML = `<div style="margin-bottom:4px;">${_hostPrivacyEsc(head)}</div><ul style="margin:0 0 0 20px;padding:0;">${items}</ul>`;
+  box.style.display = '';
+}
+
+function openHostPrivacyPreview() {
+  const isIT = hostLang === 'it';
+  const html = renderHostPrivacyNotice(propertyData, isIT);
+  const existing = document.getElementById('hostPrivacyPreviewModal');
+  if (existing) existing.remove();
+  document.body.insertAdjacentHTML('beforeend', `
+    <div id="hostPrivacyPreviewModal" style="display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10000;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;" onclick="if(event.target===this)closeHostPrivacyPreview()">
+      <div style="background:var(--white);max-width:720px;width:100%;border-radius:14px;padding:22px 26px 20px;box-shadow:0 12px 48px rgba(0,0,0,0.25);max-height:calc(100vh - 60px);overflow-y:auto;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <h3 style="font-family:'Playfair Display',serif;font-weight:600;font-size:1.2rem;color:var(--ink);margin:0;">${_hostPrivacyEsc(isIT ? 'Anteprima informativa privacy' : 'Privacy notice preview')}</h3>
+          <button onclick="closeHostPrivacyPreview()" style="background:none;border:none;font-size:1.4rem;color:var(--ink-soft);cursor:pointer;padding:2px 8px;line-height:1;">×</button>
+        </div>
+        <div style="font-size:0.72rem;color:var(--ink-soft);margin-bottom:8px;">${_hostPrivacyEsc(isIT ? 'Esattamente ciò che vede l\'ospite. Cambia lingua usando il selettore in alto per vedere l\'altra versione.' : 'This is exactly what the guest sees. Use the language toggle at the top to see the other version.')}</div>
+        <div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;background:var(--cream);font-size:0.86rem;color:var(--ink);line-height:1.55;">${html}</div>
+        <div style="margin-top:12px;display:flex;justify-content:flex-end;gap:8px;">
+          <button type="button" class="btn btn-secondary" onclick="downloadHostPrivacyNotice()">⬇ ${_hostPrivacyEsc(isIT ? 'Scarica HTML' : 'Download HTML')}</button>
+          <button type="button" class="btn btn-primary" onclick="closeHostPrivacyPreview()">${_hostPrivacyEsc(isIT ? 'Chiudi' : 'Close')}</button>
+        </div>
+      </div>
+    </div>`);
+}
+function closeHostPrivacyPreview() {
+  document.getElementById('hostPrivacyPreviewModal')?.remove();
+}
+function downloadHostPrivacyNotice() {
+  try {
+    const html = buildHostPrivacyDownloadHTML(propertyData);
+    const slug = _hostPrivacySlug(propertyData?.name);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `informativa-privacy-${slug}.html`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+    if (typeof track === 'function') track('privacy_download_host');
+  } catch (e) {
+    console.error('privacy download failed:', e);
+  }
+}
+
 function renderTaxConfigPanel() {
   const list = document.getElementById('propTaxRulesList');
   const decList = document.getElementById('propTaxDeclaredList');
@@ -10105,6 +10305,9 @@ function fillPropertyForm(data) {
   _taxRulesDraft   = Array.isArray(data.tax_rules) ? JSON.parse(JSON.stringify(data.tax_rules)) : [];
   _taxDeclaredDraft = Array.isArray(data.tax_declared_exemptions) ? JSON.parse(JSON.stringify(data.tax_declared_exemptions)) : [];
   if (typeof renderTaxConfigPanel === 'function') renderTaxConfigPanel();
+  // Round 38 — recompute the privacy-notice empty-field warning after
+  // the form has been repainted with fresh propertyData.
+  if (typeof _updatePropPrivacyWarnings === 'function') _updatePropPrivacyWarnings();
   onToggleRotatingLockbox(); // sync the "show rotating" sub-toggle visibility with the parent
   if (el('propWifiName')) el('propWifiName').value = data.wifi_name || '';
   if (el('propWifiPass')) el('propWifiPass').value = data.wifi_password || '';

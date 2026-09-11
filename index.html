@@ -5040,76 +5040,210 @@ function exitTestMode() {
 setupTestModeBanner();
 init();
 </script>
-<!-- ── Round 13.1 — Privacy notice modal (guest) ─────────────────────── -->
+<!-- ── Round 38 — Guest privacy notice (Art. 13/14 GDPR, host is titolare) ─── -->
 <div id="privacyLink" onclick="openPrivacyModal()" style="position:fixed;bottom:74px;right:12px;z-index:1100;background:rgba(255,255,255,0.94);backdrop-filter:blur(8px);border:1px solid rgba(6,26,61,0.1);border-radius:6px;padding:5px 11px;font-size:0.7rem;color:var(--ink);cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 1px 3px rgba(0,0,0,0.08);user-select:none;opacity:0.85;">Privacy</div>
 
 <div id="privacyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:flex-start;justify-content:center;padding:24px 12px;overflow-y:auto;" onclick="if(event.target===this)closePrivacyModal()">
-  <div style="background:var(--cream);max-width:680px;width:100%;border-radius:14px;padding:24px 26px 20px;box-shadow:0 12px 48px rgba(0,0,0,0.3);max-height:calc(100vh - 48px);overflow-y:auto;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <h2 id="privacyModalTitle" style="font-family:'Playfair Display',serif;font-weight:600;font-size:1.35rem;color:var(--ink);margin:0;">Privacy &amp; Data</h2>
+  <div style="background:var(--cream);max-width:720px;width:100%;border-radius:14px;padding:24px 26px 20px;box-shadow:0 12px 48px rgba(0,0,0,0.3);max-height:calc(100vh - 48px);overflow-y:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <h2 id="privacyModalTitle" style="font-family:'Playfair Display',serif;font-weight:600;font-size:1.35rem;color:var(--ink);margin:0;">Privacy</h2>
       <button onclick="closePrivacyModal()" style="background:none;border:none;font-size:1.5rem;color:var(--ink);opacity:0.55;cursor:pointer;padding:2px 8px;line-height:1;">×</button>
     </div>
-
-    <div id="privacyContentEN" style="font-size:0.84rem;color:var(--ink);line-height:1.55;">
-      <p style="margin:0 0 12px;font-size:0.74rem;color:rgba(6,26,61,0.65);">
-        <strong>Operated by:</strong> WelcomeBnB · <strong>Contact:</strong> info@welcomebnb.it
-      </p>
-
-      <h3 style="font-size:0.95rem;color:var(--ink);margin:14px 0 5px;font-weight:600;">How long we keep your data</h3>
-      <ul style="margin:0 0 12px 20px;padding:0;">
-        <li style="margin:3px 0;"><strong>Conversations</strong> with the AI assistant or your host: kept for up to 90 days after the conversation ends, then permanently deleted.</li>
-        <li style="margin:3px 0;"><strong>Your check-in data</strong> (name, document number, dates of stay): kept for 5 years as required by Italian public-security law (Alloggiati Web).</li>
-        <li style="margin:3px 0;"><strong>Your document photo</strong>: kept for <strong>48 hours after arrival</strong>, then permanently deleted. Following the Italian Garante's April 2026 clarification — the law requires the data to be transmitted, not the image to be retained.</li>
-        <li style="margin:3px 0;"><strong>App usage</strong> (which pages you opened, which recommendations you tapped): kept for 180 days, then anonymized into monthly totals.</li>
-      </ul>
-
-      <h3 style="font-size:0.95rem;color:var(--ink);margin:14px 0 5px;font-weight:600;">Improving our service</h3>
-      <p style="margin:0 0 12px;">
-        After your conversation ends, we may use it in <strong>anonymized form</strong> to improve the service. Your name, booking code, exact dates, phone, email, and document numbers are programmatically removed before the anonymized version is kept. Only the question topic, the answer, and broad context (region, season, length-of-stay range) remain. Legal basis: legitimate interest in service improvement (Art. 6(1)(f) GDPR).
-      </p>
-
-      <h3 style="font-size:0.95rem;color:var(--ink);margin:14px 0 5px;font-weight:600;">Your rights</h3>
-      <p style="margin:0 0 12px;">
-        You can ask to access, correct, or delete your data, or to receive a copy, by emailing <a href="mailto:info@welcomebnb.it" style="color:var(--warm);">info@welcomebnb.it</a>. You can also object to your conversations being used in the anonymized dataset — let us know before the end of your stay. We respond within 30 days. To complain about how your data was handled, contact the Italian Garante (<a href="https://www.garanteprivacy.it" target="_blank" rel="noopener" style="color:var(--warm);">www.garanteprivacy.it</a>).
-      </p>
+    <div id="privacyContentBody" style="font-size:0.84rem;color:var(--ink);line-height:1.55;"></div>
+    <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button onclick="downloadPrivacyNotice()" id="privacyModalDownload" style="padding:9px 18px;background:var(--white);color:var(--ink);border:1px solid rgba(6,26,61,0.16);border-radius:6px;font-size:0.84rem;cursor:pointer;font-family:'DM Sans',sans-serif;">⬇ Scarica</button>
+      <button onclick="closePrivacyModal()" id="privacyModalClose" style="padding:9px 20px;background:var(--warm);color:#fff;border:none;border-radius:6px;font-size:0.84rem;cursor:pointer;font-family:'DM Sans',sans-serif;">Chiudi</button>
     </div>
-
-    <div id="privacyContentIT" style="display:none;font-size:0.84rem;color:var(--ink);line-height:1.55;">
-      <p style="margin:0 0 12px;font-size:0.74rem;color:rgba(6,26,61,0.65);">
-        <strong>Gestito da:</strong> WelcomeBnB · <strong>Contatti:</strong> info@welcomebnb.it
-      </p>
-
-      <h3 style="font-size:0.95rem;color:var(--ink);margin:14px 0 5px;font-weight:600;">Per quanto tempo conserviamo i tuoi dati</h3>
-      <ul style="margin:0 0 12px 20px;padding:0;">
-        <li style="margin:3px 0;"><strong>Conversazioni</strong> con l'assistente AI o con l'host: conservate fino a 90 giorni dalla fine della conversazione, poi eliminate definitivamente.</li>
-        <li style="margin:3px 0;"><strong>I tuoi dati di check-in</strong> (nome, numero documento, date soggiorno): conservati per 5 anni come richiesto dalla normativa di pubblica sicurezza italiana (Alloggiati Web).</li>
-        <li style="margin:3px 0;"><strong>La foto del tuo documento</strong>: conservata per <strong>48 ore dall'arrivo</strong>, poi cancellata definitivamente. Segue la nota del Garante di aprile 2026 — la normativa richiede la trasmissione dei dati, non la conservazione dell'immagine.</li>
-        <li style="margin:3px 0;"><strong>Utilizzo dell'app</strong> (pagine aperte, consigli cliccati): conservato per 180 giorni, poi anonimizzato in totali mensili.</li>
-      </ul>
-
-      <h3 style="font-size:0.95rem;color:var(--ink);margin:14px 0 5px;font-weight:600;">Miglioramento del servizio</h3>
-      <p style="margin:0 0 12px;">
-        Dopo la fine della tua conversazione, potremmo utilizzarla in <strong>forma anonimizzata</strong> per migliorare il servizio. Il tuo nome, codice di prenotazione, date esatte, telefono, email e numeri di documento vengono rimossi automaticamente prima che la versione anonimizzata venga conservata. Rimangono solo l'argomento della domanda, la risposta e il contesto generale (regione, stagione, fascia di durata del soggiorno). Base giuridica: interesse legittimo al miglioramento del servizio (art. 6(1)(f) GDPR).
-      </p>
-
-      <h3 style="font-size:0.95rem;color:var(--ink);margin:14px 0 5px;font-weight:600;">I tuoi diritti</h3>
-      <p style="margin:0 0 12px;">
-        Puoi richiedere l'accesso, la rettifica o la cancellazione dei tuoi dati, o riceverne una copia, scrivendo a <a href="mailto:info@welcomebnb.it" style="color:var(--warm);">info@welcomebnb.it</a>. Puoi anche opporti all'uso delle tue conversazioni nel dataset anonimizzato — comunicacelo prima della fine del soggiorno. Rispondiamo entro 30 giorni. Per reclami sulla gestione dei tuoi dati, puoi rivolgerti al Garante per la Protezione dei Dati Personali (<a href="https://www.garanteprivacy.it" target="_blank" rel="noopener" style="color:var(--warm);">www.garanteprivacy.it</a>).
-      </p>
-    </div>
-
-    <button onclick="closePrivacyModal()" id="privacyModalClose" style="margin-top:6px;padding:9px 20px;background:var(--warm);color:#fff;border:none;border-radius:6px;font-size:0.84rem;cursor:pointer;font-family:'DM Sans',sans-serif;">Close</button>
   </div>
 </div>
 
 <script>
+/* Round 38 · Guest privacy notice
+   ─────────────────────────────────────────────────────────────────
+   The template is filled from propertyData (loaded on init from
+   .select('*')). Missing tokens degrade whole lines: no stray dashes,
+   labels or "undefined" appear. Retention figures carry Round 36's
+   48-hours-after-arrival unchanged. Under GDPR the HOST is titolare
+   del trattamento; WelcomeBnB is responsabile. That correction is
+   why the notice had to be rebuilt.
+   ───────────────────────────────────────────────────────────────── */
+function _privacyEsc(s) {
+  return String(s == null ? '' : s).replace(/[<>&"']/g, c =>
+    ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function _privacyLabels(isIT) {
+  return isIT ? { title: 'Informativa privacy', download: '⬇ Scarica', close: 'Chiudi' }
+              : { title: 'Privacy notice',      download: '⬇ Download', close: 'Close' };
+}
+function _privacySlug(s) {
+  return String(s || 'property').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'property';
+}
+function _privacyTokens(prop, isIT) {
+  const p = prop || {};
+  const hostNameRaw = (p.host_names && p.host_names.trim()) || (p.name && p.name.trim()) || '';
+  const propNameRaw = (p.name && p.name.trim()) || '';
+  const addressParts = [p.address, p.zip, p.city].map(x => (x || '').toString().trim()).filter(Boolean);
+  const addressRaw = addressParts.join(', ');
+  const cinRaw   = (p.cir_code && p.cir_code.trim()) || '';   // properties.cir_code holds the CIN
+  const emailRaw = (p.host_email && p.host_email.trim()) || '';
+  const phoneRaw = (p.host_phone && p.host_phone.trim()) || '';
+  const today = new Date();
+  const dateStr = today.toLocaleDateString(isIT ? 'it-IT' : 'en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  // Pre-composed HTML fragments so the template only has {{TOKEN}}s —
+  // a fragment is either a filled string or '' (in which case its host
+  // paragraph is dropped by _privacyDropEmpty).
+  const hostName   = hostNameRaw ? _privacyEsc(hostNameRaw)   : '';
+  const propName   = propNameRaw ? _privacyEsc(propNameRaw)   : (isIT ? '(struttura non specificata)' : '(property not set)');
+  const address    = addressRaw  ? ', ' + _privacyEsc(addressRaw) : '';
+  const cin        = cinRaw      ? ', ' + (isIT ? 'CIN ' : 'CIN ') + _privacyEsc(cinRaw) : '';
+  const contactBits = [];
+  if (emailRaw) contactBits.push('<a href="mailto:' + _privacyEsc(emailRaw) + '" style="color:var(--warm);">' + _privacyEsc(emailRaw) + '</a>');
+  if (phoneRaw) contactBits.push(_privacyEsc(phoneRaw));
+  const contactBlock = contactBits.length
+    ? `<p style="margin:6px 0 0;font-size:0.76rem;color:rgba(6,26,61,0.72);">${_privacyEsc(isIT ? 'Contatti:' : 'Contact:')} ${contactBits.join(' &mdash; ')}</p>`
+    : '';
+  const rightsHowTo = emailRaw
+    ? (isIT
+        ? `Per esercitarli scriva a <a href="mailto:${_privacyEsc(emailRaw)}" style="color:var(--warm);">${_privacyEsc(emailRaw)}</a>. Rispondiamo entro 30 giorni.`
+        : `To exercise them, write to <a href="mailto:${_privacyEsc(emailRaw)}" style="color:var(--warm);">${_privacyEsc(emailRaw)}</a>. We respond within 30 days.`)
+    : (isIT
+        ? 'Per esercitarli contatti il titolare del trattamento indicato al punto 1. Rispondiamo entro 30 giorni.'
+        : 'To exercise them, contact the data controller named in Section 1. We respond within 30 days.');
+  return {
+    HOST_NAME:        hostName || _privacyEsc(isIT ? '(host non specificato)' : '(host not set)'),
+    PROPERTY_NAME:    propName,
+    PROPERTY_ADDRESS: address,
+    CIN:              cin,
+    CONTACT_BLOCK:    contactBlock,
+    RIGHTS_HOWTO:     rightsHowTo,
+    DATE:             _privacyEsc(dateStr),
+  };
+}
+function _privacyFill(template, tokens) {
+  return template.replace(/\{\{([A-Z_]+)\}\}/g, (_, k) => (k in tokens ? tokens[k] : ''));
+}
+
+const PRIVACY_TEMPLATE_IT = `
+<section>
+  <h3 style="font-size:1.02rem;margin:0 0 4px;font-weight:600;">INFORMATIVA SUL TRATTAMENTO DEI DATI PERSONALI</h3>
+  <p style="margin:0 0 12px;font-style:italic;font-size:0.78rem;color:rgba(6,26,61,0.75);">ai sensi degli artt. 13 e 14 del Regolamento (UE) 2016/679</p>
+  <h4 style="font-size:0.9rem;margin:14px 0 4px;font-weight:600;">1. Titolare del trattamento</h4>
+  <p style="margin:0 0 6px;">{{HOST_NAME}}, gestore della struttura ricettiva {{PROPERTY_NAME}}{{PROPERTY_ADDRESS}}{{CIN}}.</p>
+  {{CONTACT_BLOCK}}
+  <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">2. Quali dati raccogliamo</h4>
+  <p style="margin:0 0 10px;">Dati di identificazione: nome, cognome, sesso, data e luogo di nascita, cittadinanza, tipo, numero e luogo di rilascio del documento di identità. Dati relativi al soggiorno: date di arrivo e partenza, numero di notti, codice prenotazione, composizione del gruppo. Immagine del documento di identità, se caricata durante il check-in online. Comunicazioni: i messaggi scambiati tramite la chat dell'applicazione. Indirizzo e-mail, se prestato il consenso a comunicazioni promozionali.</p>
+  <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">3. Perché trattiamo i dati e su quale base giuridica</h4>
+  <p style="margin:0 0 10px;">Comunicazione dei dati degli alloggiati alla Questura tramite il Portale Alloggiati Web &mdash; obbligo legale, art. 6.1.c GDPR e art. 109 TULPS. Comunicazioni statistiche ai portali regionali &mdash; obbligo legale, art. 6.1.c GDPR. Determinazione e riscossione dell'imposta di soggiorno &mdash; obbligo legale, art. 6.1.c GDPR. Gestione del soggiorno, informazioni pratiche, assistenza e servizio di concierge &mdash; esecuzione del contratto, art. 6.1.b GDPR. Invio di comunicazioni promozionali &mdash; consenso, art. 6.1.a GDPR, revocabile in ogni momento.</p>
+  <p style="margin:0 0 10px;">Il conferimento dei dati per le prime tre finalità è obbligatorio per legge: in loro assenza non è possibile ospitarLa. Il consenso promozionale è facoltativo e il rifiuto non ha alcuna conseguenza sul soggiorno.</p>
+  <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">4. Per quanto tempo conserviamo i dati</h4>
+  <p style="margin:0 0 10px;">Dati di identificazione e soggiorno: 5 anni, per obbligo di legge. Ricevute di trasmissione ai portali: 5 anni, per obbligo di legge. Immagine del documento di identità: 48 ore dall'arrivo, poi cancellazione automatica. Messaggi in chat: 90 giorni dalla chiusura della conversazione. Dati statistici di utilizzo: 180 giorni, poi aggregazione anonima. Consenso promozionale e indirizzo e-mail: fino a revoca.</p>
+  <p style="margin:0 0 10px;">L'immagine del documento viene cancellata automaticamente decorso il tempo necessario alla comunicazione alle autorità. Conserviamo il dato, non l'immagine, in conformità alla nota del Garante per la protezione dei dati personali dell'aprile 2026.</p>
+  <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">5. Miglioramento del servizio</h4>
+  <p style="margin:0 0 10px;">Al termine della conversazione, i messaggi scambiati con l'assistente possono essere utilizzati in forma anonimizzata per migliorare il servizio. Nome, codice prenotazione, date esatte, telefono, e-mail e numeri di documento vengono rimossi automaticamente prima della conservazione. Può opporsi a questo utilizzo comunicandolo prima della fine del soggiorno.</p>
+  <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">6. A chi comunichiamo i dati</h4>
+  <p style="margin:0 0 10px;">Autorità pubbliche: Questura tramite il Portale Alloggiati Web, enti regionali per le comunicazioni statistiche, Comune per l'imposta di soggiorno.</p>
+  <p style="margin:0 0 10px;">Responsabile del trattamento: WelcomeBnB, che fornisce la piattaforma tecnologica utilizzata per la raccolta dei dati, sulla base di un accordo ai sensi dell'art. 28 GDPR.</p>
+  <p style="margin:0 0 10px;">Sub-responsabili incaricati dal responsabile: Supabase (banca dati e archiviazione, Unione Europea &mdash; Irlanda); Vercel (infrastruttura applicativa, Unione Europea &mdash; Irlanda); Anthropic (assistente conversazionale e lettura automatica del documento, Stati Uniti); Resend (invio e-mail, Stati Uniti).</p>
+  <p style="margin:0 0 10px;">I trasferimenti verso gli Stati Uniti avvengono sulla base di clausole contrattuali tipo e/o di decisioni di adeguatezza applicabili. I dati non sono oggetto di diffusione né di vendita a terzi.</p>
+  <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">7. Processo decisionale automatizzato</h4>
+  <p style="margin:0 0 10px;">I dati del documento possono essere estratti automaticamente da un sistema di lettura ottica, al solo fine di precompilare il modulo. Il risultato è sempre verificabile e modificabile. Non viene adottata alcuna decisione automatizzata che produca effetti giuridici nei Suoi confronti.</p>
+  <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">8. I Suoi diritti</h4>
+  <p style="margin:0 0 10px;">Lei ha diritto di chiedere l'accesso ai dati, la rettifica, la cancellazione, la limitazione o l'opposizione al trattamento, nonché la portabilità dei dati (artt. 15&ndash;22 GDPR), e di revocare in ogni momento il consenso promozionale. Tali diritti non si estendono ai dati che siamo tenuti a conservare per obbligo di legge, che non possono essere cancellati prima della scadenza dei termini.</p>
+  <p style="margin:0 0 10px;">{{RIGHTS_HOWTO}}</p>
+  <p style="margin:0 0 10px;">Ha inoltre diritto di proporre reclamo al Garante per la protezione dei dati personali (<a href="https://www.garanteprivacy.it" target="_blank" rel="noopener" style="color:var(--warm);">www.garanteprivacy.it</a>).</p>
+  <p style="margin:14px 0 0;font-style:italic;font-size:0.76rem;color:rgba(6,26,61,0.7);">Ultimo aggiornamento: {{DATE}}</p>
+</section>`;
+
+const PRIVACY_TEMPLATE_EN = `
+<section>
+  <h3 style="font-size:1.02rem;margin:0 0 4px;font-weight:600;">PRIVACY NOTICE</h3>
+  <p style="margin:0 0 12px;font-style:italic;font-size:0.78rem;color:rgba(6,26,61,0.75);">pursuant to Articles 13 and 14 of Regulation (EU) 2016/679</p>
+  <h4 style="font-size:0.9rem;margin:14px 0 4px;font-weight:600;">1. Data controller</h4>
+  <p style="margin:0 0 6px;">{{HOST_NAME}}, operator of {{PROPERTY_NAME}}{{PROPERTY_ADDRESS}}{{CIN}}.</p>
+  {{CONTACT_BLOCK}}
+  <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">2. What we collect</h4>
+  <p style="margin:0 0 10px;">Identification data: first name, surname, sex, date and place of birth, citizenship, identity document type, number and place of issue. Stay data: arrival and departure dates, number of nights, booking reference, composition of the party. Image of your identity document, if uploaded during online check-in. Messages exchanged through the in-app chat. Email address, where you have consented to promotional communications.</p>
+  <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">3. Why we process it, and on what legal basis</h4>
+  <p style="margin:0 0 10px;">Reporting guest data to the Italian State Police via the Alloggiati Web portal &mdash; legal obligation, Art. 6(1)(c) GDPR and Art. 109 TULPS. Statistical reporting to regional authorities &mdash; legal obligation, Art. 6(1)(c). Calculating and collecting the tourist tax &mdash; legal obligation, Art. 6(1)(c). Managing your stay, practical information, assistance and concierge service &mdash; performance of a contract, Art. 6(1)(b). Sending promotional communications &mdash; consent, Art. 6(1)(a), withdrawable at any time.</p>
+  <p style="margin:0 0 10px;">Providing data for the first three purposes is required by law: without it we cannot accommodate you. Marketing consent is optional and refusing has no effect on your stay.</p>
+  <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">4. How long we keep it</h4>
+  <p style="margin:0 0 10px;">Identification and stay data: 5 years, legal requirement. Portal filing receipts: 5 years, legal requirement. Image of your identity document: 48 hours after arrival, then automatically deleted. Chat messages: 90 days after the conversation is closed. Usage statistics: 180 days, then anonymised. Marketing consent and email: until withdrawn.</p>
+  <p style="margin:0 0 10px;">The document image is deleted automatically once the time needed to report to the authorities has passed. We keep the data, not the image, in line with the Italian Data Protection Authority's April 2026 guidance.</p>
+  <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">5. Improving our service</h4>
+  <p style="margin:0 0 10px;">After your conversation ends, messages exchanged with the assistant may be used in anonymised form to improve the service. Your name, booking code, exact dates, phone, email and document numbers are removed automatically before storage. You can object to this use by telling us before the end of your stay.</p>
+  <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">6. Who we share it with</h4>
+  <p style="margin:0 0 10px;">Public authorities: the State Police via the Alloggiati Web portal, regional statistical bodies, and the municipality for the tourist tax.</p>
+  <p style="margin:0 0 10px;">Processor: WelcomeBnB, which provides the technology platform used to collect the data, under an Article 28 GDPR agreement.</p>
+  <p style="margin:0 0 10px;">Sub-processors engaged by the processor: Supabase (database and storage, European Union &mdash; Ireland); Vercel (application infrastructure, European Union &mdash; Ireland); Anthropic (conversational assistant and document text recognition, United States); Resend (email delivery, United States).</p>
+  <p style="margin:0 0 10px;">Transfers to the United States take place on the basis of standard contractual clauses and/or applicable adequacy decisions. Your data is never sold or publicly disclosed.</p>
+  <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">7. Automated processing</h4>
+  <p style="margin:0 0 10px;">Document data may be extracted automatically by optical character recognition, solely to pre-fill the form. The result is always visible and editable. No automated decision producing legal effects is taken about you.</p>
+  <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">8. Your rights</h4>
+  <p style="margin:0 0 10px;">You may request access, rectification, erasure, restriction, or object to processing, and request data portability (Articles 15&ndash;22 GDPR). You may withdraw marketing consent at any time. These rights do not extend to data we are legally required to retain, which cannot be deleted before the statutory period expires.</p>
+  <p style="margin:0 0 10px;">{{RIGHTS_HOWTO}}</p>
+  <p style="margin:0 0 10px;">You also have the right to lodge a complaint with the Italian Data Protection Authority, the Garante per la protezione dei dati personali (<a href="https://www.garanteprivacy.it" target="_blank" rel="noopener" style="color:var(--warm);">www.garanteprivacy.it</a>).</p>
+  <p style="margin:14px 0 0;font-style:italic;font-size:0.76rem;color:rgba(6,26,61,0.7);">Last updated: {{DATE}}</p>
+</section>`;
+
+function renderPrivacyNotice(propData, isIT) {
+  const tokens = _privacyTokens(propData, isIT);
+  return _privacyFill(isIT ? PRIVACY_TEMPLATE_IT : PRIVACY_TEMPLATE_EN, tokens);
+}
+
+// Downloaded file is self-contained: inline styles, no external
+// fonts, no CDNs. Both languages included so the guest's copy is
+// complete regardless of which language they were viewing.
+function buildPrivacyDownloadHTML(propData) {
+  const it = renderPrivacyNotice(propData, true);
+  const en = renderPrivacyNotice(propData, false);
+  const propName = _privacyEsc((propData?.name || 'Property'));
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Informativa privacy · ${propName}</title>
+<style>
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#061A3D;max-width:760px;margin:0 auto;padding:32px 24px;line-height:1.55;}
+  h1{font-family:'Playfair Display',Georgia,serif;font-size:22px;margin:0 0 10px;}
+  h3{font-size:16px;margin:0 0 4px;font-weight:600;}
+  h4{font-size:14px;margin:14px 0 4px;font-weight:600;}
+  p{margin:0 0 10px;font-size:13px;}
+  a{color:#005BFF;}
+  section{margin-bottom:26px;padding-bottom:22px;border-bottom:1px solid #e5e7eb;}
+  section:last-of-type{border-bottom:0;}
+  .footer{margin-top:24px;color:#6B7A90;font-size:11px;}
+</style></head><body>
+<h1>Informativa privacy · Privacy notice</h1>
+<p style="color:#6B7A90;font-size:12px;">${propName}</p>
+${it}
+${en}
+<p class="footer">Generato da WelcomeBnB per conto del titolare del trattamento. Copia fornita all'ospite ai sensi dell'art. 13 GDPR. &middot; Generated by WelcomeBnB on behalf of the data controller.</p>
+</body></html>`;
+}
+
+function downloadPrivacyNotice() {
+  try {
+    const html = buildPrivacyDownloadHTML(propertyData);
+    const slug = _privacySlug(propertyData?.name);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `informativa-privacy-${slug}.html`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+    if (typeof track === 'function') track('privacy_download');
+  } catch (e) {
+    console.error('privacy download failed:', e);
+  }
+}
+
 function openPrivacyModal() {
-  // lang variable lives in the main script's scope
   const isIT = (typeof lang !== 'undefined' && lang === 'it');
-  document.getElementById('privacyContentEN').style.display = isIT ? 'none' : 'block';
-  document.getElementById('privacyContentIT').style.display = isIT ? 'block' : 'none';
-  document.getElementById('privacyModalTitle').textContent = isIT ? 'Privacy e dati' : 'Privacy & Data';
-  document.getElementById('privacyModalClose').textContent = isIT ? 'Chiudi' : 'Close';
+  const L = _privacyLabels(isIT);
+  document.getElementById('privacyModalTitle').textContent   = L.title;
+  document.getElementById('privacyModalDownload').textContent = L.download;
+  document.getElementById('privacyModalClose').textContent    = L.close;
+  document.getElementById('privacyContentBody').innerHTML     = renderPrivacyNotice(propertyData, isIT);
   document.getElementById('privacyLink').textContent = 'Privacy';
   document.getElementById('privacyModal').style.display = 'flex';
   document.body.style.overflow = 'hidden';

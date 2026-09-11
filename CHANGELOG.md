@@ -65,6 +65,29 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 38 — Guest privacy notice (host as titolare) + invite-only host access _(2026-09-11)_
+**Part A · Guest privacy notice.** Old modal (`index.html` ~5041) named WelcomeBnB as data controller. Under GDPR the host is *titolare del trattamento*; WelcomeBnB is *responsabile*. The notice is legally the host's and must identify them.
+- Notice rebuilt as a template driven by `propertyData` with `{{TOKEN}}` substitution. Tokens degrade gracefully: `{{CIN}}` becomes `, CIN X` or nothing, `{{CONTACT_BLOCK}}` becomes the full paragraph or nothing, `{{RIGHTS_HOWTO}}` swaps between "write to …" and "contact the data controller named in Section 1" when `host_email` is empty. Verified against three property shapes — full, email-missing, all-empty — no orphan dashes, labels or "undefined".
+- Verbatim Art. 13 text from the spec, IT + EN, with the Round 36 retention figures (48 hours after arrival, 5 years for identification, 90 days for chat, 180 days for usage) carried through unchanged.
+- Round 13's **§5 "Improving our service" objection route is preserved** — the admin GDPR Objections card depends on guests still having a way to say no.
+- **⚠ Legal flag**: §5 covers an *anonymised conversation dataset*. The current Art. 28 agreement with WelcomeBnB authorises *aggregated anonymous statistics*, which may be narrower. Needs confirmation with the privacy lawyer before this section stays production-ready.
+- Download button on the modal builds a self-contained HTML file (inline styles, no fonts, no CDNs) containing **both** language versions. Filename `informativa-privacy-{property-slug}.html`. Analytics: `track('privacy_download')`.
+- Host console gains a "Guest privacy notice" card on the Property panel with a preview modal + Download button and a **warning banner listing empty fields** (host email, phone, CIN, host_names) — an empty `host_email` means a guest has no route to Art. 15 rights. Templates duplicate the source of truth because there's no bundler; keep them in sync.
+- **Column comment**: `properties.cir_code` now carries `COMMENT ON COLUMN` explaining it actually holds the CIN. No `cin_code` column was created. The name is a legacy holdover from before the CIR→CIN rename.
+
+**Part B · Invite-only host access.** `handleAuth` called `sb.auth.signUp()` with no gate. 9 accounts in `auth.users` today, several unused.
+- Migration `migration_round38_pilot_invites.sql`: new `public.pilot_invites (email lower unique, status IN ('invited','accepted','revoked'), invited_at, accepted_at, invited_by, notes)` with the Round 20.2 GRANT-first + admin-only RLS pattern. Round 20.2 gotcha applies — GRANTs go on before RLS or reads silently return zero.
+- **Backfilled** 9 `accepted` rows from `auth.users` so the audit view starts from reality. `invited_at` defaults to `created_at`; `accepted_at` uses `last_sign_in_at` (falling back to `created_at`).
+- New RPC `list_hosts_for_admin()` (SECURITY DEFINER, `is_admin()` gate inside) returns one row per `auth.users` with property count + invite status. Anon can't call it; a non-admin JWT gets zero rows.
+- Host console: `isSignUp` (was a `let`) is now a dead `const false`; `toggleAuthMode`, the signup branch of `handleAuth`, the identities-length check for `login_err_exists`, and the create-account link are removed. Sign-in path unchanged; password reset still works. Login screen adds one line — "Access is by invitation. Contact info@welcomebnb.it to join the pilot." — bilingual, `data-h="login_invite_only"`. Orphan i18n keys (`login_create`, `login_creating`, `login_no_account`, `login_create_link`, `login_has_account`, `login_signin_link`, `login_err_exists`) pruned from both dictionaries.
+- New endpoint `api/admin-invite-host.js` — invite / resend / revoke. CORS via `api/_cors.js` (Round 34.2), Supabase JWT verified through the auth endpoint (same pattern as `api/ical-sync.js`), then admin status re-confirmed **server-side** via `is_admin()` RPC before any admin call runs. Body cap 4 KB. Uses the GoTrue admin API (`auth.admin.inviteUserByEmail`; delete-user only when the auth row exists, has never signed in, and owns zero properties; otherwise flagged for manual review).
+- Admin Ops tab grows an "Invites" panel: full `pilot_invites` table with status pill + timeline + property count + Resend/Revoke buttons, invite form, plus an **Audit box** listing every account with no invite row OR zero properties. Auth is scoped by the SECURITY DEFINER RPC — non-admins reading admin.html get an empty audit, not an unauthorised peek.
+- **🚨 Deployment gate — do this BEFORE trusting the round.** The invite gate is enforced at the Supabase project level: **Authentication → Sign In / Providers → Email → "Allow new users to sign up" = OFF**. Without that toggle, `sb.auth.signUp()` still works against the anon key from any browser regardless of what the host console renders. The client-side change alone is cosmetic.
+
+**Files**: `migration_round38_pilot_invites.sql`, `api/admin-invite-host.js`, `index.html`, `host-console.html`, `admin.html`, `CHANGELOG.md`.
+
+**Not done here** (tag push): the session's GitHub token still refuses tag refs with 403 — `v37-tax-config` exists locally at `main` tip and needs to be pushed from your machine.
+
 ### Round 37 (redux) — Universal, per-property tourist-tax configuration _(2026-09-10)_
 - **Supersedes the earlier "shared comune rulesets" pass on the same day.** The premise there was wrong: rules that live in a central table make the operator a research bottleneck for every new comune and shift liability onto the wrong party. The host is *responsabile d'imposta*; the values in their declaration must be theirs. Comune-shared configuration is out.
 - **Migration `migration_round37_tax_config.sql`** — additive on `properties`:

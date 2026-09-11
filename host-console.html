@@ -3913,6 +3913,25 @@ function h(key) { return HT[hostLang][key] || HT['en'][key] || key; }
 
 function setHostLang(l) {
   hostLang = l;
+  // Round 37.6 — persist the host's language on the current property so
+  // the daily reminder cron sends emails in this language. Best-effort;
+  // failures don't block the UI switch. Uses the Round 20.2
+  // .select()-after-update pattern so a silent RLS block is loud in
+  // the console but doesn't surface a scary toast when nobody asked.
+  if (typeof propertyId !== 'undefined' && propertyId && (l === 'en' || l === 'it')) {
+    const prev = propertyData?.host_language;
+    if (prev !== l) {
+      if (propertyData) propertyData.host_language = l; // optimistic
+      sb.from('properties')
+        .update({ host_language: l })
+        .eq('id', propertyId)
+        .select('id, host_language')
+        .then(({ data, error }) => {
+          if (error) console.warn('host_language save failed:', error);
+          else if (!data || data.length === 0) console.warn('host_language save blocked by RLS (0 rows)');
+        });
+    }
+  }
   // Update toggle buttons
   document.querySelectorAll('.lang-opt-h').forEach(btn => {
     const isActive = btn.textContent.trim() === l.toUpperCase();
@@ -9765,6 +9784,13 @@ async function init() {
     if (chosen) {
       propertyId = chosen.id;
       propertyData = chosen;
+      // Round 37.6 — restore the language pref stored on this property so
+      // the UI opens in the language the host actually reads (and so
+      // reminder emails match). setHostLang re-persists the value only
+      // if it changes, so this doesn't cause a redundant DB write.
+      if (chosen.host_language === 'en' || chosen.host_language === 'it') {
+        setHostLang(chosen.host_language);
+      }
       fillPropertyForm(chosen);
       // First-property onboarding banner (only when the single property is blank)
       if (allProperties.length === 1 && !chosen.address && !chosen.wifi_name) {
@@ -9923,6 +9949,12 @@ async function switchProperty(propId) {
   propertyData = target;
   localStorage.setItem('wbnb_host_selected_property', propId);
 
+  // Round 37.6 — switching properties also switches the reminder-email
+  // language to whatever this property is set to. setHostLang is a
+  // no-op DB-write when the value matches.
+  if ((target.host_language === 'en' || target.host_language === 'it') && target.host_language !== hostLang) {
+    setHostLang(target.host_language);
+  }
   fillPropertyForm(target);
   // Round 36.3 — switching properties starts fresh in view mode so a
   // half-typed edit on the old property doesn't leak into the new one.

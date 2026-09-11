@@ -81,7 +81,8 @@ export default async function handler(req, res) {
   let props;
   try {
     props = await pgrestGET(
-      'properties?select=id,name,reminder_email,timezone,welcome_message&' +
+      // Round 37.6 — host_language too, so the digest renders in EN or IT.
+      'properties?select=id,name,reminder_email,timezone,welcome_message,host_language&' +
       'reminder_email=not.is.null&deleted_at=is.null',
     );
   } catch (e) {
@@ -179,8 +180,12 @@ async function runArrivalPass(p, tomorrow, dry) {
     return { tomorrow, matched: reservations.length, sent: 0, note: 'all already checked in' };
   }
 
-  const subject = `Arriving tomorrow at ${p.name || 'your property'}: ${toSend.length} reservation${toSend.length === 1 ? '' : 's'}`;
-  const html = renderArrivalHTML(p, toSend);
+  const lang = _hostLang(p);
+  const propLabel = p.name || (lang === 'it' ? 'la tua struttura' : 'your property');
+  const subject = lang === 'it'
+    ? `Arrivi domani presso ${propLabel}: ${toSend.length} prenotazione${toSend.length === 1 ? '' : 'i'}`
+    : `Arriving tomorrow at ${propLabel}: ${toSend.length} reservation${toSend.length === 1 ? '' : 's'}`;
+  const html = renderArrivalHTML(p, toSend, lang);
   const sendResult = await sendEmail(p.reminder_email, subject, html, dry);
   if (!sendResult.ok) {
     return { tomorrow, matched: reservations.length, sent: 0, error: sendResult.error };
@@ -226,8 +231,12 @@ async function runFilingPass(p, yesterday, dry) {
   }
   if (checkins.length === 0) return { yesterday, matched: 0 };
 
-  const subject = `Filing reminder — ${checkins.length} guest${checkins.length === 1 ? '' : 's'} arrived yesterday at ${p.name || 'your property'}`;
-  const html = renderFilingHTML(p, yesterday, checkins.length);
+  const lang = _hostLang(p);
+  const propLabel = p.name || (lang === 'it' ? 'la tua struttura' : 'your property');
+  const subject = lang === 'it'
+    ? `Promemoria invio Alloggiati — ${checkins.length} ospit${checkins.length === 1 ? 'e' : 'i'} arrivat${checkins.length === 1 ? 'o' : 'i'} ieri presso ${propLabel}`
+    : `Filing reminder — ${checkins.length} guest${checkins.length === 1 ? '' : 's'} arrived yesterday at ${propLabel}`;
+  const html = renderFilingHTML(p, yesterday, checkins.length, lang);
   const sendResult = await sendEmail(p.reminder_email, subject, html, dry);
   if (!sendResult.ok) {
     return { yesterday, matched: checkins.length, sent: 0, error: sendResult.error };
@@ -324,23 +333,47 @@ function esc(s) {
     ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-function renderArrivalHTML(property, rows) {
-  const propName = esc(property.name || 'your property');
+// Round 37.6 — the host picks EN or IT in the console; that pref is
+// stored on the property. Clamp to the two supported values, default
+// 'it' to match the console's own default (Italian pilot).
+function _hostLang(property) {
+  const v = property && property.host_language;
+  return v === 'en' ? 'en' : 'it';
+}
+
+function renderArrivalHTML(property, rows, lang) {
+  const isIT = lang === 'it';
+  const T = isIT ? {
+    yourProp:  'la tua struttura',
+    heading:   (n) => `Arrivi domani presso ${n}`,
+    intro:     'Invia a ciascun ospite il suo link di prenotazione così può completare il check-in prima dell\'arrivo.',
+    guest:     'Ospite',
+    guestLink: 'Link ospite:',
+    noCode:    'Nessun codice prenotazione ancora — apri la prenotazione dal dashboard per generarne uno.',
+    footer:    'Inviato da WelcomeBnB · puoi disattivare i promemoria cancellando il campo "email promemoria" nelle impostazioni della proprietà.',
+  } : {
+    yourProp:  'your property',
+    heading:   (n) => `Arriving tomorrow at ${n}`,
+    intro:     'Send each guest their unique booking link so they can complete check-in before arrival.',
+    guest:     'Guest',
+    guestLink: 'Guest link:',
+    noCode:    'No booking code yet — open the reservation in the dashboard to generate one.',
+    footer:    'Sent by WelcomeBnB · you can turn reminders off by clearing the "reminder email" field in Property settings.',
+  };
+  const propName = esc(property.name || T.yourProp);
   const list = rows.map(r => {
     const platform = ({ airbnb: 'Airbnb', booking: 'Booking.com', vrbo: 'Vrbo' })[r.platform]
-      || (r.platform || 'Reservation');
-    const guest = r.guest_name ? esc(r.guest_name) : 'Guest';
+      || (r.platform || (isIT ? 'Prenotazione' : 'Reservation'));
+    const guest = r.guest_name ? esc(r.guest_name) : T.guest;
     const link = r.booking_code
       ? `https://welcomebnb.vercel.app/?b=${encodeURIComponent(r.booking_code)}&p=${encodeURIComponent(property.id)}`
       : null;
     const linkBlock = link
       ? `<p style="margin:8px 0 0;">
-           Guest link:
+           ${T.guestLink}
            <a href="${esc(link)}" style="color:#005BFF;font-family:monospace;font-size:13px;">${esc(link)}</a>
          </p>`
-      : `<p style="margin:8px 0 0;color:#6B7A90;font-size:13px;">
-           <em>No booking code yet — open the reservation in the dashboard to generate one.</em>
-         </p>`;
+      : `<p style="margin:8px 0 0;color:#6B7A90;font-size:13px;"><em>${T.noCode}</em></p>`;
     return `
       <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;margin-bottom:10px;">
         <div style="font-size:12px;letter-spacing:0.06em;text-transform:uppercase;color:#005BFF;font-weight:600;">${esc(platform)}</div>
@@ -351,42 +384,56 @@ function renderArrivalHTML(property, rows) {
 
   return `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#061A3D;">
-      <h2 style="margin:0 0 6px;font-size:20px;">Arriving tomorrow at ${propName}</h2>
-      <p style="margin:0 0 16px;color:#6B7A90;">Send each guest their unique booking link so they can complete check-in before arrival.</p>
+      <h2 style="margin:0 0 6px;font-size:20px;">${T.heading(propName)}</h2>
+      <p style="margin:0 0 16px;color:#6B7A90;">${T.intro}</p>
       ${list}
-      <p style="margin:20px 0 0;color:#6B7A90;font-size:12px;">
-        Sent by WelcomeBnB · you can turn reminders off by clearing the "reminder email" field in Property settings.
-      </p>
+      <p style="margin:20px 0 0;color:#6B7A90;font-size:12px;">${T.footer}</p>
     </div>`;
 }
 
 // Round 36 filing-reminder template. Deliberately terse — one action,
 // no guest personal data anywhere in the body.
-function renderFilingHTML(property, yesterday, count) {
-  const propName = esc(property.name || 'your property');
+function renderFilingHTML(property, yesterday, count, lang) {
+  const isIT = lang === 'it';
   const link = HOST_CONSOLE_URL;
-  const guestWord = count === 1 ? 'guest' : 'guests';
-  const themPronoun = count === 1 ? 'them' : 'each of them';
+  const T = isIT ? {
+    yourProp: 'la tua struttura',
+    heading:  (n) => `Promemoria invio Alloggiati — ${n}`,
+    body:     (c) => `<strong>${c}</strong> ospit${c === 1 ? 'e' : 'i'} ${c === 1 ? 'è arrivato' : 'sono arrivati'} ieri (${esc(yesterday)}) e ${c === 1 ? 'non è' : 'non sono'} ancora ${c === 1 ? 'stato segnato' : 'stati segnati'} come inviat${c === 1 ? 'o' : 'i'} su Alloggiati Web.`,
+    tulps:    'La normativa italiana (TULPS art. 109) impone di trasmettere i dati dei clienti ad Alloggiati Web entro 24 ore dall\'arrivo — la scadenza è vicina o già trascorsa.',
+    cta:      'Apri console host',
+    howHead:  (c) => `Come segnare come inviat${c === 1 ? 'o' : 'i'}`,
+    step1:    'Vai su <strong>Dati Check-in</strong> nella console host.',
+    step2:    'Clicca <strong>Vedi</strong> sulla riga dell\'ospite.',
+    step3:    'Nella sezione <strong>Invio Alloggiati</strong>, carica il PDF della ricevuta (consigliato — conservato 5 anni come prova) oppure usa <em>Segna come inviato senza ricevuta</em> se la ricevuta non è disponibile.',
+    footer:   'Inviato da WelcomeBnB · una volta che un ospite è segnato come inviato, il promemoria si ferma per quell\'ospite. Disattiva tutti i promemoria cancellando l\'email promemoria nelle impostazioni della proprietà.',
+  } : {
+    yourProp: 'your property',
+    heading:  (n) => `Filing reminder — ${n}`,
+    body:     (c) => `<strong>${c}</strong> ${c === 1 ? 'guest' : 'guests'} checked in yesterday (${esc(yesterday)}) and ${c === 1 ? 'has' : 'have'} not been marked as filed on Alloggiati Web yet.`,
+    tulps:    'Italian law (TULPS art. 109) requires transmitting guest data to Alloggiati Web within 24 hours of arrival — that deadline is close or has passed.',
+    cta:      'Open host console',
+    howHead:  (c) => `How to mark ${c === 1 ? 'them' : 'each of them'} filed`,
+    step1:    'Go to <strong>Check-in Data</strong> in the host console.',
+    step2:    'Click <strong>View</strong> on the guest\'s row.',
+    step3:    'In the <strong>Alloggiati filing</strong> section, either upload the receipt PDF (recommended — kept 5 years as proof) or use <em>Mark filed without receipt</em> if a receipt isn\'t available.',
+    footer:   'Sent by WelcomeBnB · once a guest is marked as filed, this reminder stops for that guest. Turn off all reminders by clearing the "reminder email" field in Property settings.',
+  };
+  const propName = esc(property.name || T.yourProp);
   return `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#061A3D;">
-      <h2 style="margin:0 0 6px;font-size:20px;">Filing reminder — ${propName}</h2>
-      <p style="margin:0 0 12px;">
-        <strong>${count}</strong> ${guestWord} checked in yesterday (${esc(yesterday)}) and ${count === 1 ? 'has' : 'have'} not been marked as filed on Alloggiati Web yet.
-      </p>
-      <p style="margin:0 0 16px;color:#6B7A90;">
-        Italian law (TULPS art. 109) requires transmitting guest data to Alloggiati Web within 24 hours of arrival — that deadline is close or has passed.
-      </p>
+      <h2 style="margin:0 0 6px;font-size:20px;">${T.heading(propName)}</h2>
+      <p style="margin:0 0 12px;">${T.body(count)}</p>
+      <p style="margin:0 0 16px;color:#6B7A90;">${T.tulps}</p>
       <p style="margin:0 0 16px;">
-        <a href="${esc(link)}" style="display:inline-block;background:#005BFF;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;">Open host console</a>
+        <a href="${esc(link)}" style="display:inline-block;background:#005BFF;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;">${T.cta}</a>
       </p>
-      <p style="margin:0 0 8px;font-weight:600;">How to mark ${themPronoun} filed</p>
+      <p style="margin:0 0 8px;font-weight:600;">${T.howHead(count)}</p>
       <ol style="margin:0 0 16px 18px;padding:0;color:#374151;font-size:14px;line-height:1.55;">
-        <li>Go to <strong>Check-in Data</strong> in the host console.</li>
-        <li>Click <strong>View</strong> on the guest's row.</li>
-        <li>In the <strong>Alloggiati filing</strong> section, either upload the receipt PDF (recommended — kept 5 years as proof) or use <em>Mark filed without receipt</em> if a receipt isn't available.</li>
+        <li>${T.step1}</li>
+        <li>${T.step2}</li>
+        <li>${T.step3}</li>
       </ol>
-      <p style="margin:20px 0 0;color:#6B7A90;font-size:12px;">
-        Sent by WelcomeBnB · once a guest is marked as filed, this reminder stops for that guest. Turn off all reminders by clearing the "reminder email" field in Property settings.
-      </p>
+      <p style="margin:20px 0 0;color:#6B7A90;font-size:12px;">${T.footer}</p>
     </div>`;
 }

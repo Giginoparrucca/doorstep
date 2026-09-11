@@ -1667,6 +1667,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <a href="https://alloggiatiweb.poliziadistato.it" target="_blank" rel="noopener" class="export-portal-link">
               🔗 <span data-h="link_alloggiati">Open Alloggiati Web</span> ↗
             </a>
+            <span class="host-portal-slot" data-portal-tile="export.alloggiati"></span>
           </div>
         </div>
       </div>
@@ -1685,6 +1686,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           </div>
           <div class="tile-actions">
             <button class="btn btn-secondary" onclick="exportISTAT()" data-h="btn_gen_istat">📊 Generate C/59 Summary</button>
+            <span class="host-portal-slot" data-portal-tile="export.istat"></span>
           </div>
         </div>
         <div class="export-tile-h">
@@ -1697,6 +1699,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <a href="https://flussituristici.regione.veneto.it/" target="_blank" rel="noopener" class="export-portal-link">
               🔗 <span data-h="link_ross1000_portal">Open ROSS1000 Veneto</span> ↗
             </a>
+            <span class="host-portal-slot" data-portal-tile="export.ross1000"></span>
           </div>
         </div>
         <div class="export-tile-h">
@@ -1708,6 +1711,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <a href="https://dms.puglia.it" target="_blank" rel="noopener" class="export-portal-link">
               🔗 <span data-h="link_dms">Open Puglia DMS (SPOT Easy)</span> ↗
             </a>
+            <span class="host-portal-slot" data-portal-tile="export.puglia_dms"></span>
           </div>
         </div>
       </div>
@@ -1732,6 +1736,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <a href="#" id="paytouristPortalLink" target="_blank" rel="noopener" class="export-portal-link" style="display:none">
               🔗 <span data-h="link_paytourist">Open PayTourist Import</span> ↗
             </a>
+            <span class="host-portal-slot" data-portal-tile="export.paytourist"></span>
           </div>
         </div>
         <div class="export-tile-h">
@@ -1744,6 +1749,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <a href="https://www.comune.venezia.it/it/content/portale-ids-tourist-tax-0" target="_blank" rel="noopener" class="export-portal-link">
               🔗 <span data-h="link_citytax">Open CityTax++ (Venezia)</span> ↗
             </a>
+            <span class="host-portal-slot" data-portal-tile="export.citytax"></span>
           </div>
         </div>
       </div>
@@ -1761,6 +1767,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           </div>
           <div class="tile-actions">
             <button class="btn btn-secondary" onclick="exportCSV()" data-h="btn_dl_csv">📥 Download CSV</button>
+            <span class="host-portal-slot" data-portal-tile="export.csv"></span>
           </div>
         </div>
       </div>
@@ -4013,6 +4020,9 @@ function showPanel(id, btn) {
     // Cancel restores the form from propertyData and hides Save/Cancel.
     cancelPropertyEdit();
   }
+  // Round 37.5 — paint host-owned portal links into every tile slot on
+  // Export (Compliance calls this itself from renderCompliance).
+  if (id === 'export') { if (typeof applyHostPortalLinks === 'function') applyHostPortalLinks(); }
   // Round 36.2.2 — reopening the Dashboard re-fetches upcoming reservations
   // and their freshly-stamped rotating codes, so the host doesn't need to
   // hard-refresh after changing settings elsewhere.
@@ -5887,11 +5897,20 @@ function renderCompliance() {
         <div class="cmp-meta">${meta}</div>
         <details class="cmp-acc">
           <summary>${lang === 'it' ? 'Dettagli e link' : 'Details & links'}</summary>
-          <div class="cmp-acc-body">${s.body}</div>
+          <div class="cmp-acc-body">${s.body}
+            <div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span style="font-size:0.72rem;color:var(--ink-soft);">${lang === 'it' ? 'Il tuo portale:' : 'Your portal:'}</span>
+              <span class="host-portal-slot" data-portal-tile="compliance.${key}"></span>
+            </div>
+          </div>
         </details>
       </div>`;
   }).join('');
   box.innerHTML = sections + `<div class="cmp-disclaimer">⚖ ${c.disclaimer}</div>`;
+  // Round 37.5 — paint the host's saved link (if any) into every slot
+  // just rendered above. Called after box.innerHTML lands so the query
+  // finds the fresh nodes.
+  if (typeof applyHostPortalLinks === 'function') applyHostPortalLinks();
 }
 
 function renderRecos() {
@@ -7778,6 +7797,215 @@ function exportCityTax() {
 // of: a bare subdomain ("bari"), a hostname ("bari.paytourist.com"), or a
 // full URL ("https://bari.paytourist.com/admin/ps/import"). We normalize
 // all three to a usable link. Empty → hide the link, show a hint instead.
+/* ══════════════════════════════════════════════════════════════════════
+   Round 37.5 — Host-owned portal links per Export/Compliance tile
+   ─────────────────────────────────────────────────────────────────────
+   Each tile in the Export panel (and each section in the Compliance
+   Guide) may carry a `<span class="host-portal-slot" data-portal-tile="…">`.
+   This module walks those slots and paints either:
+     - a chip linking to the host's saved URL (+ a pencil to edit), or
+     - a subtle "🔗 Add my portal" chip that opens the editor modal.
+   Saves are direct DB writes on properties.portal_links, using the
+   Round 20.2 `.select()`-after-update pattern so silent RLS failures
+   are loud. No dependency on saveProperty — hosts can update these
+   from Export or Compliance without entering the property Edit flow.
+══════════════════════════════════════════════════════════════════════ */
+
+// Curated defaults per tile: the label that pre-fills the modal so
+// hosts don't have to think of one, and a short helper prompt telling
+// them which portal they're setting for that tile. Keys match the
+// data-portal-tile attributes in the HTML.
+const HOST_PORTAL_TILES = {
+  'export.alloggiati':   { defaultLabel: { en: 'My Alloggiati portal',           it: 'Il mio portale Alloggiati' },
+                           hint:          { en: "Regional Questura Alloggiati Web, if it differs from the national default.",
+                                             it: 'Portale Alloggiati Web regionale, se diverso dal default nazionale.' } },
+  'export.istat':        { defaultLabel: { en: 'My C/59 comune portal',          it: 'Il mio portale C/59 del comune' },
+                           hint:          { en: 'Where you file the monthly C/59 summary. Comune-specific.',
+                                             it: 'Dove depositi il riepilogo mensile C/59. Varia per comune.' } },
+  'export.ross1000':     { defaultLabel: { en: 'My regional flow portal',        it: 'Portale flussi turistici regionale' },
+                           hint:          { en: 'ROSS1000 lookalike for your Region — Turismo5, Stat.-er, Puglia SPOT, etc.',
+                                             it: 'Portale flussi turistici della tua Regione (Turismo5, Stat.-er, SPOT Puglia, ecc.).' } },
+  'export.puglia_dms':   { defaultLabel: { en: 'My Puglia SPOT entry',           it: 'Il mio ingresso SPOT Puglia' },
+                           hint:          { en: 'Alternative sub-portal your area uses, if different from dms.puglia.it.',
+                                             it: 'Sub-portale alternativo se diverso da dms.puglia.it.' } },
+  'export.paytourist':   { defaultLabel: { en: 'My PayTourist import',           it: 'Il mio import PayTourist' },
+                           hint:          { en: 'Direct link if the PayTourist subdomain field in Property Details isn\'t enough.',
+                                             it: 'Link diretto se il sottodominio PayTourist nei Dettagli Proprietà non basta.' } },
+  'export.citytax':      { defaultLabel: { en: 'My tourist-tax portal',          it: 'Portale imposta di soggiorno' },
+                           hint:          { en: "Your comune's tourist-tax declaration portal.",
+                                             it: 'Portale del tuo comune per la dichiarazione dell\'imposta di soggiorno.' } },
+  'export.csv':          { defaultLabel: { en: 'My records folder',              it: 'La mia cartella archivio' },
+                           hint:          { en: 'Optional — any URL you use for archiving raw exports (Drive, Dropbox…).',
+                                             it: 'Opzionale — un URL dove archivi gli export (Drive, Dropbox…).' } },
+  'compliance.police':   { defaultLabel: { en: 'My police portal',               it: 'Il mio portale Polizia' },
+                           hint:          { en: 'Regional Alloggiati Web or your Questura portal.',
+                                             it: 'Alloggiati Web regionale o portale della Questura.' } },
+  'compliance.stats':    { defaultLabel: { en: 'My regional stats portal',       it: 'Portale statistico regionale' },
+                           hint:          { en: 'Regional tourist-flow filing portal.',
+                                             it: 'Portale regionale per la dichiarazione dei flussi turistici.' } },
+  'compliance.tax':      { defaultLabel: { en: 'My tourist-tax portal',          it: 'Portale imposta di soggiorno' },
+                           hint:          { en: "Your comune's tourist-tax portal.",
+                                             it: 'Portale del comune per l\'imposta di soggiorno.' } },
+};
+
+// Ensure a pasted URL is safe to render as href. Accepts an origin
+// with optional path/query/hash; rejects javascript: and other
+// non-http schemes. Returns the normalised URL string or null.
+function _normalizeHostPortalUrl(raw) {
+  if (raw == null) return null;
+  let v = String(raw).trim();
+  if (!v) return null;
+  // Bare host: prepend https://
+  if (!/^https?:\/\//i.test(v)) v = 'https://' + v.replace(/^\/*/, '');
+  let url;
+  try { url = new URL(v); } catch (_) { return null; }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+  if (!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(url.hostname)) return null;
+  return url.toString();
+}
+
+// Read the map safely — always returns a fresh object.
+function _hostPortalMap() {
+  const m = propertyData?.portal_links;
+  return (m && typeof m === 'object' && !Array.isArray(m)) ? { ...m } : {};
+}
+
+function _hostPortalSafe(s) {
+  return String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+}
+
+// Paint every host-portal-slot on the page. Called after Compliance
+// re-renders and after showPanel switches into Export.
+function applyHostPortalLinks() {
+  const it = hostLang === 'it';
+  const map = _hostPortalMap();
+  document.querySelectorAll('.host-portal-slot').forEach(slot => {
+    const key = slot.dataset.portalTile;
+    if (!key) return;
+    const entry = map[key];
+    if (entry && entry.url) {
+      const url = _hostPortalSafe(entry.url);
+      const label = _hostPortalSafe(entry.label && entry.label.trim() ? entry.label : (HOST_PORTAL_TILES[key]?.defaultLabel?.[hostLang] || (it ? 'Il mio portale' : 'My portal')));
+      slot.innerHTML = `
+        <a href="${url}" target="_blank" rel="noopener" class="export-portal-link" title="${url}">🔗 <span>${label}</span> ↗</a>
+        <button type="button" onclick="openHostPortalEditor('${_hostPortalSafe(key)}')" title="${_hostPortalSafe(it ? 'Modifica' : 'Edit')}"
+          style="border:1px solid var(--border);background:var(--white);border-radius:6px;padding:4px 8px;cursor:pointer;color:var(--ink-soft);font-size:0.72rem;margin-left:4px;">✎</button>`;
+    } else {
+      slot.innerHTML = `
+        <button type="button" onclick="openHostPortalEditor('${_hostPortalSafe(key)}')"
+          style="border:1px dashed var(--border);background:transparent;border-radius:6px;padding:6px 10px;cursor:pointer;color:var(--ink-soft);font-size:0.76rem;font-family:inherit;">
+          🔗 ${_hostPortalSafe(it ? 'Aggiungi il tuo portale' : 'Add my portal')}
+        </button>`;
+    }
+  });
+}
+
+// Modal editor — three fields: label (optional), URL, and the
+// per-tile hint reminding the host what this tile is for. Save
+// writes to properties.portal_links[key]; Remove deletes the key.
+function openHostPortalEditor(tileKey) {
+  const it = hostLang === 'it';
+  const existing = document.getElementById('hostPortalModal');
+  if (existing) existing.remove();
+  const meta = HOST_PORTAL_TILES[tileKey] || {};
+  const cur = _hostPortalMap()[tileKey] || {};
+  const defaultLabel = meta.defaultLabel?.[hostLang] || (it ? 'Il mio portale' : 'My portal');
+  const hint = meta.hint?.[hostLang] || '';
+  const html = `
+    <div id="hostPortalModal" style="display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10000;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;" onclick="if(event.target===this)closeHostPortalEditor()">
+      <div style="background:var(--white);max-width:520px;width:100%;border-radius:14px;padding:22px 26px 18px;box-shadow:0 12px 48px rgba(0,0,0,0.25);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <h3 style="font-family:'Playfair Display',serif;font-weight:600;font-size:1.2rem;color:var(--ink);margin:0;">🔗 ${_hostPortalSafe(it ? 'Il tuo portale' : 'Your portal')}</h3>
+          <button onclick="closeHostPortalEditor()" style="background:none;border:none;font-size:1.4rem;color:var(--ink-soft);cursor:pointer;padding:2px 8px;line-height:1;">×</button>
+        </div>
+        <div style="font-size:0.68rem;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:2px;">${_hostPortalSafe(tileKey)}</div>
+        ${hint ? `<div style="font-size:0.82rem;color:var(--ink-soft);line-height:1.5;margin-bottom:12px;">${_hostPortalSafe(hint)}</div>` : ''}
+        <div class="form-group full" style="margin-bottom:10px;">
+          <label class="form-label">${_hostPortalSafe(it ? 'URL' : 'URL')}</label>
+          <input id="hostPortalUrlInput" class="form-input" type="url" placeholder="https://…" value="${_hostPortalSafe(cur.url || '')}" autofocus>
+          <div class="form-hint">${_hostPortalSafe(it ? 'Http(s) obbligatorio. Puoi incollare l\'URL completo dal portale.' : 'http/https only. Paste the full URL from the portal.')}</div>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">${_hostPortalSafe(it ? 'Etichetta (opzionale)' : 'Label (optional)')}</label>
+          <input id="hostPortalLabelInput" class="form-input" type="text" placeholder="${_hostPortalSafe(defaultLabel)}" value="${_hostPortalSafe(cur.label || '')}" maxlength="80">
+        </div>
+        <div id="hostPortalError" style="display:none;color:#b03939;font-size:0.82rem;margin-top:10px;"></div>
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:16px;">
+          <button type="button" class="btn btn-secondary" onclick="removeHostPortalLink('${_hostPortalSafe(tileKey)}')" ${cur.url ? '' : 'style="visibility:hidden;"'}>🗑 ${_hostPortalSafe(it ? 'Rimuovi' : 'Remove')}</button>
+          <div style="display:flex;gap:8px;">
+            <button type="button" class="btn btn-secondary" onclick="closeHostPortalEditor()">${_hostPortalSafe(it ? 'Annulla' : 'Cancel')}</button>
+            <button type="button" class="btn btn-primary" onclick="saveHostPortalLink('${_hostPortalSafe(tileKey)}')">💾 ${_hostPortalSafe(it ? 'Salva' : 'Save')}</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('hostPortalUrlInput')?.focus();
+}
+function closeHostPortalEditor() {
+  document.getElementById('hostPortalModal')?.remove();
+}
+
+async function saveHostPortalLink(tileKey) {
+  if (!propertyId || !tileKey) return;
+  const it = hostLang === 'it';
+  const urlRaw = document.getElementById('hostPortalUrlInput')?.value || '';
+  const label  = (document.getElementById('hostPortalLabelInput')?.value || '').trim().slice(0, 80);
+  const errEl  = document.getElementById('hostPortalError');
+  const url    = _normalizeHostPortalUrl(urlRaw);
+  if (!url) {
+    if (errEl) { errEl.textContent = it ? 'URL non valido. Usa http:// o https:// con un dominio corretto.' : 'Invalid URL. Use http:// or https:// with a real domain.'; errEl.style.display = 'block'; }
+    return;
+  }
+  const next = _hostPortalMap();
+  next[tileKey] = label ? { url, label } : { url };
+  const { data, error } = await sb.from('properties')
+    .update({ portal_links: next })
+    .eq('id', propertyId)
+    .select('id, portal_links');
+  if (error) {
+    console.error('portal_links save failed:', error);
+    if (errEl) { errEl.textContent = (it ? 'Salvataggio fallito: ' : 'Save failed: ') + error.message; errEl.style.display = 'block'; }
+    return;
+  }
+  if (!data || data.length === 0) {
+    if (errEl) { errEl.textContent = it ? 'Salvataggio bloccato dai permessi.' : 'Save blocked by permissions.'; errEl.style.display = 'block'; }
+    return;
+  }
+  propertyData = { ...(propertyData || {}), portal_links: data[0].portal_links || next };
+  applyHostPortalLinks();
+  closeHostPortalEditor();
+  toast(it ? '✓ Link salvato' : '✓ Link saved');
+  track('save_portal_link', { tile: tileKey });
+}
+
+async function removeHostPortalLink(tileKey) {
+  if (!propertyId || !tileKey) return;
+  const it = hostLang === 'it';
+  const next = _hostPortalMap();
+  if (!(tileKey in next)) { closeHostPortalEditor(); return; }
+  delete next[tileKey];
+  const { data, error } = await sb.from('properties')
+    .update({ portal_links: next })
+    .eq('id', propertyId)
+    .select('id, portal_links');
+  const errEl = document.getElementById('hostPortalError');
+  if (error) {
+    console.error('portal_links remove failed:', error);
+    if (errEl) { errEl.textContent = (it ? 'Rimozione fallita: ' : 'Remove failed: ') + error.message; errEl.style.display = 'block'; }
+    return;
+  }
+  if (!data || data.length === 0) {
+    if (errEl) { errEl.textContent = it ? 'Rimozione bloccata dai permessi.' : 'Remove blocked by permissions.'; errEl.style.display = 'block'; }
+    return;
+  }
+  propertyData = { ...(propertyData || {}), portal_links: data[0].portal_links || next };
+  applyHostPortalLinks();
+  closeHostPortalEditor();
+  toast(it ? '✓ Link rimosso' : '✓ Link removed');
+  track('remove_portal_link', { tile: tileKey });
+}
+
 function normalizePayTouristUrl(raw) {
   if (!raw) return null;
   let v = String(raw).trim();

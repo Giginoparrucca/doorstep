@@ -366,6 +366,8 @@ let apiUsageByProp = {};
 let activeTab   = 'pilot';                 // 'pilot' | 'deepdive' | 'ops'
 let showTestData = false;                  // top-bar toggle; default off
 let pilotHosts   = [];                     // fetched in loadData
+let pilotInvites = [];                     // Round 38 — fetched in loadData
+let hostAudit    = [];                     // Round 38 — filled by loadHostAudit RPC
 
 // Sonnet 4.5 list pricing (US$ / million tokens) — one edit here when the
 // number moves. See CHANGELOG "Round 35" for last-verified date.
@@ -981,9 +983,9 @@ async function loadData() {
     return q.is('deleted_at', null);
   };
 
-  let eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes;
+  let eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes, invitesRes;
   try {
-    [eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes] = await Promise.all([
+    [eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes, invitesRes] = await Promise.all([
       applyHiddenFilter(sb.from('analytics_events').select('*').gte('created_at', since)).order('created_at', { ascending: false }).limit(10000),
       applyHiddenFilter(sb.from('properties').select('*')).order('name'),
       applyHiddenFilter(sb.from('checkins').select('id, property_id, booking_code, surname, name, guest_type, submitted_at, arrival_date, departure_date, nights, is_test, deleted_at')),
@@ -993,7 +995,8 @@ async function loadData() {
       applyHiddenFilter(sb.from('chat_messages').select('id, property_id, booking_code, sender, message, created_at, is_test, deleted_at').gte('created_at', since)).order('created_at', { ascending: false }).limit(5000).then(r => r, err => ({ data: [], error: err })),
       // Round 35 — pilot_hosts ledger; admin-only RLS handles the auth.
       sb.from('pilot_hosts').select('*').order('created_at').then(r => r, err => ({ data: [], error: err })),
-      // Round 37 (redux) — tax config is per-property; nothing shared to fetch here.
+      // Round 38 — pilot_invites for the invite-only Ops panel.
+      sb.from('pilot_invites').select('*').order('invited_at', { ascending: false }).then(r => r, err => ({ data: [], error: err })),
     ]);
   } catch (e) {
     console.error('loadData fatal:', e);
@@ -1015,6 +1018,10 @@ async function loadData() {
   allCheckins = checkinsRes.data || [];
   allChatMessages = (chatRes && chatRes.data) || [];
   pilotHosts = (pilotRes && pilotRes.data) || [];
+  pilotInvites = (invitesRes && invitesRes.data) || [];
+  if (invitesRes && invitesRes.error) {
+    console.warn('pilot_invites query failed (non-fatal — Invites panel will render empty):', invitesRes.error.message || invitesRes.error);
+  }
 
   // Count check-ins per property
   const checkinCounts = {};
@@ -3010,6 +3017,7 @@ function renderOpsTab() {
   // Round 37 (redux) — tax_rulesets is retired. Configuration is now
   // per-property JSONB set by the host directly.
   const html =
+    renderInvitesPanel() +
     renderPilotHostsEditor() +
     renderHostsPropertiesTable(userStats, userIdToEmail) +
     renderRetentionSection() +
@@ -3022,6 +3030,173 @@ function renderOpsTab() {
   setTimeout(loadRetentionLog, 0);
   setTimeout(loadRetentionLaunchStatus, 0);
   setTimeout(loadGdprExclusions, 0);
+  setTimeout(loadHostAudit, 0);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Round 38 · Ops "Invites" panel + host audit.
+//   The invite table is the whole pilot_invites ledger. Below it, the
+//   audit line calls list_hosts_for_admin (SECURITY DEFINER, admin-gated
+//   inside) and flags any auth.users row without a pilot_invites entry
+//   OR with zero properties.
+//   Actions (invite / resend / revoke) go through /api/admin-invite-host
+//   which re-verifies is_admin() server-side. Nothing here trusts a
+//   client-supplied admin claim.
+// ══════════════════════════════════════════════════════════════════════
+function renderInvitesPanel() {
+  const list = Array.isArray(pilotInvites) ? pilotInvites : [];
+  const statusPill = (st) => {
+    const bg = st === 'accepted' ? 'rgba(47,122,68,0.14)' : st === 'invited' ? 'rgba(232,184,75,0.18)' : 'rgba(176,57,57,0.12)';
+    const fg = st === 'accepted' ? '#2f7a44' : st === 'invited' ? '#9a6b00' : '#b03939';
+    return `<span style="display:inline-block;font-size:0.7rem;padding:2px 8px;background:${bg};color:${fg};border-radius:10px;font-weight:600;letter-spacing:0.04em;">${escapeHtml(st)}</span>`;
+  };
+  const fmtDate = (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+  const propsByEmail = {};
+  (allProperties || []).forEach(p => {
+    // owner_id is stable; email lookup happens through hostAudit below.
+    // For the invite table we count by matching invite.email → any
+    // hostAudit row.
+  });
+  const auditByEmail = {};
+  (hostAudit || []).forEach(h => { auditByEmail[String(h.email || '').toLowerCase()] = h; });
+
+  const rowsHtml = list.length === 0
+    ? `<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--ink-soft);">No invites yet. Send one below.</td></tr>`
+    : list.map(inv => {
+        const email = String(inv.email || '').toLowerCase();
+        const audit = auditByEmail[email] || null;
+        const propCount = audit ? audit.property_count : (inv.status === 'accepted' ? '—' : 0);
+        return `<tr>
+          <td style="font-size:0.82rem;font-family:monospace;">${escapeHtml(email)}</td>
+          <td>${statusPill(inv.status)}</td>
+          <td style="font-size:0.76rem;color:var(--ink-soft);">invited ${escapeHtml(fmtDate(inv.invited_at))}${inv.accepted_at ? '<br>accepted ' + escapeHtml(fmtDate(inv.accepted_at)) : ''}</td>
+          <td style="text-align:center;font-size:0.82rem;font-family:monospace;">${escapeHtml(String(propCount ?? '—'))}</td>
+          <td style="white-space:nowrap;">
+            ${inv.status !== 'accepted' ? `<button onclick="opsInviteAction('resend','${escapeHtml(email)}')" style="padding:4px 10px;background:var(--warm);color:#fff;border:none;border-radius:4px;font-size:0.7rem;cursor:pointer;font-family:inherit;">Resend</button>` : ''}
+            ${inv.status !== 'revoked' ? `<button onclick="opsInviteAction('revoke','${escapeHtml(email)}')" style="padding:4px 10px;background:transparent;color:#b03a3a;border:1px solid #b03a3a;border-radius:4px;font-size:0.7rem;cursor:pointer;font-family:inherit;margin-left:4px;">Revoke</button>` : ''}
+          </td>
+        </tr>`;
+      }).join('');
+
+  return `
+    <div class="section-title">Invites <span style="font-weight:400;font-size:0.7rem;color:var(--ink-soft);letter-spacing:0.02em;">(pilot access control)</span></div>
+    <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:10px;line-height:1.55;">
+      Invite hosts by email. Supabase sends the invitation; the host sets a password, signs in, and lands on the console. <strong>Reminder:</strong> the invite-only gate is enforced by the Supabase project setting
+      Authentication → Sign In / Providers → Email → &ldquo;Allow new users to sign up&rdquo; OFF. Without that toggle, sb.auth.signUp() still works from any anon-key caller.
+    </div>
+    <div id="opsInvitesToast" style="display:none;font-size:0.78rem;padding:8px 12px;border-radius:6px;margin-bottom:8px;"></div>
+
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;box-shadow:var(--shadow);margin-bottom:12px;">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin-bottom:12px;">
+        <div style="flex:1;min-width:220px;">
+          <label style="display:block;font-size:0.7rem;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Email to invite</label>
+          <input id="opsInviteEmail" type="email" placeholder="host@example.com" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:4px;font-size:0.84rem;font-family:inherit;">
+        </div>
+        <div style="flex:2;min-width:220px;">
+          <label style="display:block;font-size:0.7rem;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Notes (optional)</label>
+          <input id="opsInviteNotes" type="text" placeholder="internal note — comune, source, expected date…" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:4px;font-size:0.84rem;font-family:inherit;">
+        </div>
+        <button id="opsInviteBtn" onclick="opsInviteAction('invite')" style="padding:6px 12px;background:var(--warm);color:#fff;border:none;border-radius:4px;font-size:0.78rem;cursor:pointer;font-family:inherit;">Send invitation</button>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-family:inherit;">
+        <thead>
+          <tr style="text-align:left;border-bottom:1px solid var(--border);font-size:0.7rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-soft);">
+            <th style="padding:6px 8px;">Email</th>
+            <th style="padding:6px 8px;">Status</th>
+            <th style="padding:6px 8px;">Timeline</th>
+            <th style="padding:6px 8px;text-align:center;">Props</th>
+            <th style="padding:6px 8px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="opsInvitesTbody">${rowsHtml}</tbody>
+      </table>
+    </div>
+
+    <!-- Audit lines: no-invite users and zero-property accounts -->
+    <div id="opsHostAuditBox" style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;box-shadow:var(--shadow);margin-bottom:20px;">
+      <div style="font-size:0.78rem;color:var(--ink-soft);">Loading host audit…</div>
+    </div>
+  `;
+}
+
+function _opsInvToast(msg, tone) {
+  const box = document.getElementById('opsInvitesToast');
+  if (!box) return;
+  box.style.display = '';
+  box.style.background = tone === 'error' ? 'rgba(176,57,57,0.12)' : tone === 'ok' ? 'rgba(47,122,68,0.14)' : 'rgba(0,91,255,0.08)';
+  box.style.color      = tone === 'error' ? '#b03939' : tone === 'ok' ? '#2f7a44' : 'var(--ink)';
+  box.textContent = msg;
+}
+
+async function opsInviteAction(action, emailArg) {
+  let email = emailArg || document.getElementById('opsInviteEmail')?.value?.trim().toLowerCase();
+  const notes = document.getElementById('opsInviteNotes')?.value?.trim() || null;
+  if (!email) { _opsInvToast('Missing email.', 'error'); return; }
+  if (action === 'revoke') {
+    if (!confirm(`Revoke invite for ${email}?\n\nPending users are deleted; accepted users are only flagged.`)) return;
+  }
+  const btn = document.getElementById('opsInviteBtn');
+  if (btn && action === 'invite') { btn.disabled = true; btn.textContent = 'Sending…'; }
+  _opsInvToast(`${action}ing…`, 'info');
+  try {
+    const { data: sess } = await sb.auth.getSession();
+    const jwt = sess?.session?.access_token;
+    if (!jwt) { _opsInvToast('Not signed in.', 'error'); return; }
+    const resp = await fetch('/api/admin-invite-host', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
+      body: JSON.stringify({ action, email, notes }),
+    });
+    const body = await resp.json().catch(() => ({}));
+    if (!resp.ok || body?.ok === false) {
+      _opsInvToast('Failed: ' + (body?.error || `HTTP ${resp.status}`), 'error');
+      return;
+    }
+    _opsInvToast(`✓ ${action} ok for ${email}${body.auth_user_deleted ? ' (auth user deleted)' : (body.reason ? ' — ' + body.reason : '')}`, 'ok');
+    setTimeout(() => loadData(), 400);
+  } catch (e) {
+    _opsInvToast('Request failed: ' + (e?.message || e), 'error');
+  } finally {
+    if (btn && action === 'invite') { btn.disabled = false; btn.textContent = 'Send invitation'; }
+  }
+}
+
+// SECURITY DEFINER RPC — admin gate is inside the SQL function so
+// a non-admin JWT gets zero rows back.
+async function loadHostAudit() {
+  const box = document.getElementById('opsHostAuditBox');
+  if (!box) return;
+  try {
+    const { data, error } = await sb.rpc('list_hosts_for_admin');
+    if (error) throw error;
+    hostAudit = Array.isArray(data) ? data : [];
+  } catch (e) {
+    console.warn('list_hosts_for_admin failed:', e);
+    box.innerHTML = `<div style="color:#b03939;font-size:0.82rem;">Audit query failed: ${escapeHtml(String(e?.message || e))}</div>`;
+    return;
+  }
+  const rows = hostAudit;
+  const missingInvite = rows.filter(r => !r.invite_id);
+  const noProperties  = rows.filter(r => (r.property_count ?? 0) === 0);
+  if (rows.length === 0) {
+    box.innerHTML = `<div style="font-size:0.82rem;color:var(--ink-soft);">No hosts found in auth.users.</div>`;
+    return;
+  }
+  const listBlock = (title, arr, tone) => {
+    if (arr.length === 0) return `<div style="font-size:0.78rem;color:#2f7a44;">✓ ${escapeHtml(title)}: none</div>`;
+    const rows = arr.map(r => `<li style="margin:2px 0;font-family:monospace;font-size:0.78rem;">${escapeHtml(r.email)} <span style="color:var(--ink-soft);font-family:inherit;">(${r.property_count} prop · last sign-in ${r.last_sign_in_at ? new Date(r.last_sign_in_at).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}) : 'never'})</span></li>`).join('');
+    const color = tone === 'error' ? '#b03939' : '#9a6b00';
+    return `<div style="font-size:0.82rem;font-weight:600;color:${color};margin-top:10px;">⚠ ${escapeHtml(title)} (${arr.length})</div>
+            <ul style="margin:4px 0 0 20px;padding:0;">${rows}</ul>`;
+  };
+  box.innerHTML = `
+    <div class="section-title" style="margin-top:0;">Audit</div>
+    <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:6px;">
+      ${rows.length} account${rows.length === 1 ? '' : 's'} in <code>auth.users</code>.
+    </div>
+    ${listBlock('Accounts with no pilot_invites row', missingInvite, 'warn')}
+    ${listBlock('Accounts with zero properties', noProperties, 'warn')}
+  `;
 }
 
 // ── Pilot hosts ledger editor ──────────────────────────────────────────

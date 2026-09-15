@@ -3144,6 +3144,8 @@ const HT = {
     dashboard_loading: 'Loading dashboard…',
     dash_needs_attention: 'Needs your attention',
     dash_currently_staying: 'Currently staying',
+    dash_awaiting_checkin: 'Awaiting check-in',
+    dash_awaiting_checkin_hint: 'Guest has not completed check-in. Send them their booking link so they can finish before the 24-hour Alloggiati deadline.',
     dash_all_caught_up: "You're all caught up",
     dash_nothing_pending: 'No urgent items, no guests currently staying.',
     t_property: 'Property Details', s_property: 'Edit your property information',
@@ -3552,6 +3554,8 @@ const HT = {
     dashboard_loading: 'Caricamento dashboard…',
     dash_needs_attention: 'Richiede la tua attenzione',
     dash_currently_staying: 'Soggiornano adesso',
+    dash_awaiting_checkin: 'Check-in non effettuato',
+    dash_awaiting_checkin_hint: 'L\'ospite non ha completato il check-in. Inviagli il link della prenotazione per finire prima delle 24 ore Alloggiati.',
     dash_all_caught_up: 'Tutto in ordine',
     dash_nothing_pending: 'Nessuna urgenza, nessun ospite presente.',
     t_property: 'Dettagli Proprietà', s_property: 'Modifica le informazioni della proprietà',
@@ -4131,6 +4135,57 @@ async function renderDashboard() {
     rows.push({ code, summary, status, eng, topCats, action });
   }
 
+  // Round 38.1 — reservations whose stay window includes today (or has
+  // already started) but whose guest never opened the pre-checkin link
+  // must still show on the dashboard. Otherwise they vanish from BOTH
+  // Currently Staying (no checkins row) and Upcoming (checkin_date is
+  // not strictly > today). We add a synthetic row for each with an
+  // "Awaiting check-in" pill and a hint to send the guest their link.
+  try {
+    const todayISO = new Date().toISOString().slice(0, 10);
+    const { data: activeRes } = await sb.from('ota_reservations')
+      .select('id, platform, guest_name, checkin_date, checkout_date, booking_code')
+      .eq('property_id', propertyId)
+      .eq('entry_type', 'reservation')
+      .eq('status', 'active')
+      .is('deleted_at', null)
+      .lte('checkin_date', todayISO)
+      .gt('checkout_date', todayISO);
+    for (const r of (activeRes || [])) {
+      const code = r.booking_code;
+      if (!code) continue;
+      if (dismissedBookingCodes.has(code)) continue;
+      if (summaryMap[code]) continue; // guest already has a checkin row — already surfaced above
+      const arrivalISO = String(r.checkin_date || '').split('T')[0] || null;
+      const departureISO = String(r.checkout_date || '').split('T')[0] || null;
+      let nights = null;
+      if (arrivalISO && departureISO) {
+        const n = Math.round((new Date(departureISO + 'T00:00:00') - new Date(arrivalISO + 'T00:00:00')) / 86400000);
+        nights = Number.isFinite(n) && n > 0 ? n : null;
+      }
+      const guestName = (r.guest_name && r.guest_name.trim())
+        || (hostLang === 'it' ? 'Ospite (check-in non completato)' : 'Guest (check-in not completed)');
+      const synthSummary = {
+        name: guestName,
+        arrival_date: arrivalISO,
+        departure_date: departureISO,
+        nights,
+        hasDocs: false,
+      };
+      const status = _gpgComputeStayStatus(synthSummary, today);
+      if (!status || (status.tone !== 'active' && status.tone !== 'today')) continue;
+      rows.push({
+        code, summary: synthSummary, status,
+        eng: { escs: 0, recos: 0, chats: 0, bucket: 'silent', label: '' },
+        topCats: [],
+        action: null,
+        awaitingCheckin: true,
+      });
+    }
+  } catch (e) {
+    console.warn('active-reservation dashboard fetch failed:', e);
+  }
+
   // Split into urgent + currently-staying. A row may appear in both if
   // the guest has an open help request AND is currently staying — but
   // we de-dup so urgent wins (it's the higher-priority view).
@@ -4175,9 +4230,20 @@ async function renderDashboard() {
       ? `<span style="font-size:0.62rem;font-weight:600;letter-spacing:0.05em;padding:2px 7px;border-radius:999px;background:${r.status.tone === 'today' ? 'rgba(232,184,75,0.18)' : 'rgba(109,191,130,0.15)'};color:${r.status.tone === 'today' ? '#9a6b00' : '#2f7a44'};white-space:nowrap;">${safe(r.status.label)}</span>`
       : '';
 
-    const actionBox = r.action
+    // Round 38.1 — extra pill for reservations whose guest never
+    // completed the check-in, so the host can spot them at a glance.
+    const awaitingBadge = r.awaitingCheckin
+      ? `<span style="font-size:0.62rem;font-weight:600;letter-spacing:0.05em;padding:2px 7px;border-radius:999px;background:rgba(232,184,75,0.18);color:#9a6b00;white-space:nowrap;">⏳ ${safe(h('dash_awaiting_checkin') || 'Awaiting check-in')}</span>`
+      : '';
+
+    let actionBox = r.action
       ? `<div style="margin-top:6px;font-size:0.78rem;font-weight:500;padding:6px 9px;border-radius:5px;line-height:1.3;background:${r.action.tone === 'urgent' ? 'rgba(224,90,90,0.10)' : r.action.tone === 'attention' ? 'rgba(232,184,75,0.14)' : r.action.tone === 'opportunity' ? 'rgba(109,191,130,0.13)' : 'rgba(107,174,214,0.12)'};color:${r.action.tone === 'urgent' ? '#b03939' : r.action.tone === 'attention' ? '#7d5e10' : r.action.tone === 'opportunity' ? '#2f7a44' : '#29638a'};border-left:2px solid ${r.action.tone === 'urgent' ? '#c84545' : r.action.tone === 'attention' ? '#1E7BFF' : r.action.tone === 'opportunity' ? '#6DBF82' : '#6BAED6'};">▸ ${safe(r.action.text)}</div>`
       : '';
+    if (r.awaitingCheckin && !r.action) {
+      const guestLink = `https://welcomebnb.vercel.app/?b=${encodeURIComponent(r.code)}&p=${encodeURIComponent(propertyId)}`;
+      const hint = safe(h('dash_awaiting_checkin_hint') || 'Send this guest their booking link so they can complete check-in.');
+      actionBox = `<div style="margin-top:6px;font-size:0.78rem;font-weight:500;padding:6px 9px;border-radius:5px;line-height:1.35;background:rgba(232,184,75,0.14);color:#7d5e10;border-left:2px solid #E8B84B;">▸ ${hint} <a href="${safe(guestLink)}" target="_blank" rel="noopener" style="color:#7d5e10;text-decoration:underline;font-family:monospace;font-size:0.72rem;margin-left:4px;">${safe(hostLang === 'it' ? 'apri link' : 'open link')} ↗</a></div>`;
+    }
 
     // Round 32.3 — show arrival → departure (+ nights) under the name so
     // the host can see the stay window without opening the check-in.
@@ -4199,6 +4265,7 @@ async function renderDashboard() {
           <span style="font-weight:600;color:var(--ink);font-size:0.92rem;">${safe(r.summary.name)}</span>
           <span style="font-family:monospace;font-size:0.66rem;color:var(--warm);background:rgba(0,91,255,0.08);border-radius:3px;padding:1px 6px;">${safe(r.code)}</span>
           ${statusBadge}
+          ${awaitingBadge}
         </div>
         <button onclick="dismissBooking('${safe(r.code)}', '${safe(r.summary.name)}')" title="${safe(h('dash_dismiss_tooltip') || 'Hide this booking from your dashboard')}"
                 style="position:absolute;top:8px;right:8px;background:transparent;border:none;cursor:pointer;color:var(--ink-soft);font-size:0.78rem;line-height:1;padding:6px 8px;border-radius:6px;transition:all 0.15s;"

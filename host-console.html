@@ -2056,7 +2056,7 @@ async function dismissBooking(code, displayName) {
 
   // Need the current user's id for host_id (RLS will validate it matches auth.uid()).
   const { data: { user } } = await sb.auth.getUser();
-  if (!user) { toast('Not signed in'); return; }
+  if (!user) { toast(hostLang === 'it' ? 'Non autenticato' : 'Not signed in'); return; }
 
   const { error } = await sb.from('host_dismissed_bookings').insert({
     host_id: user.id,
@@ -2987,7 +2987,7 @@ sb.auth.onAuthStateChange(async (event, session) => {
     if (newPass && newPass.length >= 6) {
       const { error } = await sb.auth.updateUser({ password: newPass });
       if (error) {
-        alert('Error: ' + error.message);
+        alert((hostLang === 'it' ? 'Errore: ' : 'Error: ') + error.message);
       } else {
         alert(hostLang === 'it' ? '✅ Password aggiornata! Ora puoi accedere.' : '✅ Password updated! You can now sign in.');
         window.location.href = window.location.origin + '/host-console.html';
@@ -3100,7 +3100,7 @@ async function handleCoverUpload(input) {
 
     status.textContent = '✓ Photo uploaded and saved!';
     status.style.color = 'var(--green)';
-    toast('Cover photo updated!');
+    toast(hostLang === 'it' ? 'Foto di copertina aggiornata!' : 'Cover photo updated!');
   } catch (e) {
     status.textContent = 'Upload error. Try again.';
     status.style.color = 'var(--red)';
@@ -4074,6 +4074,26 @@ function showPanel(id, btn) {
 /* ══════════════════════════════════════
    DASHBOARD — live stats
 ══════════════════════════════════════ */
+// Round 38.2 — OTA feeds sometimes carry placeholder strings as
+// `guest_name` ("Not available", "Reserved", "Airbnb - Not available",
+// "CLOSED - Not available", "Blocked", "-", "N/A"). We do NOT rewrite
+// the DB — that's platform data. But the DASHBOARD should not show
+// English platform placeholders when the console is in Italian.
+// Returns a cleaned name or null so the caller can pick a localised
+// fallback.
+function _cleanOtaGuestName(raw) {
+  if (raw == null) return null;
+  const v = String(raw).trim();
+  if (!v) return null;
+  const s = v.toLowerCase();
+  if (/^(not available|reserved|blocked|closed|closed\s*-\s*not\s*available|closed\s*\(|n\/a|na|-|—|nessun[oa]?|non\s+disponibile)$/i.test(v)) return null;
+  // Anywhere-in-string platform placeholder is safer to blank out too —
+  // "Airbnb - Not available", "Airbnb (Not available)", "Booking.com — reserved"
+  if (/\bnot\s+available\b/i.test(v)) return null;
+  if (/^(airbnb|booking\.com|booking|vrbo)\b\s*[-–—(]/i.test(v) && /(not\s+available|reserved|blocked|closed)/i.test(s)) return null;
+  return v;
+}
+
 async function renderDashboard() {
   const el = document.getElementById('panel-dashboard');
   if (!el) return;
@@ -4163,7 +4183,8 @@ async function renderDashboard() {
         const n = Math.round((new Date(departureISO + 'T00:00:00') - new Date(arrivalISO + 'T00:00:00')) / 86400000);
         nights = Number.isFinite(n) && n > 0 ? n : null;
       }
-      const guestName = (r.guest_name && r.guest_name.trim())
+      const cleaned = _cleanOtaGuestName(r.guest_name);
+      const guestName = cleaned
         || (hostLang === 'it' ? 'Ospite (check-in non completato)' : 'Guest (check-in not completed)');
       const synthSummary = {
         name: guestName,
@@ -4476,7 +4497,10 @@ async function renderUpcomingReservationsPanel() {
       count = grp.length;
       checkedIn = true;
     } else {
-      name = r.guest_name || null;
+      // Round 38.2 — clean platform placeholders ("Not available",
+      // "Reserved", …) so the Italian UI doesn't render English text
+      // straight from the iCal feed.
+      name = _cleanOtaGuestName(r.guest_name);
     }
 
     const n = nightsOf(r.checkin_date, r.checkout_date);
@@ -4896,7 +4920,7 @@ function renderCheckins() {
 }
 
 async function deleteCheckin(id, name) {
-  if (!id) { console.error('No ID to delete'); toast('Error: no ID'); return; }
+  if (!id) { console.error('No ID to delete'); toast(hostLang === 'it' ? 'Errore: ID mancante' : 'Error: no ID'); return; }
   if (!confirm(h('delete_confirm').replace('{name}', name))) return;
 
   // Find the row so we know its booking_code (to clean analytics too)
@@ -4957,7 +4981,7 @@ async function deleteAllCheckins() {
    PROPERTY EDITOR — save to DB
 ══════════════════════════════════════ */
 async function saveProperty() {
-  if (!propertyId) { toast('No property found!'); return false; }
+  if (!propertyId) { toast(hostLang === 'it' ? 'Nessuna proprietà trovata!' : 'No property found!'); return false; }
   // Round 37.3 — capture the previous rotating-code length so a length
   // change can trigger regeneration of every dashboard-visible code
   // after the save lands. Read from propertyData (last-known DB truth),
@@ -6608,7 +6632,7 @@ function fmtDateIT(isoDate) {
 }
 
 function exportAlloggiati() {
-  if (allCheckins.length === 0) { toast('No check-in data to export!'); return; }
+  if (allCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato check-in da esportare!' : 'No check-in data to export!'); return; }
 
   // Default: last 48 hours from now
   const cutoff48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -6803,7 +6827,7 @@ async function loadMarketingContacts() {
 }
 
 function exportContactsCSV() {
-  if (_marketingContacts.length === 0) { toast('No contacts to export!'); return; }
+  if (_marketingContacts.length === 0) { toast(hostLang === 'it' ? 'Nessun contatto da esportare!' : 'No contacts to export!'); return; }
   const header = 'Guest,Email,Phone,Booking,ConsentedOn,ConsentTextVersion';
   const rows = _marketingContacts.map(c => [
     `"${(c.guest_name || '').replace(/"/g, '""')}"`,
@@ -6827,7 +6851,7 @@ function exportContactsCSV() {
    CSV EXPORT — spreadsheet for records
 ══════════════════════════════════════ */
 function exportCSV() {
-  if (allCheckins.length === 0) { toast('No check-in data to export!'); return; }
+  if (allCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato check-in da esportare!' : 'No check-in data to export!'); return; }
   const header = 'Cognome,Nome,Sesso,DataNascita,LuogoNascita,Cittadinanza,TipoDocumento,NumeroDocumento,TipoAlloggiato,DataArrivo,StatoCode,DocCode';
   const rows = allCheckins.map(c => {
     const fields = [
@@ -6857,7 +6881,7 @@ function exportCSV() {
    ISTAT C/59 — Monthly statistical summary
 ══════════════════════════════════════ */
 function exportISTAT() {
-  if (allCheckins.length === 0) { toast('No data!'); return; }
+  if (allCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato!' : 'No data!'); return; }
   const propName = propertyData?.name || 'Property';
   const byNat = {};
   allCheckins.forEach(c => {
@@ -6887,7 +6911,7 @@ function exportISTAT() {
   ];
   downloadFile('istat_c59_' + new Date().toISOString().slice(0,7) + '.txt', lines.join('\n'));
   track('export_istat', { lines: lines.length });
-  toast('ISTAT C/59 report generated!');
+  toast(hostLang === 'it' ? 'Report ISTAT C/59 generato!' : 'ISTAT C/59 report generated!');
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -8333,7 +8357,7 @@ function refreshPayTouristLink() {
 }
 
 function exportPayTourist() {
-  if (allCheckins.length === 0) { toast('No check-in data to export!'); return; }
+  if (allCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato check-in da esportare!' : 'No check-in data to export!'); return; }
 
   const cirCode = (propertyData?.cir_code || '').trim();
   if (!cirCode) {
@@ -8478,13 +8502,13 @@ function toast(msg) {
 
 function copyLink() {
   navigator.clipboard?.writeText(document.getElementById('guestLink').textContent);
-  toast('Link copied to clipboard!');
+  toast(hostLang === 'it' ? 'Link copiato negli appunti!' : 'Link copied to clipboard!');
 }
 
 function copyTemplate() {
   const txt = document.getElementById('preArrivalTemplate').value;
   navigator.clipboard?.writeText(txt);
-  toast('Template copied!');
+  toast(hostLang === 'it' ? 'Testo copiato!' : 'Template copied!');
 }
 
 /* ══════════════════════════════════════
@@ -8532,7 +8556,7 @@ function renderPastCodes() {
         <code style="font-weight:600;color:var(--warm);letter-spacing:0.05em;">${s.code}</code>
         <span style="color:var(--ink-soft);margin-left:8px;">${s.created}</span>
       </div>
-      <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard?.writeText('${s.link}');toast('Copied!')" style="padding:2px 8px;font-size:0.55rem;">📋</button>
+      <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard?.writeText('${s.link}');toast(hostLang==='it'?'Copiato!':'Copied!')" style="padding:2px 8px;font-size:0.55rem;">📋</button>
     </div>
   `).join('');
 }
@@ -8552,7 +8576,7 @@ function initQRPanel() {
 // guest-side analytics tagger flags everything is_test=true. Shows a
 // banner on the guest side so the host knows tracking is off.
 function openPreviewAsGuest() {
-  if (!propertyId) { toast('No property loaded yet'); return; }
+  if (!propertyId) { toast(hostLang === 'it' ? 'Proprietà non ancora caricata' : 'No property loaded yet'); return; }
   const url = `https://welcomebnb.vercel.app/?p=${propertyId}&test=1`;
   window.open(url, '_blank', 'noopener');
   track('preview_as_guest', {});
@@ -9084,7 +9108,7 @@ async function archiveCurrentChat() {
 
 function viewGuest(id) {
   const c = allCheckins.find(g => g.id === id);
-  if (!c) { toast('Guest not found'); return; }
+  if (!c) { toast(hostLang === 'it' ? 'Ospite non trovato' : 'Guest not found'); return; }
 
   const it = hostLang === 'it';
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString(it ? 'it-IT' : 'en-GB') : '—';
@@ -9528,7 +9552,7 @@ async function markGroupFiledWithoutReceipt(scope, arg1, arg2) {
 
 function editGuest(id) {
   const c = allCheckins.find(g => g.id === id);
-  if (!c) { toast('Guest not found'); return; }
+  if (!c) { toast(hostLang === 'it' ? 'Ospite non trovato' : 'Guest not found'); return; }
   const it = hostLang === 'it';
   const safeAttr = s => String(s == null ? '' : s).replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const isoDate = d => {

@@ -165,7 +165,32 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
     try {
       const text = await fetchWithTimeout(url, FETCH_TIMEOUT_MS);
       const events = parseICS(text);
-      const rows = events.map(e => vEventToRow(e, propertyId, platform));
+      let rows = events.map(e => vEventToRow(e, propertyId, platform));
+
+      // Round 38.3 — Booking.com quirks:
+      //
+      // (a) Long-safety block. Booking's iCal exports a ~6-month "closed
+      //     dates" event starting at today+1. Its summary is the same
+      //     opaque "CLOSED - Not available" as a real reservation, so
+      //     Round 36.2 classified it as reservation. Cap event length —
+      //     a real Booking.com reservation is not 60+ nights.
+      //
+      // (b) UID rotation. Booking's iCal issues a fresh UID for the
+      //     same reservation every day, and moves DTSTART forward as
+      //     past nights fall behind "today". Our dedup was (property_id,
+      //     platform, uid), so every morning we cancelled the old row
+      //     and created a new one — booking_code changed daily, guest
+      //     links broke, and the recorded arrival kept rolling forward
+      //     with today. Merge by (checkout_date, entry_type) instead:
+      //     if the DB already has an active reservation with the same
+      //     checkout, treat the incoming event as the same reservation,
+      //     update the UID and summary in place, and DO NOT let
+      //     checkin_date move forward. That keeps the booking_code, the
+      //     guest link, and the real arrival intact.
+      if (platform === 'booking' && rows.length > 0) {
+        rows = await mergeBookingRollingUIDs(propertyId, rows, apikey, bearer, seenByPlatform);
+      }
+
       perFeed.push({ platform, url, parsed: rows.length });
       if (!seenByPlatform[platform]) seenByPlatform[platform] = new Set();
       rows.forEach(r => seenByPlatform[platform].add(r.uid));
@@ -223,6 +248,84 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
 
   const synced = perFeed.reduce((a, f) => a + f.parsed, 0);
   return { synced, cancelled, per_feed: perFeed, errors };
+}
+
+// Round 38.3 · Booking.com sync repair.
+//   1. Cap long-safety blocks. Anything > BOOKING_MAX_RES_NIGHTS is
+//      not a reservation — it's Booking's blanket "closed dates" event.
+//   2. Merge rolling UIDs against an existing active reservation with
+//      the same checkout_date (+ entry_type), patching the UID/summary
+//      in place instead of cancel-and-recreate. Preserves checkin_date
+//      (never rolls forward) and preserves the booking_code so the
+//      guest link the host already shared keeps working.
+const BOOKING_MAX_RES_NIGHTS = 60;
+
+async function mergeBookingRollingUIDs(propertyId, incoming, apikey, bearer, seenByPlatform) {
+  const keptRows = [];
+  seenByPlatform.booking = seenByPlatform.booking || new Set();
+
+  // Pass 1 — length cap: turn long events into blocks so downstream
+  // panels (Upcoming, Currently Staying) ignore them.
+  for (const r of incoming) {
+    if (r.entry_type === 'reservation' && r.checkin_date && r.checkout_date) {
+      const days = Math.round((Date.parse(r.checkout_date) - Date.parse(r.checkin_date)) / 86400000);
+      if (days > BOOKING_MAX_RES_NIGHTS) r.entry_type = 'block';
+    }
+  }
+
+  // Pass 2 — merge rolling UIDs. For each reservation-shaped event,
+  // look for an existing active row (any UID) with the same platform
+  // + checkout_date + entry_type. If found, PATCH its uid/summary/raw
+  // to the new values, keep checkin_date, tell the cancel sweep the
+  // OLD uid is "seen" (via the row's now-updated new uid) and skip
+  // the upsert for this row.
+  for (const r of incoming) {
+    if (r.entry_type !== 'reservation') { keptRows.push(r); continue; }
+    let matchList = [];
+    try {
+      const q = 'ota_reservations?'
+        + `property_id=eq.${encodeURIComponent(propertyId)}`
+        + `&platform=eq.booking`
+        + `&entry_type=eq.reservation`
+        + `&status=eq.active`
+        + `&deleted_at=is.null`
+        + `&checkout_date=eq.${encodeURIComponent(r.checkout_date)}`
+        + `&uid=neq.${encodeURIComponent(r.uid)}`
+        + `&select=id,uid,checkin_date`;
+      const res = await pgrestGET(q, apikey, bearer);
+      if (res.ok) matchList = await res.json();
+    } catch (_) { matchList = []; }
+    // No existing match — treat as a genuinely new reservation.
+    if (matchList.length === 0) { keptRows.push(r); continue; }
+    // Deterministic pick: the earliest-arriving row wins. Booking's
+    // trim behaviour only moves DTSTART forward, so the earliest one
+    // is the true original arrival.
+    matchList.sort((a, b) => String(a.checkin_date || '').localeCompare(String(b.checkin_date || '')));
+    const target = matchList[0];
+    const patchBody = {
+      uid: r.uid,
+      summary: r.summary,
+      raw: r.raw,
+      status: 'active',
+      updated_at: new Date().toISOString(),
+    };
+    try {
+      await pgrestPATCH(
+        `ota_reservations?id=eq.${encodeURIComponent(target.id)}`,
+        patchBody, apikey, bearer,
+      );
+      // The row now carries r.uid, so the cancel sweep will see it as
+      // still present in the feed.
+      seenByPlatform.booking.add(r.uid);
+      // If there are additional stray duplicates at the same checkout,
+      // let the cancel sweep pick them up.
+    } catch (e) {
+      // Merge failed — fall back to normal upsert so we don't drop the
+      // event entirely.
+      keptRows.push(r);
+    }
+  }
+  return keptRows;
 }
 
 // ── Supabase PostgREST helpers ─────────────────────────────────────────

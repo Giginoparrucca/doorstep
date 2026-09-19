@@ -235,7 +235,7 @@ body { display: flex; overflow: hidden; }
 .cal-day-badge-in   { background: rgba(109,191,130,0.15); color: #2f7a44; }
 .cal-day-badge-wait { background: rgba(232,184,75,0.18); color: #9a6b00; }
 
-.cal-bar { position: absolute; height: 18px; line-height: 18px; padding: 0 6px; font-size: 0.7rem; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: inherit; text-decoration: none; box-sizing: border-box; z-index: 1; }
+.cal-bar { position: absolute; height: 18px; line-height: 18px; padding: 0 6px; font-size: 0.7rem; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: inherit; text-decoration: none; box-sizing: border-box; z-index: 1; cursor: pointer; text-align: left; }
 .cal-bar-in   { background: rgba(109,191,130,0.28); color: #235a34; border: 1px solid rgba(47,122,68,0.4); }
 .cal-bar-wait { background: rgba(232,184,75,0.28); color: #7d5e10; border: 1px solid rgba(154,107,0,0.4); }
 .cal-bar:hover { filter: brightness(0.95); }
@@ -244,7 +244,7 @@ body { display: flex; overflow: hidden; }
 
 .cal-mobile-list { display: none; }
 .cal-mobile-list-head { padding: 8px 12px; background: var(--cream-2); font-size: 0.78rem; font-weight: 600; text-transform: capitalize; }
-.cal-mobile-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; text-decoration: none; color: var(--ink); border-top: 1px solid rgba(107,122,144,0.08); font-size: 0.86rem; }
+.cal-mobile-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; text-decoration: none; color: var(--ink); border-top: 1px solid rgba(107,122,144,0.08); font-size: 0.86rem; background: transparent; border-left: 0; border-right: 0; border-bottom: 0; font-family: inherit; text-align: left; cursor: pointer; width: 100%; }
 .cal-mobile-row-in   { border-left: 3px solid #6DBF82; }
 .cal-mobile-row-wait { border-left: 3px solid #E8B84B; }
 .cal-mobile-name { font-weight: 600; }
@@ -4650,189 +4650,15 @@ async function renderUpcomingReservationsPanel() {
       </div>`;
   }
 
-  // Correlate with existing checkins by date overlap. allCheckins is already
-  // scoped to this property + non-test + non-deleted (see loadPropertyData).
-  const dated = allCheckins.filter(c => c.arrival_date);
-  const isHeadType = t => t === 'single' || t === 'head' || t === 'group';
-  const platformLabel = p => (p === 'airbnb' ? 'Airbnb'
-                            : p === 'booking' ? 'Booking.com'
-                            : p === 'vrbo' ? 'Vrbo'
-                            : (p ? p[0].toUpperCase() + p.slice(1) : 'Other'));
-  // Return { color, tint } — tint is a translucent version used behind the
-  // badge label. Using a hex fallback avoids `var(--…)22` (invalid CSS).
-  const platformStyle = p => (
-    p === 'airbnb'  ? { color: '#FF5A5F', tint: 'rgba(255,90,95,0.12)' } :
-    p === 'booking' ? { color: '#003580', tint: 'rgba(0,53,128,0.12)' }  :
-    p === 'vrbo'    ? { color: '#245ABC', tint: 'rgba(36,90,188,0.12)' } :
-                      { color: '#6B7A90', tint: 'rgba(107,122,144,0.14)' }
-  );
-  const nightsOf = (a, b) => {
-    if (!a || !b) return null;
-    const da = new Date(a + 'T00:00:00'), db = new Date(b + 'T00:00:00');
-    if (isNaN(da) || isNaN(db)) return null;
-    return Math.max(0, Math.round((db - da) / 86400000));
-  };
-  const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString(hostLang === 'it' ? 'it-IT' : 'en-GB',
-    { day: '2-digit', month: 'short' }) : '—';
-
-  const rendered = rows.map(r => {
-    // Round 30.2 — exact booking_code match wins (the guest used the
-    // per-reservation link we handed them). Fall back to date-overlap
-    // grouping for pre-Round-30.2 checkins that arrived without a code.
-    let matched = [];
-    if (r.booking_code) {
-      matched = dated.filter(c => c.booking_code === r.booking_code);
-    }
-    if (matched.length === 0) {
-      // Strict inequality on the boundary: a stay departing 01 Sept and
-      // a reservation starting 01 Sept share that calendar day but don't
-      // actually overlap (guest checks out the morning the next arrives).
-      // The earlier `<=` / `>=` version attached one guest to both
-      // reservations at the boundary.
-      matched = dated.filter(c =>
-        c.arrival_date < r.checkout_date &&
-        (!c.departure_date || c.departure_date > r.checkin_date)
-      );
-    }
-    // Round 36.2.5 — hide the row from Upcoming when the guest has already
-    // arrived (early walk-in, or the OTA row's checkin_date drifted past
-    // the guest's actual arrival). That guest belongs to "Currently
-    // staying" on the dashboard, and showing them in both places is what
-    // hosts see as a duplicate.
-    const guestAlreadyArrived = matched.some(c =>
-      c.arrival_date && c.arrival_date <= todayISO &&
-      (!c.departure_date || c.departure_date >= todayISO)
-    );
-    if (guestAlreadyArrived) return '';
-    // Group by booking_code (empty/null bucket keeps its own key so we don't
-    // merge unrelated anonymous checkins together)
-    const groups = {};
-    for (const c of matched) {
-      const bc = c.booking_code || '_none_' + c.id;
-      (groups[bc] = groups[bc] || []).push(c);
-    }
-    const grpKeys = Object.keys(groups);
-
-    let name = null;
-    let count = null;
-    let checkedIn = false;
-
-    if (grpKeys.length > 0) {
-      // Prefer the group whose arrival lines up exactly with the reservation
-      // check-in, else fall back to whichever group has the earliest arrival
-      // within the window.
-      let bestKey = grpKeys[0];
-      for (const k of grpKeys) {
-        if (groups[k][0].arrival_date === r.checkin_date) { bestKey = k; break; }
-      }
-      const grp = groups[bestKey];
-      const head = grp.find(c => isHeadType(c.guest_type)) || grp[0];
-      const nm = `${head.surname || ''} ${head.name || ''}`.trim();
-      name = nm || null;
-      count = grp.length;
-      checkedIn = true;
-    } else {
-      // Round 38.2 — clean platform placeholders ("Not available",
-      // "Reserved", …) so the Italian UI doesn't render English text
-      // straight from the iCal feed.
-      name = _cleanOtaGuestName(r.guest_name);
-    }
-
-    const n = nightsOf(r.checkin_date, r.checkout_date);
-    const nightsLabel = n == null ? '' :
-      `${n} ${n === 1 ? h('dash_nights_one') : h('dash_nights_n')}`;
-    const guestsLabel = (count == null)
-      ? '—'
-      : `${count} ${count === 1 ? h('dash_guests_one') : h('dash_guests_n')}`;
-
-    const pill = checkedIn
-      ? `<span style="font-size:0.62rem;font-weight:600;letter-spacing:0.05em;padding:2px 8px;border-radius:999px;background:rgba(109,191,130,0.15);color:#2f7a44;white-space:nowrap;">${safe(h('dash_checked_in'))}</span>`
-      : `<span style="font-size:0.62rem;font-weight:600;letter-spacing:0.05em;padding:2px 8px;border-radius:999px;background:rgba(232,184,75,0.18);color:#9a6b00;white-space:nowrap;">${safe(h('dash_awaiting'))}</span>`;
-
-    const style = platformStyle(r.platform);
-    const guestLink = r.booking_code
-      ? `https://welcomebnb.vercel.app/?b=${encodeURIComponent(r.booking_code)}&p=${propertyId}`
-      : '';
-    const codeChip = r.booking_code
-      ? `<span title="${safe(hostLang === 'it' ? 'Codice prenotazione' : 'Booking code')}" style="font-family:monospace;font-size:0.68rem;color:var(--warm);background:rgba(0,91,255,0.08);border-radius:3px;padding:1px 6px;">${safe(r.booking_code)}</span>`
-      : '';
-    // Round 36.2.1/.2 — rotating lockbox code as an inline editable amber
-    // input beside the booking code. Host can change it before the guest
-    // arrives and the change fans out to any check-ins that already share
-    // this booking_code. Hidden when the property isn't using rotating codes.
-    const rotatingOn = propertyData?.rotating_lockbox_enabled === true
-                    || propertyData?.use_per_guest_lockbox === true;
-    const kbChip = rotatingOn ? `
-      <span title="${safe(hostLang === 'it' ? 'Codice lockbox rotante' : 'Rotating lockbox code')}"
-        style="display:inline-flex;align-items:center;gap:4px;font-size:0.68rem;color:#9a6b00;background:rgba(232,184,75,0.16);border-radius:3px;padding:1px 4px 1px 6px;">
-        🔐
-        <input type="text" value="${safe(r.keybox_code || '')}" placeholder="—" maxlength="8"
-          inputmode="numeric" pattern="[0-9]*"
-          data-reservation-id="${safe(r.id)}"
-          data-property-id="${safe(propertyId)}"
-          data-booking-code="${safe(r.booking_code || '')}"
-          onchange="saveReservationKeybox(this)"
-          onclick="this.select()"
-          style="width:90px;font-family:monospace;font-weight:600;color:#9a6b00;background:transparent;border:none;border-bottom:1px dashed rgba(154,107,0,0.4);padding:0 2px;text-align:center;font-size:0.72rem;outline:none;">
-      </span>` : '';
-    const linkLabel = hostLang === 'it' ? 'Link Prenotazione' : 'Booking Link';
-    // Round 36.2.3 — "Reopen check-in" button, shown only when there's at
-    // least one existing check-in on this booking (nothing to reopen
-    // otherwise) and the flag isn't already set (avoid double-stamping).
-    const groupCheckins = Array.isArray(allCheckins)
-      ? allCheckins.filter(c => c.property_id === propertyId && r.booking_code && c.booking_code === r.booking_code)
-      : [];
-    // Round 36.2.5 — the reopen flag persists in the DB until it's
-    // actively cleared, and the guest side runs as anon (no UPDATE
-    // policy on ota_reservations/checkins), so the flag never actually
-    // clears from that clear-on-batch-complete path. Treat the flag as
-    // stale — i.e. NOT reopened — once at least one check-in on this
-    // booking has been submitted AFTER the flag was stamped. The next
-    // insert from the guest is exactly the "success" we're looking for.
-    const _reopenStamps = groupCheckins
-      .map(c => c.checkin_reopened_at)
-      .concat(r.checkin_reopened_at ? [r.checkin_reopened_at] : [])
-      .filter(Boolean);
-    const _latestReopenStamp = _reopenStamps.length
-      ? _reopenStamps.reduce((a, b) => a > b ? a : b)
-      : null;
-    const _newerSubmissionExists = _latestReopenStamp
-      ? groupCheckins.some(c => c.submitted_at && c.submitted_at > _latestReopenStamp)
-      : false;
-    const alreadyReopened = !!_latestReopenStamp && !_newerSubmissionExists;
-    const reopenBtn = (r.booking_code && groupCheckins.length > 0 && !alreadyReopened) ? `
-      <button type="button" onclick="reopenCheckinForBooking('booking', '${safe(r.booking_code)}', '${safe(propertyId)}')"
-        title="${safe(hostLang === 'it' ? 'Permetti all\'ospite di aggiungere altri membri del gruppo' : 'Let the guest add more group members')}"
-        style="padding:4px 10px;background:rgba(232,184,75,0.14);border:1px solid rgba(232,184,75,0.4);border-radius:6px;font-size:0.72rem;cursor:pointer;color:#9a6b00;font-family:inherit;font-weight:500;">🔓 ${safe(hostLang === 'it' ? 'Riapri check-in' : 'Reopen check-in')}</button>` : '';
-    const reopenedNote = alreadyReopened ? `
-      <span style="font-size:0.68rem;color:#9a6b00;background:rgba(232,184,75,0.14);border-radius:6px;padding:2px 8px;">${safe(hostLang === 'it' ? '🔓 In attesa — l\'ospite può aggiungere altri' : '🔓 Waiting — guest can add more')}</span>` : '';
-    const linkRow = guestLink ? `
-      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:8px;padding-top:8px;border-top:1px dashed rgba(107,122,144,0.15);">
-        <span style="font-size:0.62rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--warm);white-space:nowrap;">${safe(linkLabel)}</span>
-        <span style="font-family:monospace;font-size:0.7rem;color:var(--ink-soft);flex:1;min-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safe(guestLink)}</span>
-        <button type="button" onclick="copyReservationLink('${safe(guestLink)}', this)" title="${safe(hostLang === 'it' ? 'Copia il link prenotazione' : 'Copy the booking link')}"
-                style="padding:4px 10px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:0.72rem;cursor:pointer;color:var(--ink);font-family:inherit;">🔗 ${safe(hostLang === 'it' ? 'Copia' : 'Copy')}</button>
-        <a href="${safe(guestLink)}" target="_blank" rel="noopener" title="${safe(hostLang === 'it' ? 'Apri come ospite' : 'Open as guest')}"
-           style="padding:4px 10px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:0.72rem;color:var(--ink);text-decoration:none;">↗ ${safe(hostLang === 'it' ? 'Apri' : 'Open')}</a>
-        ${reopenBtn}${reopenedNote}
-      </div>` : '';
-    return `
-      <div style="background:var(--white);border:1px solid rgba(107,122,144,0.10);border-left:3px solid ${style.color};border-radius:8px;padding:10px 14px;margin-bottom:8px;">
-        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
-          <span style="font-size:0.62rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${style.color};background:${style.tint};padding:2px 8px;border-radius:4px;">${safe(platformLabel(r.platform))}</span>
-          <span style="font-weight:600;color:var(--ink);font-size:0.9rem;">${safe(fmtDate(r.checkin_date))} → ${safe(fmtDate(r.checkout_date))}</span>
-          ${nightsLabel ? `<span style="font-size:0.75rem;color:var(--ink-soft);">· ${safe(nightsLabel)}</span>` : ''}
-          ${pill}
-        </div>
-        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:6px;font-size:0.85rem;color:var(--ink);">
-          <span style="font-weight:500;">${safe(name || '—')}</span>
-          <span style="font-size:0.78rem;color:var(--ink-soft);">· ${safe(guestsLabel)}</span>
-          ${codeChip}
-          ${kbChip}
-        </div>
-        ${linkRow}
-      </div>`;
-  }).filter(Boolean);
+  // Round 39.1 — per-row rendering extracted into _renderReservationCard so
+  // the calendar's click-to-view popup can reuse the exact same card the
+  // list shows. Hidden rows (guest already arrived) return { hidden: true }
+  // and are filtered out here.
+  const cards = rows.map(r => _renderReservationCard(r, todayISO));
+  // Keep a lookup by id so the calendar view can find rows for its popup.
+  _upcomingRowsById = {};
+  for (let i = 0; i < rows.length; i++) _upcomingRowsById[rows[i].id] = rows[i];
+  const rendered = cards.filter(c => !c.hidden).map(c => c.html);
   // Round 36.2.5 — visible count reflects rows the host will actually see
   // (arrived guests are hidden above), and a fully-hidden list becomes
   // the same empty-state as "no upcoming reservations".
@@ -4850,6 +4676,193 @@ async function renderUpcomingReservationsPanel() {
       ${buildHeader(rendered.length)}
       ${rendered.join('')}
     </div>`;
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+   Round 39.1 — shared reservation-card renderer.
+   Both the list view (renderUpcomingReservationsPanel) and the
+   calendar's click-to-view popup (_showReservationDetail) render a
+   reservation the same way — same platform badge, dates, pill,
+   guest correlation, booking code, rotating lockbox input, link row
+   and reopen-check-in button. Extracted here so calling this from
+   the calendar popup guarantees the two stay in sync.
+   Returns { html, hidden }. hidden === true means the guest has
+   already arrived and the list should filter this row out (calendar
+   still shows it — the guest is in the visible month).
+────────────────────────────────────────────────────────────────────── */
+let _upcomingRowsById = {};
+
+function _renderReservationCard(r, todayISO) {
+  const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const isHeadType = t => t === 'single' || t === 'head' || t === 'group';
+  const platformLabel = p => (p === 'airbnb' ? 'Airbnb'
+                            : p === 'booking' ? 'Booking.com'
+                            : p === 'vrbo' ? 'Vrbo'
+                            : (p ? p[0].toUpperCase() + p.slice(1) : 'Other'));
+  const platformStyle = p => (
+    p === 'airbnb'  ? { color: '#FF5A5F', tint: 'rgba(255,90,95,0.12)' } :
+    p === 'booking' ? { color: '#003580', tint: 'rgba(0,53,128,0.12)' }  :
+    p === 'vrbo'    ? { color: '#245ABC', tint: 'rgba(36,90,188,0.12)' } :
+                      { color: '#6B7A90', tint: 'rgba(107,122,144,0.14)' }
+  );
+  const nightsOf = (a, b) => {
+    if (!a || !b) return null;
+    const da = new Date(a + 'T00:00:00'), db = new Date(b + 'T00:00:00');
+    if (isNaN(da) || isNaN(db)) return null;
+    return Math.max(0, Math.round((db - da) / 86400000));
+  };
+  const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString(hostLang === 'it' ? 'it-IT' : 'en-GB',
+    { day: '2-digit', month: 'short' }) : '—';
+
+  const dated = (allCheckins || []).filter(c => c.arrival_date);
+  let matched = [];
+  if (r.booking_code) matched = dated.filter(c => c.booking_code === r.booking_code);
+  if (matched.length === 0) {
+    matched = dated.filter(c =>
+      c.arrival_date < r.checkout_date &&
+      (!c.departure_date || c.departure_date > r.checkin_date)
+    );
+  }
+  const todayCmp = todayISO || new Date().toISOString().slice(0, 10);
+  const guestAlreadyArrived = matched.some(c =>
+    c.arrival_date && c.arrival_date <= todayCmp &&
+    (!c.departure_date || c.departure_date >= todayCmp)
+  );
+
+  const groups = {};
+  for (const c of matched) {
+    const bc = c.booking_code || '_none_' + c.id;
+    (groups[bc] = groups[bc] || []).push(c);
+  }
+  const grpKeys = Object.keys(groups);
+  let name = null, count = null, checkedIn = false;
+  if (grpKeys.length > 0) {
+    let bestKey = grpKeys[0];
+    for (const k of grpKeys) {
+      if (groups[k][0].arrival_date === r.checkin_date) { bestKey = k; break; }
+    }
+    const grp = groups[bestKey];
+    const head = grp.find(c => isHeadType(c.guest_type)) || grp[0];
+    const nm = `${head.surname || ''} ${head.name || ''}`.trim();
+    name = nm || null;
+    count = grp.length;
+    checkedIn = true;
+  } else {
+    name = _cleanOtaGuestName(r.guest_name);
+  }
+
+  const n = nightsOf(r.checkin_date, r.checkout_date);
+  const nightsLabel = n == null ? '' :
+    `${n} ${n === 1 ? h('dash_nights_one') : h('dash_nights_n')}`;
+  const guestsLabel = (count == null)
+    ? '—'
+    : `${count} ${count === 1 ? h('dash_guests_one') : h('dash_guests_n')}`;
+
+  const pill = checkedIn
+    ? `<span style="font-size:0.62rem;font-weight:600;letter-spacing:0.05em;padding:2px 8px;border-radius:999px;background:rgba(109,191,130,0.15);color:#2f7a44;white-space:nowrap;">${safe(h('dash_checked_in'))}</span>`
+    : `<span style="font-size:0.62rem;font-weight:600;letter-spacing:0.05em;padding:2px 8px;border-radius:999px;background:rgba(232,184,75,0.18);color:#9a6b00;white-space:nowrap;">${safe(h('dash_awaiting'))}</span>`;
+
+  const style = platformStyle(r.platform);
+  const guestLink = r.booking_code
+    ? `https://welcomebnb.vercel.app/?b=${encodeURIComponent(r.booking_code)}&p=${propertyId}`
+    : '';
+  const codeChip = r.booking_code
+    ? `<span title="${safe(hostLang === 'it' ? 'Codice prenotazione' : 'Booking code')}" style="font-family:monospace;font-size:0.68rem;color:var(--warm);background:rgba(0,91,255,0.08);border-radius:3px;padding:1px 6px;">${safe(r.booking_code)}</span>`
+    : '';
+  const rotatingOn = propertyData?.rotating_lockbox_enabled === true
+                  || propertyData?.use_per_guest_lockbox === true;
+  const kbChip = rotatingOn ? `
+    <span title="${safe(hostLang === 'it' ? 'Codice lockbox rotante' : 'Rotating lockbox code')}"
+      style="display:inline-flex;align-items:center;gap:4px;font-size:0.68rem;color:#9a6b00;background:rgba(232,184,75,0.16);border-radius:3px;padding:1px 4px 1px 6px;">
+      🔐
+      <input type="text" value="${safe(r.keybox_code || '')}" placeholder="—" maxlength="8"
+        inputmode="numeric" pattern="[0-9]*"
+        data-reservation-id="${safe(r.id)}"
+        data-property-id="${safe(propertyId)}"
+        data-booking-code="${safe(r.booking_code || '')}"
+        onchange="saveReservationKeybox(this)"
+        onclick="this.select()"
+        style="width:90px;font-family:monospace;font-weight:600;color:#9a6b00;background:transparent;border:none;border-bottom:1px dashed rgba(154,107,0,0.4);padding:0 2px;text-align:center;font-size:0.72rem;outline:none;">
+    </span>` : '';
+  const linkLabel = hostLang === 'it' ? 'Link Prenotazione' : 'Booking Link';
+  const groupCheckins = Array.isArray(allCheckins)
+    ? allCheckins.filter(c => c.property_id === propertyId && r.booking_code && c.booking_code === r.booking_code)
+    : [];
+  const _reopenStamps = groupCheckins
+    .map(c => c.checkin_reopened_at)
+    .concat(r.checkin_reopened_at ? [r.checkin_reopened_at] : [])
+    .filter(Boolean);
+  const _latestReopenStamp = _reopenStamps.length
+    ? _reopenStamps.reduce((a, b) => a > b ? a : b)
+    : null;
+  const _newerSubmissionExists = _latestReopenStamp
+    ? groupCheckins.some(c => c.submitted_at && c.submitted_at > _latestReopenStamp)
+    : false;
+  const alreadyReopened = !!_latestReopenStamp && !_newerSubmissionExists;
+  const reopenBtn = (r.booking_code && groupCheckins.length > 0 && !alreadyReopened) ? `
+    <button type="button" onclick="reopenCheckinForBooking('booking', '${safe(r.booking_code)}', '${safe(propertyId)}')"
+      title="${safe(hostLang === 'it' ? 'Permetti all\'ospite di aggiungere altri membri del gruppo' : 'Let the guest add more group members')}"
+      style="padding:4px 10px;background:rgba(232,184,75,0.14);border:1px solid rgba(232,184,75,0.4);border-radius:6px;font-size:0.72rem;cursor:pointer;color:#9a6b00;font-family:inherit;font-weight:500;">🔓 ${safe(hostLang === 'it' ? 'Riapri check-in' : 'Reopen check-in')}</button>` : '';
+  const reopenedNote = alreadyReopened ? `
+    <span style="font-size:0.68rem;color:#9a6b00;background:rgba(232,184,75,0.14);border-radius:6px;padding:2px 8px;">${safe(hostLang === 'it' ? '🔓 In attesa — l\'ospite può aggiungere altri' : '🔓 Waiting — guest can add more')}</span>` : '';
+  const linkRow = guestLink ? `
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:8px;padding-top:8px;border-top:1px dashed rgba(107,122,144,0.15);">
+      <span style="font-size:0.62rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--warm);white-space:nowrap;">${safe(linkLabel)}</span>
+      <span style="font-family:monospace;font-size:0.7rem;color:var(--ink-soft);flex:1;min-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safe(guestLink)}</span>
+      <button type="button" onclick="copyReservationLink('${safe(guestLink)}', this)" title="${safe(hostLang === 'it' ? 'Copia il link prenotazione' : 'Copy the booking link')}"
+              style="padding:4px 10px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:0.72rem;cursor:pointer;color:var(--ink);font-family:inherit;">🔗 ${safe(hostLang === 'it' ? 'Copia' : 'Copy')}</button>
+      <a href="${safe(guestLink)}" target="_blank" rel="noopener" title="${safe(hostLang === 'it' ? 'Apri come ospite' : 'Open as guest')}"
+         style="padding:4px 10px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:0.72rem;color:var(--ink);text-decoration:none;">↗ ${safe(hostLang === 'it' ? 'Apri' : 'Open')}</a>
+      ${reopenBtn}${reopenedNote}
+    </div>` : '';
+  const html = `
+    <div style="background:var(--white);border:1px solid rgba(107,122,144,0.10);border-left:3px solid ${style.color};border-radius:8px;padding:10px 14px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+        <span style="font-size:0.62rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:${style.color};background:${style.tint};padding:2px 8px;border-radius:4px;">${safe(platformLabel(r.platform))}</span>
+        <span style="font-weight:600;color:var(--ink);font-size:0.9rem;">${safe(fmtDate(r.checkin_date))} → ${safe(fmtDate(r.checkout_date))}</span>
+        ${nightsLabel ? `<span style="font-size:0.75rem;color:var(--ink-soft);">· ${safe(nightsLabel)}</span>` : ''}
+        ${pill}
+      </div>
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:6px;font-size:0.85rem;color:var(--ink);">
+        <span style="font-weight:500;">${safe(name || '—')}</span>
+        <span style="font-size:0.78rem;color:var(--ink-soft);">· ${safe(guestsLabel)}</span>
+        ${codeChip}
+        ${kbChip}
+      </div>
+      ${linkRow}
+    </div>`;
+  return { html, hidden: guestAlreadyArrived };
+}
+
+// Round 39.1 — reservation-detail popup. Bar clicks in the calendar
+// view (and mobile row taps) open this modal instead of jumping
+// straight to the guest link. Same card as the list view; the guest
+// link is one click deeper via the "Open" button on the card.
+function _showReservationDetail(reservationId) {
+  const r = _upcomingRowsById && _upcomingRowsById[reservationId];
+  if (!r) return;
+  const closeExisting = document.getElementById('reservationDetailModal');
+  if (closeExisting) closeExisting.remove();
+  const card = _renderReservationCard(r);
+  const it = hostLang === 'it';
+  const title = it ? 'Dettagli prenotazione' : 'Reservation details';
+  const closeLbl = it ? 'Chiudi' : 'Close';
+  const modal = document.createElement('div');
+  modal.id = 'reservationDetailModal';
+  modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10000;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;';
+  modal.onclick = (e) => { if (e.target === modal) _closeReservationDetail(); };
+  modal.innerHTML = `
+    <div style="background:var(--white);max-width:640px;width:100%;border-radius:14px;padding:18px 20px 16px;box-shadow:0 12px 48px rgba(0,0,0,0.25);max-height:calc(100vh - 60px);overflow-y:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:600;font-size:1.05rem;color:var(--ink);margin:0;">${title}</h3>
+        <button type="button" onclick="_closeReservationDetail()" aria-label="${closeLbl}" style="background:none;border:none;font-size:1.4rem;color:var(--ink-soft);cursor:pointer;padding:2px 8px;line-height:1;">×</button>
+      </div>
+      ${card.html}
+    </div>`;
+  document.body.appendChild(modal);
+}
+function _closeReservationDetail() {
+  document.getElementById('reservationDetailModal')?.remove();
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -4902,6 +4915,13 @@ async function _renderUpcomingCalendarBody(buildHeader) {
     console.warn('Calendar reservations exception:', e);
   }
   rows = await ensureReservationBookingCodes(rows);
+
+  // Round 39.1 — expose rows to the shared _showReservationDetail popup.
+  // Bars carry the reservation id; the popup looks the row up here and
+  // calls _renderReservationCard(r) so the list and the popup stay
+  // rendered from exactly the same source.
+  _upcomingRowsById = {};
+  for (const r of rows) _upcomingRowsById[r.id] = r;
 
   // Enrich each row with { name, checkedIn }. Correlation logic
   // matches the list — booking_code first, then date overlap fallback.
@@ -5005,12 +5025,14 @@ async function _renderUpcomingCalendarBody(buildHeader) {
       const widthPct = spanCols * (100 / 7);
       const tone     = b.checkedIn ? 'in' : 'wait';
       const title    = safe(`${b.label} · ${b.r.checkin_date} → ${b.r.checkout_date}`);
-      const opener   = b.link ? `window.open('${safe(b.link)}', '_blank', 'noopener');event.stopPropagation();` : 'event.stopPropagation();';
+      // Round 39.1 — bar click opens the reservation-detail popup
+      // (same card the list view renders). The guest link is still
+      // one click away from that popup via its "Open" button.
       bars.push(`
-        <a href="${b.link ? safe(b.link) : '#'}" target="_blank" rel="noopener" class="cal-bar cal-bar-${tone}"
+        <button type="button" class="cal-bar cal-bar-${tone}"
            title="${title}"
-           onclick="${opener}"
-           style="left:${leftPct.toFixed(4)}%;width:${widthPct.toFixed(4)}%;top:${28 + b.track * 20}px;">${safe(b.label)}</a>`);
+           onclick="event.stopPropagation();_showReservationDetail('${safe(b.r.id)}');"
+           style="left:${leftPct.toFixed(4)}%;width:${widthPct.toFixed(4)}%;top:${28 + b.track * 20}px;">${safe(b.label)}</button>`);
     }
     weekRows.push(`
       <div class="cal-week" style="min-height:${Math.max(70, 28 + maxTracks * 20 + 6)}px;">
@@ -5043,10 +5065,10 @@ async function _renderUpcomingCalendarBody(buildHeader) {
         <div class="cal-mobile-list">
           <div class="cal-mobile-list-head">${safe(dayHeading)}</div>
           ${dayBookings.map(b => `
-            <a href="${b.link ? safe(b.link) : '#'}" target="_blank" rel="noopener" class="cal-mobile-row cal-mobile-row-${b.checkedIn ? 'in' : 'wait'}">
+            <button type="button" onclick="_showReservationDetail('${safe(b.r.id)}')" class="cal-mobile-row cal-mobile-row-${b.checkedIn ? 'in' : 'wait'}">
               <span class="cal-mobile-name">${safe(b.label)}</span>
               <span class="cal-mobile-dates">${safe(b.r.checkin_date)} → ${safe(b.r.checkout_date)}</span>
-            </a>`).join('')}
+            </button>`).join('')}
         </div>`;
     }
   }

@@ -3041,6 +3041,87 @@ async function signOut() {
   document.getElementById('loginOverlay').classList.remove('hidden');
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   Round 38.4 · Idle timeout — auto sign-out after inactivity.
+   ─────────────────────────────────────────────────────────────────────
+   Hosts leave the console open in a background tab and come back
+   hours later to stale data. That's confusing and, on a shared
+   device, a small security hole. Any real click / keystroke / touch
+   updates a "last active" timestamp in localStorage; a timer checks
+   every minute and, if we're past SESSION_TIMEOUT_MS AND there's an
+   active Supabase session, signs the host out and reloads. On the
+   next load we surface a soft "session expired due to inactivity"
+   note on the login screen.
+
+   Long by design (4 hours). Hosts multitask; a short timeout is
+   annoying enough that people just leave the tab focused, which
+   defeats the point.
+══════════════════════════════════════════════════════════════════════ */
+const SESSION_TIMEOUT_MS  = 4 * 60 * 60 * 1000; // 4 h
+const SESSION_ACTIVITY_KEY = 'wbnb_last_activity';
+const SESSION_EXPIRED_KEY  = 'wbnb_session_expired';
+
+function _sessionMarkActive() {
+  try { localStorage.setItem(SESSION_ACTIVITY_KEY, String(Date.now())); } catch (_) {}
+}
+function _sessionLastActivity() {
+  try {
+    const v = Number(localStorage.getItem(SESSION_ACTIVITY_KEY));
+    return Number.isFinite(v) && v > 0 ? v : 0;
+  } catch (_) { return 0; }
+}
+async function _sessionCheckIdle() {
+  const last = _sessionLastActivity();
+  if (last === 0) return;
+  if (Date.now() - last < SESSION_TIMEOUT_MS) return;
+  // Only sign out if there's actually a Supabase session — otherwise
+  // this fires on the login screen too and just re-flashes the note.
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return;
+  } catch (_) { return; }
+  try { localStorage.setItem(SESSION_EXPIRED_KEY, '1'); } catch (_) {}
+  try { await sb.auth.signOut(); } catch (_) {}
+  // Reload to clear every module's in-memory state (allCheckins,
+  // propertyData, cached DOM, chat subscriptions). Cheaper and safer
+  // than hunting them down individually.
+  window.location.reload();
+}
+function _sessionShowExpiredIfNeeded() {
+  try {
+    if (localStorage.getItem(SESSION_EXPIRED_KEY) !== '1') return;
+    localStorage.removeItem(SESSION_EXPIRED_KEY);
+    const errEl = document.getElementById('loginError');
+    if (!errEl) return;
+    const it = (typeof hostLang !== 'undefined' && hostLang === 'it');
+    errEl.textContent = it
+      ? 'Sessione scaduta per inattività. Effettua nuovamente l\'accesso.'
+      : 'Session expired due to inactivity. Please sign in again.';
+    errEl.classList.add('show');
+  } catch (_) {}
+}
+
+// Wire the activity events on the CAPTURE phase so we still record
+// activity even if a handler downstream calls stopPropagation.
+['click', 'keydown', 'mousedown', 'touchstart', 'wheel'].forEach(ev =>
+  document.addEventListener(ev, _sessionMarkActive, { passive: true, capture: true })
+);
+// When the tab becomes visible again after being backgrounded for a
+// long time, check idle immediately so we don't render stale data
+// during the ~60 s interval delay.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') _sessionCheckIdle();
+});
+window.addEventListener('focus', _sessionCheckIdle);
+
+// Initial mark + periodic check. First check runs on next tick so
+// _sessionShowExpiredIfNeeded gets to paint before we potentially
+// short-circuit into signOut on a stale tab.
+_sessionMarkActive();
+setInterval(_sessionCheckIdle, 60 * 1000);
+setTimeout(_sessionCheckIdle, 250);
+_sessionShowExpiredIfNeeded();
+
 async function forgotPassword() {
   const email = document.getElementById('loginEmail').value.trim();
   const errEl = document.getElementById('loginError');

@@ -205,6 +205,61 @@ body { display: flex; overflow: hidden; }
 .panel { display: none; }
 .panel.active { display: block; }
 
+/* Round 39 — upcoming reservations calendar view. Tokens for
+   in / wait mirror the list-view pills (checked-in green, awaiting
+   amber) so the two modes can't drift. */
+.cal-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.cal-nav-btn { border: 1px solid var(--border); background: var(--white); color: var(--ink); border-radius: 6px; padding: 4px 10px; font-size: 0.78rem; cursor: pointer; font-family: inherit; min-height: 30px; }
+.cal-nav-btn:hover { background: var(--cream-2); }
+.cal-nav-today { font-weight: 600; }
+.cal-nav-label { font-family: 'Playfair Display', serif; font-weight: 600; font-size: 1rem; color: var(--ink); min-width: 160px; text-align: center; text-transform: capitalize; }
+
+.cal-grid-wrap { background: var(--white); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.cal-week-head { display: grid; grid-template-columns: repeat(7, 1fr); background: var(--cream-2); border-bottom: 1px solid var(--border); }
+.cal-wh-cell { padding: 6px 4px; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); text-align: center; font-weight: 600; }
+
+.cal-body { }
+.cal-week { display: grid; grid-template-columns: repeat(7, 1fr); position: relative; border-top: 1px solid rgba(107,122,144,0.08); }
+.cal-week:first-child { border-top: 0; }
+
+.cal-day-cell { position: relative; background: var(--white); border: 0; border-right: 1px solid rgba(107,122,144,0.08); padding: 4px 6px; min-height: 80px; text-align: left; font-family: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; }
+.cal-day-cell:last-child { border-right: 0; }
+.cal-day-cell:hover { background: rgba(0,91,255,0.03); }
+.cal-day-cell.cal-outside { background: rgba(107,122,144,0.03); }
+.cal-day-cell.cal-outside .cal-day-num { color: rgba(107,122,144,0.5); }
+.cal-day-cell.cal-today .cal-day-num { display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center; border-radius: 50%; background: var(--warm); color: #fff; font-weight: 700; }
+.cal-day-cell.cal-selected { outline: 2px solid var(--warm); outline-offset: -2px; }
+.cal-day-num { font-size: 0.78rem; color: var(--ink); font-weight: 500; }
+
+.cal-day-badge { display: none; margin-top: 6px; font-size: 0.72rem; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+.cal-day-badge-in   { background: rgba(109,191,130,0.15); color: #2f7a44; }
+.cal-day-badge-wait { background: rgba(232,184,75,0.18); color: #9a6b00; }
+
+.cal-bar { position: absolute; height: 18px; line-height: 18px; padding: 0 6px; font-size: 0.7rem; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: inherit; text-decoration: none; box-sizing: border-box; z-index: 1; }
+.cal-bar-in   { background: rgba(109,191,130,0.28); color: #235a34; border: 1px solid rgba(47,122,68,0.4); }
+.cal-bar-wait { background: rgba(232,184,75,0.28); color: #7d5e10; border: 1px solid rgba(154,107,0,0.4); }
+.cal-bar:hover { filter: brightness(0.95); }
+
+.cal-empty { padding: 22px 16px; text-align: center; color: var(--ink-soft); font-size: 0.82rem; border-top: 1px solid rgba(107,122,144,0.08); }
+
+.cal-mobile-list { display: none; }
+.cal-mobile-list-head { padding: 8px 12px; background: var(--cream-2); font-size: 0.78rem; font-weight: 600; text-transform: capitalize; }
+.cal-mobile-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; text-decoration: none; color: var(--ink); border-top: 1px solid rgba(107,122,144,0.08); font-size: 0.86rem; }
+.cal-mobile-row-in   { border-left: 3px solid #6DBF82; }
+.cal-mobile-row-wait { border-left: 3px solid #E8B84B; }
+.cal-mobile-name { font-weight: 600; }
+.cal-mobile-dates { font-family: monospace; font-size: 0.72rem; color: var(--ink-soft); }
+
+/* Mobile: swap bars for count badges + show tap-selected list. */
+@media (max-width: 639px) {
+  .cal-nav-label { min-width: 0; flex: 1; text-align: left; font-size: 0.92rem; }
+  .cal-day-cell { min-height: 54px; padding: 4px 3px; }
+  .cal-bar { display: none; }
+  .cal-day-badge { display: inline-block; }
+  .cal-mobile-list { display: block; margin-top: 10px; background: var(--white); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .cal-wh-cell { font-size: 0.6rem; padding: 4px 2px; }
+}
+
 /* ── DASHBOARD STATS ── */
 .stat-grid {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -2231,6 +2286,86 @@ let _gaRangeDays = parseInt(localStorage.getItem('wbnb_ga_range') || '30', 10);
 if (![7, 30, 90].includes(_gaRangeDays)) _gaRangeDays = 30;
 let _gaLoading = false;
 
+/* Round 39 — upcoming panel view mode + calendar month state.
+   ─────────────────────────────────────────────────────────────
+   `_upcomingView` mirrors wbnb_ga_range's localStorage pattern.
+   Default is 'list' so existing hosts land on the same UI. The
+   month state is per-session (no localStorage); the panel always
+   opens on the current month. */
+let _upcomingView = (localStorage.getItem('wbnb_upcoming_view') === 'calendar') ? 'calendar' : 'list';
+let _upcomingCalYear = null;          // int, e.g. 2026. Initialised on first render.
+let _upcomingCalMonth = null;         // int, 0..11
+let _upcomingCalSelectedDay = null;   // YYYY-MM-DD string, mobile tap-to-expand only.
+
+// Timezone-safe YYYY-MM-DD helpers. new Date('2026-09-19') parses as
+// UTC midnight which can flip the day depending on the viewer's
+// timezone — Round 39 test #7 in the spec is written around this bug.
+// Everything here operates on Date objects at LOCAL midnight, and
+// stringifies via zero-padded components, never toISOString().
+function _r39Pad(n) { return (n < 10 ? '0' : '') + n; }
+function _r39IsoDate(d) {
+  return d.getFullYear() + '-' + _r39Pad(d.getMonth() + 1) + '-' + _r39Pad(d.getDate());
+}
+function _r39ParseISO(s) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || ''));
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+function _r39AddDays(d, n) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+}
+// Monday-first day index. getDay() returns Sunday=0 — flip so Mon=0.
+function _r39DowMon(d) { return (d.getDay() + 6) % 7; }
+
+// Localised weekday names for a Monday-first header row.
+function _r39WeekdayLabels(locale) {
+  const out = [];
+  // 5 Jan 2026 is a Monday. Any Monday works.
+  const base = new Date(2026, 0, 5);
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(2026, 0, 5 + i);
+    out.push(d.toLocaleDateString(locale, { weekday: 'short' }));
+  }
+  return out;
+}
+function _r39MonthLabel(y, m, locale) {
+  return new Date(y, m, 1).toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+}
+
+// View-mode switch + month navigation. Both re-render only the panel.
+async function _upcomingSetView(view) {
+  const next = view === 'calendar' ? 'calendar' : 'list';
+  if (next === _upcomingView) return;
+  _upcomingView = next;
+  try { localStorage.setItem('wbnb_upcoming_view', next); } catch (_) {}
+  await _upcomingRepaint();
+}
+async function _upcomingCalGoto(delta) {
+  if (_upcomingCalYear == null) return;
+  const d = new Date(_upcomingCalYear, _upcomingCalMonth + delta, 1);
+  _upcomingCalYear = d.getFullYear();
+  _upcomingCalMonth = d.getMonth();
+  _upcomingCalSelectedDay = null;
+  await _upcomingRepaint();
+}
+async function _upcomingCalToday() {
+  const now = new Date();
+  _upcomingCalYear = now.getFullYear();
+  _upcomingCalMonth = now.getMonth();
+  _upcomingCalSelectedDay = _r39IsoDate(now);
+  await _upcomingRepaint();
+}
+async function _upcomingCalSelectDay(iso) {
+  _upcomingCalSelectedDay = iso;
+  await _upcomingRepaint();
+}
+async function _upcomingRepaint() {
+  const wrap = document.getElementById('upcomingPanelWrap');
+  if (!wrap) return;
+  const html = await renderUpcomingReservationsPanel();
+  wrap.outerHTML = html;
+}
+
 function setGaRange(days) {
   _gaRangeDays = days;
   localStorage.setItem('wbnb_ga_range', String(days));
@@ -3226,6 +3361,7 @@ const HT = {
     dash_needs_attention: 'Needs your attention',
     dash_currently_staying: 'Currently staying',
     dash_awaiting_checkin: 'Awaiting check-in',
+    list_view: 'List', cal_view: 'Calendar', cal_today: 'Today', cal_no_arrivals: 'No arrivals this month',
     dash_awaiting_checkin_hint: 'Guest has not completed check-in. Send them their booking link so they can finish before the 24-hour Alloggiati deadline.',
     dash_all_caught_up: "You're all caught up",
     dash_nothing_pending: 'No urgent items, no guests currently staying.',
@@ -3636,6 +3772,7 @@ const HT = {
     dash_needs_attention: 'Richiede la tua attenzione',
     dash_currently_staying: 'Soggiornano adesso',
     dash_awaiting_checkin: 'Check-in non effettuato',
+    list_view: 'Lista', cal_view: 'Calendario', cal_today: 'Oggi', cal_no_arrivals: 'Nessun arrivo questo mese',
     dash_awaiting_checkin_hint: 'L\'ospite non ha completato il check-in. Inviagli il link della prenotazione per finire prima delle 24 ore Alloggiati.',
     dash_all_caught_up: 'Tutto in ordine',
     dash_nothing_pending: 'Nessuna urgenza, nessun ospite presente.',
@@ -4474,21 +4611,38 @@ async function renderUpcomingReservationsPanel() {
   const lastSyncedLabel = hostLang === 'it' ? 'Ultima sync:' : 'Last sync:';
   // Round 36.2.5 — the header count is filled in after the row map so it
   // reflects visible rows (some may be hidden as "already staying").
+  // Round 39 — the header also carries the list / calendar view toggle.
+  const listLabel = safe(h('list_view') || 'List');
+  const calLabel  = safe(h('cal_view')  || 'Calendar');
+  const viewToggle = `
+    <div style="display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;font-family:inherit;">
+      <button type="button" onclick="_upcomingSetView('list')" style="padding:5px 10px;font-size:0.72rem;border:none;cursor:pointer;background:${_upcomingView === 'list' ? 'var(--warm)' : 'var(--white)'};color:${_upcomingView === 'list' ? '#fff' : 'var(--ink-soft)'};font-family:inherit;">☰ ${listLabel}</button>
+      <button type="button" onclick="_upcomingSetView('calendar')" style="padding:5px 10px;font-size:0.72rem;border:none;cursor:pointer;background:${_upcomingView === 'calendar' ? 'var(--warm)' : 'var(--white)'};color:${_upcomingView === 'calendar' ? '#fff' : 'var(--ink-soft)'};font-family:inherit;">📅 ${calLabel}</button>
+    </div>`;
   const buildHeader = (visibleCount) => `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
       <span style="font-size:1rem;">📅</span>
       <h3 style="margin:0;font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--ink);font-weight:600;">${safe(title)}</h3>
       <span style="font-size:0.78rem;color:var(--ink-soft);">(${visibleCount})</span>
       <span style="flex:1;"></span>
+      ${viewToggle}
       <span style="font-size:0.72rem;color:var(--ink-soft);">${lastSyncedLabel} ${safe(lastSyncedTxt)}</span>
       <button type="button" onclick="syncCalendarsFromDashboard(this)"
         style="padding:6px 12px;background:var(--warm);color:#fff;border:none;border-radius:6px;font-size:0.76rem;cursor:pointer;font-family:inherit;">${syncBtnLabel}</button>
     </div>`;
+
+  // Round 39 — calendar mode short-circuits before the list-only query
+  // (strictly future arrivals). Calendar overlaps the visible month
+  // instead, so a stay from the 3rd to the 10th appears when viewing
+  // September. See _renderUpcomingCalendarBody.
+  if (_upcomingView === 'calendar') {
+    return await _renderUpcomingCalendarBody(buildHeader);
+  }
   const headerHtml = buildHeader(rows.length);
 
   if (rows.length === 0) {
     return `
-      <div style="margin-bottom:18px;">
+      <div id="upcomingPanelWrap" style="margin-bottom:18px;">
         ${headerHtml}
         <div style="padding:16px 18px;background:var(--white);border:1px solid var(--border);border-radius:10px;font-size:0.82rem;color:var(--ink-soft);">
           ${safe(h('dash_upcoming_empty'))}
@@ -4684,7 +4838,7 @@ async function renderUpcomingReservationsPanel() {
   // the same empty-state as "no upcoming reservations".
   if (rendered.length === 0) {
     return `
-      <div style="margin-bottom:18px;">
+      <div id="upcomingPanelWrap" style="margin-bottom:18px;">
         ${buildHeader(0)}
         <div style="padding:16px 18px;background:var(--white);border:1px solid var(--border);border-radius:10px;font-size:0.82rem;color:var(--ink-soft);">
           ${safe(h('dash_upcoming_empty'))}
@@ -4692,9 +4846,237 @@ async function renderUpcomingReservationsPanel() {
       </div>`;
   }
   return `
-    <div style="margin-bottom:18px;">
+    <div id="upcomingPanelWrap" style="margin-bottom:18px;">
       ${buildHeader(rendered.length)}
       ${rendered.join('')}
+    </div>`;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Round 39 — Calendar view for the upcoming reservations panel.
+   ─────────────────────────────────────────────────────────────────────
+   Same data source and per-property scope as the list, DIFFERENT
+   date filter: month-overlap (checkin_date <= monthEnd AND
+   checkout_date >= monthStart) rather than the list's strictly-
+   future .gt('checkin_date', today). A stay from the 3rd to the
+   10th belongs on this month's calendar even though it's excluded
+   from the list.
+   Bars render check-in inclusive / check-out exclusive so back-to-
+   back bookings don't visually overlap on the boundary day.
+   Below the mobile breakpoint (<640px), bars are hidden and each
+   cell shows a count badge; tapping a day lists that day's arrivals
+   under the grid. Same data, same colours, same click target.
+══════════════════════════════════════════════════════════════════════ */
+async function _renderUpcomingCalendarBody(buildHeader) {
+  const it = hostLang === 'it';
+  const locale = it ? 'it-IT' : 'en-GB';
+  const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  if (_upcomingCalYear == null) {
+    const now = new Date();
+    _upcomingCalYear = now.getFullYear();
+    _upcomingCalMonth = now.getMonth();
+  }
+  const y = _upcomingCalYear;
+  const m = _upcomingCalMonth;
+  const monthStart = new Date(y, m, 1);
+  const monthEnd   = new Date(y, m + 1, 0); // last day of month
+  const monthStartISO = _r39IsoDate(monthStart);
+  const monthEndISO   = _r39IsoDate(monthEnd);
+
+  // Fetch overlapping reservations. Different from the list query on
+  // purpose — do not unify the two.
+  let rows = [];
+  try {
+    const { data, error } = await sb.from('ota_reservations')
+      .select('id, platform, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code')
+      .eq('property_id', propertyId)
+      .eq('entry_type', 'reservation')
+      .eq('status', 'active')
+      .is('deleted_at', null)
+      .lte('checkin_date',  monthEndISO)
+      .gte('checkout_date', monthStartISO)
+      .order('checkin_date', { ascending: true });
+    if (error) { console.warn('Calendar reservations load failed:', error.message); }
+    else rows = data || [];
+  } catch (e) {
+    console.warn('Calendar reservations exception:', e);
+  }
+  rows = await ensureReservationBookingCodes(rows);
+
+  // Enrich each row with { name, checkedIn }. Correlation logic
+  // matches the list — booking_code first, then date overlap fallback.
+  const dated = (allCheckins || []).filter(c => c.arrival_date);
+  const isHeadType = t => t === 'single' || t === 'head' || t === 'group';
+  const enriched = rows.map(r => {
+    let matched = r.booking_code ? dated.filter(c => c.booking_code === r.booking_code) : [];
+    if (matched.length === 0) {
+      matched = dated.filter(c =>
+        c.arrival_date < r.checkout_date &&
+        (!c.departure_date || c.departure_date > r.checkin_date)
+      );
+    }
+    let name = null, checkedIn = false;
+    if (matched.length > 0) {
+      const head = matched.find(c => isHeadType(c.guest_type)) || matched[0];
+      const nm = `${head.surname || ''} ${head.name || ''}`.trim();
+      name = nm || null;
+      checkedIn = true;
+    } else {
+      name = _cleanOtaGuestName(r.guest_name);
+    }
+    const label = name || r.booking_code || (it ? 'Prenotazione' : 'Reservation');
+    const link = r.booking_code
+      ? `https://welcomebnb.vercel.app/?b=${encodeURIComponent(r.booking_code)}&p=${encodeURIComponent(propertyId)}`
+      : '';
+    return { r, label, checkedIn, link };
+  });
+
+  // Layout constants.
+  const firstDayCol = _r39DowMon(monthStart);
+  const daysInMonth = monthEnd.getDate();
+  const totalCells  = Math.ceil((firstDayCol + daysInMonth) / 7) * 7;
+  const weeks       = totalCells / 7;
+  const gridStart   = _r39AddDays(monthStart, -firstDayCol);
+  const todayISO    = _r39IsoDate(new Date());
+  const monthLabel  = _r39MonthLabel(y, m, locale);
+  const weekdayHdr  = _r39WeekdayLabels(locale);
+
+  // Assign each enriched row to a display track for stacking bars.
+  // Sort by check-in (inclusive) and greedy-assign to the lowest
+  // track whose last-used end is <= this row's start.
+  const bookings = enriched
+    .map(e => ({
+      ...e,
+      startD: _r39ParseISO(e.r.checkin_date),
+      endD:   _r39ParseISO(e.r.checkout_date), // exclusive
+    }))
+    .filter(b => b.startD && b.endD && b.endD > b.startD)
+    .sort((a, b) => a.startD - b.startD || a.endD - b.endD);
+  const trackEnds = []; // per-track end-date exclusive
+  for (const b of bookings) {
+    let t = 0;
+    while (t < trackEnds.length && trackEnds[t] > b.startD) t++;
+    b.track = t;
+    trackEnds[t] = b.endD;
+  }
+  const maxTracks = trackEnds.length;
+
+  // Weekday header row.
+  const headerRow = `
+    <div class="cal-week-head">
+      ${weekdayHdr.map(w => `<div class="cal-wh-cell">${safe(w)}</div>`).join('')}
+    </div>`;
+
+  // For each week row: seven day cells (day numbers, dim if outside
+  // month, ring today) plus absolutely-positioned bars.
+  const weekRows = [];
+  for (let w = 0; w < weeks; w++) {
+    const weekStart = _r39AddDays(gridStart, w * 7);
+    const weekEndEx = _r39AddDays(weekStart, 7); // exclusive
+    // Day cells.
+    const cells = [];
+    for (let d = 0; d < 7; d++) {
+      const day = _r39AddDays(weekStart, d);
+      const iso = _r39IsoDate(day);
+      const outside = day < monthStart || day > monthEnd;
+      const isToday = iso === todayISO;
+      const arrivalsToday = bookings.filter(b => b.r.checkin_date === iso);
+      const arrivalsCount = arrivalsToday.length;
+      const isSelected = _upcomingCalSelectedDay === iso;
+      // Base cell (all viewports). Bars overlay on desktop; badge shows on mobile.
+      cells.push(`
+        <button type="button" class="cal-day-cell${outside ? ' cal-outside' : ''}${isToday ? ' cal-today' : ''}${isSelected ? ' cal-selected' : ''}"
+                data-cal-day="${safe(iso)}"
+                onclick="_upcomingCalSelectDay('${safe(iso)}')">
+          <span class="cal-day-num">${day.getDate()}</span>
+          ${arrivalsCount > 0 ? `<span class="cal-day-badge cal-day-badge-${arrivalsToday[0].checkedIn && arrivalsToday.every(a => a.checkedIn) ? 'in' : 'wait'}">${arrivalsCount}</span>` : ''}
+        </button>`);
+    }
+    // Bars for this week. For each booking, clip to [weekStart, weekEndEx).
+    const bars = [];
+    for (const b of bookings) {
+      if (b.endD <= weekStart) continue;
+      if (b.startD >= weekEndEx) continue;
+      const segStart = b.startD < weekStart ? weekStart : b.startD;
+      const segEndEx = b.endD > weekEndEx ? weekEndEx : b.endD;
+      const colStart = Math.floor((segStart - weekStart) / 86400000);
+      const spanCols = Math.max(1, Math.round((segEndEx - segStart) / 86400000));
+      const leftPct  = colStart * (100 / 7);
+      const widthPct = spanCols * (100 / 7);
+      const tone     = b.checkedIn ? 'in' : 'wait';
+      const title    = safe(`${b.label} · ${b.r.checkin_date} → ${b.r.checkout_date}`);
+      const opener   = b.link ? `window.open('${safe(b.link)}', '_blank', 'noopener');event.stopPropagation();` : 'event.stopPropagation();';
+      bars.push(`
+        <a href="${b.link ? safe(b.link) : '#'}" target="_blank" rel="noopener" class="cal-bar cal-bar-${tone}"
+           title="${title}"
+           onclick="${opener}"
+           style="left:${leftPct.toFixed(4)}%;width:${widthPct.toFixed(4)}%;top:${28 + b.track * 20}px;">${safe(b.label)}</a>`);
+    }
+    weekRows.push(`
+      <div class="cal-week" style="min-height:${Math.max(70, 28 + maxTracks * 20 + 6)}px;">
+        ${cells.join('')}
+        ${bars.join('')}
+      </div>`);
+  }
+
+  // Mobile selected-day list. Only renders when a day is selected;
+  // CSS media query hides it above 640px.
+  let selectedList = '';
+  if (_upcomingCalSelectedDay) {
+    const dayBookings = bookings.filter(b =>
+      b.r.checkin_date <= _upcomingCalSelectedDay &&
+      b.r.checkout_date > _upcomingCalSelectedDay
+    );
+    const dayHeading = _r39ParseISO(_upcomingCalSelectedDay)
+      ? _r39ParseISO(_upcomingCalSelectedDay).toLocaleDateString(locale, { weekday: 'long', day: '2-digit', month: 'long' })
+      : _upcomingCalSelectedDay;
+    if (dayBookings.length === 0) {
+      selectedList = `
+        <div class="cal-mobile-list">
+          <div class="cal-mobile-list-head">${safe(dayHeading)}</div>
+          <div style="padding:10px 12px;font-size:0.82rem;color:var(--ink-soft);">
+            ${safe(h('cal_no_arrivals') || (it ? 'Nessun arrivo' : 'No arrivals'))}
+          </div>
+        </div>`;
+    } else {
+      selectedList = `
+        <div class="cal-mobile-list">
+          <div class="cal-mobile-list-head">${safe(dayHeading)}</div>
+          ${dayBookings.map(b => `
+            <a href="${b.link ? safe(b.link) : '#'}" target="_blank" rel="noopener" class="cal-mobile-row cal-mobile-row-${b.checkedIn ? 'in' : 'wait'}">
+              <span class="cal-mobile-name">${safe(b.label)}</span>
+              <span class="cal-mobile-dates">${safe(b.r.checkin_date)} → ${safe(b.r.checkout_date)}</span>
+            </a>`).join('')}
+        </div>`;
+    }
+  }
+
+  // Nav bar (month label + prev / today / next).
+  const nav = `
+    <div class="cal-nav">
+      <button type="button" onclick="_upcomingCalGoto(-1)" class="cal-nav-btn" aria-label="prev">‹</button>
+      <div class="cal-nav-label">${safe(monthLabel)}</div>
+      <button type="button" onclick="_upcomingCalGoto(1)" class="cal-nav-btn" aria-label="next">›</button>
+      <span style="flex:1;"></span>
+      <button type="button" onclick="_upcomingCalToday()" class="cal-nav-btn cal-nav-today">${safe(h('cal_today') || (it ? 'Oggi' : 'Today'))}</button>
+    </div>`;
+
+  const body = bookings.length === 0
+    ? `<div class="cal-empty">${safe(h('cal_no_arrivals') || (it ? 'Nessun arrivo questo mese' : 'No arrivals this month'))}</div>`
+    : '';
+
+  return `
+    <div id="upcomingPanelWrap" style="margin-bottom:18px;">
+      ${buildHeader(bookings.length)}
+      ${nav}
+      <div class="cal-grid-wrap">
+        ${headerRow}
+        <div class="cal-body">
+          ${weekRows.join('')}
+        </div>
+        ${body}
+      </div>
+      ${selectedList}
     </div>`;
 }
 

@@ -65,6 +65,40 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 39 — Calendar view for upcoming reservations _(2026-09-19)_
+Upcoming-reservations panel now toggles between the existing **List** and a new **Calendar** view. Same data source, same per-property scope, same guest-link click behaviour — just a different rendering. Persisted in `localStorage.wbnb_upcoming_view` (default `'list'`).
+- **Scope discipline**: not a PMS calendar. No availability editing, no rate management, no drag-move, no multi-property overlay, no schema changes, no new endpoints. If the diff had grown beyond the panel + its helpers + i18n strings, something would have been wrong.
+- **Data filter differs from list intentionally**: the list is strict-future; the calendar shows *month overlap* — `.lte('checkin_date', monthEndISO).gte('checkout_date', monthStartISO)` — so a stay whose check-in is in the past but check-out is in the visible month still renders. Same platform/property filters as the list.
+- **Timezone-safe date parsing throughout.** Every YYYY-MM-DD → Date conversion goes through `_r39ParseISO(s)` returning `new Date(+y, +m-1, +d)` (LOCAL midnight). Never `new Date('2026-09-01')` — that parses as UTC midnight and shifts the day negatively in Pago_Pago (UTC-11) and positively in Kiritimati (UTC+14). This was flagged in the round spec as "the failure this round is most likely to ship"; verified across four timezones before commit.
+- **Bars are check-in inclusive / check-out exclusive.** A stay Sep 3 → Sep 5 and another Sep 5 → Sep 8 don't visually overlap on the 5th, matching the real semantic (guest A leaves the morning of the 5th, guest B arrives that afternoon).
+- **Grid**: Monday-start (`(getDay() + 6) % 7`), 7 columns, 4–6 week rows per month, `outerHTML`-replaced on nav. Weekday and month labels come from `toLocaleDateString(locale, { weekday: 'short' | ... })` iterating from a known Monday (2026-01-05) — no hardcoded English/Italian name arrays.
+- **Cross-week bars**: rendered per-week as clipped segments — for each week compute intersection of `[startD, endD)` with `[weekStart, weekEndEx)`, skip if empty, place absolute bar with `left%/width%` = `colStart · (100/7)%` / `spanCols · (100/7)%`. Overlapping bars stacked via greedy track assignment (`top = 28 + track·20` px).
+- **Mobile (<640px)**: bars are replaced by a small count-badge in each day cell; tapping a day surfaces a stacked list of that day's arrivals. Same click handler (opens existing guest link).
+- **Colours match the list view**: green rgba(109,191,130,·) for checked-in guests, amber rgba(232,184,75,·) for awaiting arrival.
+- **i18n**: `list_view` / `cal_view` / `cal_today` / `cal_no_arrivals` in EN + IT dictionaries.
+- **Gotcha**: the calendar mode short-circuits *after* the list-mode query has already fetched (~60 rows). Semantically correct, small extra query, cleanup possible later if it ever matters.
+
+### Round 38.4 — Host console: idle sign-out after 4 h inactivity _(2026-09-16)_
+Old sessions left open overnight were showing stale data on wake. Session now auto-signs-out and reloads after 4 hours of no activity, with a bilingual "signed out for inactivity" note on the login screen.
+- Constants: `SESSION_TIMEOUT_MS = 4·60·60·1000`, `SESSION_ACTIVITY_KEY = 'wbnb_last_activity'`, `SESSION_EXPIRED_KEY = 'wbnb_session_expired'`.
+- Activity listeners on the capture phase (`click`, `keydown`, `mousemove`, `scroll`, `touchstart`) update `localStorage` timestamps so multiple tabs share the same idle clock.
+- Wake-up checks: minute interval + `visibilitychange` + `window.focus`. Tab surfaced from background → immediate re-check, no waiting for the next minute tick.
+- Sign-out path: `sb.auth.signOut()` + full `location.reload()` to reset every in-memory state slot, then reads `SESSION_EXPIRED_KEY` on login mount to render the bilingual note.
+- **Not carried to `admin.html`**: intentional — admin sessions are Daniele-only and low-frequency. Queued as a follow-up task.
+
+### Round 38.3 — Booking.com iCal repair _(2026-09-16)_
+Booking.com's iCal rotates UIDs daily for each reservation (different `UID` string every morning) AND publishes a rolling 6-month "closed dates" safety block whose `SUMMARY` is identical to a real reservation ("CLOSED - Not available"). Our sync's dedup was `(property_id, platform, uid)` — every morning the old row got cancelled and a fresh one inserted, moving the check-in date forward one day at a time. The dashboard was showing "arriving tomorrow" three days running for the same physical booking, with a new `booking_code` each time.
+- **Length cap**: introduced `BOOKING_MAX_RES_NIGHTS = 60`. Any Booking event with a span > 60 nights is classed as a block (`entry_type='block'`), not a reservation — filters the rolling closed-dates event without needing to parse its content.
+- **Merge-by-checkout dedup**: for `platform === 'booking'`, dedup key is now `(property_id, platform, checkout_date, entry_type='reservation')` instead of `(property_id, platform, uid)`. When a UID rotates, `mergeBookingRollingUIDs()` PATCHes the existing row's `uid`/`summary`/`raw` in place and preserves `checkin_date` + `booking_code`. The new UID is registered as "seen" so the cancel-sweep doesn't touch it.
+- **Data repair**: reclassified 3 orphan `Trullo Verde Ulivo` (`c26b7de2-c0f5-4545-955f-88a778ab36b2`) reservations > 60 nights as `entry_type='block'`; un-cancelled `TRU-9LZDAN` (the real active stay) and cancelled `TRU-4QQE8D` (its duplicate rotated UID).
+- Airbnb / VRBO unaffected — their UIDs are stable; the merge path only fires for `platform === 'booking'`.
+
+### Round 38.2 — Language sweep _(2026-09-14)_
+Two language leaks fixed. (1) Dashboard was showing raw `"Not Available"` from Booking.com summaries next to real guest names on the ongoing-reservations tile — replaced with `_cleanOtaGuestName()` that returns a localised "Booking.com reservation" / "Prenotazione Booking.com" when the summary is a generic OTA placeholder. (2) Batch-localised ~40 host-console toasts and alerts that were still English-only.
+
+### Round 38.1 — Dashboard: show ongoing OTA reservations that never got a check-in _(2026-09-13)_
+Dashboard now surfaces guests who are physically in the property today but never completed pre-check-in — the OTA iCal knew about them, the check-in flow never saw them. Tile groups them under "Currently staying (no check-in)" so hosts don't miss a physical presence.
+
 ### Round 38 — Guest privacy notice (host as titolare) + invite-only host access _(2026-09-11)_
 **Part A · Guest privacy notice.** Old modal (`index.html` ~5041) named WelcomeBnB as data controller. Under GDPR the host is *titolare del trattamento*; WelcomeBnB is *responsabile*. The notice is legally the host's and must identify them.
 - Notice rebuilt as a template driven by `propertyData` with `{{TOKEN}}` substitution. Tokens degrade gracefully: `{{CIN}}` becomes `, CIN X` or nothing, `{{CONTACT_BLOCK}}` becomes the full paragraph or nothing, `{{RIGHTS_HOWTO}}` swaps between "write to …" and "contact the data controller named in Section 1" when `host_email` is empty. Verified against three property shapes — full, email-missing, all-empty — no orphan dashes, labels or "undefined".

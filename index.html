@@ -729,12 +729,11 @@ body.tab-chat .powered-by {
   transform: translateY(20px);
   pointer-events: none !important;
 }
-body:has(#page-chat.active) #privacyLink,
-body.tab-chat #privacyLink {
-  opacity: 0 !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-}
+/* Round 41 Task 1 — the floating Privacy button that used to live at
+   bottom-right (position:fixed, its own layer) is gone. Privacy is a
+   once-ever link; it now sits inside the Powered-by strip, to the
+   right of the wordmark, at the same muted weight. Its old
+   :has(#page-chat.active) hide rule went with it. */
 .powered-by a {
   pointer-events: all;
   display: flex; align-items: center; gap: 5px;
@@ -744,6 +743,17 @@ body.tab-chat #privacyLink {
   opacity: 0.5;
   transition: opacity 0.2s;
 }
+.powered-by .privacy-inline {
+  pointer-events: all;
+  margin-left: 10px; padding-left: 10px;
+  border-left: 1px solid rgba(6,26,61,0.12);
+  font-size: 0.56rem; letter-spacing: 0.08em;
+  color: var(--ink-soft); opacity: 0.5;
+  background: none; border-top: none; border-right: none; border-bottom: none;
+  font-family: 'DM Sans', sans-serif; cursor: pointer;
+  transition: opacity 0.2s;
+}
+.powered-by .privacy-inline:hover { opacity: 0.8; }
 .powered-by a:hover { opacity: 0.8; }
 .powered-by .wbnb-mark {
   width: 14px; height: 14px;
@@ -1331,11 +1341,17 @@ body.tab-chat #privacyLink {
 </div>
 
 <!-- Powered by WelcomeBnB -->
+<!-- Round 41 Task 1 — Privacy link inline here, to the right of the
+     wordmark. The old floating #privacyLink pill (bottom-right, layer
+     over the page) is gone; it was overlapping WiFi/Emergency on Home,
+     the second reco on Explore, and the No-Parties rule on Rules. -->
 <div class="powered-by">
   <a href="https://getwelcomebnb.com" target="_blank">
     <div class="wbnb-mark">W</div>
     Powered by <strong style="font-weight:600;color:var(--ink-2);">Welcome</strong><strong style="font-weight:600;color:var(--warm);">BnB</strong>
   </a>
+  <button type="button" id="privacyLink" class="privacy-inline"
+    onclick="openPrivacyModal()" data-i18n="privacy_link">Privacy</button>
 </div>
 
 <!-- ══════════════════════════════════════
@@ -1763,6 +1779,7 @@ const T = {
     consent_err_generic: 'Something went wrong saving your preference. Please try again.',
     unsub_title: 'You\'ve been unsubscribed',
     unsub_text: 'You won\'t receive any further offers or news from us. Thank you for staying with us.',
+    privacy_link: 'Privacy',
     unsub_err: 'This unsubscribe link is invalid or has already been used.',
     review_saved: 'already registered',
     review_fill: 'Fill details for each guest',
@@ -1904,6 +1921,7 @@ const T = {
     consent_err_generic: 'Si è verificato un errore nel salvataggio. Riprova.',
     unsub_title: 'Iscrizione annullata',
     unsub_text: 'Non riceverai più offerte o novità da parte nostra. Grazie per essere stato nostro ospite.',
+    privacy_link: 'Privacy',
     unsub_err: 'Questo link di annullamento non è valido o è già stato utilizzato.',
     review_saved: 'già registrati',
     review_fill: 'Compila i dati per ogni ospite',
@@ -5067,7 +5085,9 @@ setupTestModeBanner();
 init();
 </script>
 <!-- ── Round 38 — Guest privacy notice (Art. 13/14 GDPR, host is titolare) ─── -->
-<div id="privacyLink" onclick="openPrivacyModal()" style="position:fixed;bottom:74px;right:12px;z-index:1100;background:rgba(255,255,255,0.94);backdrop-filter:blur(8px);border:1px solid rgba(6,26,61,0.1);border-radius:6px;padding:5px 11px;font-size:0.7rem;color:var(--ink);cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 1px 3px rgba(0,0,0,0.08);user-select:none;opacity:0.85;">Privacy</div>
+<!-- Round 41 Task 1 — floating #privacyLink pill removed; it now lives
+     inline in the Powered-by strip above. openPrivacyModal() is the
+     same; only the trigger element moved. -->
 
 <div id="privacyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:flex-start;justify-content:center;padding:24px 12px;overflow-y:auto;" onclick="if(event.target===this)closePrivacyModal()">
   <div style="background:var(--cream);max-width:720px;width:100%;border-radius:14px;padding:24px 26px 20px;box-shadow:0 12px 48px rgba(0,0,0,0.3);max-height:calc(100vh - 48px);overflow-y:auto;">

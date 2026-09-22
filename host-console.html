@@ -4460,6 +4460,7 @@ function showPanel(id, btn) {
   if (id === 'chat') { loadHostChat(); document.getElementById('chatBadge').style.display = 'none'; markChatSeen(); requestNotifPermission(); }
   if (id === 'guestanalytics') loadGuestAnalytics();
   if (id === 'contacts') loadMarketingContacts();
+  if (id === 'calendar') renderCalendarPanel(); // Round 40 T5
   trackPanelSwitch(id);
 }
 
@@ -4783,35 +4784,21 @@ async function renderUpcomingReservationsPanel() {
     : (hostLang === 'it' ? 'mai' : 'never');
   const syncBtnLabel = hostLang === 'it' ? '🔄 Sincronizza' : '🔄 Sync now';
   const lastSyncedLabel = hostLang === 'it' ? 'Ultima sync:' : 'Last sync:';
-  // Round 36.2.5 — the header count is filled in after the row map so it
-  // reflects visible rows (some may be hidden as "already staying").
-  // Round 39 — the header also carries the list / calendar view toggle.
-  const listLabel = safe(h('list_view') || 'List');
-  const calLabel  = safe(h('cal_view')  || 'Calendar');
-  const viewToggle = `
-    <div style="display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;font-family:inherit;">
-      <button type="button" onclick="_upcomingSetView('list')" style="padding:5px 10px;font-size:0.72rem;border:none;cursor:pointer;background:${_upcomingView === 'list' ? 'var(--warm)' : 'var(--white)'};color:${_upcomingView === 'list' ? '#fff' : 'var(--ink-soft)'};font-family:inherit;">☰ ${listLabel}</button>
-      <button type="button" onclick="_upcomingSetView('calendar')" style="padding:5px 10px;font-size:0.72rem;border:none;cursor:pointer;background:${_upcomingView === 'calendar' ? 'var(--warm)' : 'var(--white)'};color:${_upcomingView === 'calendar' ? '#fff' : 'var(--ink-soft)'};font-family:inherit;">📅 ${calLabel}</button>
-    </div>`;
+  // Round 40 Task 5 — the dashboard is list-only. The old Lista /
+  // Calendario toggle moved into its own sidebar tab (Ospiti → Calendario)
+  // so the dashboard doesn't have two ways to render the same data. The
+  // toggle-related helpers (_renderUpcomingCalendarBody, _upcomingSetView)
+  // still exist and are used by that tab; only this panel forced list.
   const buildHeader = (visibleCount) => `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
       <span style="font-size:1rem;">📅</span>
       <h3 style="margin:0;font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--ink);font-weight:600;">${safe(title)}</h3>
       <span style="font-size:0.78rem;color:var(--ink-soft);">(${visibleCount})</span>
       <span style="flex:1;"></span>
-      ${viewToggle}
       <span style="font-size:0.72rem;color:var(--ink-soft);">${lastSyncedLabel} ${safe(lastSyncedTxt)}</span>
       <button type="button" onclick="syncCalendarsFromDashboard(this)"
         style="padding:6px 12px;background:var(--warm);color:#fff;border:none;border-radius:6px;font-size:0.76rem;cursor:pointer;font-family:inherit;">${syncBtnLabel}</button>
     </div>`;
-
-  // Round 39 — calendar mode short-circuits before the list-only query
-  // (strictly future arrivals). Calendar overlaps the visible month
-  // instead, so a stay from the 3rd to the 10th appears when viewing
-  // September. See _renderUpcomingCalendarBody.
-  if (_upcomingView === 'calendar') {
-    return await _renderUpcomingCalendarBody(buildHeader);
-  }
   const headerHtml = buildHeader(rows.length);
 
   if (rows.length === 0) {
@@ -4845,11 +4832,66 @@ async function renderUpcomingReservationsPanel() {
         </div>
       </div>`;
   }
+  // Round 40 Task 5 — cap the dashboard list at 3, hide the rest under
+  // a "Mostra tutte (N)" expander. Full context still lives in
+  // Ospiti → Check-in / Calendario; the dashboard is a triage view.
+  const DASH_CAP = 3;
+  const hasOverflow = rendered.length > DASH_CAP;
+  const visible = hasOverflow ? rendered.slice(0, DASH_CAP) : rendered;
+  const hidden  = hasOverflow ? rendered.slice(DASH_CAP)    : [];
+  const showAllLabel = hostLang === 'it'
+    ? `Mostra tutte (${rendered.length})`
+    : `Show all (${rendered.length})`;
+  const showLessLabel = hostLang === 'it' ? 'Mostra meno' : 'Show less';
+  const overflowBlock = hasOverflow ? `
+      <div id="upcomingOverflow" style="display:none;">${hidden.join('')}</div>
+      <div style="text-align:center;padding:6px 0 4px;">
+        <button type="button" id="upcomingOverflowBtn"
+          onclick="_toggleUpcomingOverflow(this)"
+          data-more-label="${safe(showAllLabel)}" data-less-label="${safe(showLessLabel)}"
+          style="padding:5px 14px;background:transparent;color:var(--warm);border:1px solid rgba(0,91,255,0.25);border-radius:6px;font-size:0.72rem;cursor:pointer;font-family:inherit;">${safe(showAllLabel)}</button>
+      </div>` : '';
   return `
     <div id="upcomingPanelWrap" style="margin-bottom:18px;">
       ${buildHeader(rendered.length)}
-      ${rendered.join('')}
+      ${visible.join('')}
+      ${overflowBlock}
     </div>`;
+}
+
+// Round 40 Task 5 — dashboard "Show all / Show less" expander.
+function _toggleUpcomingOverflow(btn) {
+  const ov = document.getElementById('upcomingOverflow');
+  if (!ov) return;
+  const open = ov.style.display !== 'none';
+  ov.style.display = open ? 'none' : 'block';
+  btn.textContent = open ? btn.getAttribute('data-more-label') : btn.getAttribute('data-less-label');
+}
+
+// Round 40 Task 5 — Ospiti → Calendario paints the calendar into its
+// own panel body. Reuses _renderUpcomingCalendarBody(), which was the
+// dashboard's calendar rendering — no logic duplicated.
+async function renderCalendarPanel() {
+  const body = document.getElementById('calendarPanelBody');
+  if (!body || !propertyId) return;
+  const it = hostLang === 'it';
+  body.innerHTML = `<div style="padding:24px;text-align:center;color:var(--ink-soft);font-size:0.82rem;">${it ? 'Caricamento…' : 'Loading…'}</div>`;
+  // The helper wants a buildHeader function; the calendar panel doesn't
+  // need the sync-button header (the dashboard already has it), so we
+  // hand it an empty renderer.
+  const noHeader = () => '';
+  try {
+    const html = await _renderUpcomingCalendarBody(noHeader);
+    body.innerHTML = html;
+    // Style-wise the panel body no longer needs the placeholder padding
+    // once the grid is in — the grid brings its own borders.
+    body.style.padding = '0';
+    body.style.background = 'transparent';
+    body.style.border = 'none';
+  } catch (e) {
+    console.warn('renderCalendarPanel failed:', e);
+    body.innerHTML = `<div style="padding:16px 18px;color:#b03939;font-size:0.82rem;">${it ? 'Errore caricamento calendario.' : 'Failed to load calendar.'}</div>`;
+  }
 }
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -4979,10 +5021,14 @@ function _renderReservationCard(r, todayISO) {
       style="padding:4px 10px;background:rgba(232,184,75,0.14);border:1px solid rgba(232,184,75,0.4);border-radius:6px;font-size:0.72rem;cursor:pointer;color:#9a6b00;font-family:inherit;font-weight:500;">🔓 ${safe(hostLang === 'it' ? 'Riapri check-in' : 'Reopen check-in')}</button>` : '';
   const reopenedNote = alreadyReopened ? `
     <span style="font-size:0.68rem;color:#9a6b00;background:rgba(232,184,75,0.14);border-radius:6px;padding:2px 8px;">${safe(hostLang === 'it' ? '🔓 In attesa — l\'ospite può aggiungere altri' : '🔓 Waiting — guest can add more')}</span>` : '';
+  // Round 40 Task 5 — the full URL was noisy in the row; show the
+  // booking code chip instead. Copy still copies the full URL, Open
+  // still opens it in a new tab, so hosts lose nothing.
   const linkRow = guestLink ? `
     <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:8px;padding-top:8px;border-top:1px dashed rgba(107,122,144,0.15);">
       <span style="font-size:0.62rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--warm);white-space:nowrap;">${safe(linkLabel)}</span>
-      <span style="font-family:monospace;font-size:0.7rem;color:var(--ink-soft);flex:1;min-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safe(guestLink)}</span>
+      ${codeChip || `<span style="font-family:monospace;font-size:0.7rem;color:var(--ink-soft);">—</span>`}
+      <span style="flex:1;"></span>
       <button type="button" onclick="copyReservationLink('${safe(guestLink)}', this)" title="${safe(hostLang === 'it' ? 'Copia il link prenotazione' : 'Copy the booking link')}"
               style="padding:4px 10px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:0.72rem;cursor:pointer;color:var(--ink);font-family:inherit;">🔗 ${safe(hostLang === 'it' ? 'Copia' : 'Copy')}</button>
       <a href="${safe(guestLink)}" target="_blank" rel="noopener" title="${safe(hostLang === 'it' ? 'Apri come ospite' : 'Open as guest')}"

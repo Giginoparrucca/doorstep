@@ -554,6 +554,25 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 }
 .panel-tab.active { color: var(--warm); border-bottom-color: var(--warm); }
 
+/* Round 40 Task 4 — section tab strip in the main header. Same visual
+   spec as .panel-tab (thin underline that turns warm-blue when active)
+   so hosts don't have to learn a second tab style. */
+.section-tabs { border-bottom: 1px solid var(--border); margin: 14px -28px 0; padding: 0 28px; }
+.section-tab {
+  padding: 9px 16px; font-size: 0.84rem; font-weight: 500;
+  color: var(--ink-soft); background: none; border: none;
+  border-bottom: 2px solid transparent; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.section-tab:hover { color: var(--ink); }
+.section-tab.active { color: var(--warm); border-bottom-color: var(--warm); font-weight: 600; }
+.section-tab .tab-badge {
+  background: #E0455E; color: #fff; font-size: 0.6rem; font-weight: 700;
+  padding: 1px 7px; border-radius: 10px;
+}
+.section-tab.active .tab-badge { background: var(--warm); color: #fff; }
+
 /* ── RESPONSIVE ── */
 /* ══════════════════════════════════════
    MOBILE RESPONSIVE
@@ -1083,58 +1102,34 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     <div class="prop-switcher-menu" id="propSwitcherMenu"></div>
   </div>
 
-  <nav class="sidebar-nav">
-    <div class="sidebar-section" data-h="sidebar_overview">Overview</div>
-    <button class="sidebar-item active" onclick="showPanel('dashboard', this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-      <span data-h="sidebar_dashboard">Dashboard</span>
+  <!-- Round 40 Task 4 — five top-level items, no group headers, no
+       inner scroll. Each item calls showSection(sectionId); the router
+       maps that to the right panel and paints the tab strip in the
+       header. Old data-h keys (sidebar_dashboard, sidebar_property, …)
+       are kept in the dictionaries so existing references still resolve. -->
+  <nav class="sidebar-nav" style="overflow:visible;">
+    <button class="sidebar-item active" data-section="oggi" onclick="showSection('oggi')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span data-h="sidebar_oggi">Today</span>
+      <span class="badge-count" id="navBadge-oggi" style="display:none;">0</span>
     </button>
-
-    <div class="sidebar-section" data-h="sidebar_property_sec">Property</div>
-    <button class="sidebar-item" onclick="showPanel('property', this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/></svg>
-      <span data-h="sidebar_property">Property Details</span>
-    </button>
-    <button class="sidebar-item" onclick="showPanel('rules', this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      <span data-h="sidebar_rules">House Rules</span>
-    </button>
-    <button class="sidebar-item" onclick="showPanel('recos', this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88"/></svg>
-      <span data-h="sidebar_recos">Recommendations</span>
-    </button>
-
-    <div class="sidebar-section" data-h="sidebar_guests_sec">Guests</div>
-    <button class="sidebar-item" onclick="showPanel('checkins', this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      <span data-h="sidebar_checkins">Check-in Data</span>
-    </button>
-    <button class="sidebar-item" onclick="showPanel('guestanalytics', this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="M7 15l4-6 4 3 5-8"/></svg>
-      <span data-h="sidebar_guest_analytics">Guest Analytics</span>
-    </button>
-    <button class="sidebar-item" onclick="showPanel('contacts', this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 4h16v16H4z"/><path d="M22 6l-10 7L2 6"/></svg>
-      <span data-h="sidebar_contacts">Marketing Contacts</span>
-    </button>
-    <button class="sidebar-item" onclick="showPanel('export', this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      <span data-h="sidebar_export">Export / Alloggiati</span>
-    </button>
-    <button class="sidebar-item" onclick="showPanel('compliance', this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      <span data-h="sidebar_compliance">Compliance Guide</span>
-    </button>
-
-    <div class="sidebar-section" data-h="sidebar_share_sec">Share</div>
-    <button class="sidebar-item" onclick="showPanel('qrlink', this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3z"/><path d="M18 18h3v3h-3z"/><path d="M14 18h3v3h-3z"/></svg>
-      <span data-h="sidebar_qr">QR Code & Link</span>
-    </button>
-    <button class="sidebar-item" onclick="showPanel('chat', this)" style="position:relative;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-      <span data-h="sidebar_chat">Guest Chat</span>
+    <button class="sidebar-item" data-section="ospiti" onclick="showSection('ospiti')" style="position:relative;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/></svg>
+      <span data-h="sidebar_ospiti">Guests</span>
       <div id="chatBadge" style="display:none;position:absolute;right:12px;width:8px;height:8px;border-radius:50%;background:var(--red);"></div>
+    </button>
+    <button class="sidebar-item" data-section="conf" onclick="showSection('conf')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+      <span data-h="sidebar_conf">Compliance</span>
+      <span class="badge-count" id="navBadge-conf" style="display:none;">0</span>
+    </button>
+    <button class="sidebar-item" data-section="prop" onclick="showSection('prop')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/></svg>
+      <span data-h="sidebar_prop">Property</span>
+    </button>
+    <button class="sidebar-item" data-section="cond" onclick="showSection('cond')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+      <span data-h="sidebar_cond">Share</span>
     </button>
   </nav>
 
@@ -1156,12 +1151,18 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 <!-- MAIN -->
 <div class="main">
   <div class="main-header">
-    <div style="display:flex;align-items:center;gap:12px;">
-      <div class="mobile-toggle" onclick="toggleSidebar()">☰</div>
-      <div>
-        <div class="main-title" id="panelTitle">Dashboard</div>
-        <div class="main-subtitle" id="panelSubtitle">Overview of your property and guests</div>
+    <div style="flex:1;min-width:0;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="mobile-toggle" onclick="toggleSidebar()">☰</div>
+        <div>
+          <div class="main-title" id="panelTitle">Dashboard</div>
+          <div class="main-subtitle" id="panelSubtitle">Overview of your property and guests</div>
+        </div>
       </div>
+      <!-- Round 40 Task 4 — section tab strip. Populated by
+           renderTabStrip(); one button per panel in the active
+           section, hidden when the section has only one panel. -->
+      <div class="section-tabs" id="sectionTabs" style="display:flex;gap:2px;margin-top:14px;flex-wrap:wrap;"></div>
     </div>
     <div class="header-actions" id="headerActions">
       <div class="lang-toggle" style="display:flex;align-items:center;background:var(--cream-2);border-radius:20px;padding:3px;gap:2px;border:1px solid var(--border);">
@@ -1688,6 +1689,16 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           <tbody id="checkinTable">
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- Round 40 Task 4 — Calendar tab placeholder. Task 5 will move the
+         existing calendar rendering (_renderUpcomingCalendarBody) into
+         this panel and make List the dashboard default. Kept empty here
+         so the sidebar/tab restructure ships cleanly on its own. -->
+    <div class="panel" id="panel-calendar">
+      <div id="calendarPanelBody" style="padding:16px 18px;background:var(--white);border:1px solid var(--border);border-radius:10px;font-size:0.82rem;color:var(--ink-soft);">
+        <span data-h="cal_panel_placeholder">Calendar view coming here.</span>
       </div>
     </div>
 
@@ -3384,6 +3395,18 @@ const HT = {
     sidebar_guest_analytics: 'Guest Analytics',
     sidebar_contacts: 'Marketing Contacts',
     sidebar_compliance: 'Compliance Guide',
+    // Round 40 Task 4 — five top-level sidebar sections + per-section
+    // header title/subtitle. Old sidebar_* keys are kept above so any
+    // stray reference still resolves.
+    sidebar_oggi: 'Today', sidebar_ospiti: 'Guests', sidebar_conf: 'Compliance',
+    sidebar_prop: 'Property', sidebar_cond: 'Share',
+    sidebar_oggi_title:   'Today',      sidebar_oggi_sub:   'What needs your attention right now',
+    sidebar_ospiti_title: 'Guests',     sidebar_ospiti_sub: 'Check-ins, calendar, analytics and contacts',
+    sidebar_conf_title:   'Compliance', sidebar_conf_sub:   'Filings for the Italian authorities',
+    sidebar_prop_title:   'Property',   sidebar_prop_sub:   'Details, rules and recommendations',
+    sidebar_cond_title:   'Share',      sidebar_cond_sub:   'Guest link and chat',
+    t_calendar: 'Calendar', s_calendar: 'Bookings by month',
+    cal_panel_placeholder: 'Calendar view is coming here in the next update.',
     admin_enable_edit: 'Enable editing',
     admin_close: 'Close',
     cmp_intro: 'A plain-language guide to the three compliance obligations for short-term rentals in Italy. This is reference information — verify the specifics for your region and comune.',
@@ -3799,6 +3822,15 @@ const HT = {
     sidebar_guest_analytics: 'Analisi Ospiti',
     sidebar_contacts: 'Contatti Marketing',
     sidebar_compliance: 'Guida Conformità',
+    sidebar_oggi: 'Oggi', sidebar_ospiti: 'Ospiti', sidebar_conf: 'Conformità',
+    sidebar_prop: 'Proprietà', sidebar_cond: 'Condividi',
+    sidebar_oggi_title:   'Oggi',       sidebar_oggi_sub:   'Cosa richiede la tua attenzione adesso',
+    sidebar_ospiti_title: 'Ospiti',     sidebar_ospiti_sub: 'Check-in, calendario, analisi e contatti',
+    sidebar_conf_title:   'Conformità', sidebar_conf_sub:   'Adempimenti per le autorità italiane',
+    sidebar_prop_title:   'Proprietà',  sidebar_prop_sub:   'Dettagli, regole e consigli',
+    sidebar_cond_title:   'Condividi',  sidebar_cond_sub:   'Link per gli ospiti e chat',
+    t_calendar: 'Calendario', s_calendar: 'Prenotazioni per mese',
+    cal_panel_placeholder: 'La vista calendario arriverà qui nel prossimo aggiornamento.',
     admin_enable_edit: 'Abilita modifica',
     admin_close: 'Chiudi',
     cmp_intro: 'Una guida in linguaggio semplice ai tre obblighi di conformità per le locazioni brevi in Italia. È informazione di riferimento — verifica i dettagli per la tua regione e il tuo comune.',
@@ -4264,6 +4296,7 @@ const titlesMap = {
   rules: ['t_rules', 's_rules'],
   recos: ['t_recos', 's_recos'],
   checkins: ['t_checkins', 's_checkins'],
+  calendar: ['t_calendar', 's_calendar'],
   guestanalytics: ['t_guest_analytics', 's_guest_analytics'],
   contacts: ['t_contacts', 's_contacts'],
   export: ['t_export', 's_export'],
@@ -4271,6 +4304,60 @@ const titlesMap = {
   qrlink: ['t_qrlink', 's_qrlink'],
   chat: ['t_chat', 's_chat'],
 };
+
+// Round 40 Task 4 — five top-level sections, ordered as they appear in
+// the sidebar. Each section owns the panels that used to be siblings in
+// the old flat sidebar; the tab strip in the header renders one button
+// per panel and delegates to showPanel(id). Panel ids stay unchanged so
+// every existing call site keeps working; a helper panelSection() finds
+// the containing section for any panel id.
+const SECTIONS = {
+  oggi:   { panels: ['dashboard'] },
+  ospiti: { panels: ['checkins', 'calendar', 'guestanalytics', 'contacts'] },
+  conf:   { panels: ['export', 'compliance'] },
+  prop:   { panels: ['property', 'rules', 'recos'] },
+  cond:   { panels: ['qrlink', 'chat'] },
+};
+const SECTION_TITLES = {
+  oggi:   ['sidebar_oggi_title',   'sidebar_oggi_sub'],
+  ospiti: ['sidebar_ospiti_title', 'sidebar_ospiti_sub'],
+  conf:   ['sidebar_conf_title',   'sidebar_conf_sub'],
+  prop:   ['sidebar_prop_title',   'sidebar_prop_sub'],
+  cond:   ['sidebar_cond_title',   'sidebar_cond_sub'],
+};
+const SECTION_LAST_TAB_KEY = 'wbnb_section_tab';
+function panelSection(panelId) {
+  for (const s of Object.keys(SECTIONS)) {
+    if (SECTIONS[s].panels.includes(panelId)) return s;
+  }
+  return null;
+}
+function _readLastTab(sectionId) {
+  try {
+    const raw = localStorage.getItem(SECTION_LAST_TAB_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    return obj && obj[sectionId] || null;
+  } catch (_) { return null; }
+}
+function _writeLastTab(sectionId, panelId) {
+  try {
+    const raw = localStorage.getItem(SECTION_LAST_TAB_KEY);
+    const obj = raw ? JSON.parse(raw) : {};
+    obj[sectionId] = panelId;
+    localStorage.setItem(SECTION_LAST_TAB_KEY, JSON.stringify(obj));
+  } catch (_) {}
+}
+// The section that was last visible, so a full reload lands the host
+// on the same view they left. Stored alongside the per-section tab
+// map so a single localStorage key covers both.
+const SECTION_LAST_ACTIVE_KEY = 'wbnb_section_last';
+function _readLastSection() {
+  try { return localStorage.getItem(SECTION_LAST_ACTIVE_KEY); } catch (_) { return null; }
+}
+function _writeLastSection(sectionId) {
+  try { localStorage.setItem(SECTION_LAST_ACTIVE_KEY, sectionId); } catch (_) {}
+}
 // Keep old titles object for compatibility
 const titles = {};
 Object.keys(titlesMap).forEach(k => {
@@ -4284,11 +4371,59 @@ function toggleSidebar() {
   ov.classList.toggle('show');
 }
 
+// Round 40 Task 4 — showSection() is the router the sidebar calls; it
+// picks the last-used tab for that section (or the first panel) and
+// hands off to showPanel(). Deep-link callers of showPanel(id) still
+// work: showPanel derives the section and paints the tab strip itself.
+function showSection(sectionId, tabId) {
+  const section = SECTIONS[sectionId];
+  if (!section) return;
+  const remembered = _readLastTab(sectionId);
+  const target = (tabId && section.panels.includes(tabId)) ? tabId
+               : (remembered && section.panels.includes(remembered)) ? remembered
+               : section.panels[0];
+  showPanel(target);
+}
+
+function _paintSidebarActive(sectionId) {
+  document.querySelectorAll('.sidebar-item[data-section]').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('data-section') === sectionId);
+  });
+}
+
+function _renderSectionTabs(sectionId, activePanelId) {
+  const strip = document.getElementById('sectionTabs');
+  if (!strip) return;
+  const section = SECTIONS[sectionId];
+  if (!section || section.panels.length < 2) {
+    strip.style.display = 'none';
+    strip.innerHTML = '';
+    return;
+  }
+  strip.style.display = '';
+  const btnHtml = section.panels.map(p => {
+    const label = h(titlesMap[p][0]);
+    const active = p === activePanelId ? ' active' : '';
+    const badgeId = p === 'export' || p === 'compliance' ? '' : ''; // future per-tab badges
+    return `<button type="button" class="section-tab${active}" data-panel="${p}" onclick="showPanel('${p}')">${label}${badgeId}</button>`;
+  }).join('');
+  strip.innerHTML = btnHtml;
+}
+
 function showPanel(id, btn) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.getElementById('panel-' + id).classList.add('active');
-  document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
+  const target = document.getElementById('panel-' + id);
+  if (!target) { console.warn('showPanel: unknown panel', id); return; }
+  target.classList.add('active');
+  // Round 40 Task 4 — sidebar reflects the SECTION, not the panel. The
+  // btn argument is left in place for any external caller that still
+  // passes it, but we ignore it — the section-derived highlight is what
+  // matches the visible state.
+  const sectionId = panelSection(id) || 'oggi';
+  _paintSidebarActive(sectionId);
+  _renderSectionTabs(sectionId, id);
+  _writeLastTab(sectionId, id);
+  _writeLastSection(sectionId);
   document.getElementById('panelTitle').textContent = titles[id][0];
   document.getElementById('panelSubtitle').textContent = titles[id][1];
   // Close sidebar + overlay on mobile
@@ -10678,6 +10813,24 @@ async function init() {
       history.replaceState(null, '', url.toString());
     }
   }
+
+  // Round 40 Task 4 — restore the last visible section/tab across
+  // reloads. Panels other than dashboard start hidden until an explicit
+  // showPanel is called, so we need to fire one at boot regardless.
+  // The onboarding redirect above may already have called showPanel;
+  // don't second-guess that here.
+  const alreadyOnPanel = document.querySelector('.panel.active')?.id?.replace('panel-', '');
+  if (alreadyOnPanel && alreadyOnPanel !== 'dashboard') {
+    // Onboarding forced us onto property — paint the tab strip to match.
+    showPanel(alreadyOnPanel);
+  } else {
+    const lastSection = _readLastSection();
+    if (lastSection && SECTIONS[lastSection]) {
+      showSection(lastSection);
+    } else {
+      showPanel('dashboard');
+    }
+  }
 }
 
 // Is the currently-authenticated user an admin? Checks the admin_users
@@ -10861,6 +11014,42 @@ async function refreshCheckinsCache() {
       .order('submitted_at', { ascending: false });
     if (Array.isArray(data)) allCheckins = data;
   } catch (e) { console.warn('refreshCheckinsCache failed:', e); }
+  // Round 40 Task 4 — repaint sidebar attention badges from the fresh cache.
+  paintNavBadges();
+}
+
+// Round 40 Task 4 — sidebar count badges.
+//   Oggi     · guests currently in-property whose check-in was never
+//              submitted. Same "needs your attention" signal the
+//              dashboard's "Currently staying (no check-in)" tile shows.
+//   Conforma · check-ins in the last 48h that are not yet filed on
+//              Alloggiati. That's the actionable subset — anything
+//              past 48h is already late-and-visible via the export.
+function paintNavBadges() {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const rows = Array.isArray(allCheckins) ? allCheckins : [];
+    const staying = rows.filter(c =>
+      c.arrival_date && c.arrival_date <= today &&
+      (!c.departure_date || c.departure_date >= today) &&
+      !c.submitted_at
+    ).length;
+    _setBadge('navBadge-oggi', staying);
+
+    const cutoff48h = new Date(Date.now() - 48 * 3600 * 1000).toISOString().slice(0, 10);
+    const overdue = rows.filter(c =>
+      c.submitted_at &&
+      (c.arrival_date || c.submitted_at.slice(0, 10)) >= cutoff48h &&
+      c.alloggiati_status !== 'filed'
+    ).length;
+    _setBadge('navBadge-conf', overdue);
+  } catch (e) { console.warn('paintNavBadges failed:', e); }
+}
+function _setBadge(id, count) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (count > 0) { el.textContent = String(count); el.style.display = ''; }
+  else            { el.style.display = 'none'; }
 }
 
 async function loadPropertyData() {

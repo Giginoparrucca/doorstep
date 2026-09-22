@@ -1026,9 +1026,13 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   <div class="login-card">
     <div class="login-logo">Welcome<em>BnB</em></div>
     <div class="login-badge" data-h="login_badge">Host Console</div>
-    <div style="display:flex;gap:4px;justify-content:center;margin-bottom:12px;">
-      <button class="lang-opt-h" onclick="setHostLang('en')" style="padding:4px 10px;border:1px solid var(--cream-3);border-radius:4px;font-size:0.6rem;cursor:pointer;background:none;color:var(--ink-soft);">EN</button>
-      <button class="lang-opt-h" onclick="setHostLang('it')" style="padding:4px 10px;border:1px solid var(--cream-3);border-radius:4px;font-size:0.6rem;cursor:pointer;background:var(--white);color:var(--warm);box-shadow:0 1px 3px rgba(6,26,61,0.06);">IT</button>
+    <!-- Round 40 T3 — same pill toggle as the console header. Previous
+         version used two square buttons that visually clashed with the
+         Playfair / DM Sans header pill. The active button gets its
+         "active" class the same way the header's does via setHostLang. -->
+    <div class="lang-toggle" style="display:flex;align-items:center;justify-content:center;background:var(--cream-2);border-radius:20px;padding:3px;gap:2px;border:1px solid var(--border);margin:0 auto 14px;width:fit-content;">
+      <button class="lang-opt-h" onclick="setHostLang('en')" style="padding:5px 14px;border-radius:16px;font-size:0.72rem;font-weight:600;letter-spacing:0.06em;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;background:none;color:var(--ink-soft);">EN</button>
+      <button class="lang-opt-h active" onclick="setHostLang('it')" style="padding:5px 14px;border-radius:16px;font-size:0.72rem;font-weight:600;letter-spacing:0.06em;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;background:var(--white);color:var(--warm);box-shadow:0 1px 3px rgba(6,26,61,0.06);">IT</button>
     </div>
     <div class="login-error" id="loginError"></div>
     <div id="loginForm">
@@ -3148,8 +3152,35 @@ async function handleAuth() {
   btn.textContent = h('login_signing_in');
   errEl.classList.remove('show');
 
+  // Round 40 T3 — a hung auth call left the button stuck on
+  // "Accesso in corso…" indefinitely. Race with a 15s timeout so the
+  // host can always retry. Sentinel objects distinguish resolution
+  // paths without relying on error.name (fetch abort text differs
+  // between browsers).
+  const TIMEOUT_MS = 15_000;
+  const TIMEOUT_MARKER = Symbol('login-timeout');
+  let timeoutId = null;
+  const timeoutPromise = new Promise(resolve => {
+    timeoutId = setTimeout(() => resolve(TIMEOUT_MARKER), TIMEOUT_MS);
+  });
+
   try {
-    const result = await sb.auth.signInWithPassword({ email, password });
+    const raced = await Promise.race([
+      sb.auth.signInWithPassword({ email, password }),
+      timeoutPromise,
+    ]);
+    if (raced === TIMEOUT_MARKER) {
+      // Keep the email in the field (never clear it — that's the fix's
+      // main affordance for retry). Just restore the button and surface
+      // a retryable error.
+      errEl.textContent = h('login_err_timeout');
+      errEl.classList.add('show');
+      btn.disabled = false;
+      btn.textContent = h('login_signin');
+      return;
+    }
+    if (timeoutId) clearTimeout(timeoutId);
+    const result = raced;
     if (result.error) {
       errEl.textContent = result.error.message;
       errEl.classList.add('show');
@@ -3164,6 +3195,7 @@ async function handleAuth() {
     document.getElementById('loginOverlay').classList.add('hidden');
     init();
   } catch (e) {
+    if (timeoutId) clearTimeout(timeoutId);
     errEl.textContent = h('login_err_connection');
     errEl.classList.add('show');
     btn.disabled = false;
@@ -3345,6 +3377,7 @@ const HT = {
     login_err_fields: 'Please fill in both fields',
     login_err_password: 'Password must be at least 6 characters',
     login_err_connection: 'Connection error. Please try again.',
+    login_err_timeout: 'Sign-in is taking too long. Please check your connection and try again.',
     sidebar_dashboard: 'Dashboard', sidebar_property: 'Property Details', sidebar_rules: 'House Rules',
     sidebar_recos: 'Recommendations', sidebar_checkins: 'Check-in Data', sidebar_export: 'Export & Compliance',
     sidebar_qr: 'QR Code & Link', sidebar_role: 'Property Manager',
@@ -3759,6 +3792,7 @@ const HT = {
     login_err_fields: 'Compila entrambi i campi',
     login_err_password: 'La password deve essere di almeno 6 caratteri',
     login_err_connection: 'Errore di connessione. Riprova.',
+    login_err_timeout: 'L\'accesso sta impiegando troppo tempo. Controlla la connessione e riprova.',
     sidebar_dashboard: 'Dashboard', sidebar_property: 'Dettagli Proprietà', sidebar_rules: 'Regole della Casa',
     sidebar_recos: 'Consigli', sidebar_checkins: 'Dati Check-in', sidebar_export: 'Export & Conformità',
     sidebar_qr: 'QR Code & Link', sidebar_role: 'Gestore Proprietà',

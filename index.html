@@ -107,6 +107,14 @@ body.has-test-banner .page { top: var(--test-banner-h, 36px); }
   font-family: 'Playfair Display', serif;
   font-size: 1.1rem; font-weight: 500; color: var(--ink);
 }
+/* Round 41 Task 3.3 — the Home page's hero already carries the
+   property name in Playfair; the sticky top-bar underneath was
+   showing it AGAIN, so the property name appeared twice within
+   the first 200px. Hide the top-bar title on Home only. Keep the
+   language toggle in the same position via space-between +
+   invisible spacer. Other pages (Check-in, Rules, Explore, Chat)
+   still show their top-bar title. */
+#page-welcome .top-bar-title { visibility: hidden; }
 .lang-toggle {
   display: flex; align-items: center;
   background: var(--cream-2); border-radius: 20px;
@@ -319,7 +327,12 @@ body.has-test-banner .page { top: var(--test-banner-h, 36px); }
   background: linear-gradient(135deg, rgba(224,90,90,0.04), rgba(224,90,90,0.01));
   border-color: rgba(224,90,90,0.18);
 }
-.home-card-emergency .home-card-value { color: var(--ink); font-size: 0.82rem; }
+.home-card-emergency .home-card-value {
+  /* Round 41 Task 3.2 — allow the phone number to wrap onto its own
+     line rather than being clipped mid-digit in the half-width grid. */
+  color: var(--ink); font-size: 0.82rem;
+  white-space: normal; line-height: 1.35; word-break: break-word;
+}
 
 /* Host card avatar styles (used in #hostMessageCard, also referenced
    in other places like chat) */
@@ -707,14 +720,20 @@ body.has-test-banner .page { top: var(--test-banner-h, 36px); }
 .hidden { display: none !important; }
 
 /* ── POWERED BY WELCOMEBNB FOOTER ── */
+/* Round 41 Task 3.4 — the strip is hidden at rest and only reveals
+   when the active page is scrolled to its end. Frees ~30px of the
+   viewport for content and keeps the Privacy link a one-scroll-away
+   affordance. */
 .powered-by {
   position: fixed; bottom: 64px; left: 0; right: 0; z-index: 999;
   display: flex; align-items: center; justify-content: center; gap: 6px;
   padding: 6px 0;
   background: linear-gradient(to bottom, rgba(250,246,240,0), rgba(250,246,240,1) 30%);
   pointer-events: none;
+  opacity: 0; transform: translateY(4px);
   transition: opacity 0.2s, transform 0.2s;
 }
+body.at-page-end .powered-by { opacity: 1; transform: translateY(0); }
 /* Hide on chat tab — chat input + suggestions already occupy this strip.
    !important is intentional: the Privacy link has inline styles
    (opacity, etc.) that would otherwise win specificity. */
@@ -2012,6 +2031,25 @@ function setLang(l) {
 /* ══════════════════════════════════════
    NAVIGATION
 ══════════════════════════════════════ */
+
+// Round 41 Task 3.4 — reveal the Powered-by strip only when the active
+// page is scrolled to its end. Each .page is its own scroller because
+// they're position:fixed with overflow-y:auto, so we listen on each
+// page independently and toggle a body-level class.
+function _updatePoweredByVisibility() {
+  const active = document.querySelector('.page.active');
+  if (!active) { document.body.classList.remove('at-page-end'); return; }
+  // 24px slack — feels natural, avoids flicker on rubberband bounce.
+  const nearEnd = (active.scrollTop + active.clientHeight) >= (active.scrollHeight - 24);
+  document.body.classList.toggle('at-page-end', nearEnd);
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.page').forEach(p => {
+    p.addEventListener('scroll', _updatePoweredByVisibility, { passive: true });
+  });
+  _updatePoweredByVisibility();
+});
+
 function goTo(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
@@ -2021,6 +2059,10 @@ function goTo(page) {
   });
   // Toggle body class so chat-specific styles (e.g. hide watermark) apply
   document.body.classList.toggle('tab-chat', page === 'chat');
+  // Round 41 Task 3.4 — recompute at-page-end status on every page swap
+  // so a page that was scrolled at the bottom last time doesn't leave
+  // the footer strip stuck showing on the new (unscrolled) page.
+  _updatePoweredByVisibility();
 
   // Analytics: track page view + accumulate time on previous page
   if (_guestLastPage && _guestLastPage !== page) {
@@ -4621,7 +4663,24 @@ async function init() {
       // helper the rest of this block uses.
       const welcomeMsg = _propTextLang(d, 'welcome_message', lang);
       if (el('hostMsg') && welcomeMsg) el('hostMsg').textContent = welcomeMsg;
-      if (el('emergencyNum')) el('emergencyNum').textContent = `112 · ${d.host_names || 'Host'}: ${d.host_phone || ''}`;
+      // Round 41 Task 3.2 — Emergency card. The number used to be jammed
+      // into one line with the host name, which the compact half-width
+      // grid clipped mid-digit ("112 · Daniele: +6-8…"). A number the
+      // guest can't read is worse than none — split it: host name on
+      // line 1, tel: link on line 2. innerHTML now, not textContent.
+      const emgEl = el('emergencyNum');
+      if (emgEl) {
+        const hostName = (d.host_names || 'Host').trim();
+        const rawPhone = (d.host_phone || '').trim();
+        const telHref = rawPhone.replace(/[^+\d]/g, '');
+        emgEl.innerHTML = `
+          <span style="font-weight:600;">112</span>
+          <span style="color:var(--ink-soft);"> · ${_escapeHTML(hostName)}</span>
+          ${rawPhone ? `<br><a href="tel:${telHref}" style="color:var(--warm);text-decoration:none;word-break:break-all;">${_escapeHTML(rawPhone)}</a>` : ''}`;
+      }
+      function _escapeHTML(s) {
+        return String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+      }
 
       // Round 21: transport / getting-around info (Staying section).
       // Hidden if the host hasn't filled it in.
@@ -4983,6 +5042,18 @@ async function fetchReservationKeybox() {
 // Legacy behaviour: a property with the pre-R36.2 use_per_guest_lockbox
 // flag still opts into rotating; the show_ flags default to true when not
 // present in the row.
+// Round 41 Task 3.1 — a value counts as "no code" when it is empty,
+// whitespace, or one of the placeholder strings hosts have typed in
+// the past (N/A, n/a, -, —, none). The chip renders a dashed border,
+// so any of these turns into a visible "CODE — N/A" pill covering
+// dashboard content. Filter them out at the source.
+function _isLockboxPlaceholder(s) {
+  if (!s) return true;
+  const t = String(s).trim().toLowerCase();
+  if (!t) return true;
+  return t === 'n/a' || t === 'na' || t === '-' || t === '—' || t === 'none' || t === 'nessuno';
+}
+
 function _resolveLockboxCodes(propData) {
   const out = { fixed: '', rotating: '' };
   if (!propData) return out;
@@ -4991,16 +5062,19 @@ function _resolveLockboxCodes(propData) {
   const show_fixed    = propData.show_fixed_lockbox_to_guest    !== false;
   const show_rotating = propData.show_rotating_lockbox_to_guest !== false;
 
-  if (show_fixed) out.fixed = (propData.keybox_code || '').trim();
+  if (show_fixed) {
+    const v = (propData.keybox_code || '').trim();
+    out.fixed = _isLockboxPlaceholder(v) ? '' : v;
+  }
 
   if (rotating_enabled && show_rotating) {
-    if (reservationKeyboxCode) {
+    if (reservationKeyboxCode && !_isLockboxPlaceholder(reservationKeyboxCode)) {
       out.rotating = reservationKeyboxCode;
     } else if (Array.isArray(existingCheckins) && existingCheckins.length > 0) {
       const head = existingCheckins.find(c =>
         c.guest_type === 'single' || c.guest_type === 'head' || c.guest_type === 'group'
       ) || existingCheckins[0];
-      if (head && head.keybox_code && head.keybox_code.trim()) {
+      if (head && head.keybox_code && !_isLockboxPlaceholder(head.keybox_code)) {
         out.rotating = head.keybox_code.trim();
       }
     }

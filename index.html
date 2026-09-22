@@ -1096,6 +1096,13 @@ body.tab-chat #privacyLink {
       <div class="form-group">
         <label class="form-label" data-i18n="dob_label">Date of Birth <span class="req">*</span></label>
         <input class="form-input" type="date" id="dob">
+        <!-- Round 40 T2 — inline scan warning when the model returned
+             an impossible date (future date, obvious misread). Empty
+             by default; populated by scanDocument() when the response
+             carries warnings: ['date_of_birth_invalid']. -->
+        <div id="dobScanWarning" data-i18n="dob_scan_warning" style="display:none;margin-top:6px;font-size:0.72rem;color:var(--red);">
+          Please enter your date of birth manually — we couldn't read it clearly.
+        </div>
       </div>
     </div>
     <div class="form-group">
@@ -1703,6 +1710,7 @@ const T = {
     surname_label: 'Surname', name_label: 'Name',
     sex_label: 'Sex', male: 'Male', female: 'Female',
     dob_label: 'Date of Birth',
+    dob_scan_warning: 'Please enter your date of birth manually — we couldn\'t read it clearly.',
     birthplace_label: 'Place of Birth', birthplace_hint: 'City or town',
     birth_country_label: 'Country of Birth', birth_country_hint: 'e.g., Italy, Switzerland, France',
     citizenship_label: 'Citizenship', citizenship_hint: 'e.g., Italian, French, German',
@@ -1846,6 +1854,7 @@ const T = {
     surname_label: 'Cognome', name_label: 'Nome',
     sex_label: 'Sesso', male: 'Maschio', female: 'Femmina',
     dob_label: 'Data di Nascita',
+    dob_scan_warning: 'Inserisci la data di nascita manualmente — non siamo riusciti a leggerla con chiarezza.',
     birthplace_label: 'Luogo di Nascita', birthplace_hint: 'Città o comune',
     birth_country_label: 'Stato di Nascita', birth_country_hint: 'es. Italia, Svizzera, Francia',
     citizenship_label: 'Cittadinanza', citizenship_hint: 'es. Italiana, Francese, Tedesca',
@@ -3645,6 +3654,7 @@ async function scanDocument(input) {
     const result = await response.json();
     if (result.success && result.data) {
       const d = result.data;
+      const warns = Array.isArray(result.warnings) ? result.warnings : [];
       // Analytics: document scan success
       trackGuest('guest_doc_scanned', {
         doc_type: d.document_type || 'unknown',
@@ -3653,7 +3663,23 @@ async function scanDocument(input) {
       if (d.surname) document.getElementById('surname').value = d.surname;
       if (d.name) document.getElementById('gname').value = d.name;
       if (d.sex) document.getElementById('sex').value = d.sex;
-      if (d.date_of_birth) document.getElementById('dob').value = d.date_of_birth;
+      // Round 40 T2 — the server nulls date_of_birth when it fails
+      // validation (future date, doesn't parse, less than a year ago)
+      // and attaches warnings: ['date_of_birth_invalid']. Leave the
+      // field empty rather than silently pre-filling garbage, and
+      // focus it with a visible note so the guest sees what to fix.
+      const dobEl = document.getElementById('dob');
+      const dobWarnEl = document.getElementById('dobScanWarning');
+      if (warns.includes('date_of_birth_invalid') || !d.date_of_birth) {
+        if (dobEl) dobEl.value = '';
+        if (dobWarnEl) dobWarnEl.style.display = '';
+        // Focus without scrolling the page around; the field is already
+        // in view because the scan-result banner is right above it.
+        try { if (dobEl && warns.includes('date_of_birth_invalid')) dobEl.focus({ preventScroll: true }); } catch (_) {}
+      } else {
+        if (dobEl) dobEl.value = d.date_of_birth;
+        if (dobWarnEl) dobWarnEl.style.display = 'none';
+      }
       if (d.place_of_birth) document.getElementById('birthplace').value = d.place_of_birth;
       if (d.citizenship) document.getElementById('citizenship').value = d.citizenship;
       // Birth country: use scan result if available, otherwise default to citizenship

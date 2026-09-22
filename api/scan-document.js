@@ -140,7 +140,18 @@ Rules:
 
     try {
       const extracted = JSON.parse(clean);
-      return res.status(200).json({ success: true, data: extracted });
+      // Round 40 T2 — validate date_of_birth. A future date (or a real-
+      // world impossible one like "next Tuesday") comes back sometimes
+      // when the model misreads the year on a passport. Alloggiati
+      // rejects it at submission with an opaque error, by which time the
+      // host has no idea which guest to fix. Null the field here and
+      // surface a warning so the guest UI can prompt for manual entry.
+      const warnings = [];
+      if (!isValidPastDOB(extracted.date_of_birth)) {
+        extracted.date_of_birth = null;
+        warnings.push('date_of_birth_invalid');
+      }
+      return res.status(200).json({ success: true, data: extracted, warnings });
     } catch (e) {
       return res.status(422).json({ error: 'Could not parse response', raw: text });
     }
@@ -231,6 +242,24 @@ async function pgrestGET(path, opts = {}) {
   }
   const data = await r.json();
   return { data, headers: r.headers };
+}
+
+// Round 40 T2 — accept a date_of_birth ONLY when: (a) it parses as a
+// real YYYY-MM-DD, (b) it is in the past, and (c) it is more than a
+// year ago. The last rule filters out "today minus a few days" garbage
+// (misread expiry / issue date) without needing to guess a minimum age.
+function isValidPastDOB(s) {
+  if (typeof s !== 'string') return false;
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return false;
+  const y = +m[1], mo = +m[2], d = +m[3];
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  if (isNaN(dt.getTime())) return false;
+  // Round-trip check catches "2026-02-30" (which JS silently rolls into March).
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return false;
+  const oneYearAgo = new Date();
+  oneYearAgo.setUTCFullYear(oneYearAgo.getUTCFullYear() - 1);
+  return dt.getTime() < oneYearAgo.getTime();
 }
 
 async function recordUsage(row) {

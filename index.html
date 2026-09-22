@@ -4566,6 +4566,21 @@ async function init() {
       propertyId = data.id;
       propertyData = data;
       console.log('✅ Property loaded from Supabase:', data.name, 'ID:', data.id);
+      // Round 41 Task 2 — helper for per-language property free-text
+      // fields. Reads d.<field>_<lang>, falls back to the other
+      // language (so a host who wrote only one still renders), then
+      // the legacy single-column value (pre-migration properties).
+      // Empty strings and whitespace count as absent.
+      // The reference is kept on window so any late render can reuse it.
+      window._propTextLang = window._propTextLang || function(dObj, field, lg) {
+        const primary = (dObj && dObj[field + '_' + lg]) || '';
+        if (primary && primary.trim()) return primary;
+        const other = lg === 'en' ? 'it' : 'en';
+        const secondary = (dObj && dObj[field + '_' + other]) || '';
+        if (secondary && secondary.trim()) return secondary;
+        return (dObj && dObj[field]) || '';
+      };
+      const _propTextLang = window._propTextLang;
       // Round 33 — mint the guest-session token as soon as we know which
       // property this is. Non-blocking: if the network hiccups, the first
       // AI call will lazy-mint on its own.
@@ -4599,12 +4614,18 @@ async function init() {
       if (el('accessMethod')) el('accessMethod').textContent = d.access_method || 'Self check-in';
       if (el('hostName')) el('hostName').textContent = d.host_names || 'Your Host';
       if (el('hostAvatar')) el('hostAvatar').textContent = (d.host_names || 'H').charAt(0);
-      if (el('hostMsg') && d.welcome_message) el('hostMsg').textContent = d.welcome_message;
+      // Round 41 Task 2 — read per-language column first, fall back to
+      // the other language (so a host who wrote only one still renders),
+      // finally fall back to the legacy single-column value (so
+      // pre-migration properties still work). _propTextLang() is the
+      // helper the rest of this block uses.
+      const welcomeMsg = _propTextLang(d, 'welcome_message', lang);
+      if (el('hostMsg') && welcomeMsg) el('hostMsg').textContent = welcomeMsg;
       if (el('emergencyNum')) el('emergencyNum').textContent = `112 · ${d.host_names || 'Host'}: ${d.host_phone || ''}`;
 
       // Round 21: transport / getting-around info (Staying section).
       // Hidden if the host hasn't filled it in.
-      const transportInfo = (d.transport_info || '').trim();
+      const transportInfo = (_propTextLang(d, 'transport_info', lang) || '').trim();
       if (el('transportInfoText')) el('transportInfoText').textContent = transportInfo;
       if (el('transportCard')) el('transportCard').style.display = transportInfo ? 'block' : 'none';
 
@@ -4614,8 +4635,8 @@ async function init() {
       // cards themselves are always shown (they always have a time);
       // we just toggle the visibility of the instructions text and the
       // lockbox row based on whether the host has filled them in.
-      const ciInst = (d.checkin_instructions || '').trim();
-      const coInst = (d.checkout_instructions || '').trim();
+      const ciInst = (_propTextLang(d, 'checkin_instructions',  lang) || '').trim();
+      const coInst = (_propTextLang(d, 'checkout_instructions', lang) || '').trim();
       if (el('checkinInstructionsText')) {
         el('checkinInstructionsText').textContent = ciInst;
         el('checkinInstructionsText').style.display = ciInst ? 'block' : 'none';
@@ -4636,8 +4657,8 @@ async function init() {
       T.it.welcome_title = `Benvenuti a<br><em>${d.name}</em>`;
       T.en.wifi_pass = `Password: ${d.wifi_password || '—'}`;
       T.it.wifi_pass = `Password: ${d.wifi_password || '—'}`;
-      T.en.host_msg = d.welcome_message || T.en.host_msg;
-      T.it.host_msg = d.welcome_message || T.it.host_msg;
+      T.en.host_msg = _propTextLang(d, 'welcome_message', 'en') || T.en.host_msg;
+      T.it.host_msg = _propTextLang(d, 'welcome_message', 'it') || T.it.host_msg;
       T.en.chat_h2 = `🏠 ${d.name} Concierge`;
       T.it.chat_h2 = `🏠 Concierge ${d.name}`;
       T.en.chat_p = `Ask me anything about ${d.name}, the area, or your stay`;

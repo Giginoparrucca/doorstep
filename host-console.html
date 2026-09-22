@@ -1668,15 +1668,16 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <table>
           <thead>
             <tr>
+              <!-- Round 40 T1 — cittadinanza / documento / inviato / docs
+                   moved to the detail view (viewGuest) to stop the
+                   sticky-right Actions column from painting over them at
+                   1440 / 1024 widths. The detail view still shows every
+                   removed field. -->
               <th data-h="th_guest">Guest</th>
               <th data-h="th_type">Type</th>
               <th data-h="th_arrival">Arrival</th>
               <th data-h="th_departure">Departure</th>
               <th data-h="th_birth">Birth</th>
-              <th data-h="th_citizenship">Citizenship</th>
-              <th data-h="th_document">Document</th>
-              <th data-h="th_submitted">Submitted</th>
-              <th data-h="th_docs">Docs</th>
               <th data-h="th_actions">Actions</th>
             </tr>
           </thead>
@@ -5214,7 +5215,7 @@ function renderCheckins() {
   const target = document.getElementById('checkinTable');
 
   if (allCheckins.length === 0) {
-    target.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--ink-soft);padding:24px;">${h('no_checkins')}</td></tr>`;
+    target.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--ink-soft);padding:24px;">${h('no_checkins')}</td></tr>`;
     const cc0 = document.getElementById('checkinCount'); if (cc0) cc0.textContent = 0;
     return;
   }
@@ -5306,7 +5307,9 @@ function renderCheckins() {
     `;
     const groupStatusMsg = `<span id="receiptUploadStatus_${groupToken}" style="font-size:0.72rem;color:var(--ink-soft);"></span>`;
 
-    // Group header row spans all 10 columns of the check-ins table.
+    // Group header row spans all 6 columns of the check-ins table.
+    // (Round 40 T1 reduced the visible columns from 10 → 6; the removed
+    // fields live in the guest detail view.)
     const groupLabel = isSolo
       ? (it ? 'Ospite senza codice' : 'Guest without booking code')
       : `<span style="font-family:monospace;color:var(--warm);letter-spacing:0.05em;">${bookingCode}</span>`;
@@ -5349,7 +5352,7 @@ function renderCheckins() {
       </span>` : '';
     html += `
       <tr class="checkin-group-header" style="background:rgba(107,122,144,0.05);cursor:pointer;" onclick="toggleCheckinGroup('${groupToken}', event)">
-        <td colspan="10" style="padding:0;position:static;background:rgba(107,122,144,0.05);box-shadow:none;white-space:normal;">
+        <td colspan="6" style="padding:0;position:static;background:rgba(107,122,144,0.05);box-shadow:none;white-space:normal;">
           <div style="position:sticky;left:0;padding:12px 16px;box-sizing:border-box;">
             <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;">
               <span data-group-chevron="${groupToken}"
@@ -5377,6 +5380,10 @@ function renderCheckins() {
       const rowPill = c.alloggiati_status === 'filed'
         ? `<span style="display:inline-block;font-size:0.6rem;padding:1px 6px;background:rgba(47,122,68,0.14);color:#2f7a44;border-radius:8px;font-weight:600;letter-spacing:0.04em;margin-left:6px;vertical-align:middle;">${it ? '✓' : '✓'}</span>`
         : `<span style="display:inline-block;font-size:0.6rem;padding:1px 6px;background:rgba(176,57,57,0.12);color:#b03939;border-radius:8px;font-weight:600;letter-spacing:0.04em;margin-left:6px;vertical-align:middle;" title="${it ? 'Da inviare ad Alloggiati' : 'Not filed on Alloggiati'}">${it ? '⚠' : '⚠'}</span>`;
+      // Round 40 T1 — citizenship / document / submitted / docs
+      // moved to the detail view (viewGuest opens the modal that already
+      // shows them). Keeping them in the table caused the sticky-right
+      // Actions column to overlay them at 1440 / 1024 widths.
       html += `
         <tr data-checkin-group="${groupToken}"${hideAttr}>
           <td data-label=""><strong>${c.surname} ${c.name}</strong>${rowPill}</td>
@@ -5384,10 +5391,6 @@ function renderCheckins() {
           <td data-label="${h('th_arrival')}">${fmtDate(c.arrival_date)}</td>
           <td data-label="${h('th_departure')}">${fmtDate(c.departure_date)}</td>
           <td data-label="${h('th_birth')}">${fmtDate(c.date_of_birth)} <span style="font-size:0.72rem;color:var(--ink-soft)">${c.place_of_birth || ''}${c.birth_province && c.birth_province!=='EE' ? ' ('+c.birth_province+')' : ''}</span></td>
-          <td data-label="${h('th_citizenship')}">${c.citizenship}</td>
-          <td data-label="${h('th_document')}">${c.document_type || '—'} <span style="font-size:0.72rem;color:var(--ink-soft)">${c.document_number || ''}</span></td>
-          <td data-label="${h('th_submitted')}">${fmtDate(c.submitted_at)}</td>
-          <td data-label="${h('th_docs')}"><span class="status-badge ${c.docs_status==='complete'?'complete':c.docs_status==='not_required'?'complete':c.docs_status==='partial'?'pending':'missing'}">${c.docs_status==='complete'?'✓':c.docs_status==='not_required'?'—':c.docs_status==='partial'?'⏳':'✗'}</span></td>
           <td data-label="">
             <div style="display:flex;gap:8px;justify-content:flex-end;padding:4px 0;">
               <button class="btn btn-secondary btn-sm" onclick="viewGuest('${c.id}')" style="min-height:36px;padding:6px 12px;">${h('btn_view')}</button>

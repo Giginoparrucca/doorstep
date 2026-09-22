@@ -1754,6 +1754,15 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
     <!-- ════════════ EXPORT / ALLOGGIATI ════════════ -->
     <div class="panel" id="panel-export">
+      <!-- Round 40 Task 7 — status checklist at the top of the page.
+           Painted by renderExportChecklist() using propertyData.region
+           and allCheckins. Shows Alloggiati (national, always shown),
+           this region's statistical portal, and — if any is configured —
+           the tourist-tax obligation. Everything else lives further down
+           and, when the region is known, non-matching regional tiles are
+           tucked under an "Altre regioni" disclosure. -->
+      <div id="exportChecklist" style="margin-bottom:16px;"></div>
+
       <div class="alert alert-info" data-h="export_info"></div>
 
       <!-- ─── Axis 1: Police · National ─── -->
@@ -1797,7 +1806,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <button class="btn btn-secondary" onclick="exportISTAT()" data-h="btn_gen_istat">📊 Generate C/59 Summary</button>
           </div>
         </div>
-        <div class="export-tile-h">
+        <div class="export-tile-h" data-region="Veneto">
           <div class="tile-body">
             <h3 data-h="export_ross1000_title">🗺 ROSS1000 statistical file</h3>
             <p data-h="export_ross1000_desc"></p>
@@ -1809,7 +1818,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             </a>
           </div>
         </div>
-        <div class="export-tile-h">
+        <div class="export-tile-h" data-region="Puglia">
           <div class="tile-body">
             <h3 data-h="export_puglia_dms_title">🏛 Puglia DMS (SPOT Easy)</h3>
             <p data-h="export_puglia_dms_desc"></p>
@@ -4470,7 +4479,10 @@ function showPanel(id, btn) {
   }
   // Round 37.5 — paint host-owned portal links into every tile slot on
   // Export (Compliance calls this itself from renderCompliance).
-  if (id === 'export') { if (typeof applyHostPortalLinks === 'function') applyHostPortalLinks(); }
+  if (id === 'export') {
+    if (typeof applyHostPortalLinks === 'function') applyHostPortalLinks();
+    if (typeof renderExportChecklist === 'function') renderExportChecklist(); // Round 40 T7
+  }
   // Round 36.2.2 — reopening the Dashboard re-fetches upcoming reservations
   // and their freshly-stamped rotating codes, so the host doesn't need to
   // hard-refresh after changing settings elsewhere.
@@ -9034,6 +9046,153 @@ function _hostPortalMap() {
 
 function _hostPortalSafe(s) {
   return String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+}
+
+// Round 40 Task 7 — region filter + status checklist for the export
+// panel. Runs when the export panel is opened; does not touch the
+// tile catalog below, only shows/hides regional tiles by property
+// region and paints a checklist card at the top.
+const REGION_TILE_MAP = {
+  Veneto: { title: '🗺 ROSS1000 (Veneto)',        selector: '[data-region="Veneto"]' },
+  Puglia: { title: '🏛 Puglia DMS (SPOT Easy)',   selector: '[data-region="Puglia"]' },
+};
+function renderExportChecklist() {
+  const host = document.getElementById('exportChecklist');
+  if (!host) return;
+  const it = hostLang === 'it';
+  const region = (propertyData?.region || '').trim();
+  const rows = Array.isArray(allCheckins) ? allCheckins : [];
+  const today = new Date().toISOString().slice(0, 10);
+  const cutoff48h = new Date(Date.now() - 48 * 3600 * 1000).toISOString().slice(0, 10);
+  const overdueAll = rows.filter(c =>
+    c.submitted_at &&
+    (c.arrival_date || c.submitted_at.slice(0, 10)) >= cutoff48h &&
+    c.alloggiati_status !== 'filed'
+  ).length;
+
+  // National — always shown. Status derived from Alloggiati filing state.
+  const nationalState = overdueAll > 0 ? 'due' : 'done';
+  const nationalDesc  = overdueAll > 0
+    ? (it ? `${overdueAll} ospite/i da inviare — scadenza 24 h dall'arrivo` : `${overdueAll} guest(s) to file — 24 h deadline from arrival`)
+    : (it ? 'Tutti i check-in recenti sono stati inviati.' : 'All recent check-ins have been filed.');
+  const nationalRow = _ckRow({
+    state: nationalState,
+    title: it ? 'Alloggiati Web — invio ospiti' : 'Alloggiati Web — guest filing',
+    desc: nationalDesc,
+    action: `<button class="btn btn-primary btn-sm" onclick="exportAlloggiati()">${it ? '📥 Genera .txt' : '📥 Generate .txt'}</button>`,
+  });
+
+  // Regional — one row for the property's region if we know it.
+  let regionalRow = '';
+  const regionMeta = REGION_TILE_MAP[region];
+  if (region && regionMeta) {
+    regionalRow = _ckRow({
+      state: 'due',
+      title: `${regionMeta.title} — ${it ? 'flussi turistici' : 'tourist flows'}`,
+      desc: it ? 'Adempimento periodico regionale.' : 'Regional periodic filing.',
+      action: `<button class="btn btn-sm" onclick="_scrollToRegionalTile('${region}')">${it ? '↓ Vai al tile' : '↓ Go to tile'}</button>`,
+    });
+  } else if (!region) {
+    regionalRow = _ckRow({
+      state: 'idle',
+      title: it ? 'Regione della proprietà non impostata' : 'Property region not set',
+      desc: it ? 'Impostala in Proprietà per vedere solo gli obblighi che si applicano.' : 'Set it in Property to see only the obligations that apply.',
+      action: `<button class="btn btn-sm" onclick="showPanel('property')">${it ? 'Apri Proprietà' : 'Open Property'}</button>`,
+    });
+  }
+
+  // Tourist tax — optional; only show if propertyData.tax_config or a paytourist_url is present.
+  const hasTax = !!(propertyData?.paytourist_url || propertyData?.tax_config);
+  let taxRow = '';
+  if (hasTax) {
+    taxRow = _ckRow({
+      state: 'idle',
+      title: it ? 'Imposta di soggiorno — dichiarazione periodica' : 'Tourist tax — periodic declaration',
+      desc: it ? 'Cadenza definita dal comune.' : 'Frequency set by your municipality.',
+      action: `<button class="btn btn-sm" onclick="exportCityTax()">${it ? '🧮 Calcola' : '🧮 Compute'}</button>`,
+    });
+  }
+
+  const propName = propertyData?.name || '';
+  const regionLabel = region || (it ? '—' : '—');
+  host.innerHTML = `
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+      <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:14px;">
+        <div>
+          <div style="font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:600;">${it ? 'Da fare adesso' : 'To do now'}</div>
+          <div style="font-size:0.72rem;color:var(--ink-2);margin-top:2px;">${_htmlEsc(propName)} · ${_htmlEsc(regionLabel)}</div>
+        </div>
+      </div>
+      ${nationalRow}
+      ${regionalRow}
+      ${taxRow}
+    </div>`;
+
+  // Region filter: hide non-matching regional tiles, offer them under
+  // an "Altre regioni" disclosure. Only kicks in when the region IS set.
+  _applyExportRegionFilter(region);
+}
+function _ckRow({ state, title, desc, action }) {
+  // state: 'done' | 'due' | 'idle'
+  const icClass = state === 'done' ? 'ck-ic-done'
+                : state === 'due'  ? 'ck-ic-due'
+                :                    'ck-ic-idle';
+  const glyph   = state === 'done' ? '✓' : state === 'due' ? '!' : '—';
+  return `
+    <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid rgba(0,91,255,0.07);">
+      <div class="${icClass}" style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700;font-size:0.85rem;
+        ${state==='done'?'background:rgba(45,155,99,0.14);color:#1F7A4C;':''}
+        ${state==='due' ?'background:rgba(232,184,75,0.20);color:#9A6B00;':''}
+        ${state==='idle'?'background:var(--cream-2);color:var(--ink-2);':''}
+      ">${glyph}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:0.9rem;font-weight:600;">${_htmlEsc(title)}</div>
+        <div style="font-size:0.77rem;color:var(--ink-soft);margin-top:2px;line-height:1.45;">${_htmlEsc(desc)}</div>
+      </div>
+      ${action || ''}
+    </div>`;
+}
+function _htmlEsc(s) {
+  return String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+}
+function _scrollToRegionalTile(region) {
+  const el = document.querySelector('.export-tile-h[data-region="' + region + '"]');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+// Hide regional tiles that don't apply and wrap the rest under an
+// "Altre regioni" disclosure at the bottom of the Stat axis. When
+// the region is empty, we show everything (existing behaviour).
+function _applyExportRegionFilter(region) {
+  const tiles = Array.from(document.querySelectorAll('.export-tile-h[data-region]'));
+  if (tiles.length === 0) return;
+  // Remove any previously-injected disclosure so re-renders don't stack.
+  const oldDisclosure = document.getElementById('exportOtherRegionsBlock');
+  if (oldDisclosure) {
+    // Put the hidden tiles back where the disclosure was so their parent
+    // stays authoritative.
+    while (oldDisclosure.firstChild && oldDisclosure.firstChild !== oldDisclosure.querySelector('summary')) {
+      oldDisclosure.parentNode.insertBefore(oldDisclosure.firstChild, oldDisclosure);
+    }
+    oldDisclosure.remove();
+  }
+  if (!region) {
+    tiles.forEach(t => { t.style.display = ''; });
+    return;
+  }
+  const it = hostLang === 'it';
+  const others = tiles.filter(t => t.dataset.region !== region);
+  if (others.length === 0) return;
+  const parent = others[0].parentNode;
+  const details = document.createElement('details');
+  details.id = 'exportOtherRegionsBlock';
+  details.style.cssText = 'margin-top:8px;';
+  const summary = document.createElement('summary');
+  summary.style.cssText = 'cursor:pointer;font-size:0.82rem;color:var(--ink-soft);padding:8px 0;';
+  summary.textContent = it ? 'Altre regioni' : 'Other regions';
+  details.appendChild(summary);
+  // Move the non-matching tiles into the details element.
+  for (const t of others) details.appendChild(t);
+  parent.appendChild(details);
 }
 
 // Paint every host-portal-slot on the page. Called after Compliance

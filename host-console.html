@@ -1594,6 +1594,22 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
       </div>
 
+      <!-- Round 40 Task 6 — Privacy & data card. "Delete all check-in
+           records" moved here from the check-in table toolbar; it's
+           destructive enough to belong on the property panel behind a
+           typed-name confirmation, not one clumsy click away on the
+           list header. -->
+      <div class="form-card">
+        <div class="form-card-title" data-h="prop_privacy_data_title">Privacy &amp; data</div>
+        <div class="form-card-desc" data-h="prop_privacy_data_desc">Bulk data actions for this property. Regular retention purges are automatic — see Data Retention in the admin console. Use this only when you need to wipe the current check-in history in one go.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+          <button type="button" class="btn btn-secondary" id="btnDeleteAllProp" onclick="deleteAllCheckinsGated()" style="color:var(--red);border-color:rgba(224,69,94,0.3);">
+            <span data-h="btn_delete_all_prop">Delete all check-in records</span>
+          </button>
+          <span style="font-size:0.72rem;color:var(--ink-soft);" data-h="prop_privacy_data_hint">Confirmation requires typing the property name.</span>
+        </div>
+      </div>
+
       <!-- Round 37.1 — one action row at the bottom, in flow. The Edit
            button toggles the fieldset above; Save + Cancel appear in
            edit mode; Preview stays visible in both. -->
@@ -1667,7 +1683,9 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <button type="button" onclick="setAllCheckinGroups(true)"
               style="background:transparent;border:none;color:var(--ink-soft);font-size:0.76rem;cursor:pointer;font-family:inherit;padding:6px 8px;"
               data-h="btn_collapse_all">▸ Collapse all</button>
-            <button class="btn btn-secondary btn-sm" onclick="deleteAllCheckins()" style="color:var(--red);border-color:rgba(224,69,94,0.3);" id="btnDeleteAll" data-h="btn_delete_all">🗑 Delete All</button>
+            <!-- Round 40 Task 6 — "Delete All" moved to Property → Privacy & data.
+                 It's a destructive bulk action; the property panel now hosts
+                 the confirmation gate that requires typing the property name. -->
           </div>
         </div>
         <table>
@@ -3523,6 +3541,7 @@ const HT = {
     th_docs: 'Docs', th_submitted: 'Submitted', th_birth: 'Birth', th_alloggiati: 'Alloggiati', th_actions: 'Actions',
     dob_invalid_chip: 'Invalid date of birth',
     dob_invalid_export_block: 'Cannot export: some guests have an invalid date of birth. Fix these rows first:',
+    btn_row_menu: 'More actions',
     no_checkins: 'No check-ins yet. Share your guest link to get started!',
     doc_complete: '✓ Complete', doc_partial: '⏳ Partial', doc_missing: '✗ Missing',
     alloggiati_filed: '✓ Filed', alloggiati_pending: 'Pending',
@@ -3602,6 +3621,10 @@ const HT = {
     prop_privacy_desc: 'Generated from your property details. Under GDPR you are the data controller (titolare del trattamento) — guests are shown this notice, and can download a copy.',
     prop_privacy_preview_btn: '🔍 Preview as guest',
     prop_privacy_download_btn: '⬇ Download HTML',
+    prop_privacy_data_title: 'Privacy & data',
+    prop_privacy_data_desc: 'Bulk data actions for this property. Regular retention purges are automatic — see Data Retention in the admin console. Use this only when you need to wipe the current check-in history in one go.',
+    prop_privacy_data_hint: 'Confirmation requires typing the property name.',
+    btn_delete_all_prop: 'Delete all check-in records',
     prop_tax_rate: 'Rate (€ per person per night)',
     prop_tax_max_nights: 'Max taxable nights',
     prop_tax_max_nights_hint: 'Many comuni only charge the first N nights per stay (or per person per month).',
@@ -3944,6 +3967,7 @@ const HT = {
     th_docs: 'Docs', th_submitted: 'Inviato', th_birth: 'Nascita', th_alloggiati: 'Alloggiati', th_actions: 'Azioni',
     dob_invalid_chip: 'Data di nascita non valida',
     dob_invalid_export_block: 'Impossibile esportare: alcuni ospiti hanno una data di nascita non valida. Correggi prima queste righe:',
+    btn_row_menu: 'Altre azioni',
     no_checkins: 'Nessun check-in ancora. Condividi il link ospiti per iniziare!',
     doc_complete: '✓ Completo', doc_partial: '⏳ Parziale', doc_missing: '✗ Mancante',
     alloggiati_filed: '✓ Inviato', alloggiati_pending: 'In attesa',
@@ -4021,6 +4045,10 @@ const HT = {
     prop_privacy_desc: 'Generata dai dettagli della tua proprietà. Ai sensi del GDPR sei il titolare del trattamento — gli ospiti visualizzano questa informativa e possono scaricarne copia.',
     prop_privacy_preview_btn: '🔍 Anteprima come ospite',
     prop_privacy_download_btn: '⬇ Scarica HTML',
+    prop_privacy_data_title: 'Privacy & dati',
+    prop_privacy_data_desc: 'Azioni di massa sui dati per questa proprietà. I purghi periodici di retention sono automatici — vedi Data Retention nella console admin. Usa questa opzione solo se devi ripulire in blocco tutta la cronologia dei check-in.',
+    prop_privacy_data_hint: 'La conferma richiede di digitare il nome della proprietà.',
+    btn_delete_all_prop: 'Elimina tutti i check-in',
     prop_tax_rate: 'Tariffa (€ per persona a notte)',
     prop_tax_max_nights: 'Notti max tassabili',
     prop_tax_basis_stay: 'per soggiorno',
@@ -4249,7 +4277,10 @@ function setHostLang(l) {
   });
   // Update dynamic elements with IDs
   const idMap = {
-    'allCheckinsTitle': 'all_checkins_title', 'btnDeleteAll': 'btn_delete_all',
+    // Round 40 T6 — btnDeleteAll id retired (moved to Property panel
+    // as btnDeleteAllProp with data-h="btn_delete_all_prop", which the
+    // generic data-h sweep above already handles).
+    'allCheckinsTitle': 'all_checkins_title',
     'qrGenTitle': 'qr_gen_title', 'qrGenDesc': 'qr_gen_desc', 'genBookingBtn': 'btn_gen_booking',
     'bookingCodeLabel': 'booking_code_label', 'qrReturningHint': 'qr_returning_hint',
     'recentCodesTitle': 'recent_codes_title', 'templateTitle': 'template_title', 'templateDesc': 'template_desc',
@@ -5428,6 +5459,34 @@ function setAllCheckinGroups(collapse) {
   });
 }
 
+// Round 40 T6 — localised label for the raw DB guest_type values.
+// Display only — the stored value is unchanged and still drives
+// Alloggiati coding (see GUEST_TYPE_CODES).
+function _guestTypeLabel(t) {
+  const it = hostLang === 'it';
+  if (t === 'single')                        return it ? 'Individuale'  : 'Solo guest';
+  if (t === 'head' || t === 'group')         return it ? 'Capogruppo'   : 'Group lead';
+  if (t === 'member' || t === 'group_member') return it ? 'Ospite'      : 'Guest';
+  return t || '—';
+}
+// Round 40 T6 — row kebab menu open/close. Only one menu open at a
+// time; a click anywhere else closes it (window listener below).
+function _closeRowMenus() {
+  document.querySelectorAll('.row-menu').forEach(m => { m.style.display = 'none'; });
+}
+function _toggleRowMenu(btn) {
+  const menu = btn.parentElement.querySelector('.row-menu');
+  if (!menu) return;
+  const open = menu.style.display !== 'none';
+  _closeRowMenus();
+  if (!open) menu.style.display = 'block';
+}
+if (typeof window !== 'undefined') {
+  // Bubble phase, not capture — the kebab and menu-item handlers stop
+  // propagation, so a click that reaches window is a click OUTSIDE.
+  window.addEventListener('click', () => _closeRowMenus());
+}
+
 // Round 40 T2 — shared DOB validator, mirrors api/scan-document.js.
 // Alloggiati rejects any submission with a future / obviously-wrong DOB,
 // and by that point the host has no useful error to act on. We surface
@@ -5622,21 +5681,33 @@ function renderCheckins() {
       // moved to the detail view (viewGuest opens the modal that already
       // shows them). Keeping them in the table caused the sticky-right
       // Actions column to overlay them at 1440 / 1024 widths.
+      // Round 40 T6 — the whole row opens the detail view (Vedi is
+      // gone), Modifica / Elimina are folded into a ⋯ menu. Row
+      // .cursor:pointer is set inline; the menu button stops
+      // propagation so clicking it doesn't also trigger the row.
+      const typeLabel = _guestTypeLabel(c.guest_type);
+      const escName = (c.surname || '').replace(/'/g,'\\\'');
       html += `
-        <tr data-checkin-group="${groupToken}"${hideAttr}>
+        <tr data-checkin-group="${groupToken}"${hideAttr}
+            onclick="viewGuest('${c.id}')" style="cursor:pointer;">
           <td data-label=""><strong>${c.surname} ${c.name}</strong>${rowPill}</td>
-          <td data-label="${h('th_type')}">${c.guest_type}</td>
+          <td data-label="${h('th_type')}">${typeLabel}</td>
           <td data-label="${h('th_arrival')}">${fmtDate(c.arrival_date)}</td>
           <td data-label="${h('th_departure')}">${fmtDate(c.departure_date)}</td>
           <td data-label="${h('th_birth')}">${_isValidPastDOB(c.date_of_birth)
               ? `${fmtDate(c.date_of_birth)} <span style="font-size:0.72rem;color:var(--ink-soft)">${c.place_of_birth || ''}${c.birth_province && c.birth_province!=='EE' ? ' ('+c.birth_province+')' : ''}</span>`
               : `<span title="${h('dob_invalid_chip')}" style="display:inline-flex;align-items:center;gap:5px;font-size:0.72rem;color:#b03939;background:rgba(224,69,94,0.10);border:1px solid rgba(224,69,94,0.25);padding:2px 8px;border-radius:6px;font-weight:600;">⚠ ${h('dob_invalid_chip')}</span>`
             }</td>
-          <td data-label="">
-            <div style="display:flex;gap:8px;justify-content:flex-end;padding:4px 0;">
-              <button class="btn btn-secondary btn-sm" onclick="viewGuest('${c.id}')" style="min-height:36px;padding:6px 12px;">${h('btn_view')}</button>
-              <button class="btn btn-secondary btn-sm" onclick="editGuest('${c.id}')" style="min-height:36px;padding:6px 12px;color:var(--warm);border-color:rgba(0,91,255,0.25);">✏️ ${h('btn_edit_single') || 'Edit'}</button>
-              <button class="btn btn-secondary btn-sm" onclick="deleteCheckin('${c.id}','${(c.surname||'').replace(/'/g,'\\\'')}')" style="color:var(--red);border-color:rgba(224,69,94,0.2);min-height:36px;padding:6px 12px;">🗑 ${h('btn_delete_single')}</button>
+          <td data-label="" onclick="event.stopPropagation();" style="text-align:right;">
+            <button type="button" class="row-kebab"
+              aria-label="${h('btn_row_menu')}" title="${h('btn_row_menu')}"
+              onclick="event.stopPropagation();_toggleRowMenu(this)"
+              style="background:none;border:1px solid transparent;border-radius:6px;padding:4px 10px;cursor:pointer;color:var(--ink-2);font-size:1.05rem;line-height:1;">⋯</button>
+            <div class="row-menu" style="display:none;position:absolute;right:16px;margin-top:4px;background:var(--white);border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.10);z-index:20;min-width:140px;overflow:hidden;">
+              <button type="button" onclick="event.stopPropagation();_closeRowMenus();editGuest('${c.id}')"
+                style="display:block;width:100%;text-align:left;background:none;border:none;padding:8px 14px;font-size:0.82rem;color:var(--warm);cursor:pointer;font-family:inherit;">${h('btn_edit_single') || 'Edit'}</button>
+              <button type="button" onclick="event.stopPropagation();_closeRowMenus();deleteCheckin('${c.id}','${escName}')"
+                style="display:block;width:100%;text-align:left;background:none;border:none;padding:8px 14px;font-size:0.82rem;color:var(--red);cursor:pointer;font-family:inherit;">${h('btn_delete_single')}</button>
             </div>
           </td>
         </tr>`;
@@ -5704,6 +5775,50 @@ async function deleteAllCheckins() {
   renderDashboard();
   toast(h('deleted_all'));
   track('delete_all_checkins', { count: allCheckins.length });
+}
+
+// Round 40 Task 6 — property-panel entry point for the bulk delete.
+// Confirmation requires typing the property name (not DELETE/ELIMINA);
+// deletion is scoped to THIS property only via property_id, so it can
+// never accidentally sweep another host's data. Delegates to a
+// property-scoped delete rather than reusing the unscoped
+// deleteAllCheckins() above.
+async function deleteAllCheckinsGated() {
+  const it = hostLang === 'it';
+  const propName = (propertyData?.name || '').trim();
+  if (!propName || !propertyId) {
+    toast(it ? 'Impossibile — nessuna proprietà selezionata.' : 'Cannot proceed — no property selected.');
+    return;
+  }
+  const count = Array.isArray(allCheckins) ? allCheckins.length : 0;
+  if (count === 0) {
+    toast(it ? 'Nessun check-in da eliminare.' : 'No check-in records to delete.');
+    return;
+  }
+  const prompt1 = (it
+    ? `Stai per eliminare tutti i ${count} check-in di "${propName}". Non si può annullare.\n\nDigita il nome esatto della proprietà per confermare:`
+    : `You are about to delete all ${count} check-ins for "${propName}". This cannot be undone.\n\nType the exact property name to confirm:`);
+  const typed = prompt(prompt1);
+  if (typed == null) return; // cancelled
+  if (typed.trim() !== propName) {
+    toast(it ? 'Nome non corrispondente — nessuna eliminazione.' : 'Name did not match — nothing deleted.');
+    return;
+  }
+  const { data: deleted, error } = await sb.from('checkins')
+    .delete()
+    .eq('property_id', propertyId)
+    .select('id');
+  if (error) {
+    console.error(error);
+    toast((it ? 'Errore: ' : 'Error: ') + error.message);
+    return;
+  }
+  const n = Array.isArray(deleted) ? deleted.length : 0;
+  allCheckins = [];
+  if (typeof renderCheckins === 'function') renderCheckins();
+  if (typeof renderDashboard === 'function') renderDashboard();
+  toast(it ? `Eliminati ${n} check-in.` : `Deleted ${n} check-ins.`);
+  track('delete_all_checkins', { count: n, gated: true });
 }
 
 /* ══════════════════════════════════════

@@ -554,6 +554,25 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 }
 .panel-tab.active { color: var(--warm); border-bottom-color: var(--warm); }
 
+/* Round 40 Task 4 — section tab strip in the main header. Same visual
+   spec as .panel-tab (thin underline that turns warm-blue when active)
+   so hosts don't have to learn a second tab style. */
+.section-tabs { border-bottom: 1px solid var(--border); margin: 14px -28px 0; padding: 0 28px; }
+.section-tab {
+  padding: 9px 16px; font-size: 0.84rem; font-weight: 500;
+  color: var(--ink-soft); background: none; border: none;
+  border-bottom: 2px solid transparent; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.section-tab:hover { color: var(--ink); }
+.section-tab.active { color: var(--warm); border-bottom-color: var(--warm); font-weight: 600; }
+.section-tab .tab-badge {
+  background: #E0455E; color: #fff; font-size: 0.6rem; font-weight: 700;
+  padding: 1px 7px; border-radius: 10px;
+}
+.section-tab.active .tab-badge { background: var(--warm); color: #fff; }
+
 /* ── RESPONSIVE ── */
 /* ══════════════════════════════════════
    MOBILE RESPONSIVE
@@ -1026,9 +1045,13 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   <div class="login-card">
     <div class="login-logo">Welcome<em>BnB</em></div>
     <div class="login-badge" data-h="login_badge">Host Console</div>
-    <div style="display:flex;gap:4px;justify-content:center;margin-bottom:12px;">
-      <button class="lang-opt-h" onclick="setHostLang('en')" style="padding:4px 10px;border:1px solid var(--cream-3);border-radius:4px;font-size:0.6rem;cursor:pointer;background:none;color:var(--ink-soft);">EN</button>
-      <button class="lang-opt-h" onclick="setHostLang('it')" style="padding:4px 10px;border:1px solid var(--cream-3);border-radius:4px;font-size:0.6rem;cursor:pointer;background:var(--white);color:var(--warm);box-shadow:0 1px 3px rgba(6,26,61,0.06);">IT</button>
+    <!-- Round 40 T3 — same pill toggle as the console header. Previous
+         version used two square buttons that visually clashed with the
+         Playfair / DM Sans header pill. The active button gets its
+         "active" class the same way the header's does via setHostLang. -->
+    <div class="lang-toggle" style="display:flex;align-items:center;justify-content:center;background:var(--cream-2);border-radius:20px;padding:3px;gap:2px;border:1px solid var(--border);margin:0 auto 14px;width:fit-content;">
+      <button class="lang-opt-h" onclick="setHostLang('en')" style="padding:5px 14px;border-radius:16px;font-size:0.72rem;font-weight:600;letter-spacing:0.06em;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;background:none;color:var(--ink-soft);">EN</button>
+      <button class="lang-opt-h active" onclick="setHostLang('it')" style="padding:5px 14px;border-radius:16px;font-size:0.72rem;font-weight:600;letter-spacing:0.06em;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;background:var(--white);color:var(--warm);box-shadow:0 1px 3px rgba(6,26,61,0.06);">IT</button>
     </div>
     <div class="login-error" id="loginError"></div>
     <div id="loginForm">
@@ -1079,58 +1102,34 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     <div class="prop-switcher-menu" id="propSwitcherMenu"></div>
   </div>
 
-  <nav class="sidebar-nav">
-    <div class="sidebar-section" data-h="sidebar_overview">Overview</div>
-    <button class="sidebar-item active" onclick="showPanel('dashboard', this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-      <span data-h="sidebar_dashboard">Dashboard</span>
+  <!-- Round 40 Task 4 — five top-level items, no group headers, no
+       inner scroll. Each item calls showSection(sectionId); the router
+       maps that to the right panel and paints the tab strip in the
+       header. Old data-h keys (sidebar_dashboard, sidebar_property, …)
+       are kept in the dictionaries so existing references still resolve. -->
+  <nav class="sidebar-nav" style="overflow:visible;">
+    <button class="sidebar-item active" data-section="oggi" onclick="showSection('oggi')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span data-h="sidebar_oggi">Today</span>
+      <span class="badge-count" id="navBadge-oggi" style="display:none;">0</span>
     </button>
-
-    <div class="sidebar-section" data-h="sidebar_property_sec">Property</div>
-    <button class="sidebar-item" onclick="showPanel('property', this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/></svg>
-      <span data-h="sidebar_property">Property Details</span>
-    </button>
-    <button class="sidebar-item" onclick="showPanel('rules', this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      <span data-h="sidebar_rules">House Rules</span>
-    </button>
-    <button class="sidebar-item" onclick="showPanel('recos', this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88"/></svg>
-      <span data-h="sidebar_recos">Recommendations</span>
-    </button>
-
-    <div class="sidebar-section" data-h="sidebar_guests_sec">Guests</div>
-    <button class="sidebar-item" onclick="showPanel('checkins', this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      <span data-h="sidebar_checkins">Check-in Data</span>
-    </button>
-    <button class="sidebar-item" onclick="showPanel('guestanalytics', this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="M7 15l4-6 4 3 5-8"/></svg>
-      <span data-h="sidebar_guest_analytics">Guest Analytics</span>
-    </button>
-    <button class="sidebar-item" onclick="showPanel('contacts', this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 4h16v16H4z"/><path d="M22 6l-10 7L2 6"/></svg>
-      <span data-h="sidebar_contacts">Marketing Contacts</span>
-    </button>
-    <button class="sidebar-item" onclick="showPanel('export', this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      <span data-h="sidebar_export">Export / Alloggiati</span>
-    </button>
-    <button class="sidebar-item" onclick="showPanel('compliance', this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      <span data-h="sidebar_compliance">Compliance Guide</span>
-    </button>
-
-    <div class="sidebar-section" data-h="sidebar_share_sec">Share</div>
-    <button class="sidebar-item" onclick="showPanel('qrlink', this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3z"/><path d="M18 18h3v3h-3z"/><path d="M14 18h3v3h-3z"/></svg>
-      <span data-h="sidebar_qr">QR Code & Link</span>
-    </button>
-    <button class="sidebar-item" onclick="showPanel('chat', this)" style="position:relative;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-      <span data-h="sidebar_chat">Guest Chat</span>
+    <button class="sidebar-item" data-section="ospiti" onclick="showSection('ospiti')" style="position:relative;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/></svg>
+      <span data-h="sidebar_ospiti">Guests</span>
       <div id="chatBadge" style="display:none;position:absolute;right:12px;width:8px;height:8px;border-radius:50%;background:var(--red);"></div>
+    </button>
+    <button class="sidebar-item" data-section="conf" onclick="showSection('conf')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+      <span data-h="sidebar_conf">Compliance</span>
+      <span class="badge-count" id="navBadge-conf" style="display:none;">0</span>
+    </button>
+    <button class="sidebar-item" data-section="prop" onclick="showSection('prop')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/></svg>
+      <span data-h="sidebar_prop">Property</span>
+    </button>
+    <button class="sidebar-item" data-section="cond" onclick="showSection('cond')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+      <span data-h="sidebar_cond">Share</span>
     </button>
   </nav>
 
@@ -1152,12 +1151,18 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 <!-- MAIN -->
 <div class="main">
   <div class="main-header">
-    <div style="display:flex;align-items:center;gap:12px;">
-      <div class="mobile-toggle" onclick="toggleSidebar()">☰</div>
-      <div>
-        <div class="main-title" id="panelTitle">Dashboard</div>
-        <div class="main-subtitle" id="panelSubtitle">Overview of your property and guests</div>
+    <div style="flex:1;min-width:0;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="mobile-toggle" onclick="toggleSidebar()">☰</div>
+        <div>
+          <div class="main-title" id="panelTitle">Dashboard</div>
+          <div class="main-subtitle" id="panelSubtitle">Overview of your property and guests</div>
+        </div>
       </div>
+      <!-- Round 40 Task 4 — section tab strip. Populated by
+           renderTabStrip(); one button per panel in the active
+           section, hidden when the section has only one panel. -->
+      <div class="section-tabs" id="sectionTabs" style="display:flex;gap:2px;margin-top:14px;flex-wrap:wrap;"></div>
     </div>
     <div class="header-actions" id="headerActions">
       <div class="lang-toggle" style="display:flex;align-items:center;background:var(--cream-2);border-radius:20px;padding:3px;gap:2px;border:1px solid var(--border);">
@@ -1178,6 +1183,20 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
     <!-- ════════════ PROPERTY DETAILS ════════════ -->
     <div class="panel" id="panel-property">
+
+      <!-- Round 40 Task 8 — sticky in-panel header bar. Sits at the top
+           of the panel body and sticks to the top on scroll. Replaces
+           the floating .panel-actions pill that overlapped the content. -->
+      <div class="panel-header-actions" style="position:sticky;top:0;z-index:5;background:var(--white);border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin-bottom:16px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+        <div style="flex:1;min-width:0;">
+          <div style="font-family:'Playfair Display',serif;font-weight:600;font-size:1rem;" data-h="prop_header_title">Property details</div>
+          <div style="font-size:0.72rem;color:var(--ink-soft);" data-h="prop_header_hint">View mode</div>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="openPreviewAsGuest()" data-h="btn_preview_guest" title="Open the guest app in test mode (no analytics)">🧪 Preview as guest</button>
+        <button type="button" id="propertyEditBtn" class="btn btn-secondary btn-sm" onclick="startPropertyEdit()">✏️ <span data-h="btn_edit_list">Edit</span></button>
+        <button type="button" id="propertySaveBtn" class="btn btn-primary btn-sm" onclick="savePropertyEdit()" style="display:none;">💾 <span data-h="btn_save_property">Save</span></button>
+        <button type="button" id="propertyCancelBtn" class="btn btn-secondary btn-sm" onclick="cancelPropertyEdit()" style="display:none;"><span data-h="btn_cancel_edit">Cancel</span></button>
+      </div>
 
       <!-- Onboarding banner for new users -->
       <div id="onboardingBanner" style="display:none;position:relative;margin-bottom:20px;padding:20px 24px;background:linear-gradient(135deg,rgba(0,91,255,0.08),rgba(30,123,255,0.08));border:1px solid rgba(0,91,255,0.2);border-radius:12px;">
@@ -1589,15 +1608,28 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
       </div>
 
-      <!-- Round 37.1 — one action row at the bottom, in flow. The Edit
-           button toggles the fieldset above; Save + Cancel appear in
-           edit mode; Preview stays visible in both. -->
-      <div class="panel-actions">
-        <button type="button" id="propertyEditBtn" class="btn btn-secondary" onclick="startPropertyEdit()">✏️ <span data-h="btn_edit_list">Edit</span></button>
-        <button type="button" id="propertySaveBtn" class="btn btn-primary" onclick="savePropertyEdit()" style="display:none;">💾 <span data-h="btn_save_property">Save Property Details</span></button>
-        <button type="button" id="propertyCancelBtn" class="btn btn-secondary" onclick="cancelPropertyEdit()" style="display:none;"><span data-h="btn_cancel_edit">Cancel</span></button>
-        <button type="button" class="btn btn-secondary" onclick="openPreviewAsGuest()" data-h="btn_preview_guest" title="Open the guest app in test mode (no analytics)">🧪 Preview as guest</button>
+      <!-- Round 40 Task 6 — Privacy & data card. "Delete all check-in
+           records" moved here from the check-in table toolbar; it's
+           destructive enough to belong on the property panel behind a
+           typed-name confirmation, not one clumsy click away on the
+           list header. -->
+      <div class="form-card">
+        <div class="form-card-title" data-h="prop_privacy_data_title">Privacy &amp; data</div>
+        <div class="form-card-desc" data-h="prop_privacy_data_desc">Bulk data actions for this property. Regular retention purges are automatic — see Data Retention in the admin console. Use this only when you need to wipe the current check-in history in one go.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+          <button type="button" class="btn btn-secondary" id="btnDeleteAllProp" onclick="deleteAllCheckinsGated()" style="color:var(--red);border-color:rgba(224,69,94,0.3);">
+            <span data-h="btn_delete_all_prop">Delete all check-in records</span>
+          </button>
+          <span style="font-size:0.72rem;color:var(--ink-soft);" data-h="prop_privacy_data_hint">Confirmation requires typing the property name.</span>
+        </div>
       </div>
+
+      <!-- Round 40 Task 8 — the property panel's action row is now a
+           sticky bar INSIDE the panel (top of the panel body, sticks
+           to top on scroll) rather than a floating pill overlaying
+           the content. The three other panels that use .panel-actions
+           are unchanged. Class .panel-header-actions is a scoped
+           override for this panel only. -->
     </div>
 
     <!-- ════════════ HOUSE RULES ════════════ -->
@@ -1662,27 +1694,40 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <button type="button" onclick="setAllCheckinGroups(true)"
               style="background:transparent;border:none;color:var(--ink-soft);font-size:0.76rem;cursor:pointer;font-family:inherit;padding:6px 8px;"
               data-h="btn_collapse_all">▸ Collapse all</button>
-            <button class="btn btn-secondary btn-sm" onclick="deleteAllCheckins()" style="color:var(--red);border-color:rgba(224,69,94,0.3);" id="btnDeleteAll" data-h="btn_delete_all">🗑 Delete All</button>
+            <!-- Round 40 Task 6 — "Delete All" moved to Property → Privacy & data.
+                 It's a destructive bulk action; the property panel now hosts
+                 the confirmation gate that requires typing the property name. -->
           </div>
         </div>
         <table>
           <thead>
             <tr>
+              <!-- Round 40 T1 — cittadinanza / documento / inviato / docs
+                   moved to the detail view (viewGuest) to stop the
+                   sticky-right Actions column from painting over them at
+                   1440 / 1024 widths. The detail view still shows every
+                   removed field. -->
               <th data-h="th_guest">Guest</th>
               <th data-h="th_type">Type</th>
               <th data-h="th_arrival">Arrival</th>
               <th data-h="th_departure">Departure</th>
               <th data-h="th_birth">Birth</th>
-              <th data-h="th_citizenship">Citizenship</th>
-              <th data-h="th_document">Document</th>
-              <th data-h="th_submitted">Submitted</th>
-              <th data-h="th_docs">Docs</th>
               <th data-h="th_actions">Actions</th>
             </tr>
           </thead>
           <tbody id="checkinTable">
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- Round 40 Task 4 — Calendar tab placeholder. Task 5 will move the
+         existing calendar rendering (_renderUpcomingCalendarBody) into
+         this panel and make List the dashboard default. Kept empty here
+         so the sidebar/tab restructure ships cleanly on its own. -->
+    <div class="panel" id="panel-calendar">
+      <div id="calendarPanelBody" style="padding:16px 18px;background:var(--white);border:1px solid var(--border);border-radius:10px;font-size:0.82rem;color:var(--ink-soft);">
+        <span data-h="cal_panel_placeholder">Calendar view coming here.</span>
       </div>
     </div>
 
@@ -1720,6 +1765,15 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
     <!-- ════════════ EXPORT / ALLOGGIATI ════════════ -->
     <div class="panel" id="panel-export">
+      <!-- Round 40 Task 7 — status checklist at the top of the page.
+           Painted by renderExportChecklist() using propertyData.region
+           and allCheckins. Shows Alloggiati (national, always shown),
+           this region's statistical portal, and — if any is configured —
+           the tourist-tax obligation. Everything else lives further down
+           and, when the region is known, non-matching regional tiles are
+           tucked under an "Altre regioni" disclosure. -->
+      <div id="exportChecklist" style="margin-bottom:16px;"></div>
+
       <div class="alert alert-info" data-h="export_info"></div>
 
       <!-- ─── Axis 1: Police · National ─── -->
@@ -1763,7 +1817,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <button class="btn btn-secondary" onclick="exportISTAT()" data-h="btn_gen_istat">📊 Generate C/59 Summary</button>
           </div>
         </div>
-        <div class="export-tile-h">
+        <div class="export-tile-h" data-region="Veneto">
           <div class="tile-body">
             <h3 data-h="export_ross1000_title">🗺 ROSS1000 statistical file</h3>
             <p data-h="export_ross1000_desc"></p>
@@ -1775,7 +1829,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             </a>
           </div>
         </div>
-        <div class="export-tile-h">
+        <div class="export-tile-h" data-region="Puglia">
           <div class="tile-body">
             <h3 data-h="export_puglia_dms_title">🏛 Puglia DMS (SPOT Easy)</h3>
             <p data-h="export_puglia_dms_desc"></p>
@@ -3147,8 +3201,35 @@ async function handleAuth() {
   btn.textContent = h('login_signing_in');
   errEl.classList.remove('show');
 
+  // Round 40 T3 — a hung auth call left the button stuck on
+  // "Accesso in corso…" indefinitely. Race with a 15s timeout so the
+  // host can always retry. Sentinel objects distinguish resolution
+  // paths without relying on error.name (fetch abort text differs
+  // between browsers).
+  const TIMEOUT_MS = 15_000;
+  const TIMEOUT_MARKER = Symbol('login-timeout');
+  let timeoutId = null;
+  const timeoutPromise = new Promise(resolve => {
+    timeoutId = setTimeout(() => resolve(TIMEOUT_MARKER), TIMEOUT_MS);
+  });
+
   try {
-    const result = await sb.auth.signInWithPassword({ email, password });
+    const raced = await Promise.race([
+      sb.auth.signInWithPassword({ email, password }),
+      timeoutPromise,
+    ]);
+    if (raced === TIMEOUT_MARKER) {
+      // Keep the email in the field (never clear it — that's the fix's
+      // main affordance for retry). Just restore the button and surface
+      // a retryable error.
+      errEl.textContent = h('login_err_timeout');
+      errEl.classList.add('show');
+      btn.disabled = false;
+      btn.textContent = h('login_signin');
+      return;
+    }
+    if (timeoutId) clearTimeout(timeoutId);
+    const result = raced;
     if (result.error) {
       errEl.textContent = result.error.message;
       errEl.classList.add('show');
@@ -3163,6 +3244,7 @@ async function handleAuth() {
     document.getElementById('loginOverlay').classList.add('hidden');
     init();
   } catch (e) {
+    if (timeoutId) clearTimeout(timeoutId);
     errEl.textContent = h('login_err_connection');
     errEl.classList.add('show');
     btn.disabled = false;
@@ -3344,12 +3426,25 @@ const HT = {
     login_err_fields: 'Please fill in both fields',
     login_err_password: 'Password must be at least 6 characters',
     login_err_connection: 'Connection error. Please try again.',
+    login_err_timeout: 'Sign-in is taking too long. Please check your connection and try again.',
     sidebar_dashboard: 'Dashboard', sidebar_property: 'Property Details', sidebar_rules: 'House Rules',
     sidebar_recos: 'Recommendations', sidebar_checkins: 'Check-in Data', sidebar_export: 'Export & Compliance',
     sidebar_qr: 'QR Code & Link', sidebar_role: 'Property Manager',
     sidebar_guest_analytics: 'Guest Analytics',
     sidebar_contacts: 'Marketing Contacts',
     sidebar_compliance: 'Compliance Guide',
+    // Round 40 Task 4 — five top-level sidebar sections + per-section
+    // header title/subtitle. Old sidebar_* keys are kept above so any
+    // stray reference still resolves.
+    sidebar_oggi: 'Today', sidebar_ospiti: 'Guests', sidebar_conf: 'Compliance',
+    sidebar_prop: 'Property', sidebar_cond: 'Share',
+    sidebar_oggi_title:   'Today',      sidebar_oggi_sub:   'What needs your attention right now',
+    sidebar_ospiti_title: 'Guests',     sidebar_ospiti_sub: 'Check-ins, calendar, analytics and contacts',
+    sidebar_conf_title:   'Compliance', sidebar_conf_sub:   'Filings for the Italian authorities',
+    sidebar_prop_title:   'Property',   sidebar_prop_sub:   'Details, rules and recommendations',
+    sidebar_cond_title:   'Share',      sidebar_cond_sub:   'Guest link and chat',
+    t_calendar: 'Calendar', s_calendar: 'Bookings by month',
+    cal_panel_placeholder: 'Calendar view is coming here in the next update.',
     admin_enable_edit: 'Enable editing',
     admin_close: 'Close',
     cmp_intro: 'A plain-language guide to the three compliance obligations for short-term rentals in Italy. This is reference information — verify the specifics for your region and comune.',
@@ -3464,6 +3559,9 @@ const HT = {
     stat_from_guests: 'from guests', recent_checkins: 'Recent Check-ins', view_all: 'View All →',
     th_guest: 'Guest', th_type: 'Type', th_arrival: 'Arrival', th_departure: 'Departure', th_citizenship: 'Citizenship', th_document: 'Document',
     th_docs: 'Docs', th_submitted: 'Submitted', th_birth: 'Birth', th_alloggiati: 'Alloggiati', th_actions: 'Actions',
+    dob_invalid_chip: 'Invalid date of birth',
+    dob_invalid_export_block: 'Cannot export: some guests have an invalid date of birth. Fix these rows first:',
+    btn_row_menu: 'More actions',
     no_checkins: 'No check-ins yet. Share your guest link to get started!',
     doc_complete: '✓ Complete', doc_partial: '⏳ Partial', doc_missing: '✗ Missing',
     alloggiati_filed: '✓ Filed', alloggiati_pending: 'Pending',
@@ -3543,6 +3641,12 @@ const HT = {
     prop_privacy_desc: 'Generated from your property details. Under GDPR you are the data controller (titolare del trattamento) — guests are shown this notice, and can download a copy.',
     prop_privacy_preview_btn: '🔍 Preview as guest',
     prop_privacy_download_btn: '⬇ Download HTML',
+    prop_privacy_data_title: 'Privacy & data',
+    prop_privacy_data_desc: 'Bulk data actions for this property. Regular retention purges are automatic — see Data Retention in the admin console. Use this only when you need to wipe the current check-in history in one go.',
+    prop_privacy_data_hint: 'Confirmation requires typing the property name.',
+    btn_delete_all_prop: 'Delete all check-in records',
+    prop_header_title: 'Property details',
+    prop_header_hint:  'View mode',
     prop_tax_rate: 'Rate (€ per person per night)',
     prop_tax_max_nights: 'Max taxable nights',
     prop_tax_max_nights_hint: 'Many comuni only charge the first N nights per stay (or per person per month).',
@@ -3756,12 +3860,22 @@ const HT = {
     login_err_fields: 'Compila entrambi i campi',
     login_err_password: 'La password deve essere di almeno 6 caratteri',
     login_err_connection: 'Errore di connessione. Riprova.',
+    login_err_timeout: 'L\'accesso sta impiegando troppo tempo. Controlla la connessione e riprova.',
     sidebar_dashboard: 'Dashboard', sidebar_property: 'Dettagli Proprietà', sidebar_rules: 'Regole della Casa',
     sidebar_recos: 'Consigli', sidebar_checkins: 'Dati Check-in', sidebar_export: 'Export & Conformità',
     sidebar_qr: 'QR Code & Link', sidebar_role: 'Gestore Proprietà',
     sidebar_guest_analytics: 'Analisi Ospiti',
     sidebar_contacts: 'Contatti Marketing',
     sidebar_compliance: 'Guida Conformità',
+    sidebar_oggi: 'Oggi', sidebar_ospiti: 'Ospiti', sidebar_conf: 'Conformità',
+    sidebar_prop: 'Proprietà', sidebar_cond: 'Condividi',
+    sidebar_oggi_title:   'Oggi',       sidebar_oggi_sub:   'Cosa richiede la tua attenzione adesso',
+    sidebar_ospiti_title: 'Ospiti',     sidebar_ospiti_sub: 'Check-in, calendario, analisi e contatti',
+    sidebar_conf_title:   'Conformità', sidebar_conf_sub:   'Adempimenti per le autorità italiane',
+    sidebar_prop_title:   'Proprietà',  sidebar_prop_sub:   'Dettagli, regole e consigli',
+    sidebar_cond_title:   'Condividi',  sidebar_cond_sub:   'Link per gli ospiti e chat',
+    t_calendar: 'Calendario', s_calendar: 'Prenotazioni per mese',
+    cal_panel_placeholder: 'La vista calendario arriverà qui nel prossimo aggiornamento.',
     admin_enable_edit: 'Abilita modifica',
     admin_close: 'Chiudi',
     cmp_intro: 'Una guida in linguaggio semplice ai tre obblighi di conformità per le locazioni brevi in Italia. È informazione di riferimento — verifica i dettagli per la tua regione e il tuo comune.',
@@ -3873,6 +3987,9 @@ const HT = {
     stat_from_guests: 'dagli ospiti', recent_checkins: 'Check-in Recenti', view_all: 'Vedi Tutti →',
     th_guest: 'Ospite', th_type: 'Tipo', th_arrival: 'Arrivo', th_departure: 'Partenza', th_citizenship: 'Cittadinanza', th_document: 'Documento',
     th_docs: 'Docs', th_submitted: 'Inviato', th_birth: 'Nascita', th_alloggiati: 'Alloggiati', th_actions: 'Azioni',
+    dob_invalid_chip: 'Data di nascita non valida',
+    dob_invalid_export_block: 'Impossibile esportare: alcuni ospiti hanno una data di nascita non valida. Correggi prima queste righe:',
+    btn_row_menu: 'Altre azioni',
     no_checkins: 'Nessun check-in ancora. Condividi il link ospiti per iniziare!',
     doc_complete: '✓ Completo', doc_partial: '⏳ Parziale', doc_missing: '✗ Mancante',
     alloggiati_filed: '✓ Inviato', alloggiati_pending: 'In attesa',
@@ -3950,6 +4067,12 @@ const HT = {
     prop_privacy_desc: 'Generata dai dettagli della tua proprietà. Ai sensi del GDPR sei il titolare del trattamento — gli ospiti visualizzano questa informativa e possono scaricarne copia.',
     prop_privacy_preview_btn: '🔍 Anteprima come ospite',
     prop_privacy_download_btn: '⬇ Scarica HTML',
+    prop_privacy_data_title: 'Privacy & dati',
+    prop_privacy_data_desc: 'Azioni di massa sui dati per questa proprietà. I purghi periodici di retention sono automatici — vedi Data Retention nella console admin. Usa questa opzione solo se devi ripulire in blocco tutta la cronologia dei check-in.',
+    prop_privacy_data_hint: 'La conferma richiede di digitare il nome della proprietà.',
+    btn_delete_all_prop: 'Elimina tutti i check-in',
+    prop_header_title: 'Dettagli proprietà',
+    prop_header_hint:  'Modalità visualizzazione',
     prop_tax_rate: 'Tariffa (€ per persona a notte)',
     prop_tax_max_nights: 'Notti max tassabili',
     prop_tax_basis_stay: 'per soggiorno',
@@ -4178,7 +4301,10 @@ function setHostLang(l) {
   });
   // Update dynamic elements with IDs
   const idMap = {
-    'allCheckinsTitle': 'all_checkins_title', 'btnDeleteAll': 'btn_delete_all',
+    // Round 40 T6 — btnDeleteAll id retired (moved to Property panel
+    // as btnDeleteAllProp with data-h="btn_delete_all_prop", which the
+    // generic data-h sweep above already handles).
+    'allCheckinsTitle': 'all_checkins_title',
     'qrGenTitle': 'qr_gen_title', 'qrGenDesc': 'qr_gen_desc', 'genBookingBtn': 'btn_gen_booking',
     'bookingCodeLabel': 'booking_code_label', 'qrReturningHint': 'qr_returning_hint',
     'recentCodesTitle': 'recent_codes_title', 'templateTitle': 'template_title', 'templateDesc': 'template_desc',
@@ -4225,6 +4351,7 @@ const titlesMap = {
   rules: ['t_rules', 's_rules'],
   recos: ['t_recos', 's_recos'],
   checkins: ['t_checkins', 's_checkins'],
+  calendar: ['t_calendar', 's_calendar'],
   guestanalytics: ['t_guest_analytics', 's_guest_analytics'],
   contacts: ['t_contacts', 's_contacts'],
   export: ['t_export', 's_export'],
@@ -4232,6 +4359,60 @@ const titlesMap = {
   qrlink: ['t_qrlink', 's_qrlink'],
   chat: ['t_chat', 's_chat'],
 };
+
+// Round 40 Task 4 — five top-level sections, ordered as they appear in
+// the sidebar. Each section owns the panels that used to be siblings in
+// the old flat sidebar; the tab strip in the header renders one button
+// per panel and delegates to showPanel(id). Panel ids stay unchanged so
+// every existing call site keeps working; a helper panelSection() finds
+// the containing section for any panel id.
+const SECTIONS = {
+  oggi:   { panels: ['dashboard'] },
+  ospiti: { panels: ['checkins', 'calendar', 'guestanalytics', 'contacts'] },
+  conf:   { panels: ['export', 'compliance'] },
+  prop:   { panels: ['property', 'rules', 'recos'] },
+  cond:   { panels: ['qrlink', 'chat'] },
+};
+const SECTION_TITLES = {
+  oggi:   ['sidebar_oggi_title',   'sidebar_oggi_sub'],
+  ospiti: ['sidebar_ospiti_title', 'sidebar_ospiti_sub'],
+  conf:   ['sidebar_conf_title',   'sidebar_conf_sub'],
+  prop:   ['sidebar_prop_title',   'sidebar_prop_sub'],
+  cond:   ['sidebar_cond_title',   'sidebar_cond_sub'],
+};
+const SECTION_LAST_TAB_KEY = 'wbnb_section_tab';
+function panelSection(panelId) {
+  for (const s of Object.keys(SECTIONS)) {
+    if (SECTIONS[s].panels.includes(panelId)) return s;
+  }
+  return null;
+}
+function _readLastTab(sectionId) {
+  try {
+    const raw = localStorage.getItem(SECTION_LAST_TAB_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    return obj && obj[sectionId] || null;
+  } catch (_) { return null; }
+}
+function _writeLastTab(sectionId, panelId) {
+  try {
+    const raw = localStorage.getItem(SECTION_LAST_TAB_KEY);
+    const obj = raw ? JSON.parse(raw) : {};
+    obj[sectionId] = panelId;
+    localStorage.setItem(SECTION_LAST_TAB_KEY, JSON.stringify(obj));
+  } catch (_) {}
+}
+// The section that was last visible, so a full reload lands the host
+// on the same view they left. Stored alongside the per-section tab
+// map so a single localStorage key covers both.
+const SECTION_LAST_ACTIVE_KEY = 'wbnb_section_last';
+function _readLastSection() {
+  try { return localStorage.getItem(SECTION_LAST_ACTIVE_KEY); } catch (_) { return null; }
+}
+function _writeLastSection(sectionId) {
+  try { localStorage.setItem(SECTION_LAST_ACTIVE_KEY, sectionId); } catch (_) {}
+}
 // Keep old titles object for compatibility
 const titles = {};
 Object.keys(titlesMap).forEach(k => {
@@ -4245,11 +4426,59 @@ function toggleSidebar() {
   ov.classList.toggle('show');
 }
 
+// Round 40 Task 4 — showSection() is the router the sidebar calls; it
+// picks the last-used tab for that section (or the first panel) and
+// hands off to showPanel(). Deep-link callers of showPanel(id) still
+// work: showPanel derives the section and paints the tab strip itself.
+function showSection(sectionId, tabId) {
+  const section = SECTIONS[sectionId];
+  if (!section) return;
+  const remembered = _readLastTab(sectionId);
+  const target = (tabId && section.panels.includes(tabId)) ? tabId
+               : (remembered && section.panels.includes(remembered)) ? remembered
+               : section.panels[0];
+  showPanel(target);
+}
+
+function _paintSidebarActive(sectionId) {
+  document.querySelectorAll('.sidebar-item[data-section]').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('data-section') === sectionId);
+  });
+}
+
+function _renderSectionTabs(sectionId, activePanelId) {
+  const strip = document.getElementById('sectionTabs');
+  if (!strip) return;
+  const section = SECTIONS[sectionId];
+  if (!section || section.panels.length < 2) {
+    strip.style.display = 'none';
+    strip.innerHTML = '';
+    return;
+  }
+  strip.style.display = '';
+  const btnHtml = section.panels.map(p => {
+    const label = h(titlesMap[p][0]);
+    const active = p === activePanelId ? ' active' : '';
+    const badgeId = p === 'export' || p === 'compliance' ? '' : ''; // future per-tab badges
+    return `<button type="button" class="section-tab${active}" data-panel="${p}" onclick="showPanel('${p}')">${label}${badgeId}</button>`;
+  }).join('');
+  strip.innerHTML = btnHtml;
+}
+
 function showPanel(id, btn) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.getElementById('panel-' + id).classList.add('active');
-  document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
+  const target = document.getElementById('panel-' + id);
+  if (!target) { console.warn('showPanel: unknown panel', id); return; }
+  target.classList.add('active');
+  // Round 40 Task 4 — sidebar reflects the SECTION, not the panel. The
+  // btn argument is left in place for any external caller that still
+  // passes it, but we ignore it — the section-derived highlight is what
+  // matches the visible state.
+  const sectionId = panelSection(id) || 'oggi';
+  _paintSidebarActive(sectionId);
+  _renderSectionTabs(sectionId, id);
+  _writeLastTab(sectionId, id);
+  _writeLastSection(sectionId);
   document.getElementById('panelTitle').textContent = titles[id][0];
   document.getElementById('panelSubtitle').textContent = titles[id][1];
   // Close sidebar + overlay on mobile
@@ -4265,7 +4494,10 @@ function showPanel(id, btn) {
   }
   // Round 37.5 — paint host-owned portal links into every tile slot on
   // Export (Compliance calls this itself from renderCompliance).
-  if (id === 'export') { if (typeof applyHostPortalLinks === 'function') applyHostPortalLinks(); }
+  if (id === 'export') {
+    if (typeof applyHostPortalLinks === 'function') applyHostPortalLinks();
+    if (typeof renderExportChecklist === 'function') renderExportChecklist(); // Round 40 T7
+  }
   // Round 36.2.2 — reopening the Dashboard re-fetches upcoming reservations
   // and their freshly-stamped rotating codes, so the host doesn't need to
   // hard-refresh after changing settings elsewhere.
@@ -4286,6 +4518,7 @@ function showPanel(id, btn) {
   if (id === 'chat') { loadHostChat(); document.getElementById('chatBadge').style.display = 'none'; markChatSeen(); requestNotifPermission(); }
   if (id === 'guestanalytics') loadGuestAnalytics();
   if (id === 'contacts') loadMarketingContacts();
+  if (id === 'calendar') renderCalendarPanel(); // Round 40 T5
   trackPanelSwitch(id);
 }
 
@@ -4609,35 +4842,21 @@ async function renderUpcomingReservationsPanel() {
     : (hostLang === 'it' ? 'mai' : 'never');
   const syncBtnLabel = hostLang === 'it' ? '🔄 Sincronizza' : '🔄 Sync now';
   const lastSyncedLabel = hostLang === 'it' ? 'Ultima sync:' : 'Last sync:';
-  // Round 36.2.5 — the header count is filled in after the row map so it
-  // reflects visible rows (some may be hidden as "already staying").
-  // Round 39 — the header also carries the list / calendar view toggle.
-  const listLabel = safe(h('list_view') || 'List');
-  const calLabel  = safe(h('cal_view')  || 'Calendar');
-  const viewToggle = `
-    <div style="display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;font-family:inherit;">
-      <button type="button" onclick="_upcomingSetView('list')" style="padding:5px 10px;font-size:0.72rem;border:none;cursor:pointer;background:${_upcomingView === 'list' ? 'var(--warm)' : 'var(--white)'};color:${_upcomingView === 'list' ? '#fff' : 'var(--ink-soft)'};font-family:inherit;">☰ ${listLabel}</button>
-      <button type="button" onclick="_upcomingSetView('calendar')" style="padding:5px 10px;font-size:0.72rem;border:none;cursor:pointer;background:${_upcomingView === 'calendar' ? 'var(--warm)' : 'var(--white)'};color:${_upcomingView === 'calendar' ? '#fff' : 'var(--ink-soft)'};font-family:inherit;">📅 ${calLabel}</button>
-    </div>`;
+  // Round 40 Task 5 — the dashboard is list-only. The old Lista /
+  // Calendario toggle moved into its own sidebar tab (Ospiti → Calendario)
+  // so the dashboard doesn't have two ways to render the same data. The
+  // toggle-related helpers (_renderUpcomingCalendarBody, _upcomingSetView)
+  // still exist and are used by that tab; only this panel forced list.
   const buildHeader = (visibleCount) => `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
       <span style="font-size:1rem;">📅</span>
       <h3 style="margin:0;font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--ink);font-weight:600;">${safe(title)}</h3>
       <span style="font-size:0.78rem;color:var(--ink-soft);">(${visibleCount})</span>
       <span style="flex:1;"></span>
-      ${viewToggle}
       <span style="font-size:0.72rem;color:var(--ink-soft);">${lastSyncedLabel} ${safe(lastSyncedTxt)}</span>
       <button type="button" onclick="syncCalendarsFromDashboard(this)"
         style="padding:6px 12px;background:var(--warm);color:#fff;border:none;border-radius:6px;font-size:0.76rem;cursor:pointer;font-family:inherit;">${syncBtnLabel}</button>
     </div>`;
-
-  // Round 39 — calendar mode short-circuits before the list-only query
-  // (strictly future arrivals). Calendar overlaps the visible month
-  // instead, so a stay from the 3rd to the 10th appears when viewing
-  // September. See _renderUpcomingCalendarBody.
-  if (_upcomingView === 'calendar') {
-    return await _renderUpcomingCalendarBody(buildHeader);
-  }
   const headerHtml = buildHeader(rows.length);
 
   if (rows.length === 0) {
@@ -4671,11 +4890,66 @@ async function renderUpcomingReservationsPanel() {
         </div>
       </div>`;
   }
+  // Round 40 Task 5 — cap the dashboard list at 3, hide the rest under
+  // a "Mostra tutte (N)" expander. Full context still lives in
+  // Ospiti → Check-in / Calendario; the dashboard is a triage view.
+  const DASH_CAP = 3;
+  const hasOverflow = rendered.length > DASH_CAP;
+  const visible = hasOverflow ? rendered.slice(0, DASH_CAP) : rendered;
+  const hidden  = hasOverflow ? rendered.slice(DASH_CAP)    : [];
+  const showAllLabel = hostLang === 'it'
+    ? `Mostra tutte (${rendered.length})`
+    : `Show all (${rendered.length})`;
+  const showLessLabel = hostLang === 'it' ? 'Mostra meno' : 'Show less';
+  const overflowBlock = hasOverflow ? `
+      <div id="upcomingOverflow" style="display:none;">${hidden.join('')}</div>
+      <div style="text-align:center;padding:6px 0 4px;">
+        <button type="button" id="upcomingOverflowBtn"
+          onclick="_toggleUpcomingOverflow(this)"
+          data-more-label="${safe(showAllLabel)}" data-less-label="${safe(showLessLabel)}"
+          style="padding:5px 14px;background:transparent;color:var(--warm);border:1px solid rgba(0,91,255,0.25);border-radius:6px;font-size:0.72rem;cursor:pointer;font-family:inherit;">${safe(showAllLabel)}</button>
+      </div>` : '';
   return `
     <div id="upcomingPanelWrap" style="margin-bottom:18px;">
       ${buildHeader(rendered.length)}
-      ${rendered.join('')}
+      ${visible.join('')}
+      ${overflowBlock}
     </div>`;
+}
+
+// Round 40 Task 5 — dashboard "Show all / Show less" expander.
+function _toggleUpcomingOverflow(btn) {
+  const ov = document.getElementById('upcomingOverflow');
+  if (!ov) return;
+  const open = ov.style.display !== 'none';
+  ov.style.display = open ? 'none' : 'block';
+  btn.textContent = open ? btn.getAttribute('data-more-label') : btn.getAttribute('data-less-label');
+}
+
+// Round 40 Task 5 — Ospiti → Calendario paints the calendar into its
+// own panel body. Reuses _renderUpcomingCalendarBody(), which was the
+// dashboard's calendar rendering — no logic duplicated.
+async function renderCalendarPanel() {
+  const body = document.getElementById('calendarPanelBody');
+  if (!body || !propertyId) return;
+  const it = hostLang === 'it';
+  body.innerHTML = `<div style="padding:24px;text-align:center;color:var(--ink-soft);font-size:0.82rem;">${it ? 'Caricamento…' : 'Loading…'}</div>`;
+  // The helper wants a buildHeader function; the calendar panel doesn't
+  // need the sync-button header (the dashboard already has it), so we
+  // hand it an empty renderer.
+  const noHeader = () => '';
+  try {
+    const html = await _renderUpcomingCalendarBody(noHeader);
+    body.innerHTML = html;
+    // Style-wise the panel body no longer needs the placeholder padding
+    // once the grid is in — the grid brings its own borders.
+    body.style.padding = '0';
+    body.style.background = 'transparent';
+    body.style.border = 'none';
+  } catch (e) {
+    console.warn('renderCalendarPanel failed:', e);
+    body.innerHTML = `<div style="padding:16px 18px;color:#b03939;font-size:0.82rem;">${it ? 'Errore caricamento calendario.' : 'Failed to load calendar.'}</div>`;
+  }
 }
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -4805,10 +5079,14 @@ function _renderReservationCard(r, todayISO) {
       style="padding:4px 10px;background:rgba(232,184,75,0.14);border:1px solid rgba(232,184,75,0.4);border-radius:6px;font-size:0.72rem;cursor:pointer;color:#9a6b00;font-family:inherit;font-weight:500;">🔓 ${safe(hostLang === 'it' ? 'Riapri check-in' : 'Reopen check-in')}</button>` : '';
   const reopenedNote = alreadyReopened ? `
     <span style="font-size:0.68rem;color:#9a6b00;background:rgba(232,184,75,0.14);border-radius:6px;padding:2px 8px;">${safe(hostLang === 'it' ? '🔓 In attesa — l\'ospite può aggiungere altri' : '🔓 Waiting — guest can add more')}</span>` : '';
+  // Round 40 Task 5 — the full URL was noisy in the row; show the
+  // booking code chip instead. Copy still copies the full URL, Open
+  // still opens it in a new tab, so hosts lose nothing.
   const linkRow = guestLink ? `
     <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:8px;padding-top:8px;border-top:1px dashed rgba(107,122,144,0.15);">
       <span style="font-size:0.62rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--warm);white-space:nowrap;">${safe(linkLabel)}</span>
-      <span style="font-family:monospace;font-size:0.7rem;color:var(--ink-soft);flex:1;min-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safe(guestLink)}</span>
+      ${codeChip || `<span style="font-family:monospace;font-size:0.7rem;color:var(--ink-soft);">—</span>`}
+      <span style="flex:1;"></span>
       <button type="button" onclick="copyReservationLink('${safe(guestLink)}', this)" title="${safe(hostLang === 'it' ? 'Copia il link prenotazione' : 'Copy the booking link')}"
               style="padding:4px 10px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:0.72rem;cursor:pointer;color:var(--ink);font-family:inherit;">🔗 ${safe(hostLang === 'it' ? 'Copia' : 'Copy')}</button>
       <a href="${safe(guestLink)}" target="_blank" rel="noopener" title="${safe(hostLang === 'it' ? 'Apri come ospite' : 'Open as guest')}"
@@ -5208,13 +5486,60 @@ function setAllCheckinGroups(collapse) {
   });
 }
 
+// Round 40 T6 — localised label for the raw DB guest_type values.
+// Display only — the stored value is unchanged and still drives
+// Alloggiati coding (see GUEST_TYPE_CODES).
+function _guestTypeLabel(t) {
+  const it = hostLang === 'it';
+  if (t === 'single')                        return it ? 'Individuale'  : 'Solo guest';
+  if (t === 'head' || t === 'group')         return it ? 'Capogruppo'   : 'Group lead';
+  if (t === 'member' || t === 'group_member') return it ? 'Ospite'      : 'Guest';
+  return t || '—';
+}
+// Round 40 T6 — row kebab menu open/close. Only one menu open at a
+// time; a click anywhere else closes it (window listener below).
+function _closeRowMenus() {
+  document.querySelectorAll('.row-menu').forEach(m => { m.style.display = 'none'; });
+}
+function _toggleRowMenu(btn) {
+  const menu = btn.parentElement.querySelector('.row-menu');
+  if (!menu) return;
+  const open = menu.style.display !== 'none';
+  _closeRowMenus();
+  if (!open) menu.style.display = 'block';
+}
+if (typeof window !== 'undefined') {
+  // Bubble phase, not capture — the kebab and menu-item handlers stop
+  // propagation, so a click that reaches window is a click OUTSIDE.
+  window.addEventListener('click', () => _closeRowMenus());
+}
+
+// Round 40 T2 — shared DOB validator, mirrors api/scan-document.js.
+// Alloggiati rejects any submission with a future / obviously-wrong DOB,
+// and by that point the host has no useful error to act on. We surface
+// it here (chip on the row) and again in exportAlloggiati (block +
+// list).
+function _isValidPastDOB(s) {
+  if (!s) return false;
+  const str = String(s).slice(0, 10);
+  const m = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return false;
+  const y = +m[1], mo = +m[2], d = +m[3];
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  if (isNaN(dt.getTime())) return false;
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return false;
+  const oneYearAgo = new Date();
+  oneYearAgo.setUTCFullYear(oneYearAgo.getUTCFullYear() - 1);
+  return dt.getTime() < oneYearAgo.getTime();
+}
+
 function renderCheckins() {
   const it = hostLang === 'it';
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString(it?'it-IT':'en-GB') : '—';
   const target = document.getElementById('checkinTable');
 
   if (allCheckins.length === 0) {
-    target.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--ink-soft);padding:24px;">${h('no_checkins')}</td></tr>`;
+    target.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--ink-soft);padding:24px;">${h('no_checkins')}</td></tr>`;
     const cc0 = document.getElementById('checkinCount'); if (cc0) cc0.textContent = 0;
     return;
   }
@@ -5306,7 +5631,9 @@ function renderCheckins() {
     `;
     const groupStatusMsg = `<span id="receiptUploadStatus_${groupToken}" style="font-size:0.72rem;color:var(--ink-soft);"></span>`;
 
-    // Group header row spans all 10 columns of the check-ins table.
+    // Group header row spans all 6 columns of the check-ins table.
+    // (Round 40 T1 reduced the visible columns from 10 → 6; the removed
+    // fields live in the guest detail view.)
     const groupLabel = isSolo
       ? (it ? 'Ospite senza codice' : 'Guest without booking code')
       : `<span style="font-family:monospace;color:var(--warm);letter-spacing:0.05em;">${bookingCode}</span>`;
@@ -5349,7 +5676,7 @@ function renderCheckins() {
       </span>` : '';
     html += `
       <tr class="checkin-group-header" style="background:rgba(107,122,144,0.05);cursor:pointer;" onclick="toggleCheckinGroup('${groupToken}', event)">
-        <td colspan="10" style="padding:0;position:static;background:rgba(107,122,144,0.05);box-shadow:none;white-space:normal;">
+        <td colspan="6" style="padding:0;position:static;background:rgba(107,122,144,0.05);box-shadow:none;white-space:normal;">
           <div style="position:sticky;left:0;padding:12px 16px;box-sizing:border-box;">
             <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;">
               <span data-group-chevron="${groupToken}"
@@ -5377,22 +5704,37 @@ function renderCheckins() {
       const rowPill = c.alloggiati_status === 'filed'
         ? `<span style="display:inline-block;font-size:0.6rem;padding:1px 6px;background:rgba(47,122,68,0.14);color:#2f7a44;border-radius:8px;font-weight:600;letter-spacing:0.04em;margin-left:6px;vertical-align:middle;">${it ? '✓' : '✓'}</span>`
         : `<span style="display:inline-block;font-size:0.6rem;padding:1px 6px;background:rgba(176,57,57,0.12);color:#b03939;border-radius:8px;font-weight:600;letter-spacing:0.04em;margin-left:6px;vertical-align:middle;" title="${it ? 'Da inviare ad Alloggiati' : 'Not filed on Alloggiati'}">${it ? '⚠' : '⚠'}</span>`;
+      // Round 40 T1 — citizenship / document / submitted / docs
+      // moved to the detail view (viewGuest opens the modal that already
+      // shows them). Keeping them in the table caused the sticky-right
+      // Actions column to overlay them at 1440 / 1024 widths.
+      // Round 40 T6 — the whole row opens the detail view (Vedi is
+      // gone), Modifica / Elimina are folded into a ⋯ menu. Row
+      // .cursor:pointer is set inline; the menu button stops
+      // propagation so clicking it doesn't also trigger the row.
+      const typeLabel = _guestTypeLabel(c.guest_type);
+      const escName = (c.surname || '').replace(/'/g,'\\\'');
       html += `
-        <tr data-checkin-group="${groupToken}"${hideAttr}>
+        <tr data-checkin-group="${groupToken}"${hideAttr}
+            onclick="viewGuest('${c.id}')" style="cursor:pointer;">
           <td data-label=""><strong>${c.surname} ${c.name}</strong>${rowPill}</td>
-          <td data-label="${h('th_type')}">${c.guest_type}</td>
+          <td data-label="${h('th_type')}">${typeLabel}</td>
           <td data-label="${h('th_arrival')}">${fmtDate(c.arrival_date)}</td>
           <td data-label="${h('th_departure')}">${fmtDate(c.departure_date)}</td>
-          <td data-label="${h('th_birth')}">${fmtDate(c.date_of_birth)} <span style="font-size:0.72rem;color:var(--ink-soft)">${c.place_of_birth || ''}${c.birth_province && c.birth_province!=='EE' ? ' ('+c.birth_province+')' : ''}</span></td>
-          <td data-label="${h('th_citizenship')}">${c.citizenship}</td>
-          <td data-label="${h('th_document')}">${c.document_type || '—'} <span style="font-size:0.72rem;color:var(--ink-soft)">${c.document_number || ''}</span></td>
-          <td data-label="${h('th_submitted')}">${fmtDate(c.submitted_at)}</td>
-          <td data-label="${h('th_docs')}"><span class="status-badge ${c.docs_status==='complete'?'complete':c.docs_status==='not_required'?'complete':c.docs_status==='partial'?'pending':'missing'}">${c.docs_status==='complete'?'✓':c.docs_status==='not_required'?'—':c.docs_status==='partial'?'⏳':'✗'}</span></td>
-          <td data-label="">
-            <div style="display:flex;gap:8px;justify-content:flex-end;padding:4px 0;">
-              <button class="btn btn-secondary btn-sm" onclick="viewGuest('${c.id}')" style="min-height:36px;padding:6px 12px;">${h('btn_view')}</button>
-              <button class="btn btn-secondary btn-sm" onclick="editGuest('${c.id}')" style="min-height:36px;padding:6px 12px;color:var(--warm);border-color:rgba(0,91,255,0.25);">✏️ ${h('btn_edit_single') || 'Edit'}</button>
-              <button class="btn btn-secondary btn-sm" onclick="deleteCheckin('${c.id}','${(c.surname||'').replace(/'/g,'\\\'')}')" style="color:var(--red);border-color:rgba(224,69,94,0.2);min-height:36px;padding:6px 12px;">🗑 ${h('btn_delete_single')}</button>
+          <td data-label="${h('th_birth')}">${_isValidPastDOB(c.date_of_birth)
+              ? `${fmtDate(c.date_of_birth)} <span style="font-size:0.72rem;color:var(--ink-soft)">${c.place_of_birth || ''}${c.birth_province && c.birth_province!=='EE' ? ' ('+c.birth_province+')' : ''}</span>`
+              : `<span title="${h('dob_invalid_chip')}" style="display:inline-flex;align-items:center;gap:5px;font-size:0.72rem;color:#b03939;background:rgba(224,69,94,0.10);border:1px solid rgba(224,69,94,0.25);padding:2px 8px;border-radius:6px;font-weight:600;">⚠ ${h('dob_invalid_chip')}</span>`
+            }</td>
+          <td data-label="" onclick="event.stopPropagation();" style="text-align:right;">
+            <button type="button" class="row-kebab"
+              aria-label="${h('btn_row_menu')}" title="${h('btn_row_menu')}"
+              onclick="event.stopPropagation();_toggleRowMenu(this)"
+              style="background:none;border:1px solid transparent;border-radius:6px;padding:4px 10px;cursor:pointer;color:var(--ink-2);font-size:1.05rem;line-height:1;">⋯</button>
+            <div class="row-menu" style="display:none;position:absolute;right:16px;margin-top:4px;background:var(--white);border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.10);z-index:20;min-width:140px;overflow:hidden;">
+              <button type="button" onclick="event.stopPropagation();_closeRowMenus();editGuest('${c.id}')"
+                style="display:block;width:100%;text-align:left;background:none;border:none;padding:8px 14px;font-size:0.82rem;color:var(--warm);cursor:pointer;font-family:inherit;">${h('btn_edit_single') || 'Edit'}</button>
+              <button type="button" onclick="event.stopPropagation();_closeRowMenus();deleteCheckin('${c.id}','${escName}')"
+                style="display:block;width:100%;text-align:left;background:none;border:none;padding:8px 14px;font-size:0.82rem;color:var(--red);cursor:pointer;font-family:inherit;">${h('btn_delete_single')}</button>
             </div>
           </td>
         </tr>`;
@@ -5460,6 +5802,50 @@ async function deleteAllCheckins() {
   renderDashboard();
   toast(h('deleted_all'));
   track('delete_all_checkins', { count: allCheckins.length });
+}
+
+// Round 40 Task 6 — property-panel entry point for the bulk delete.
+// Confirmation requires typing the property name (not DELETE/ELIMINA);
+// deletion is scoped to THIS property only via property_id, so it can
+// never accidentally sweep another host's data. Delegates to a
+// property-scoped delete rather than reusing the unscoped
+// deleteAllCheckins() above.
+async function deleteAllCheckinsGated() {
+  const it = hostLang === 'it';
+  const propName = (propertyData?.name || '').trim();
+  if (!propName || !propertyId) {
+    toast(it ? 'Impossibile — nessuna proprietà selezionata.' : 'Cannot proceed — no property selected.');
+    return;
+  }
+  const count = Array.isArray(allCheckins) ? allCheckins.length : 0;
+  if (count === 0) {
+    toast(it ? 'Nessun check-in da eliminare.' : 'No check-in records to delete.');
+    return;
+  }
+  const prompt1 = (it
+    ? `Stai per eliminare tutti i ${count} check-in di "${propName}". Non si può annullare.\n\nDigita il nome esatto della proprietà per confermare:`
+    : `You are about to delete all ${count} check-ins for "${propName}". This cannot be undone.\n\nType the exact property name to confirm:`);
+  const typed = prompt(prompt1);
+  if (typed == null) return; // cancelled
+  if (typed.trim() !== propName) {
+    toast(it ? 'Nome non corrispondente — nessuna eliminazione.' : 'Name did not match — nothing deleted.');
+    return;
+  }
+  const { data: deleted, error } = await sb.from('checkins')
+    .delete()
+    .eq('property_id', propertyId)
+    .select('id');
+  if (error) {
+    console.error(error);
+    toast((it ? 'Errore: ' : 'Error: ') + error.message);
+    return;
+  }
+  const n = Array.isArray(deleted) ? deleted.length : 0;
+  allCheckins = [];
+  if (typeof renderCheckins === 'function') renderCheckins();
+  if (typeof renderDashboard === 'function') renderDashboard();
+  toast(it ? `Eliminati ${n} check-in.` : `Deleted ${n} check-ins.`);
+  track('delete_all_checkins', { count: n, gated: true });
 }
 
 /* ══════════════════════════════════════
@@ -7135,6 +7521,20 @@ function exportAlloggiati() {
     toExport = allCheckins;
   }
 
+  // Round 40 T2 — block generation if any guest in the selected set has
+  // an invalid / missing DOB. Alloggiati would reject the whole batch
+  // with an opaque error and the host wouldn't know which row to fix.
+  // Same rule as the row-level chip: DOB must parse and be > 1 year ago.
+  const dobOffenders = toExport.filter(c => !_isValidPastDOB(c.date_of_birth));
+  if (dobOffenders.length > 0) {
+    const names = dobOffenders
+      .map(c => `${(c.surname || '').trim()} ${(c.name || '').trim()}`.trim() || (c.booking_code || '—'))
+      .slice(0, 20);
+    const more = dobOffenders.length > 20 ? `\n… +${dobOffenders.length - 20}` : '';
+    alert(h('dob_invalid_export_block') + '\n\n• ' + names.join('\n• ') + more);
+    return;
+  }
+
   // ── GROUP BY STAY ──
   // Guests with same booking_code = same stay
   // Guests without booking_code grouped by arrival_date
@@ -8661,6 +9061,153 @@ function _hostPortalMap() {
 
 function _hostPortalSafe(s) {
   return String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+}
+
+// Round 40 Task 7 — region filter + status checklist for the export
+// panel. Runs when the export panel is opened; does not touch the
+// tile catalog below, only shows/hides regional tiles by property
+// region and paints a checklist card at the top.
+const REGION_TILE_MAP = {
+  Veneto: { title: '🗺 ROSS1000 (Veneto)',        selector: '[data-region="Veneto"]' },
+  Puglia: { title: '🏛 Puglia DMS (SPOT Easy)',   selector: '[data-region="Puglia"]' },
+};
+function renderExportChecklist() {
+  const host = document.getElementById('exportChecklist');
+  if (!host) return;
+  const it = hostLang === 'it';
+  const region = (propertyData?.region || '').trim();
+  const rows = Array.isArray(allCheckins) ? allCheckins : [];
+  const today = new Date().toISOString().slice(0, 10);
+  const cutoff48h = new Date(Date.now() - 48 * 3600 * 1000).toISOString().slice(0, 10);
+  const overdueAll = rows.filter(c =>
+    c.submitted_at &&
+    (c.arrival_date || c.submitted_at.slice(0, 10)) >= cutoff48h &&
+    c.alloggiati_status !== 'filed'
+  ).length;
+
+  // National — always shown. Status derived from Alloggiati filing state.
+  const nationalState = overdueAll > 0 ? 'due' : 'done';
+  const nationalDesc  = overdueAll > 0
+    ? (it ? `${overdueAll} ospite/i da inviare — scadenza 24 h dall'arrivo` : `${overdueAll} guest(s) to file — 24 h deadline from arrival`)
+    : (it ? 'Tutti i check-in recenti sono stati inviati.' : 'All recent check-ins have been filed.');
+  const nationalRow = _ckRow({
+    state: nationalState,
+    title: it ? 'Alloggiati Web — invio ospiti' : 'Alloggiati Web — guest filing',
+    desc: nationalDesc,
+    action: `<button class="btn btn-primary btn-sm" onclick="exportAlloggiati()">${it ? '📥 Genera .txt' : '📥 Generate .txt'}</button>`,
+  });
+
+  // Regional — one row for the property's region if we know it.
+  let regionalRow = '';
+  const regionMeta = REGION_TILE_MAP[region];
+  if (region && regionMeta) {
+    regionalRow = _ckRow({
+      state: 'due',
+      title: `${regionMeta.title} — ${it ? 'flussi turistici' : 'tourist flows'}`,
+      desc: it ? 'Adempimento periodico regionale.' : 'Regional periodic filing.',
+      action: `<button class="btn btn-sm" onclick="_scrollToRegionalTile('${region}')">${it ? '↓ Vai al tile' : '↓ Go to tile'}</button>`,
+    });
+  } else if (!region) {
+    regionalRow = _ckRow({
+      state: 'idle',
+      title: it ? 'Regione della proprietà non impostata' : 'Property region not set',
+      desc: it ? 'Impostala in Proprietà per vedere solo gli obblighi che si applicano.' : 'Set it in Property to see only the obligations that apply.',
+      action: `<button class="btn btn-sm" onclick="showPanel('property')">${it ? 'Apri Proprietà' : 'Open Property'}</button>`,
+    });
+  }
+
+  // Tourist tax — optional; only show if propertyData.tax_config or a paytourist_url is present.
+  const hasTax = !!(propertyData?.paytourist_url || propertyData?.tax_config);
+  let taxRow = '';
+  if (hasTax) {
+    taxRow = _ckRow({
+      state: 'idle',
+      title: it ? 'Imposta di soggiorno — dichiarazione periodica' : 'Tourist tax — periodic declaration',
+      desc: it ? 'Cadenza definita dal comune.' : 'Frequency set by your municipality.',
+      action: `<button class="btn btn-sm" onclick="exportCityTax()">${it ? '🧮 Calcola' : '🧮 Compute'}</button>`,
+    });
+  }
+
+  const propName = propertyData?.name || '';
+  const regionLabel = region || (it ? '—' : '—');
+  host.innerHTML = `
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+      <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:14px;">
+        <div>
+          <div style="font-family:'Playfair Display',serif;font-size:1.05rem;font-weight:600;">${it ? 'Da fare adesso' : 'To do now'}</div>
+          <div style="font-size:0.72rem;color:var(--ink-2);margin-top:2px;">${_htmlEsc(propName)} · ${_htmlEsc(regionLabel)}</div>
+        </div>
+      </div>
+      ${nationalRow}
+      ${regionalRow}
+      ${taxRow}
+    </div>`;
+
+  // Region filter: hide non-matching regional tiles, offer them under
+  // an "Altre regioni" disclosure. Only kicks in when the region IS set.
+  _applyExportRegionFilter(region);
+}
+function _ckRow({ state, title, desc, action }) {
+  // state: 'done' | 'due' | 'idle'
+  const icClass = state === 'done' ? 'ck-ic-done'
+                : state === 'due'  ? 'ck-ic-due'
+                :                    'ck-ic-idle';
+  const glyph   = state === 'done' ? '✓' : state === 'due' ? '!' : '—';
+  return `
+    <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid rgba(0,91,255,0.07);">
+      <div class="${icClass}" style="width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:700;font-size:0.85rem;
+        ${state==='done'?'background:rgba(45,155,99,0.14);color:#1F7A4C;':''}
+        ${state==='due' ?'background:rgba(232,184,75,0.20);color:#9A6B00;':''}
+        ${state==='idle'?'background:var(--cream-2);color:var(--ink-2);':''}
+      ">${glyph}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:0.9rem;font-weight:600;">${_htmlEsc(title)}</div>
+        <div style="font-size:0.77rem;color:var(--ink-soft);margin-top:2px;line-height:1.45;">${_htmlEsc(desc)}</div>
+      </div>
+      ${action || ''}
+    </div>`;
+}
+function _htmlEsc(s) {
+  return String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+}
+function _scrollToRegionalTile(region) {
+  const el = document.querySelector('.export-tile-h[data-region="' + region + '"]');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+// Hide regional tiles that don't apply and wrap the rest under an
+// "Altre regioni" disclosure at the bottom of the Stat axis. When
+// the region is empty, we show everything (existing behaviour).
+function _applyExportRegionFilter(region) {
+  const tiles = Array.from(document.querySelectorAll('.export-tile-h[data-region]'));
+  if (tiles.length === 0) return;
+  // Remove any previously-injected disclosure so re-renders don't stack.
+  const oldDisclosure = document.getElementById('exportOtherRegionsBlock');
+  if (oldDisclosure) {
+    // Put the hidden tiles back where the disclosure was so their parent
+    // stays authoritative.
+    while (oldDisclosure.firstChild && oldDisclosure.firstChild !== oldDisclosure.querySelector('summary')) {
+      oldDisclosure.parentNode.insertBefore(oldDisclosure.firstChild, oldDisclosure);
+    }
+    oldDisclosure.remove();
+  }
+  if (!region) {
+    tiles.forEach(t => { t.style.display = ''; });
+    return;
+  }
+  const it = hostLang === 'it';
+  const others = tiles.filter(t => t.dataset.region !== region);
+  if (others.length === 0) return;
+  const parent = others[0].parentNode;
+  const details = document.createElement('details');
+  details.id = 'exportOtherRegionsBlock';
+  details.style.cssText = 'margin-top:8px;';
+  const summary = document.createElement('summary');
+  summary.style.cssText = 'cursor:pointer;font-size:0.82rem;color:var(--ink-soft);padding:8px 0;';
+  summary.textContent = it ? 'Altre regioni' : 'Other regions';
+  details.appendChild(summary);
+  // Move the non-matching tiles into the details element.
+  for (const t of others) details.appendChild(t);
+  parent.appendChild(details);
 }
 
 // Paint every host-portal-slot on the page. Called after Compliance
@@ -10601,6 +11148,24 @@ async function init() {
       history.replaceState(null, '', url.toString());
     }
   }
+
+  // Round 40 Task 4 — restore the last visible section/tab across
+  // reloads. Panels other than dashboard start hidden until an explicit
+  // showPanel is called, so we need to fire one at boot regardless.
+  // The onboarding redirect above may already have called showPanel;
+  // don't second-guess that here.
+  const alreadyOnPanel = document.querySelector('.panel.active')?.id?.replace('panel-', '');
+  if (alreadyOnPanel && alreadyOnPanel !== 'dashboard') {
+    // Onboarding forced us onto property — paint the tab strip to match.
+    showPanel(alreadyOnPanel);
+  } else {
+    const lastSection = _readLastSection();
+    if (lastSection && SECTIONS[lastSection]) {
+      showSection(lastSection);
+    } else {
+      showPanel('dashboard');
+    }
+  }
 }
 
 // Is the currently-authenticated user an admin? Checks the admin_users
@@ -10784,6 +11349,42 @@ async function refreshCheckinsCache() {
       .order('submitted_at', { ascending: false });
     if (Array.isArray(data)) allCheckins = data;
   } catch (e) { console.warn('refreshCheckinsCache failed:', e); }
+  // Round 40 Task 4 — repaint sidebar attention badges from the fresh cache.
+  paintNavBadges();
+}
+
+// Round 40 Task 4 — sidebar count badges.
+//   Oggi     · guests currently in-property whose check-in was never
+//              submitted. Same "needs your attention" signal the
+//              dashboard's "Currently staying (no check-in)" tile shows.
+//   Conforma · check-ins in the last 48h that are not yet filed on
+//              Alloggiati. That's the actionable subset — anything
+//              past 48h is already late-and-visible via the export.
+function paintNavBadges() {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const rows = Array.isArray(allCheckins) ? allCheckins : [];
+    const staying = rows.filter(c =>
+      c.arrival_date && c.arrival_date <= today &&
+      (!c.departure_date || c.departure_date >= today) &&
+      !c.submitted_at
+    ).length;
+    _setBadge('navBadge-oggi', staying);
+
+    const cutoff48h = new Date(Date.now() - 48 * 3600 * 1000).toISOString().slice(0, 10);
+    const overdue = rows.filter(c =>
+      c.submitted_at &&
+      (c.arrival_date || c.submitted_at.slice(0, 10)) >= cutoff48h &&
+      c.alloggiati_status !== 'filed'
+    ).length;
+    _setBadge('navBadge-conf', overdue);
+  } catch (e) { console.warn('paintNavBadges failed:', e); }
+}
+function _setBadge(id, count) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (count > 0) { el.textContent = String(count); el.style.display = ''; }
+  else            { el.style.display = 'none'; }
 }
 
 async function loadPropertyData() {

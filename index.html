@@ -107,6 +107,14 @@ body.has-test-banner .page { top: var(--test-banner-h, 36px); }
   font-family: 'Playfair Display', serif;
   font-size: 1.1rem; font-weight: 500; color: var(--ink);
 }
+/* Round 41 Task 3.3 — the Home page's hero already carries the
+   property name in Playfair; the sticky top-bar underneath was
+   showing it AGAIN, so the property name appeared twice within
+   the first 200px. Hide the top-bar title on Home only. Keep the
+   language toggle in the same position via space-between +
+   invisible spacer. Other pages (Check-in, Rules, Explore, Chat)
+   still show their top-bar title. */
+#page-welcome .top-bar-title { visibility: hidden; }
 .lang-toggle {
   display: flex; align-items: center;
   background: var(--cream-2); border-radius: 20px;
@@ -319,7 +327,12 @@ body.has-test-banner .page { top: var(--test-banner-h, 36px); }
   background: linear-gradient(135deg, rgba(224,90,90,0.04), rgba(224,90,90,0.01));
   border-color: rgba(224,90,90,0.18);
 }
-.home-card-emergency .home-card-value { color: var(--ink); font-size: 0.82rem; }
+.home-card-emergency .home-card-value {
+  /* Round 41 Task 3.2 — allow the phone number to wrap onto its own
+     line rather than being clipped mid-digit in the half-width grid. */
+  color: var(--ink); font-size: 0.82rem;
+  white-space: normal; line-height: 1.35; word-break: break-word;
+}
 
 /* Host card avatar styles (used in #hostMessageCard, also referenced
    in other places like chat) */
@@ -707,14 +720,20 @@ body.has-test-banner .page { top: var(--test-banner-h, 36px); }
 .hidden { display: none !important; }
 
 /* ── POWERED BY WELCOMEBNB FOOTER ── */
+/* Round 41 Task 3.4 — the strip is hidden at rest and only reveals
+   when the active page is scrolled to its end. Frees ~30px of the
+   viewport for content and keeps the Privacy link a one-scroll-away
+   affordance. */
 .powered-by {
   position: fixed; bottom: 64px; left: 0; right: 0; z-index: 999;
   display: flex; align-items: center; justify-content: center; gap: 6px;
   padding: 6px 0;
   background: linear-gradient(to bottom, rgba(250,246,240,0), rgba(250,246,240,1) 30%);
   pointer-events: none;
+  opacity: 0; transform: translateY(4px);
   transition: opacity 0.2s, transform 0.2s;
 }
+body.at-page-end .powered-by { opacity: 1; transform: translateY(0); }
 /* Hide on chat tab — chat input + suggestions already occupy this strip.
    !important is intentional: the Privacy link has inline styles
    (opacity, etc.) that would otherwise win specificity. */
@@ -729,12 +748,11 @@ body.tab-chat .powered-by {
   transform: translateY(20px);
   pointer-events: none !important;
 }
-body:has(#page-chat.active) #privacyLink,
-body.tab-chat #privacyLink {
-  opacity: 0 !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-}
+/* Round 41 Task 1 — the floating Privacy button that used to live at
+   bottom-right (position:fixed, its own layer) is gone. Privacy is a
+   once-ever link; it now sits inside the Powered-by strip, to the
+   right of the wordmark, at the same muted weight. Its old
+   :has(#page-chat.active) hide rule went with it. */
 .powered-by a {
   pointer-events: all;
   display: flex; align-items: center; gap: 5px;
@@ -744,6 +762,17 @@ body.tab-chat #privacyLink {
   opacity: 0.5;
   transition: opacity 0.2s;
 }
+.powered-by .privacy-inline {
+  pointer-events: all;
+  margin-left: 10px; padding-left: 10px;
+  border-left: 1px solid rgba(6,26,61,0.12);
+  font-size: 0.56rem; letter-spacing: 0.08em;
+  color: var(--ink-soft); opacity: 0.5;
+  background: none; border-top: none; border-right: none; border-bottom: none;
+  font-family: 'DM Sans', sans-serif; cursor: pointer;
+  transition: opacity 0.2s;
+}
+.powered-by .privacy-inline:hover { opacity: 0.8; }
 .powered-by a:hover { opacity: 0.8; }
 .powered-by .wbnb-mark {
   width: 14px; height: 14px;
@@ -1331,11 +1360,17 @@ body.tab-chat #privacyLink {
 </div>
 
 <!-- Powered by WelcomeBnB -->
+<!-- Round 41 Task 1 — Privacy link inline here, to the right of the
+     wordmark. The old floating #privacyLink pill (bottom-right, layer
+     over the page) is gone; it was overlapping WiFi/Emergency on Home,
+     the second reco on Explore, and the No-Parties rule on Rules. -->
 <div class="powered-by">
   <a href="https://getwelcomebnb.com" target="_blank">
     <div class="wbnb-mark">W</div>
     Powered by <strong style="font-weight:600;color:var(--ink-2);">Welcome</strong><strong style="font-weight:600;color:var(--warm);">BnB</strong>
   </a>
+  <button type="button" id="privacyLink" class="privacy-inline"
+    onclick="openPrivacyModal()" data-i18n="privacy_link">Privacy</button>
 </div>
 
 <!-- ══════════════════════════════════════
@@ -1763,6 +1798,7 @@ const T = {
     consent_err_generic: 'Something went wrong saving your preference. Please try again.',
     unsub_title: 'You\'ve been unsubscribed',
     unsub_text: 'You won\'t receive any further offers or news from us. Thank you for staying with us.',
+    privacy_link: 'Privacy',
     unsub_err: 'This unsubscribe link is invalid or has already been used.',
     review_saved: 'already registered',
     review_fill: 'Fill details for each guest',
@@ -1904,6 +1940,7 @@ const T = {
     consent_err_generic: 'Si è verificato un errore nel salvataggio. Riprova.',
     unsub_title: 'Iscrizione annullata',
     unsub_text: 'Non riceverai più offerte o novità da parte nostra. Grazie per essere stato nostro ospite.',
+    privacy_link: 'Privacy',
     unsub_err: 'Questo link di annullamento non è valido o è già stato utilizzato.',
     review_saved: 'già registrati',
     review_fill: 'Compila i dati per ogni ospite',
@@ -1994,6 +2031,25 @@ function setLang(l) {
 /* ══════════════════════════════════════
    NAVIGATION
 ══════════════════════════════════════ */
+
+// Round 41 Task 3.4 — reveal the Powered-by strip only when the active
+// page is scrolled to its end. Each .page is its own scroller because
+// they're position:fixed with overflow-y:auto, so we listen on each
+// page independently and toggle a body-level class.
+function _updatePoweredByVisibility() {
+  const active = document.querySelector('.page.active');
+  if (!active) { document.body.classList.remove('at-page-end'); return; }
+  // 24px slack — feels natural, avoids flicker on rubberband bounce.
+  const nearEnd = (active.scrollTop + active.clientHeight) >= (active.scrollHeight - 24);
+  document.body.classList.toggle('at-page-end', nearEnd);
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.page').forEach(p => {
+    p.addEventListener('scroll', _updatePoweredByVisibility, { passive: true });
+  });
+  _updatePoweredByVisibility();
+});
+
 function goTo(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
@@ -2003,6 +2059,10 @@ function goTo(page) {
   });
   // Toggle body class so chat-specific styles (e.g. hide watermark) apply
   document.body.classList.toggle('tab-chat', page === 'chat');
+  // Round 41 Task 3.4 — recompute at-page-end status on every page swap
+  // so a page that was scrolled at the bottom last time doesn't leave
+  // the footer strip stuck showing on the new (unscrolled) page.
+  _updatePoweredByVisibility();
 
   // Analytics: track page view + accumulate time on previous page
   if (_guestLastPage && _guestLastPage !== page) {
@@ -4548,6 +4608,21 @@ async function init() {
       propertyId = data.id;
       propertyData = data;
       console.log('✅ Property loaded from Supabase:', data.name, 'ID:', data.id);
+      // Round 41 Task 2 — helper for per-language property free-text
+      // fields. Reads d.<field>_<lang>, falls back to the other
+      // language (so a host who wrote only one still renders), then
+      // the legacy single-column value (pre-migration properties).
+      // Empty strings and whitespace count as absent.
+      // The reference is kept on window so any late render can reuse it.
+      window._propTextLang = window._propTextLang || function(dObj, field, lg) {
+        const primary = (dObj && dObj[field + '_' + lg]) || '';
+        if (primary && primary.trim()) return primary;
+        const other = lg === 'en' ? 'it' : 'en';
+        const secondary = (dObj && dObj[field + '_' + other]) || '';
+        if (secondary && secondary.trim()) return secondary;
+        return (dObj && dObj[field]) || '';
+      };
+      const _propTextLang = window._propTextLang;
       // Round 33 — mint the guest-session token as soon as we know which
       // property this is. Non-blocking: if the network hiccups, the first
       // AI call will lazy-mint on its own.
@@ -4581,12 +4656,35 @@ async function init() {
       if (el('accessMethod')) el('accessMethod').textContent = d.access_method || 'Self check-in';
       if (el('hostName')) el('hostName').textContent = d.host_names || 'Your Host';
       if (el('hostAvatar')) el('hostAvatar').textContent = (d.host_names || 'H').charAt(0);
-      if (el('hostMsg') && d.welcome_message) el('hostMsg').textContent = d.welcome_message;
-      if (el('emergencyNum')) el('emergencyNum').textContent = `112 · ${d.host_names || 'Host'}: ${d.host_phone || ''}`;
+      // Round 41 Task 2 — read per-language column first, fall back to
+      // the other language (so a host who wrote only one still renders),
+      // finally fall back to the legacy single-column value (so
+      // pre-migration properties still work). _propTextLang() is the
+      // helper the rest of this block uses.
+      const welcomeMsg = _propTextLang(d, 'welcome_message', lang);
+      if (el('hostMsg') && welcomeMsg) el('hostMsg').textContent = welcomeMsg;
+      // Round 41 Task 3.2 — Emergency card. The number used to be jammed
+      // into one line with the host name, which the compact half-width
+      // grid clipped mid-digit ("112 · Daniele: +6-8…"). A number the
+      // guest can't read is worse than none — split it: host name on
+      // line 1, tel: link on line 2. innerHTML now, not textContent.
+      const emgEl = el('emergencyNum');
+      if (emgEl) {
+        const hostName = (d.host_names || 'Host').trim();
+        const rawPhone = (d.host_phone || '').trim();
+        const telHref = rawPhone.replace(/[^+\d]/g, '');
+        emgEl.innerHTML = `
+          <span style="font-weight:600;">112</span>
+          <span style="color:var(--ink-soft);"> · ${_escapeHTML(hostName)}</span>
+          ${rawPhone ? `<br><a href="tel:${telHref}" style="color:var(--warm);text-decoration:none;word-break:break-all;">${_escapeHTML(rawPhone)}</a>` : ''}`;
+      }
+      function _escapeHTML(s) {
+        return String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+      }
 
       // Round 21: transport / getting-around info (Staying section).
       // Hidden if the host hasn't filled it in.
-      const transportInfo = (d.transport_info || '').trim();
+      const transportInfo = (_propTextLang(d, 'transport_info', lang) || '').trim();
       if (el('transportInfoText')) el('transportInfoText').textContent = transportInfo;
       if (el('transportCard')) el('transportCard').style.display = transportInfo ? 'block' : 'none';
 
@@ -4596,8 +4694,8 @@ async function init() {
       // cards themselves are always shown (they always have a time);
       // we just toggle the visibility of the instructions text and the
       // lockbox row based on whether the host has filled them in.
-      const ciInst = (d.checkin_instructions || '').trim();
-      const coInst = (d.checkout_instructions || '').trim();
+      const ciInst = (_propTextLang(d, 'checkin_instructions',  lang) || '').trim();
+      const coInst = (_propTextLang(d, 'checkout_instructions', lang) || '').trim();
       if (el('checkinInstructionsText')) {
         el('checkinInstructionsText').textContent = ciInst;
         el('checkinInstructionsText').style.display = ciInst ? 'block' : 'none';
@@ -4618,8 +4716,8 @@ async function init() {
       T.it.welcome_title = `Benvenuti a<br><em>${d.name}</em>`;
       T.en.wifi_pass = `Password: ${d.wifi_password || '—'}`;
       T.it.wifi_pass = `Password: ${d.wifi_password || '—'}`;
-      T.en.host_msg = d.welcome_message || T.en.host_msg;
-      T.it.host_msg = d.welcome_message || T.it.host_msg;
+      T.en.host_msg = _propTextLang(d, 'welcome_message', 'en') || T.en.host_msg;
+      T.it.host_msg = _propTextLang(d, 'welcome_message', 'it') || T.it.host_msg;
       T.en.chat_h2 = `🏠 ${d.name} Concierge`;
       T.it.chat_h2 = `🏠 Concierge ${d.name}`;
       T.en.chat_p = `Ask me anything about ${d.name}, the area, or your stay`;
@@ -4944,6 +5042,18 @@ async function fetchReservationKeybox() {
 // Legacy behaviour: a property with the pre-R36.2 use_per_guest_lockbox
 // flag still opts into rotating; the show_ flags default to true when not
 // present in the row.
+// Round 41 Task 3.1 — a value counts as "no code" when it is empty,
+// whitespace, or one of the placeholder strings hosts have typed in
+// the past (N/A, n/a, -, —, none). The chip renders a dashed border,
+// so any of these turns into a visible "CODE — N/A" pill covering
+// dashboard content. Filter them out at the source.
+function _isLockboxPlaceholder(s) {
+  if (!s) return true;
+  const t = String(s).trim().toLowerCase();
+  if (!t) return true;
+  return t === 'n/a' || t === 'na' || t === '-' || t === '—' || t === 'none' || t === 'nessuno';
+}
+
 function _resolveLockboxCodes(propData) {
   const out = { fixed: '', rotating: '' };
   if (!propData) return out;
@@ -4952,16 +5062,19 @@ function _resolveLockboxCodes(propData) {
   const show_fixed    = propData.show_fixed_lockbox_to_guest    !== false;
   const show_rotating = propData.show_rotating_lockbox_to_guest !== false;
 
-  if (show_fixed) out.fixed = (propData.keybox_code || '').trim();
+  if (show_fixed) {
+    const v = (propData.keybox_code || '').trim();
+    out.fixed = _isLockboxPlaceholder(v) ? '' : v;
+  }
 
   if (rotating_enabled && show_rotating) {
-    if (reservationKeyboxCode) {
+    if (reservationKeyboxCode && !_isLockboxPlaceholder(reservationKeyboxCode)) {
       out.rotating = reservationKeyboxCode;
     } else if (Array.isArray(existingCheckins) && existingCheckins.length > 0) {
       const head = existingCheckins.find(c =>
         c.guest_type === 'single' || c.guest_type === 'head' || c.guest_type === 'group'
       ) || existingCheckins[0];
-      if (head && head.keybox_code && head.keybox_code.trim()) {
+      if (head && head.keybox_code && !_isLockboxPlaceholder(head.keybox_code)) {
         out.rotating = head.keybox_code.trim();
       }
     }
@@ -5067,7 +5180,9 @@ setupTestModeBanner();
 init();
 </script>
 <!-- ── Round 38 — Guest privacy notice (Art. 13/14 GDPR, host is titolare) ─── -->
-<div id="privacyLink" onclick="openPrivacyModal()" style="position:fixed;bottom:74px;right:12px;z-index:1100;background:rgba(255,255,255,0.94);backdrop-filter:blur(8px);border:1px solid rgba(6,26,61,0.1);border-radius:6px;padding:5px 11px;font-size:0.7rem;color:var(--ink);cursor:pointer;font-family:'DM Sans',sans-serif;box-shadow:0 1px 3px rgba(0,0,0,0.08);user-select:none;opacity:0.85;">Privacy</div>
+<!-- Round 41 Task 1 — floating #privacyLink pill removed; it now lives
+     inline in the Powered-by strip above. openPrivacyModal() is the
+     same; only the trigger element moved. -->
 
 <div id="privacyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:flex-start;justify-content:center;padding:24px 12px;overflow-y:auto;" onclick="if(event.target===this)closePrivacyModal()">
   <div style="background:var(--cream);max-width:720px;width:100%;border-radius:14px;padding:24px 26px 20px;box-shadow:0 12px 48px rgba(0,0,0,0.3);max-height:calc(100vh - 48px);overflow-y:auto;">

@@ -1400,13 +1400,22 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="form-grid">
           <div class="form-group full">
             <label class="form-label" data-h="prop_checkin_inst">Check-in instructions</label>
-            <textarea class="form-textarea" id="propCheckinInstructions" rows="6" maxlength="2000" placeholder="e.g., Walk past the green gate on Via Roma. The lockbox is on the left wall next to the bell. Code on arrival day below."></textarea>
+            <!-- Round 41 Task 2 — per-field IT/EN pill. Toggle stores the
+                 current textarea value on the OTHER lang, then loads
+                 this lang from data-lang-state. Save reads both from
+                 data-lang-state and writes checkin_instructions_it and
+                 checkin_instructions_en columns. -->
+            <div class="i18n-pill" data-field="checkin_instructions"></div>
+            <textarea class="form-textarea" id="propCheckinInstructions" rows="6" maxlength="2000" placeholder="e.g., Walk past the green gate on Via Roma. The lockbox is on the left wall next to the bell. Code on arrival day below." data-i18n-field="checkin_instructions"></textarea>
             <div class="form-hint" data-h="prop_checkin_inst_hint">Step-by-step instructions for arrival. Write in your preferred language — guests can use their browser's translate feature if needed (long-press on iOS, three-dot menu on Android).</div>
+            <div style="margin-top:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="offerLangSplit('checkin_instructions')" data-h="btn_split_langs">✂ Split existing content by language</button></div>
           </div>
           <div class="form-group full">
             <label class="form-label" data-h="prop_checkout_inst">Check-out instructions</label>
-            <textarea class="form-textarea" id="propCheckoutInstructions" rows="6" maxlength="2000" placeholder="e.g., Leave keys on the kitchen table. Don't lock the door — it locks itself. Open windows to air the apartment if possible."></textarea>
+            <div class="i18n-pill" data-field="checkout_instructions"></div>
+            <textarea class="form-textarea" id="propCheckoutInstructions" rows="6" maxlength="2000" placeholder="e.g., Leave keys on the kitchen table. Don't lock the door — it locks itself. Open windows to air the apartment if possible." data-i18n-field="checkout_instructions"></textarea>
             <div class="form-hint" data-h="prop_checkout_inst_hint">What guests should do before leaving.</div>
+            <div style="margin-top:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="offerLangSplit('checkout_instructions')" data-h="btn_split_langs">✂ Split existing content by language</button></div>
           </div>
         </div>
       </div>
@@ -1416,8 +1425,10 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="form-grid">
           <div class="form-group full">
             <label class="form-label" data-h="prop_transport">Parking, public transport & taxis</label>
-            <textarea class="form-textarea" id="propTransportInfo" rows="6" maxlength="2000" placeholder="e.g., Free street parking on Via Roma after 8pm. Bus #20 to the centre stops 50m away (every 15 min). Taxi: Radio Taxi Bari +39 080 5210500. Airport: 40 min by taxi (~€35) or the Tempesta shuttle from the station."></textarea>
+            <div class="i18n-pill" data-field="transport_info"></div>
+            <textarea class="form-textarea" id="propTransportInfo" rows="6" maxlength="2000" placeholder="e.g., Free street parking on Via Roma after 8pm. Bus #20 to the centre stops 50m away (every 15 min). Taxi: Radio Taxi Bari +39 080 5210500. Airport: 40 min by taxi (~€35) or the Tempesta shuttle from the station." data-i18n-field="transport_info"></textarea>
             <div class="form-hint" data-h="prop_transport_hint">Parking situation, nearest bus/metro/train, taxi numbers, airport transfers. Shown to guests in the "Staying" section. Write in your preferred language — guests can browser-translate.</div>
+            <div style="margin-top:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="offerLangSplit('transport_info')" data-h="btn_split_langs">✂ Split existing content by language</button></div>
           </div>
         </div>
       </div>
@@ -1534,7 +1545,9 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           </div>
           <div class="form-group full">
             <label class="form-label" data-h="prop_welcome">Host Welcome Message</label>
-            <textarea class="form-textarea" id="propWelcome"></textarea>
+            <div class="i18n-pill" data-field="welcome_message"></div>
+            <textarea class="form-textarea" id="propWelcome" data-i18n-field="welcome_message"></textarea>
+            <div style="margin-top:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="offerLangSplit('welcome_message')" data-h="btn_split_langs">✂ Split existing content by language</button></div>
           </div>
           <div class="form-group">
             <label class="form-label" data-h="prop_emergency">Emergency Phone</label>
@@ -3647,6 +3660,7 @@ const HT = {
     btn_delete_all_prop: 'Delete all check-in records',
     prop_header_title: 'Property details',
     prop_header_hint:  'View mode',
+    btn_split_langs: '✂ Split existing content by language',
     prop_tax_rate: 'Rate (€ per person per night)',
     prop_tax_max_nights: 'Max taxable nights',
     prop_tax_max_nights_hint: 'Many comuni only charge the first N nights per stay (or per person per month).',
@@ -4073,6 +4087,7 @@ const HT = {
     btn_delete_all_prop: 'Elimina tutti i check-in',
     prop_header_title: 'Dettagli proprietà',
     prop_header_hint:  'Modalità visualizzazione',
+    btn_split_langs: '✂ Dividi il contenuto per lingua',
     prop_tax_rate: 'Tariffa (€ per persona a notte)',
     prop_tax_max_nights: 'Notti max tassabili',
     prop_tax_basis_stay: 'per soggiorno',
@@ -5851,6 +5866,141 @@ async function deleteAllCheckinsGated() {
 /* ══════════════════════════════════════
    PROPERTY EDITOR — save to DB
 ══════════════════════════════════════ */
+// ══════════════════════════════════════════════════════════════════════
+// Round 41 Task 2 — per-field IT/EN pill for property free-text.
+// Each participating textarea carries data-lang-it, data-lang-en, and
+// data-lang (which language is currently visible in the textarea). The
+// pill above it is initialised by _i18nRenderPill() and swapping
+// languages is done by _i18nSetLang(). Save is a two-step flush via
+// _i18nCollect() which reads the CURRENT textarea into the correct
+// data-lang-* slot before returning both values.
+// ══════════════════════════════════════════════════════════════════════
+function _i18nHydrateField(textareaId, data, field) {
+  const ta = document.getElementById(textareaId);
+  if (!ta) return;
+  const it = data[field + '_it'] || '';
+  const en = data[field + '_en'] || '';
+  const legacy = data[field] || '';
+  // Seed the host's default language with the legacy value only when
+  // both new columns are empty — never overwrite fresh per-lang data.
+  const defLang = (hostLang === 'it') ? 'it' : 'en';
+  const seededIt = it || (!en && defLang === 'it' ? legacy : '');
+  const seededEn = en || (!it && defLang === 'en' ? legacy : '');
+  ta.setAttribute('data-lang-it', seededIt);
+  ta.setAttribute('data-lang-en', seededEn);
+  ta.setAttribute('data-lang', defLang);
+  ta.value = defLang === 'it' ? seededIt : seededEn;
+  _i18nRenderPill(field, defLang);
+}
+function _i18nRenderPill(field, active) {
+  const pill = document.querySelector('.i18n-pill[data-field="' + field + '"]');
+  if (!pill) return;
+  const activeStyle = 'background:var(--white);color:var(--warm);box-shadow:0 1px 3px rgba(6,26,61,0.08);';
+  const inactiveStyle = 'background:none;color:var(--ink-soft);';
+  const btn = (lg) => `<button type="button" onclick="_i18nSetLang('${field}','${lg}')" style="padding:4px 12px;border-radius:14px;font-size:0.68rem;font-weight:600;letter-spacing:0.06em;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;${lg === active ? activeStyle : inactiveStyle}">${lg.toUpperCase()}</button>`;
+  pill.style.cssText = 'display:inline-flex;align-items:center;background:var(--cream-2);border-radius:20px;padding:3px;gap:2px;border:1px solid var(--border);margin-bottom:6px;';
+  pill.innerHTML = btn('it') + btn('en');
+}
+function _i18nSetLang(field, next) {
+  const ta = document.querySelector('[data-i18n-field="' + field + '"]');
+  if (!ta) return;
+  const cur = ta.getAttribute('data-lang') || (hostLang === 'it' ? 'it' : 'en');
+  if (cur === next) return;
+  // Flush the current textarea value into the correct slot before we swap.
+  ta.setAttribute('data-lang-' + cur, ta.value || '');
+  ta.value = ta.getAttribute('data-lang-' + next) || '';
+  ta.setAttribute('data-lang', next);
+  _i18nRenderPill(field, next);
+  ta.focus();
+}
+function _i18nCollect(textareaId) {
+  const ta = document.getElementById(textareaId);
+  if (!ta) return { it: '', en: '' };
+  const cur = ta.getAttribute('data-lang') || (hostLang === 'it' ? 'it' : 'en');
+  ta.setAttribute('data-lang-' + cur, ta.value || '');
+  return {
+    it: (ta.getAttribute('data-lang-it') || '').trim(),
+    en: (ta.getAttribute('data-lang-en') || '').trim(),
+  };
+}
+// Round 41 Task 2 — one-off "split existing double-language content
+// into two columns" helper. Reads the current textarea, splits on the
+// first blank-line boundary, shows a modal with the proposed IT and
+// EN halves for the host to review, and on Confirm loads the halves
+// into the data-lang-* slots. Requires clicking Save on the panel
+// afterwards to persist — the split is never auto-committed.
+function offerLangSplit(field) {
+  const ta = document.querySelector('[data-i18n-field="' + field + '"]');
+  if (!ta) return;
+  // Flush current textarea → its slot first, so we work with the union
+  // of everything the host has typed.
+  const cur = ta.getAttribute('data-lang') || (hostLang === 'it' ? 'it' : 'en');
+  ta.setAttribute('data-lang-' + cur, ta.value || '');
+  const combined = ((ta.getAttribute('data-lang-it') || '') + '\n\n' + (ta.getAttribute('data-lang-en') || '')).trim()
+                || ta.value || '';
+  const it = hostLang === 'it';
+  if (!combined) {
+    alert(it ? 'Il campo è vuoto — niente da dividere.' : 'The field is empty — nothing to split.');
+    return;
+  }
+  // Split on the first blank line. A blank line is one or more line
+  // separators with no non-whitespace between them.
+  const parts = combined.split(/\n\s*\n/, 2);
+  const partA = (parts[0] || '').trim();
+  const partB = (parts[1] || '').trim();
+  // Cheap language sniff: presence of common Italian-only words in
+  // partA vs partB decides which half goes to which column.
+  const sniff = (s) => (s.match(/\b(il|la|le|gli|che|con|sono|siamo|grazie|ciao|arrivo|ospiti|casa|bagno|cucina|piano|codice|chiave)\b/gi) || []).length;
+  const aScore = sniff(partA), bScore = sniff(partB);
+  const proposedIt = aScore >= bScore ? partA : partB;
+  const proposedEn = aScore >= bScore ? partB : partA;
+  _showLangSplitModal(field, proposedIt, proposedEn);
+}
+function _showLangSplitModal(field, proposedIt, proposedEn) {
+  const existing = document.getElementById('langSplitModal');
+  if (existing) existing.remove();
+  const it = hostLang === 'it';
+  const title = it ? 'Dividi contenuto in IT / EN' : 'Split content into IT / EN';
+  const hint  = it
+    ? 'Anteprima. Modifica il testo qui sotto se serve, poi premi Applica: il pulsante Salva della Proprietà scrive nei nuovi campi.'
+    : 'Preview. Edit the text below if needed, then click Apply: the Property panel Save button writes the new columns.';
+  const applyLbl = it ? 'Applica al modulo' : 'Apply to form';
+  const cancelLbl = it ? 'Annulla' : 'Cancel';
+  const modal = document.createElement('div');
+  modal.id = 'langSplitModal';
+  modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10000;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div style="background:var(--white);max-width:720px;width:100%;border-radius:14px;padding:20px 24px;box-shadow:0 12px 48px rgba(0,0,0,0.25);max-height:calc(100vh - 60px);overflow-y:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:600;font-size:1.1rem;margin:0;">${title}</h3>
+        <button type="button" onclick="document.getElementById('langSplitModal').remove()" style="background:none;border:none;font-size:1.4rem;color:var(--ink-soft);cursor:pointer;padding:2px 8px;line-height:1;">×</button>
+      </div>
+      <div style="font-size:0.78rem;color:var(--ink-soft);margin-bottom:12px;">${hint}</div>
+      <label style="display:block;font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;margin-bottom:4px;">IT</label>
+      <textarea id="langSplitIT" rows="6" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:0.85rem;margin-bottom:10px;">${(proposedIt || '').replace(/</g,'&lt;')}</textarea>
+      <label style="display:block;font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;margin-bottom:4px;">EN</label>
+      <textarea id="langSplitEN" rows="6" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:'DM Sans',sans-serif;font-size:0.85rem;margin-bottom:14px;">${(proposedEn || '').replace(/</g,'&lt;')}</textarea>
+      <div style="display:flex;justify-content:flex-end;gap:8px;">
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('langSplitModal').remove()">${cancelLbl}</button>
+        <button type="button" class="btn btn-primary" onclick="_applyLangSplit('${field}')">${applyLbl}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+function _applyLangSplit(field) {
+  const ta = document.querySelector('[data-i18n-field="' + field + '"]');
+  if (!ta) return;
+  const itVal = (document.getElementById('langSplitIT')?.value || '').trim();
+  const enVal = (document.getElementById('langSplitEN')?.value || '').trim();
+  ta.setAttribute('data-lang-it', itVal);
+  ta.setAttribute('data-lang-en', enVal);
+  const cur = ta.getAttribute('data-lang') || (hostLang === 'it' ? 'it' : 'en');
+  ta.value = cur === 'it' ? itVal : enVal;
+  document.getElementById('langSplitModal')?.remove();
+  toast(hostLang === 'it' ? '✓ Split applicato — ricordati di premere Salva' : '✓ Split applied — remember to press Save');
+}
+
 async function saveProperty() {
   if (!propertyId) { toast(hostLang === 'it' ? 'Nessuna proprietà trovata!' : 'No property found!'); return false; }
   // Round 37.3 — capture the previous rotating-code length so a length
@@ -5891,9 +6041,27 @@ async function saveProperty() {
     // rollback to older client bundles keeps the same behaviour. Safe to
     // remove once every deployed client reads only the new field.
     use_per_guest_lockbox: !!document.getElementById('propRotatingLockboxEnabled')?.checked,
-    checkin_instructions: document.getElementById('propCheckinInstructions')?.value || null,
-    checkout_instructions: document.getElementById('propCheckoutInstructions')?.value || null,
-    transport_info: document.getElementById('propTransportInfo')?.value || null,
+    // Round 41 Task 2 — write both language columns AND keep the legacy
+    // single column populated as the "combined" value (guests on pre-
+    // migration read paths still see something). _i18nCollect() flushes
+    // the current textarea into whichever data-lang-* slot the pill is
+    // on, then returns {it, en}.
+    ...(function() {
+      const ci = _i18nCollect('propCheckinInstructions');
+      const co = _i18nCollect('propCheckoutInstructions');
+      const tr = _i18nCollect('propTransportInfo');
+      return {
+        checkin_instructions_it:  ci.it || null,
+        checkin_instructions_en:  ci.en || null,
+        checkin_instructions:     (ci.it || ci.en) || null,
+        checkout_instructions_it: co.it || null,
+        checkout_instructions_en: co.en || null,
+        checkout_instructions:    (co.it || co.en) || null,
+        transport_info_it:        tr.it || null,
+        transport_info_en:        tr.en || null,
+        transport_info:           (tr.it || tr.en) || null,
+      };
+    })(),
     ross1000_codice: document.getElementById('propRossCodice')?.value?.trim() || null,
     rooms_available: _numOrNull(document.getElementById('propRoomsAvailable')?.value),
     beds_available: _numOrNull(document.getElementById('propBedsAvailable')?.value),
@@ -5908,7 +6076,14 @@ async function saveProperty() {
     tax_verified_at: (document.getElementById('propTaxVerifiedAt')?.value || '').trim() || null,
     wifi_name: document.getElementById('propWifiName').value,
     wifi_password: document.getElementById('propWifiPass').value,
-    welcome_message: document.getElementById('propWelcome').value,
+    ...(function() {
+      const wm = _i18nCollect('propWelcome');
+      return {
+        welcome_message_it: wm.it || null,
+        welcome_message_en: wm.en || null,
+        welcome_message:    (wm.it || wm.en) || '',
+      };
+    })(),
     host_phone: document.getElementById('propPhone').value,
     host_names: document.getElementById('propHostNames').value,
     ical_feeds: collectIcalFeeds(),
@@ -11464,9 +11639,15 @@ function fillPropertyForm(data) {
     const n = Number.isFinite(raw) ? Math.floor(raw) : 4;
     el('propRotatingLockboxLength').value = String(Math.max(4, Math.min(8, n || 4)));
   }
-  if (el('propCheckinInstructions')) el('propCheckinInstructions').value = data.checkin_instructions || '';
-  if (el('propCheckoutInstructions')) el('propCheckoutInstructions').value = data.checkout_instructions || '';
-  if (el('propTransportInfo')) el('propTransportInfo').value = data.transport_info || '';
+  // Round 41 Task 2 — hydrate both language columns onto data-lang-* on
+  // the textarea; the textarea itself shows whichever language the pill
+  // is on. Legacy single-column value (data.<field>) becomes the seed
+  // for the host's default language when both new columns are empty,
+  // so existing content keeps rendering until the host opens the
+  // Property panel and saves.
+  _i18nHydrateField('propCheckinInstructions',   data, 'checkin_instructions');
+  _i18nHydrateField('propCheckoutInstructions',  data, 'checkout_instructions');
+  _i18nHydrateField('propTransportInfo',         data, 'transport_info');
   if (el('propRossCodice')) el('propRossCodice').value = data.ross1000_codice || '';
   if (el('propRoomsAvailable')) el('propRoomsAvailable').value = (data.rooms_available ?? '');
   if (el('propBedsAvailable')) el('propBedsAvailable').value = (data.beds_available ?? '');
@@ -11488,7 +11669,7 @@ function fillPropertyForm(data) {
   onToggleRotatingLockbox(); // sync the "show rotating" sub-toggle visibility with the parent
   if (el('propWifiName')) el('propWifiName').value = data.wifi_name || '';
   if (el('propWifiPass')) el('propWifiPass').value = data.wifi_password || '';
-  if (el('propWelcome')) el('propWelcome').value = data.welcome_message || '';
+  _i18nHydrateField('propWelcome', data, 'welcome_message');
   if (el('propPhone')) el('propPhone').value = data.host_phone || '';
   if (el('propHostNames')) el('propHostNames').value = data.host_names || '';
   if (typeof renderIcalFeeds === 'function') renderIcalFeeds();

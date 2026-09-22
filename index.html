@@ -822,7 +822,12 @@ body.tab-chat .powered-by {
   <symbol id="ic-alert"    viewBox="0 0 24 24"><path d="M12 3l10 18H2z"/><path d="M12 10v5"/><circle cx="12" cy="18" r="0.4"/></symbol>
   <symbol id="ic-car"      viewBox="0 0 24 24"><path d="M4 16v-3l2-5a2 2 0 012-1h8a2 2 0 012 1l2 5v3"/><path d="M4 16h16v3H4z"/><circle cx="7.5" cy="18" r="1.2"/><circle cx="16.5" cy="18" r="1.2"/></symbol>
   <symbol id="ic-door"     viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1"/><circle cx="15" cy="12" r="0.7"/></symbol>
-  <symbol id="ic-pin-note" viewBox="0 0 24 24"><path d="M9 3l6 0"/><path d="M12 3v6"/><path d="M6 12l12 0"/><path d="M12 12v9"/></symbol>
+  <!-- Round 41 Task 4 hotfix — the previous ic-pin-note (four short
+       segments meant to look like a pushpin from above) rendered as
+       an ugly double-T shape on the Rules cards. Swapped for a
+       standard info-circle: outline circle with dot + short vertical
+       line. Reads cleanly at 1em and matches the line-icon family. -->
+  <symbol id="ic-pin-note" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="0.5" fill="currentColor"/><path d="M12 11v6"/></symbol>
   <symbol id="ic-utensils" viewBox="0 0 24 24"><path d="M6 3v8a2 2 0 004 0V3"/><path d="M8 11v10"/><path d="M17 3c-2 1-3 3-3 5v5h3v8"/></symbol>
   <symbol id="ic-wine"     viewBox="0 0 24 24"><path d="M8 3h8l-1 6a3 3 0 01-6 0z"/><path d="M12 15v6"/><path d="M8 21h8"/></symbol>
   <symbol id="ic-eye"      viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></symbol>

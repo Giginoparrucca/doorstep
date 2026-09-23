@@ -325,9 +325,11 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}`;
       const followupsMatch = fullText.match(/<followups>([\s\S]*?)<\/followups>/);
       const followups = sanitizeFollowups(followupsMatch ? followupsMatch[1] : '');
 
-      if (escalated && process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
-        notifyTelegram(messages).catch(() => {});
-      }
+      // Round 42 — the legacy global Telegram alert (single TELEGRAM_CHAT_ID
+      // for every property, and — worse — carrying the guest's message text)
+      // was replaced by api/_notify-host.js, which is fired from
+      // api/guest-chat.js on the actual chat_messages insert. Nothing here now.
+      // TELEGRAM_CHAT_ID env var is unused; you can delete it on Vercel.
 
       res.write(`data: ${JSON.stringify({ type: 'done', escalated, followups })}\n\n`);
       res.end();
@@ -364,9 +366,7 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}`;
     const followupsMatch = rawText.match(/<followups>([\s\S]*?)<\/followups>/);
     const followups = sanitizeFollowups(followupsMatch ? followupsMatch[1] : '');
 
-    if (escalated && process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
-      notifyTelegram(messages).catch(() => {});
-    }
+    // Round 42 — legacy notifyTelegram call removed (see stream-path comment).
 
     // Record real usage. Await it: Vercel serverless would otherwise
     // cancel the pending PostgREST POST when the handler returns.
@@ -612,23 +612,9 @@ function sanitizeFollowups(raw) {
     .slice(0, 3);
 }
 
-async function notifyTelegram(messages) {
-  const lastGuestMsg = messages.filter(m => m.role === 'user').pop()?.content || '';
-  const text = typeof lastGuestMsg === 'string' ? lastGuestMsg : '[image + text]';
-  const tgText = `🔔 WelcomeBnB — Guest needs help\n\n"${text}"\n\nReply from the host console.`;
-  try {
-    await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: process.env.TELEGRAM_CHAT_ID,
-        text: tgText,
-      }),
-    });
-  } catch (e) {
-    console.warn('Telegram notification failed:', e);
-  }
-}
+// Round 42 — notifyTelegram removed. Legacy single-recipient alert with
+// guest message text is replaced by api/_notify-host.js, called from
+// api/guest-chat.js on the actual chat_messages insert.
 
 // ─── Weather support (Round 17) ────────────────────────────────────
 function extractCoordsFromContext(ctx) {

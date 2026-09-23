@@ -1028,6 +1028,36 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 </head>
 <body>
 
+<!-- Round 41 T4.1 — rule-icon sprite. Same 12 symbols the guest app
+     uses (index.html); the host picks one and the id stored on
+     rules.icon is one of: info, alert, pin, key, water, mute, no,
+     broom, shirt, paw, trash, flame. -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none;" aria-hidden="true">
+  <symbol id="ic-rule-info"    viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="0.5" fill="currentColor"/><path d="M12 11v6"/></symbol>
+  <symbol id="ic-rule-alert"   viewBox="0 0 24 24"><path d="M12 3l10 18H2z"/><path d="M12 10v5"/><circle cx="12" cy="18" r="0.4"/></symbol>
+  <symbol id="ic-rule-pin"     viewBox="0 0 24 24"><path d="M12 22s7-6.5 7-13a7 7 0 10-14 0c0 6.5 7 13 7 13z"/><circle cx="12" cy="9" r="2.5"/></symbol>
+  <symbol id="ic-rule-key"     viewBox="0 0 24 24"><circle cx="7" cy="17" r="3"/><path d="M9 15l11-11"/><path d="M17 7l3 3"/><path d="M14 10l2 2"/></symbol>
+  <symbol id="ic-rule-water"   viewBox="0 0 24 24"><path d="M12 3s6 7 6 12a6 6 0 01-12 0c0-5 6-12 6-12z"/></symbol>
+  <symbol id="ic-rule-mute"    viewBox="0 0 24 24"><path d="M11 6l-5 4H3v4h3l5 4z"/><path d="M16 9l5 6"/><path d="M21 9l-5 6"/></symbol>
+  <symbol id="ic-rule-no"      viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M6 6l12 12"/></symbol>
+  <symbol id="ic-rule-broom"   viewBox="0 0 24 24"><path d="M17 3l-9 9"/><path d="M5 20l4-8 6 6-8 4z"/><path d="M13 8l3 3"/></symbol>
+  <symbol id="ic-rule-shirt"   viewBox="0 0 24 24"><path d="M8 3l-5 4 3 3V21h12V10l3-3-5-4"/><path d="M9 3l3 4 3-4"/></symbol>
+  <symbol id="ic-rule-paw"     viewBox="0 0 24 24"><ellipse cx="6" cy="10" rx="1.8" ry="2.4"/><ellipse cx="10" cy="6" rx="1.8" ry="2.4"/><ellipse cx="14" cy="6" rx="1.8" ry="2.4"/><ellipse cx="18" cy="10" rx="1.8" ry="2.4"/><path d="M9 18a3 3 0 006 0c0-3-3-3-3-6-2 0-3 3-3 6z"/></symbol>
+  <symbol id="ic-rule-trash"   viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6"/><path d="M14 11v6"/></symbol>
+  <symbol id="ic-rule-flame"   viewBox="0 0 24 24"><path d="M12 3s5 4 5 10a5 5 0 01-10 0c0-3 2-4 2-6 2 2 3 0 3-4z"/></symbol>
+</svg>
+<style>
+  /* Round 41 T4.1 — rule-icon picker + read-only card icon */
+  .rule-icon-svg { display: inline-block; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .rule-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 40px; background: var(--white); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; color: var(--ink); padding: 0; }
+  .rule-icon-btn:hover { border-color: var(--warm); color: var(--warm); }
+  .rule-icon-picker { position: absolute; z-index: 100; background: var(--white); border: 1px solid var(--border); border-radius: 10px; padding: 8px; box-shadow: 0 8px 24px rgba(6,26,61,0.12); display: grid; grid-template-columns: repeat(4, 44px); gap: 6px; }
+  .rule-icon-picker button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 44px; height: 48px; background: transparent; border: 1px solid transparent; border-radius: 6px; cursor: pointer; color: var(--ink-soft); font-family: inherit; padding: 4px 0; }
+  .rule-icon-picker button:hover { background: var(--cream-2); color: var(--warm); border-color: var(--border); }
+  .rule-icon-picker button.selected { background: rgba(0,91,255,0.08); color: var(--warm); border-color: rgba(0,91,255,0.25); }
+  .rule-icon-picker button .lbl { font-size: 0.54rem; letter-spacing: 0.04em; text-transform: uppercase; }
+</style>
+
 <!-- Round 25: admin "view as host" banner. Hidden unless ?admin=1. Fixed
      bar across the top; read-only until the admin enables editing. -->
 <div id="adminViewBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#061A3D;color:#fff;padding:8px 14px;align-items:center;gap:12px;font-family:'DM Sans',sans-serif;font-size:0.8rem;box-shadow:0 2px 12px rgba(0,0,0,0.25);">
@@ -3719,6 +3749,7 @@ const HT = {
     rules_info: 'ℹ️ These rules appear in the guest app\'s "Rules" tab. Pick from common rules below, or add your own custom rules.',
     rules_preset_label: 'Quick-add common rules',
     rules_your_rules: 'Your rules',
+    rules_choose_icon: 'Choose icon',
     rules_no_rules: 'No rules yet. Pick from presets above or add a custom rule.',
     rules_title_en: 'Title (EN)', rules_title_it: 'Titolo (IT)',
     rules_desc_en: 'Description (EN)', rules_desc_it: 'Descrizione (IT)',
@@ -4144,6 +4175,7 @@ const HT = {
     rules_info: 'ℹ️ Queste regole appaiono nella scheda "Regole" dell\'app ospiti. Scegli dalle regole comuni o aggiungine di personalizzate.',
     rules_preset_label: 'Aggiungi regole comuni',
     rules_your_rules: 'Le tue regole',
+    rules_choose_icon: 'Scegli icona',
     rules_no_rules: 'Nessuna regola ancora. Scegli dai preset sopra o aggiungi una regola personalizzata.',
     rules_title_en: 'Title (EN)', rules_title_it: 'Titolo (IT)',
     rules_desc_en: 'Description (EN)', rules_desc_it: 'Descrizione (IT)',
@@ -6489,30 +6521,34 @@ async function syncIcalNow() {
 let rulesData = [];
 
 /* ── Preset Rules Library (bilingual) ── */
+// Round 41 T4.1 — preset rules now carry curated icon names (mute,
+// flame, paw, trash, key, water, broom, pin, info, alert). The value
+// stored on rules.icon is the same name and both the host card and
+// the guest card resolve it to an SVG.
 const PRESET_RULES = [
-  { icon:'🔇', title_en:'Quiet Hours', title_it:'Ore di Silenzio', desc_en:'Keep noise to a minimum between 22:00 and 8:00.', desc_it:'Mantenere il silenzio tra le 22:00 e le 8:00.', is_important:true },
-  { icon:'🚭', title_en:'No Smoking Inside', title_it:'Vietato Fumare', desc_en:'Smoking is not allowed inside. Please use the balcony or outdoor areas.', desc_it:'Vietato fumare all\'interno. Usare il balcone o le aree esterne.', is_important:true },
-  { icon:'🐾', title_en:'No Pets', title_it:'No Animali', desc_en:'Unfortunately we cannot accommodate pets.', desc_it:'Purtroppo non possiamo ospitare animali domestici.', is_important:false },
-  { icon:'🗑', title_en:'Waste Separation', title_it:'Raccolta Differenziata', desc_en:'Separate waste: organic, plastic, paper, glass, general. Bins are under the sink.', desc_it:'Separare i rifiuti: umido, plastica, carta, vetro, indifferenziata. I bidoni sono sotto il lavello.', is_important:false },
-  { icon:'🔑', title_en:'Keys & Lockbox', title_it:'Chiavi & Lockbox', desc_en:'On departure, return keys to the lockbox and scramble the code.', desc_it:'Alla partenza, rimettere le chiavi nella lockbox e mescolare il codice.', is_important:false },
-  { icon:'💧', title_en:'Water is Precious', title_it:'L\'Acqua è Preziosa', desc_en:'Water is a scarce resource — short showers are appreciated!', desc_it:'L\'acqua è una risorsa scarsa — docce brevi sono apprezzate!', is_important:false },
-  { icon:'🧹', title_en:'Leave it Tidy', title_it:'Lascia in Ordine', desc_en:'Strip bed linen and start the dishwasher before you leave. Thank you!', desc_it:'Togliere le lenzuola e avviare la lavastoviglie prima di partire. Grazie!', is_important:false },
-  { icon:'🅿️', title_en:'Parking', title_it:'Parcheggio', desc_en:'Free parking is available on the street. No reserved spot.', desc_it:'Parcheggio gratuito in strada. Nessun posto riservato.', is_important:false },
-  { icon:'🌡️', title_en:'Air Conditioning', title_it:'Aria Condizionata', desc_en:'Please close windows when the AC is on. Turn it off when you leave.', desc_it:'Chiudere le finestre quando il condizionatore è acceso. Spegnerlo quando si esce.', is_important:false },
-  { icon:'🏊', title_en:'Pool Rules', title_it:'Regole Piscina', desc_en:'No diving. Shower before entering. Children must be supervised at all times.', desc_it:'Vietato tuffarsi. Doccia prima di entrare. I bambini devono essere sempre sorvegliati.', is_important:true },
-  { icon:'🔥', title_en:'No Open Flames', title_it:'Niente Fiamme Libere', desc_en:'No candles, incense, or open flames inside the property.', desc_it:'Vietato accendere candele, incenso o fiamme libere all\'interno.', is_important:true },
-  { icon:'👥', title_en:'No Parties / Events', title_it:'No Feste / Eventi', desc_en:'Parties and events are not allowed. Maximum occupancy must be respected.', desc_it:'Feste ed eventi non sono permessi. Rispettare la capienza massima.', is_important:true },
-  { icon:'📶', title_en:'WiFi Fair Use', title_it:'WiFi Uso Corretto', desc_en:'WiFi is shared — please avoid heavy downloads or streaming on multiple devices.', desc_it:'Il WiFi è condiviso — evitare download pesanti o streaming su più dispositivi.', is_important:false },
-  { icon:'🚿', title_en:'Bathroom', title_it:'Bagno', desc_en:'Please don\'t flush anything other than toilet paper. Use the bin provided.', desc_it:'Non gettare nulla nel water tranne la carta igienica. Usare il cestino.', is_important:false },
-  { icon:'👟', title_en:'Shoes Off Inside', title_it:'Scarpe Fuori', desc_en:'Please remove shoes when entering. Slippers are provided.', desc_it:'Togliere le scarpe all\'ingresso. Le ciabatte sono a disposizione.', is_important:false },
-  { icon:'🚪', title_en:'Check-out by 10:00', title_it:'Check-out entro le 10:00', desc_en:'Please leave by 10:00 AM. Late check-out available on request.', desc_it:'Partenza entro le 10:00. Check-out tardivo disponibile su richiesta.', is_important:false },
+  { icon:'mute',  title_en:'Quiet Hours',      title_it:'Ore di Silenzio',      desc_en:'Keep noise to a minimum between 22:00 and 8:00.', desc_it:'Mantenere il silenzio tra le 22:00 e le 8:00.', is_important:true },
+  { icon:'flame', title_en:'No Smoking Inside',title_it:'Vietato Fumare',       desc_en:'Smoking is not allowed inside. Please use the balcony or outdoor areas.', desc_it:'Vietato fumare all\'interno. Usare il balcone o le aree esterne.', is_important:true },
+  { icon:'paw',   title_en:'No Pets',          title_it:'No Animali',           desc_en:'Unfortunately we cannot accommodate pets.', desc_it:'Purtroppo non possiamo ospitare animali domestici.', is_important:false },
+  { icon:'trash', title_en:'Waste Separation', title_it:'Raccolta Differenziata',desc_en:'Separate waste: organic, plastic, paper, glass, general. Bins are under the sink.', desc_it:'Separare i rifiuti: umido, plastica, carta, vetro, indifferenziata. I bidoni sono sotto il lavello.', is_important:false },
+  { icon:'key',   title_en:'Keys & Lockbox',   title_it:'Chiavi & Lockbox',     desc_en:'On departure, return keys to the lockbox and scramble the code.', desc_it:'Alla partenza, rimettere le chiavi nella lockbox e mescolare il codice.', is_important:false },
+  { icon:'water', title_en:'Water is Precious',title_it:'L\'Acqua è Preziosa',  desc_en:'Water is a scarce resource — short showers are appreciated!', desc_it:'L\'acqua è una risorsa scarsa — docce brevi sono apprezzate!', is_important:false },
+  { icon:'broom', title_en:'Leave it Tidy',    title_it:'Lascia in Ordine',     desc_en:'Strip bed linen and start the dishwasher before you leave. Thank you!', desc_it:'Togliere le lenzuola e avviare la lavastoviglie prima di partire. Grazie!', is_important:false },
+  { icon:'pin',   title_en:'Parking',          title_it:'Parcheggio',           desc_en:'Free parking is available on the street. No reserved spot.', desc_it:'Parcheggio gratuito in strada. Nessun posto riservato.', is_important:false },
+  { icon:'info',  title_en:'Air Conditioning', title_it:'Aria Condizionata',    desc_en:'Please close windows when the AC is on. Turn it off when you leave.', desc_it:'Chiudere le finestre quando il condizionatore è acceso. Spegnerlo quando si esce.', is_important:false },
+  { icon:'water', title_en:'Pool Rules',       title_it:'Regole Piscina',       desc_en:'No diving. Shower before entering. Children must be supervised at all times.', desc_it:'Vietato tuffarsi. Doccia prima di entrare. I bambini devono essere sempre sorvegliati.', is_important:true },
+  { icon:'flame', title_en:'No Open Flames',   title_it:'Niente Fiamme Libere', desc_en:'No candles, incense, or open flames inside the property.', desc_it:'Vietato accendere candele, incenso o fiamme libere all\'interno.', is_important:true },
+  { icon:'alert', title_en:'No Parties / Events',title_it:'No Feste / Eventi',  desc_en:'Parties and events are not allowed. Maximum occupancy must be respected.', desc_it:'Feste ed eventi non sono permessi. Rispettare la capienza massima.', is_important:true },
+  { icon:'info',  title_en:'WiFi Fair Use',    title_it:'WiFi Uso Corretto',    desc_en:'WiFi is shared — please avoid heavy downloads or streaming on multiple devices.', desc_it:'Il WiFi è condiviso — evitare download pesanti o streaming su più dispositivi.', is_important:false },
+  { icon:'water', title_en:'Bathroom',         title_it:'Bagno',                desc_en:'Please don\'t flush anything other than toilet paper. Use the bin provided.', desc_it:'Non gettare nulla nel water tranne la carta igienica. Usare il cestino.', is_important:false },
+  { icon:'info',  title_en:'Shoes Off Inside', title_it:'Scarpe Fuori',         desc_en:'Please remove shoes when entering. Slippers are provided.', desc_it:'Togliere le scarpe all\'ingresso. Le ciabatte sono a disposizione.', is_important:false },
+  { icon:'pin',   title_en:'Check-out by 10:00',title_it:'Check-out entro le 10:00',desc_en:'Please leave by 10:00 AM. Late check-out available on request.', desc_it:'Partenza entro le 10:00. Check-out tardivo disponibile su richiesta.', is_important:false },
 ];
 
 function renderPresetRules() {
   const existing = rulesData.map(r => (r.title_en || r.title || '').toLowerCase());
   document.getElementById('presetRulesGrid').innerHTML = PRESET_RULES.map((p, i) => {
     const alreadyAdded = existing.includes(p.title_en.toLowerCase());
-    return `<button type="button" onclick="addPresetRule(${i})" style="padding:8px 14px;border-radius:8px;font-size:0.82rem;border:1px solid ${alreadyAdded ? 'var(--green)' : 'var(--cream-3)'};background:${alreadyAdded ? 'rgba(109,191,130,0.06)' : 'var(--bg)'};color:${alreadyAdded ? 'var(--green)' : 'var(--ink-soft)'};cursor:${alreadyAdded ? 'default' : 'pointer'};transition:all 0.15s;min-height:40px;" ${alreadyAdded ? 'disabled' : ''}>${p.icon} ${hostLang === 'it' ? p.title_it : p.title_en}${alreadyAdded ? ' ✓' : ''}</button>`;
+    return `<button type="button" onclick="addPresetRule(${i})" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;font-size:0.82rem;border:1px solid ${alreadyAdded ? 'var(--green)' : 'var(--cream-3)'};background:${alreadyAdded ? 'rgba(109,191,130,0.06)' : 'var(--bg)'};color:${alreadyAdded ? 'var(--green)' : 'var(--ink-soft)'};cursor:${alreadyAdded ? 'default' : 'pointer'};transition:all 0.15s;min-height:40px;" ${alreadyAdded ? 'disabled' : ''}>${_hcRuleIconSVG(p.icon)} <span>${hostLang === 'it' ? p.title_it : p.title_en}${alreadyAdded ? ' ✓' : ''}</span></button>`;
   }).join('');
 }
 
@@ -6777,6 +6813,72 @@ function toggleRecosEditMode() {
   renderRecos();
 }
 
+// Round 41 T4.1 — curated icon set for house rules. r.icon stores one
+// of these names; any legacy emoji or unknown value falls back to
+// 'info'. Keep this list in sync with the ic-rule-* symbols in the
+// sprite above AND with the guest-app allowlist in index.html
+// (RULE_ICON_NAMES).
+const RULE_ICONS = [
+  { name: 'info',  label_en: 'Info',     label_it: 'Info' },
+  { name: 'alert', label_en: 'Urgent',   label_it: 'Urgente' },
+  { name: 'pin',   label_en: 'Pin',      label_it: 'Nota' },
+  { name: 'key',   label_en: 'Keys',     label_it: 'Chiavi' },
+  { name: 'water', label_en: 'Water',    label_it: 'Acqua' },
+  { name: 'mute',  label_en: 'Quiet',    label_it: 'Silenzio' },
+  { name: 'no',    label_en: 'No / not', label_it: 'Vietato' },
+  { name: 'broom', label_en: 'Cleaning', label_it: 'Pulizia' },
+  { name: 'shirt', label_en: 'Laundry',  label_it: 'Bucato' },
+  { name: 'paw',   label_en: 'Pets',     label_it: 'Animali' },
+  { name: 'trash', label_en: 'Waste',    label_it: 'Rifiuti' },
+  { name: 'flame', label_en: 'Smoking',  label_it: 'Fumo' },
+];
+const RULE_ICON_NAMES_HC = RULE_ICONS.map(r => r.name);
+function _hcRuleIconName(raw) {
+  const s = String(raw == null ? '' : raw).trim().toLowerCase();
+  return RULE_ICON_NAMES_HC.includes(s) ? s : 'info';
+}
+function _hcRuleIconSVG(name) {
+  return `<svg class="rule-icon-svg" aria-hidden="true"><use href="#ic-rule-${_hcRuleIconName(name)}"/></svg>`;
+}
+// Small dropdown picker rendered under the rule row's icon button.
+// Anchored with position:absolute inside the trigger's parent.
+function _openRuleIconPicker(i, btn) {
+  _closeRuleIconPickers();
+  const it = hostLang === 'it';
+  const current = _hcRuleIconName(rulesData[i]?.icon);
+  const pick = document.createElement('div');
+  pick.className = 'rule-icon-picker';
+  pick.style.left = '0';
+  pick.style.top = '46px';
+  pick.innerHTML = RULE_ICONS.map(r => {
+    const active = r.name === current ? ' selected' : '';
+    const lbl = it ? r.label_it : r.label_en;
+    return `<button type="button" class="${active}" onclick="_selectRuleIcon(${i}, '${r.name}')">
+      <svg class="rule-icon-svg" aria-hidden="true"><use href="#ic-rule-${r.name}"/></svg>
+      <span class="lbl">${lbl}</span>
+    </button>`;
+  }).join('');
+  btn.parentElement.style.position = 'relative';
+  btn.parentElement.appendChild(pick);
+}
+function _closeRuleIconPickers() {
+  document.querySelectorAll('.rule-icon-picker').forEach(el => el.remove());
+}
+function _selectRuleIcon(i, name) {
+  rulesData[i].icon = name;
+  _closeRuleIconPickers();
+  renderRules();
+}
+if (typeof window !== 'undefined') {
+  // Bubble phase — the picker's buttons stopPropagation implicitly by
+  // calling functions synchronously; a click that reaches window is
+  // outside the picker, so close.
+  window.addEventListener('click', (e) => {
+    if (e.target.closest('.rule-icon-picker') || e.target.closest('.rule-icon-btn')) return;
+    _closeRuleIconPickers();
+  });
+}
+
 function renderRules() {
   const listEl = document.getElementById('rulesList');
   if (!listEl) return;
@@ -6799,9 +6901,11 @@ function renderRules() {
       const important = r.is_important
         ? `<span style="background:rgba(224,90,90,0.10);color:#b03939;padding:2px 8px;border-radius:4px;font-size:0.6rem;letter-spacing:0.06em;text-transform:uppercase;font-weight:600;margin-left:8px;vertical-align:middle;">${_rulesSafe(h('rules_important') || 'Important')}</span>`
         : '';
+      // Round 41 T4.1 — read-only card uses the SVG matching the
+      // stored icon name; legacy emoji values fall back to 'info'.
       return `
         <div style="padding:12px 14px;background:var(--white);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start;">
-          <div style="font-size:1.35rem;line-height:1;flex-shrink:0;margin-top:1px;">${_rulesSafe(r.icon || '📌')}</div>
+          <div style="line-height:1;flex-shrink:0;margin-top:3px;color:var(--ink);">${_hcRuleIconSVG(r.icon)}</div>
           <div style="flex:1;">
             <div style="font-weight:600;font-size:0.92rem;color:var(--ink);">${_rulesSafe(title) || '<em style="color:var(--ink-soft);font-weight:400;">(empty)</em>'}${important}</div>
             ${desc ? `<div style="font-size:0.82rem;color:var(--ink-soft);margin-top:4px;line-height:1.4;">${_rulesSafe(desc)}</div>` : ''}
@@ -6817,7 +6921,14 @@ function renderRules() {
       <div class="edit-item-drag" title="Drag to reorder">⠿</div>
       <div class="edit-item-body" style="flex:1;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-          <input class="form-input" style="width:50px;text-align:center;padding:6px;font-size:1.1rem;" value="${r.icon}" onchange="rulesData[${i}].icon=this.value" title="Emoji">
+          <!-- Round 41 T4.1 — icon picker replaces the free-text emoji
+               input. Click opens a 12-icon grid; selection updates
+               rulesData[i].icon with the icon name. -->
+          <button type="button" class="rule-icon-btn"
+            onclick="event.stopPropagation();_openRuleIconPicker(${i}, this);"
+            title="${h('rules_choose_icon') || 'Choose icon'}">
+            ${_hcRuleIconSVG(r.icon)}
+          </button>
           <div style="flex:1;display:flex;gap:6px;">
             <div style="flex:1;">
               <label style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:2px;">${h('rules_title_en')}</label>
@@ -6853,7 +6964,8 @@ function renderRules() {
 }
 
 function addRule() {
-  rulesData.unshift({ icon: '📌', title_en: '', title_it: '', desc_en: '', desc_it: '', is_important: false });
+  // Round 41 T4.1 — default new rules to the neutral info icon.
+  rulesData.unshift({ icon: 'info', title_en: '', title_it: '', desc_en: '', desc_it: '', is_important: false });
   renderRules();
   // Focus the first input of the freshly-added blank row so the host
   // can start typing straight away.

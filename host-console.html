@@ -1143,9 +1143,12 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       <span data-h="sidebar_oggi">Today</span>
       <span class="badge-count" id="navBadge-oggi" style="display:none;">0</span>
     </button>
-    <button class="sidebar-item" data-section="ospiti" onclick="showSection('ospiti')">
+    <!-- Round 41 T4.3 — chatBadge lives on Ospiti (Chat is now a
+         tab under Ospiti). -->
+    <button class="sidebar-item" data-section="ospiti" onclick="showSection('ospiti')" style="position:relative;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/></svg>
       <span data-h="sidebar_ospiti">Guests</span>
+      <div id="chatBadge" style="display:none;position:absolute;right:12px;width:8px;height:8px;border-radius:50%;background:var(--red);"></div>
     </button>
     <button class="sidebar-item" data-section="conf" onclick="showSection('conf')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
@@ -1156,14 +1159,9 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/></svg>
       <span data-h="sidebar_prop">Property</span>
     </button>
-    <!-- Round 41 T4.2 hotfix — chatBadge lives on Condividi, which
-         owns the Chat panel. It was previously nested inside the
-         Ospiti sidebar item (Round 40 T4 miswire) so the red dot was
-         drawing the host's eye to the wrong section. -->
-    <button class="sidebar-item" data-section="cond" onclick="showSection('cond')" style="position:relative;">
+    <button class="sidebar-item" data-section="cond" onclick="showSection('cond')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
       <span data-h="sidebar_cond">Share</span>
-      <div id="chatBadge" style="display:none;position:absolute;right:12px;width:8px;height:8px;border-radius:50%;background:var(--red);"></div>
     </button>
   </nav>
 
@@ -4419,10 +4417,15 @@ const titlesMap = {
 // the containing section for any panel id.
 const SECTIONS = {
   oggi:   { panels: ['dashboard'] },
-  ospiti: { panels: ['checkins', 'calendar', 'guestanalytics', 'contacts'] },
+  // Round 41 T4.2 hotfix — Chat moved from Condividi into Ospiti at the
+  // host's request. It sits alongside check-ins / calendar / analytics /
+  // contacts because that's where the host thinks about individual guests.
+  // Condividi keeps qrlink alone (single-panel section — the tab strip
+  // auto-hides when there's only one panel).
+  ospiti: { panels: ['checkins', 'calendar', 'guestanalytics', 'contacts', 'chat'] },
   conf:   { panels: ['export', 'compliance'] },
   prop:   { panels: ['property', 'rules', 'recos'] },
-  cond:   { panels: ['qrlink', 'chat'] },
+  cond:   { panels: ['qrlink'] },
 };
 const SECTION_TITLES = {
   oggi:   ['sidebar_oggi_title',   'sidebar_oggi_sub'],
@@ -4845,8 +4848,40 @@ async function renderDashboard() {
   // "currently staying" block: today's guests first, planning next.
   const upcomingPanel = await renderUpcomingReservationsPanel();
 
+  // Round 41 T4.3 — top-of-dashboard help-request alert. Sums all rows
+  // whose action prompt is a "reply to help request" (tone === 'urgent'
+  // and eng.escs > 0). Shows a single clickable banner that jumps
+  // straight to Ospiti → Chat. Nothing new is fetched — this reads
+  // from the rows we already computed above.
+  const helpRows = rows.filter(r => r.action && r.action.tone === 'urgent' && r.eng && r.eng.escs > 0);
+  const totalHelp = helpRows.reduce((a, r) => a + (r.eng.escs || 0), 0);
+  const it = hostLang === 'it';
+  const helpBanner = totalHelp === 0 ? '' : `
+    <button type="button" onclick="showPanel('chat')"
+      style="width:100%;text-align:left;font-family:inherit;display:flex;align-items:center;gap:12px;padding:14px 16px;margin-bottom:14px;
+             background:linear-gradient(135deg,rgba(224,90,90,0.10),rgba(224,90,90,0.04));
+             border:1px solid rgba(224,90,90,0.28);border-radius:10px;cursor:pointer;
+             box-shadow:0 1px 3px rgba(224,90,90,0.08);">
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:rgba(224,90,90,0.15);color:#b03939;font-weight:700;flex-shrink:0;">${totalHelp}</span>
+      <span style="flex:1;min-width:0;">
+        <span style="display:block;font-size:0.92rem;font-weight:600;color:#b03939;">
+          ${safe(it
+            ? (totalHelp === 1 ? 'Un ospite ti sta chiedendo aiuto' : `${totalHelp} ospiti ti stanno chiedendo aiuto`)
+            : (totalHelp === 1 ? 'A guest needs your help' : `${totalHelp} guests need your help`)
+          )}
+        </span>
+        <span style="display:block;font-size:0.76rem;color:var(--ink-soft);margin-top:2px;">
+          ${safe(it ? 'Rispondi dalla chat prima possibile.' : 'Reply from chat as soon as you can.')}
+        </span>
+      </span>
+      <span style="color:var(--warm);font-size:0.82rem;font-weight:600;white-space:nowrap;">
+        ${safe(it ? 'Apri Chat' : 'Open Chat')} →
+      </span>
+    </button>`;
+
   el.innerHTML = `
     <div style="max-width:920px;">
+      ${helpBanner}
       ${urgentPanel}
       ${stayingPanel}
       ${upcomingPanel}

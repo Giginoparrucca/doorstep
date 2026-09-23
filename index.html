@@ -842,6 +842,24 @@ body.tab-chat .powered-by {
   <symbol id="ic-message"  viewBox="0 0 24 24"><path d="M4 5h16v12H8l-4 4z"/></symbol>
   <symbol id="ic-check"    viewBox="0 0 24 24"><path d="M4 12l6 6 10-14"/></symbol>
   <symbol id="ic-check-c"  viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></symbol>
+
+  <!-- Round 41 T4.1 — rule-picker icons. Curated set the host chooses
+       from in the host console; the stored r.icon holds one of these
+       names. Any legacy emoji or unknown name falls back to
+       ic-rule-info. Keep this list in sync with the RULE_ICONS
+       catalog in host-console.html. -->
+  <symbol id="ic-rule-info"    viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="8" r="0.5" fill="currentColor"/><path d="M12 11v6"/></symbol>
+  <symbol id="ic-rule-alert"   viewBox="0 0 24 24"><path d="M12 3l10 18H2z"/><path d="M12 10v5"/><circle cx="12" cy="18" r="0.4"/></symbol>
+  <symbol id="ic-rule-pin"     viewBox="0 0 24 24"><path d="M12 22s7-6.5 7-13a7 7 0 10-14 0c0 6.5 7 13 7 13z"/><circle cx="12" cy="9" r="2.5"/></symbol>
+  <symbol id="ic-rule-key"     viewBox="0 0 24 24"><circle cx="7" cy="17" r="3"/><path d="M9 15l11-11"/><path d="M17 7l3 3"/><path d="M14 10l2 2"/></symbol>
+  <symbol id="ic-rule-water"   viewBox="0 0 24 24"><path d="M12 3s6 7 6 12a6 6 0 01-12 0c0-5 6-12 6-12z"/></symbol>
+  <symbol id="ic-rule-mute"    viewBox="0 0 24 24"><path d="M11 6l-5 4H3v4h3l5 4z"/><path d="M16 9l5 6"/><path d="M21 9l-5 6"/></symbol>
+  <symbol id="ic-rule-no"      viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M6 6l12 12"/></symbol>
+  <symbol id="ic-rule-broom"   viewBox="0 0 24 24"><path d="M17 3l-9 9"/><path d="M5 20l4-8 6 6-8 4z"/><path d="M13 8l3 3"/></symbol>
+  <symbol id="ic-rule-shirt"   viewBox="0 0 24 24"><path d="M8 3l-5 4 3 3V21h12V10l3-3-5-4"/><path d="M9 3l3 4 3-4"/></symbol>
+  <symbol id="ic-rule-paw"     viewBox="0 0 24 24"><ellipse cx="6" cy="10" rx="1.8" ry="2.4"/><ellipse cx="10" cy="6" rx="1.8" ry="2.4"/><ellipse cx="14" cy="6" rx="1.8" ry="2.4"/><ellipse cx="18" cy="10" rx="1.8" ry="2.4"/><path d="M9 18a3 3 0 006 0c0-3-3-3-3-6-2 0-3 3-3 6z"/></symbol>
+  <symbol id="ic-rule-trash"   viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6"/><path d="M14 11v6"/></symbol>
+  <symbol id="ic-rule-flame"   viewBox="0 0 24 24"><path d="M12 3s5 4 5 10a5 5 0 01-10 0c0-3 2-4 2-6 2 2 3 0 3-4z"/></symbol>
 </svg>
 
 <script>
@@ -3961,18 +3979,26 @@ function renderRules() {
   }
   const escapeHtml = (s) => String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  // Round 41 Task 4 — a single neutral line-icon marker replaces the
-  // per-rule emoji (🔇 🚭 🐾 …). Task 5 will introduce severity variants
-  // (info vs restriction); r.icon stays in the DB for that later pass.
+  // Round 41 T4.1 — r.icon now stores a curated name (info / alert /
+  // pin / key / water / mute / no / broom / shirt / paw / trash / flame).
+  // Any legacy emoji or unrecognised string falls back to the info icon.
   c.innerHTML = data.map(r => `
     <div class="rule-card ${r.type}">
-      <div class="rule-icon">${icon('pin-note')}</div>
+      <div class="rule-icon">${icon(_ruleIconName(r.icon))}</div>
       <div>
         <div class="rule-title">${escapeHtml(r.title)}</div>
         <div class="rule-desc">${escapeHtml(r.desc)}</div>
       </div>
     </div>
   `).join('');
+}
+// Round 41 T4.1 — allowlist of icon names the guest app knows how to
+// render. If r.icon isn't in this set (legacy emoji, empty, garbage),
+// return 'rule-info' so the card still gets a neutral marker.
+const RULE_ICON_NAMES = ['info','alert','pin','key','water','mute','no','broom','shirt','paw','trash','flame'];
+function _ruleIconName(raw) {
+  const s = String(raw == null ? '' : raw).trim().toLowerCase();
+  return RULE_ICON_NAMES.includes(s) ? 'rule-' + s : 'rule-info';
 }
 
 /* ══════════════════════════════════════

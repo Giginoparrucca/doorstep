@@ -531,9 +531,20 @@ body.has-test-banner .page { top: var(--test-banner-h, 36px); }
 }
 .explore-header p { font-size: 0.78rem; color: var(--ink-soft); font-weight: 300; margin-top: 4px; }
 
+/* Round 41 Task 6 — chip strip. After Task 4 stripped the emoji the
+   labels are narrow enough to sit on one line, but 7 × ~70px still
+   overflows 390px viewports — so we scroll instead of wrap. Snap
+   centres each chip as the user swipes; scrollIntoView on filter
+   change keeps the active chip in view without the strip jumping. */
 .cat-tabs {
-  display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px;
+  display: flex; flex-wrap: nowrap; gap: 6px;
+  padding: 10px 16px;
+  overflow-x: auto; overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
 }
+.cat-tabs::-webkit-scrollbar { display: none; }
 .cat-tab {
   padding: 7px 14px; border-radius: 20px;
   font-size: 0.68rem; font-weight: 500;
@@ -542,6 +553,8 @@ body.has-test-banner .page { top: var(--test-banner-h, 36px); }
   background: var(--white); color: var(--ink-soft);
   transition: all 0.2s; font-family: 'DM Sans', sans-serif;
   -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0; scroll-snap-align: center;
+  display: inline-flex; align-items: center; gap: 5px;
 }
 .cat-tab.active { background: var(--warm); color: var(--white); border-color: var(--warm); }
 
@@ -4024,11 +4037,22 @@ const CAT_ICON_NAME = { food: 'utensils', drink: 'wine', see: 'eye', beach: 'bea
 function renderCatTabs() {
   const cats = ['all','food','drink','see','beach','shop','experiences'];
   const keys = ['cat_all','cat_food','cat_drink','cat_see','cat_beach','cat_shop','cat_experiences'];
-  document.getElementById('catTabs').innerHTML = cats.map((c,i) => {
+  const host = document.getElementById('catTabs');
+  host.innerHTML = cats.map((c,i) => {
     const label = T[lang][keys[i]];
-    const ic = CAT_ICON_NAME[c] ? icon(CAT_ICON_NAME[c]) + ' ' : '';
-    return `<button class="cat-tab ${c===activeCat?'active':''}" onclick="filterCat('${c}')">${ic}${label}</button>`;
+    const ic = CAT_ICON_NAME[c] ? icon(CAT_ICON_NAME[c]) : '';
+    return `<button class="cat-tab ${c===activeCat?'active':''}" onclick="filterCat('${c}')">${ic}<span>${label}</span></button>`;
   }).join('');
+  // Round 41 Task 6 — after render, centre the active chip in the
+  // horizontal strip. Uses inline:'center' so a chip near either edge
+  // still ends up visually anchored. rAF gives the browser a paint tick
+  // to measure the fresh innerHTML before we scroll.
+  requestAnimationFrame(() => {
+    const active = host.querySelector('.cat-tab.active');
+    if (active && typeof active.scrollIntoView === 'function') {
+      active.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    }
+  });
 }
 function filterCat(c) { activeCat = c; renderRecos(); }
 

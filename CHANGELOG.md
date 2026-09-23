@@ -65,7 +65,87 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
-### Round 39 — Calendar view for upcoming reservations _(2026-09-19)_
+### Round 41 — Guest app polish _(2026-09-23)_
+Six-task pass to correct visible defects across the guest-facing app without any redesign. Every task is independently shippable; all six merged separately with hotfixes along the way.
+
+**Task 1 · Privacy is a footer link, not a floating button.** The fixed-position "Privacy" pill (bottom-right, z-index 1100) overlapped WiFi/Emergency on Home, the second reco on Explore and the No-Parties rule on Rules. Same `#privacyLink` id now lives inside `.powered-by`, right of the wordmark, at the same muted weight. `openPrivacyModal()` unchanged. New i18n key `privacy_link` (EN + IT).
+
+**Task 2 · Split property free-text into per-language columns.** Home was rendering both languages back-to-back on Check-in Time / Getting Around / Check-out Time because the host had entered EN + IT into a single field. Migration `migration_round41_i18n_property_fields.sql` adds 8 nullable text columns (`welcome_message_it/_en`, `checkin_instructions_it/_en`, `checkout_instructions_it/_en`, `transport_info_it/_en`); original columns kept as fallback. Host console gets an IT/EN pill per field and a "✂ Split existing content" preview modal that proposes a blank-line split, sniffs Italian keywords for the halves and requires the host to Apply + Save. Guest app reads `_it/_en` first, falls back to the other language, then the legacy column via `window._propTextLang(d, field, lang)`. Field scope: 4 fields (welcome / checkin / checkout / transport) — spec listed "wifi notes" and "emergency notes" but neither exists as a column.
+
+**Task 3 · Small Home defects.** Four fixes:
+- **3.1 · Door-code chip filters placeholder values.** `_isLockboxPlaceholder()` treats `N/A`, `-`, `—`, `None`, `Nessuno` the same as empty; the dashed pill no longer covers the check-in card when hosts typed those strings into `keybox_code`.
+- **3.2 · Emergency phone.** "112 · Daniele: +6-8…" was clipped mid-digit in the compact half-width grid. Split into two lines — name on line 1, `tel:` link on line 2 — with `word-break: break-word`. Tap-to-call works from mobile.
+- **3.3 · Duplicate property name.** Home hero already carries the name in Playfair; the sticky top-bar was showing it again. `#page-welcome .top-bar-title { visibility: hidden }` on Home only; other pages keep their top-bar title. `visibility` (not `display:none`) keeps the space so the language toggle stays in place.
+- **3.4 · Bottom-chrome fold.** The Powered-by strip was ~30 px of permanent chrome above the 64 px nav (~22 % of an 844 px viewport). Now hidden at rest; `body.at-page-end` fades it in when the active `.page` is scrolled within 24 px of its end. `_updatePoweredByVisibility()` wired to each page's scroll (passive) and to every `goTo()`.
+
+**Task 4 · Emoji sweep → line-SVG sprite.** Every app-chrome emoji now renders as a 1.6-stroke line SVG matching the existing bottom-nav visual, so guests see the same design language on iOS Safari and Android Chrome (where Samsung's photo-realistic set was undercutting Playfair + property photography).
+- Inline `<svg>` sprite at top of body with 22 `<symbol>` definitions (plane, home, wave, pin, clock, wifi, alert, car, door, utensils, wine, eye, beach, bag, sparkle, camera, image, user, users, key, message, check + check-circle). `.ic` class = 1em × 1em, `fill:none`, `stroke:currentColor`, `stroke-width:1.6`. `icon(name)` helper for dynamic sites.
+- Replaced across Home (3 section headers + 6 card icons), Explore (filter chips + reco headers + address pin), Rules (single neutral marker — see Task 5), Check-in (guest-type icons + scan camera/image + success screens + "Already checked in?" key chip + escalation banner), Chat (h2 concierge marker, static + dynamic + T dictionaries).
+- Emoji stripped from i18n strings: `cat_*`, `maps_btn`, `consent_title`, `consent_saved`, `role_main`, `role_companion`, `scan_reading` (EN + IT). Also from dynamic templates: guest review-card summaries (📄🌍✏💾), doc-type chip (🛂🪪), chat toasts (📎🎤📨), host-reply bubble marker (🏠 → bold `**Name:**`), hero city badge (☀).
+- Kept Unicode geometric glyphs (⚠♀♂✓✕) — they render as text everywhere. Test-mode banner (host-only) and `console.log` emoji untouched. Guest-entered content out of scope.
+- **Hotfix #48**: initial `ic-pin-note` glyph (four segments meant to look like a top-down pushpin) rendered as an ugly double-T. Swapped for a standard info-circle.
+
+**Task 4.1 · Curated icon picker for rules.** Host console still had a free-text emoji input for rule icons, so the neutral marker on the guest side was uniform regardless of intent. Now: 12 curated icon names (`info, alert, pin, key, water, mute, no, broom, shirt, paw, trash, flame`) selectable from a 4×3 grid picker. Storage is the name string; both sides resolve to line-SVGs from a shared sprite. Legacy emoji values fall back to `info`. Preset rules re-mapped (quiet→mute, no smoking→flame, no pets→paw, waste→trash, keys→key, water→water, tidy→broom, parking→pin, AC→info, pool→water, open flames→flame, no parties→alert, WiFi→info, bathroom→water, shoes→info, check-out→pin).
+
+**Task 4.2 · Chat access fix + Oggi dashboard alert.** Two bugs surfaced when a help request came in:
+1. Round 40 T4 moved chat into Condividi but the `#chatBadge` `<div>` was left nested inside the Ospiti sidebar item. Host saw the red dot on Guests, clicked, found no chat. Badge moved to Condividi first, then back to Ospiti after the user asked to move chat there.
+2. The "Rispondi alla richiesta di aiuto" banner on the Guest Action Board was a plain `<div>`. Now renders as a button that jumps to `showPanel('chat')` — the router resolves the current section and paints the tab strip.
+
+**Chat moved to Ospiti** at the user's request. `SECTIONS.ospiti` now includes `chat` as its fifth panel; `SECTIONS.cond` keeps `qrlink` alone (single-panel section auto-hides the tab strip). Old `_readLastTab('cond') === 'chat'` returns are safe — `section.panels.includes()` fails and falls back to `qrlink`.
+
+**Oggi dashboard help alert.** New top-of-page red banner that surfaces the total count of pending help requests across all guests. Reads the same `rows[]` the dashboard already computed — no extra fetch. Click opens Chat via the router.
+
+**Task 5 · Rules severity (info vs restriction).** Every rule card had a red left rail and IMPORTANTE pill because the host had ticked "Importante" on all of them. Two-tier severity now:
+- **info** (default): neutral grey left rail, muted icon, no pill on guest side.
+- **restriction** (opt-in): red left rail, red icon, RESTRIZIONE pill on the host card.
+
+Guest CSS: `.rule-card` gets a neutral grey `border-left` by default; `.rule-card.important` keeps the red rail and now colours the icon `--red`. Host editor: the Importante checkbox becomes a two-option pill (Info | Restrizione) matching the header language toggle. New **"✨ Suggest severity"** button runs a title-match heuristic (`parties, smoking, pets, noise, quiet hours` + IT variants `feste, fumo, animali, rumore, silenzio`) and flips `is_important` accordingly. Non-destructive: rulesData updates in memory, toast reports before/after counts, host presses Save. No schema change — `is_important` boolean still drives everything, only the vocabulary got sharper. New i18n keys `rules_sev_info`, `rules_sev_restriction`, `btn_suggest_sev` (EN + IT).
+
+**Task 6 · Explore filter chip strip.** Post-Task-4 the 7 labels sit on one line, but 7 × ~70 px still overflows 390 px. Swap wrap for horizontal scroll: `flex-wrap: nowrap`, `overflow-x: auto`, `-webkit-overflow-scrolling: touch`, hidden scrollbar, `scroll-snap-type: x proximity` with `scroll-snap-align: center` on each chip. `renderCatTabs()` runs `requestAnimationFrame → scrollIntoView({inline:'center', behavior:'smooth'})` on the active chip after every render, so filter changes always centre the picked chip.
+
+### Round 40 — Host console simplification _(2026-09-22)_
+Eight-task restructure of the host console for two early-adopter pilot hosts. Every task independently shippable, all shipped in a single PR. **Alloggiati `.txt` output byte-identical** — content SHA `9553ab98…` for the export function body + every helper matched before and after the round.
+
+**Task 1 · Check-in table column overlap.** The `<thead>` and `<tbody>` both rendered 10 columns; the visible overlap was the sticky-right Actions column overlaying Citizenship / Document. Dropped Citizenship, Document, Submitted, Docs from thead + tbody (all four live in `viewGuest` already). Kept Guest / Type / Arrival / Departure / Birth / Actions. Colspans on empty-state and group-header rows updated (10 → 6).
+
+**Task 2 · Reject impossible dates of birth.** A guest row showed DOB `24/09/2026` — a future date parsed off a passport by the AI scan. Fixed at four layers:
+1. `api/scan-document.js` validates DOB after the model returns (real date, round-trips through `Date.UTC()`, > 1 year ago); on failure nulls the field and attaches `warnings: ['date_of_birth_invalid']`.
+2. `index.html` guest form: leaves the input empty, focuses it with `preventScroll`, shows an inline red note.
+3. Host `renderCheckins()`: red chip `⚠ Data di nascita non valida` / `⚠ Invalid date of birth` for any row failing the shared `_isValidPastDOB()` check.
+4. `exportAlloggiati()` blocks with an alert listing offenders (up to 20 + overflow) — no lines written when the guard fires.
+
+New i18n keys `dob_scan_warning` (guest app), `dob_invalid_chip`, `dob_invalid_export_block` (host console).
+
+**Task 3 · Login timeout + pill-toggle language switcher.** Login button could sit on "Accesso in corso…" forever if `sb.auth.signInWithPassword` hung. `Promise.race` against a 15 s timer with a `Symbol` sentinel to distinguish the timeout branch. On timeout: button restores its label, email stays in the field, inline error surfaces (`login_err_timeout`, EN + IT). Also replaced the two square language buttons on the login screen with the same pill toggle the console header uses — `setHostLang` already sweeps every `.lang-opt-h`, so the login pill stays in sync automatically.
+
+**Task 4 · Sidebar collapse to 5 sections + tab strip.** Old sidebar had 11 items across 4 group headers plus its own scrollbar — "Export & Conformità" sat below the fold. Restructured to five top-level items (no group headers, no inner scroll):
+
+| Section | Panels |
+|---|---|
+| **Oggi** | dashboard |
+| **Ospiti** | checkins, calendar, guestanalytics, contacts (+ chat, added in R41 T4.2) |
+| **Conformità** | export, compliance |
+| **Proprietà** | property, rules, recos |
+| **Condividi** | qrlink |
+
+Router: `showSection(id, tabId?)` picks the last-used tab (persisted in `localStorage.wbnb_section_tab`) and delegates to `showPanel(id)`. `showPanel(id)` extended to derive the section via `panelSection(id)`, highlight the sidebar item and paint the tab strip — all existing call sites (e.g. `showPanel('export')` from onboarding) still work. Last-active section persisted in `wbnb_section_last`.
+
+Sidebar count badges: **Oggi** shows guests in-property with no submitted check-in; **Conformità** shows check-ins in the last 48 h with `alloggiati_status !== 'filed'`. Painted from `allCheckins` at every cache refresh.
+
+**Task 5 · Dashboard: list-first, calendar moved.** List is the dashboard default; toggle removed. Calendar rendering moved to Ospiti → Calendario (`renderCalendarPanel()` reuses `_renderUpcomingCalendarBody()` — zero duplication). Booking rows: ellipsed URL replaced by the booking-code chip; Copia still copies the URL, Apri still opens it. 3-item cap with "Mostra tutte (N)" / "Show all (N)" expander.
+
+**Task 6 · Check-in table action weight.** Whole row is now clickable → `viewGuest`; Vedi button removed. Modifica / Elimina collapsed into a `⋯` menu per row (bubble-phase window listener closes menus on outside click). Type column shows localised label (Capogruppo / Ospite / Group lead / Guest) via `_guestTypeLabel()` — display only, stored `guest_type` and `GUEST_TYPE_CODES` unchanged. **Elimina Tutto** removed from the toolbar and relocated to **Property → Privacy & data** as `deleteAllCheckinsGated()` — scoped to `property_id`, gated by typing the property name.
+
+**Task 7 · Conformità: region filter + status checklist.** Every host used to see the ROSS1000 Veneto and Puglia SPOT Easy tiles regardless of where the property was. Now the export panel reads `propertyData.region` and:
+- Injects a top-of-page status checklist (three rows: national Alloggiati, regional statistical, tourist tax — each with a state (done / due / optional), a one-line description and a single primary action).
+- Regional tiles get `data-region` attributes; non-matching tiles collapse under an "Altre regioni" / "Other regions" `<details>` disclosure at the bottom of the Stat axis.
+- If `region` is empty, everything shows plus a prompt to set the region.
+
+Non-invasive by design: every existing action button and host-portal-slot integration is preserved.
+
+**Task 8 · Property panel sticky bar.** The floating `.panel-actions` pill (Round 37.2) pinned Edit / Save / Cancel / Preview to the top-right of the viewport, overlaying content as the host scrolled. Replaced on the property panel only with a sticky bar inside the panel body (`position:sticky top:0`). New i18n keys `prop_header_title`, `prop_header_hint`. Two follow-ups deferred and called out: wholesale emoji → line-SVG sweep (host console) and `.btn/.pri/.sm` class-name audit — both file-wide diffs that belong in their own rounds.
+
+
 Upcoming-reservations panel now toggles between the existing **List** and a new **Calendar** view. Same data source, same per-property scope, same guest-link click behaviour — just a different rendering. Persisted in `localStorage.wbnb_upcoming_view` (default `'list'`).
 - **Scope discipline**: not a PMS calendar. No availability editing, no rate management, no drag-move, no multi-property overlay, no schema changes, no new endpoints. If the diff had grown beyond the panel + its helpers + i18n strings, something would have been wrong.
 - **Data filter differs from list intentionally**: the list is strict-future; the calendar shows *month overlap* — `.lte('checkin_date', monthEndISO).gte('checkout_date', monthStartISO)` — so a stay whose check-in is in the past but check-out is in the visible month still renders. Same platform/property filters as the list.

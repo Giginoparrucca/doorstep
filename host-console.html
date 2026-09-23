@@ -1695,6 +1695,12 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       <div class="panel-actions">
         <button id="rulesEditToggle" class="btn btn-secondary" onclick="toggleRulesEditMode()">✏️ <span data-h="btn_edit_list">Edit</span></button>
         <button class="btn btn-secondary" onclick="addRule()" data-h="btn_add_rule" data-rules-edit-only style="display:none;">+ Add Custom Rule</button>
+        <!-- Round 41 Task 5 — auto-suggest severity. Runs a small
+             title-match heuristic (parties, smoking, pets, noise, quiet
+             hours + IT variants) and flips is_important on matching
+             rules to true, everything else to false. Non-destructive:
+             the host reviews and hits Save. -->
+        <button class="btn btn-secondary" onclick="autoSuggestRuleSeverity()" data-h="btn_suggest_sev" data-rules-edit-only style="display:none;">✨ Suggest severity</button>
         <button class="btn btn-primary" onclick="saveRules()" data-h="btn_save_rules" data-rules-edit-only style="display:none;">💾 Save Rules</button>
       </div>
     </div>
@@ -3756,6 +3762,10 @@ const HT = {
     rules_title_en: 'Title (EN)', rules_title_it: 'Titolo (IT)',
     rules_desc_en: 'Description (EN)', rules_desc_it: 'Descrizione (IT)',
     rules_important: 'Important',
+    // Round 41 Task 5 — severity vocabulary.
+    rules_sev_info: 'Info',
+    rules_sev_restriction: 'Restriction',
+    btn_suggest_sev: '✨ Suggest severity',
     rules_confirm_delete:  'Delete this rule?',
     rules_confirm_delete_named:  'Delete the rule "{name}"?',
     recos_confirm_delete:  'Delete this recommendation?',
@@ -4182,6 +4192,9 @@ const HT = {
     rules_title_en: 'Title (EN)', rules_title_it: 'Titolo (IT)',
     rules_desc_en: 'Description (EN)', rules_desc_it: 'Descrizione (IT)',
     rules_important: 'Importante',
+    rules_sev_info: 'Info',
+    rules_sev_restriction: 'Restrizione',
+    btn_suggest_sev: '✨ Suggerisci gravità',
     rules_confirm_delete:  'Eliminare questa regola?',
     rules_confirm_delete_named:  'Eliminare la regola "{name}"?',
     recos_confirm_delete:  'Eliminare questo consiglio?',
@@ -6865,6 +6878,28 @@ function toggleRecosEditMode() {
   renderRecos();
 }
 
+// Round 41 Task 5 — auto-suggest severity. Marks a rule as
+// restriction (is_important = true) when its title matches a small
+// bag of restriction words in EN + IT; everything else becomes info.
+// Runs in-memory only; the host reviews the pill state and clicks
+// Save to persist. Prevents "everything is red" — the state we hit
+// after hosts ticked "Importante" on every rule.
+const RESTRICTION_RE = /\b(party|parties|smoking|no smoking|pets?|no pets|noise|quiet hours?|feste?|eventi|fumo|animali|rumore|silenzio|ore di silenzio)\b/i;
+function autoSuggestRuleSeverity() {
+  if (!Array.isArray(rulesData) || rulesData.length === 0) return;
+  const it = hostLang === 'it';
+  const before = rulesData.filter(r => r.is_important).length;
+  for (const r of rulesData) {
+    const titles = [r.title_en, r.title_it, r.title].filter(Boolean).join(' ');
+    r.is_important = RESTRICTION_RE.test(titles);
+  }
+  const after = rulesData.filter(r => r.is_important).length;
+  renderRules();
+  toast(it
+    ? `Suggerimento applicato: ${after} restrizione/i (prima ${before}). Ricordati di premere Salva.`
+    : `Suggestion applied: ${after} restriction(s) (was ${before}). Remember to press Save.`);
+}
+
 // Round 41 T4.1 — curated icon set for house rules. r.icon stores one
 // of these names; any legacy emoji or unknown value falls back to
 // 'info'. Keep this list in sync with the ic-rule-* symbols in the
@@ -6950,8 +6985,13 @@ function renderRules() {
     listEl.innerHTML = rulesData.map(r => {
       const title = it ? (r.title_it || r.title_en || r.title || '') : (r.title_en || r.title_it || r.title || '');
       const desc  = it ? (r.desc_it  || r.desc_en  || r.desc  || '') : (r.desc_en  || r.desc_it  || r.desc  || '');
+      // Round 41 Task 5 — read-only pill renamed from "IMPORTANTE" to
+      // "RESTRIZIONE" so the label matches the severity vocabulary.
+      // is_important is still the underlying flag — the semantics just
+      // got sharper: "this is a restriction the guest must respect",
+      // not "please look at this too".
       const important = r.is_important
-        ? `<span style="background:rgba(224,90,90,0.10);color:#b03939;padding:2px 8px;border-radius:4px;font-size:0.6rem;letter-spacing:0.06em;text-transform:uppercase;font-weight:600;margin-left:8px;vertical-align:middle;">${_rulesSafe(h('rules_important') || 'Important')}</span>`
+        ? `<span style="background:rgba(224,90,90,0.10);color:#b03939;padding:2px 8px;border-radius:4px;font-size:0.6rem;letter-spacing:0.06em;text-transform:uppercase;font-weight:600;margin-left:8px;vertical-align:middle;">${_rulesSafe(h('rules_sev_restriction') || 'Restriction')}</span>`
         : '';
       // Round 41 T4.1 — read-only card uses the SVG matching the
       // stored icon name; legacy emoji values fall back to 'info'.
@@ -6991,9 +7031,19 @@ function renderRules() {
               <input class="form-input" style="font-size:0.75rem;" value="${r.title_it||''}" onchange="rulesData[${i}].title_it=this.value">
             </div>
           </div>
-          <label style="display:flex;align-items:center;gap:4px;font-size:0.75rem;white-space:nowrap;color:var(--red);cursor:pointer;">
-            <input type="checkbox" ${r.is_important?'checked':''} onchange="rulesData[${i}].is_important=this.checked"> ${h('rules_important')}
-          </label>
+          <!-- Round 41 Task 5 — severity toggle. "Info" is the neutral
+               default (grey rail on guest side, no chip). "Restrizione"
+               is the red-rail treatment for actual prohibitions
+               (parties, smoking, pets, noise). The DB stores the same
+               is_important boolean — this is just a clearer label. -->
+          <div class="severity-pill" role="tablist" style="display:inline-flex;background:var(--cream-2);border-radius:14px;padding:2px;border:1px solid var(--border);gap:2px;white-space:nowrap;">
+            <button type="button" role="tab" aria-selected="${!r.is_important}"
+              onclick="rulesData[${i}].is_important=false; renderRules();"
+              style="padding:4px 10px;border-radius:12px;font-size:0.66rem;font-weight:600;letter-spacing:0.05em;border:none;cursor:pointer;font-family:inherit;background:${!r.is_important ? 'var(--white)' : 'transparent'};color:${!r.is_important ? 'var(--ink)' : 'var(--ink-soft)'};box-shadow:${!r.is_important ? '0 1px 3px rgba(6,26,61,0.08)' : 'none'};">${h('rules_sev_info') || 'Info'}</button>
+            <button type="button" role="tab" aria-selected="${!!r.is_important}"
+              onclick="rulesData[${i}].is_important=true; renderRules();"
+              style="padding:4px 10px;border-radius:12px;font-size:0.66rem;font-weight:600;letter-spacing:0.05em;border:none;cursor:pointer;font-family:inherit;background:${r.is_important ? 'var(--red)' : 'transparent'};color:${r.is_important ? '#fff' : 'var(--ink-soft)'};box-shadow:${r.is_important ? '0 1px 3px rgba(224,69,94,0.25)' : 'none'};">${h('rules_sev_restriction') || 'Restriction'}</button>
+          </div>
         </div>
         <div style="display:flex;gap:6px;">
           <div style="flex:1;">

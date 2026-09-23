@@ -499,19 +499,27 @@ body.has-test-banner .page { top: var(--test-banner-h, 36px); }
   font-family: 'Playfair Display', serif;
   font-size: 1.4rem; font-weight: 500; color: var(--ink);
 }
+/* Round 41 Task 5 — rule cards have two severities:
+   - default (info): neutral gray left rail, muted icon
+   - .important (restriction): red left rail, ink-coloured icon
+   Result: "Cleaning tools" no longer looks like the alarm that
+   "No Parties" does. */
 .rule-card {
   margin: 0 16px 12px;
   background: var(--white); border-radius: var(--radius-s);
   padding: 16px 18px;
   border: 1px solid rgba(0,91,255,0.08);
+  border-left: 3px solid rgba(107,122,144,0.35);
   display: flex; align-items: flex-start; gap: 12px;
   box-shadow: var(--shadow-s);
 }
-.rule-icon { font-size: 1.3rem; flex-shrink: 0; margin-top: 2px; }
+.rule-icon { font-size: 1.3rem; flex-shrink: 0; margin-top: 2px; color: var(--ink-soft); }
 .rule-title { font-size: 0.82rem; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
 .rule-desc { font-size: 0.74rem; color: var(--ink-soft); line-height: 1.65; font-weight: 300; white-space: pre-wrap; }
 .rule-card.important { border-left: 3px solid var(--red); }
+.rule-card.important .rule-icon { color: var(--red); }
 .rule-card.tip { border-left: 3px solid var(--green); }
+.rule-card.tip .rule-icon { color: var(--green); }
 
 /* ══════════════════════════
    EXPLORE PAGE

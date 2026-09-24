@@ -4702,6 +4702,54 @@ async function renderDashboard() {
     rows.push({ code, summary, status, eng, topCats, action });
   }
 
+  // Round 42.1 — resolve the current escalation state per booking_code
+  // from chat_messages. Analytics events only record escalations, never
+  // resolutions, so the "help request" banner never cleared once the
+  // host replied. Same rule as loadHostChat / _notify-host.js: the
+  // latest system message decides — escalat/i means open, resolved or
+  // "returned to AI" means closed.
+  const escalatedCodes = new Set();
+  try {
+    const codesWithEscs = rows.filter(r => r.eng && r.eng.escs > 0).map(r => r.code);
+    if (codesWithEscs.length > 0) {
+      const { data: sysMsgs } = await sb.from('chat_messages')
+        .select('booking_code, message, created_at')
+        .eq('property_id', propertyId)
+        .eq('sender', 'system')
+        .eq('is_test', false)
+        .is('deleted_at', null)
+        .in('booking_code', codesWithEscs)
+        .order('created_at', { ascending: false })
+        .limit(500);
+      const latestByCode = {};
+      for (const m of (sysMsgs || [])) {
+        const code = m.booking_code;
+        if (!code || latestByCode[code]) continue;
+        const msg = String(m.message || '');
+        if (!/escalat|resolved|returned to ai/i.test(msg)) continue;
+        latestByCode[code] = msg;
+      }
+      for (const [code, msg] of Object.entries(latestByCode)) {
+        if (/resolved|returned to ai/i.test(msg)) continue;
+        if (/escalat/i.test(msg)) escalatedCodes.add(code);
+      }
+    }
+  } catch (e) { console.warn('[dashboard] escalation state fetch failed:', e); }
+
+  // Zero the escs count on rows whose conversation is no longer
+  // escalated. Recompute the action so the "urgent" prompt falls back
+  // to whatever's next in _gpgActionPrompt's chain (attention / normal
+  // / opportunity) instead of disappearing entirely for guests who
+  // still need something else.
+  for (const r of rows) {
+    if (r.eng && r.eng.escs > 0 && !escalatedCodes.has(r.code)) {
+      r.eng.escs = 0;
+      if (r.action && r.action.tone === 'urgent') {
+        r.action = _gpgActionPrompt(r.status, r.eng, r.topCats, false, r.summary.hasDocs);
+      }
+    }
+  }
+
   // Round 38.1 — reservations whose stay window includes today (or has
   // already started) but whose guest never opened the pre-checkin link
   // must still show on the dashboard. Otherwise they vanish from BOTH
@@ -9497,9 +9545,15 @@ function renderExportChecklist() {
   const rows = Array.isArray(allCheckins) ? allCheckins : [];
   const today = new Date().toISOString().slice(0, 10);
   const cutoff48h = new Date(Date.now() - 48 * 3600 * 1000).toISOString().slice(0, 10);
+  // Round 42.1 — count only guests who have arrived and are inside the
+  // 24 h filing window. Excludes future arrivals (their deadline hasn't
+  // started) and rows past the 48 h grace window (visible in the
+  // export list anyway). Keep in sync with paintNavBadges.
   const overdueAll = rows.filter(c =>
     c.submitted_at &&
-    (c.arrival_date || c.submitted_at.slice(0, 10)) >= cutoff48h &&
+    c.arrival_date &&
+    c.arrival_date <= today &&
+    c.arrival_date >= cutoff48h &&
     c.alloggiati_status !== 'filed'
   ).length;
 
@@ -12207,10 +12261,17 @@ function paintNavBadges() {
     ).length;
     _setBadge('navBadge-oggi', staying);
 
+    // Round 42.1 — Alloggiati filing badge counts only guests who have
+    // ACTUALLY ARRIVED and aren't yet filed. Previously the filter
+    // matched every future arrival too (arrival_date >= cutoff48h is
+    // true for any date after 48h ago, including next week's guests),
+    // so the badge red-flagged reservations that aren't due yet.
     const cutoff48h = new Date(Date.now() - 48 * 3600 * 1000).toISOString().slice(0, 10);
     const overdue = rows.filter(c =>
       c.submitted_at &&
-      (c.arrival_date || c.submitted_at.slice(0, 10)) >= cutoff48h &&
+      c.arrival_date &&
+      c.arrival_date <= today &&
+      c.arrival_date >= cutoff48h &&
       c.alloggiati_status !== 'filed'
     ).length;
     _setBadge('navBadge-conf', overdue);

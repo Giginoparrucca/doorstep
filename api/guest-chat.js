@@ -31,6 +31,7 @@
 
 import { verifyFromAuthHeader } from './_guest-token.js';
 import { applyCors } from './_cors.js';
+import { notifyHostForChatInsert } from './_notify-host.js';
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
@@ -164,6 +165,20 @@ async function doSend(res, propertyId, bookingCode, sessionId, body, isTest) {
       output_tokens: 0,
     });
   } catch (e) { console.warn('[guest-chat] api_usage insert failed:', e); }
+
+  // Round 42 — host notification pipeline. Fixed payload (no guest data)
+  // over push / telegram / email based on the host's settings. Awaited so
+  // Vercel doesn't cancel the mid-flight fetches; the guest client doesn't
+  // await this endpoint anyway, so the added latency is invisible.
+  try {
+    await notifyHostForChatInsert({
+      propertyId,
+      bookingCode,
+      sender,
+      message,
+      isTest: isTest === true,
+    });
+  } catch (e) { console.warn('[guest-chat] notifyHostForChatInsert failed:', e); }
 
   return res.status(200).json({ ok: true, id: inserted?.id });
 }

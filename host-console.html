@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>WelcomeBnB · Host Console</title>
+<!-- Round 42 — PWA manifest so the host can install to Home Screen
+     (iOS needs standalone mode before Web Push is available). -->
+<link rel="manifest" href="/host-manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="WelcomeBnB">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#061A3D">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -2133,6 +2141,18 @@ See you soon!</textarea>
       </div>
     </div>
     <div class="panel" id="panel-chat">
+      <!-- Round 42 — Avvisi card. Push / Telegram / Email settings for
+           the host. Hidden in admin view (?p=). Collapsed by default
+           once any channel is active. Populated by renderNotifCard(). -->
+      <details id="notifCard" class="notif-card" style="display:none;margin-bottom:14px;background:var(--white);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+        <summary style="cursor:pointer;list-style:none;padding:12px 16px;display:flex;align-items:center;gap:10px;font-weight:600;font-size:0.92rem;">
+          <span aria-hidden="true">🔔</span>
+          <span data-h="notif_card_title">Alerts</span>
+          <span id="notifCardSummary" style="flex:1;font-weight:400;font-size:0.78rem;color:var(--ink-soft);"></span>
+          <span aria-hidden="true" class="chev">▾</span>
+        </summary>
+        <div id="notifCardBody" style="padding:8px 16px 16px;font-size:0.86rem;"></div>
+      </details>
       <div style="display:flex;flex-direction:column;height:calc(100vh - 160px);min-height:300px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-shrink:0;flex-wrap:wrap;gap:8px;">
           <div>
@@ -3580,6 +3600,7 @@ const HT = {
     sidebar_chat: 'Guest Chat',
     t_chat: 'Guest Chat', s_chat: 'Respond to guest messages',
     chat_active_convos: 'Active Conversations',
+    notif_card_title: 'Alerts',
     chat_all_guests: 'All Guests',
     chat_no_messages: 'No messages yet. Guest conversations will appear here.',
     chat_no_booking: 'Guest (no booking code)',
@@ -4015,6 +4036,7 @@ const HT = {
     sidebar_chat: 'Chat Ospiti',
     t_chat: 'Chat Ospiti', s_chat: 'Rispondi ai messaggi degli ospiti',
     chat_active_convos: 'Conversazioni Attive',
+    notif_card_title: 'Avvisi',
     chat_all_guests: 'Tutti gli Ospiti',
     chat_no_messages: 'Nessun messaggio ancora. Le conversazioni degli ospiti appariranno qui.',
     chat_no_booking: 'Ospite (senza codice prenotazione)',
@@ -4582,7 +4604,14 @@ function showPanel(id, btn) {
   if (typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled) {
     setTimeout(() => setConsoleReadOnly(true), 0);
   }
-  if (id === 'chat') { loadHostChat(); document.getElementById('chatBadge').style.display = 'none'; markChatSeen(); requestNotifPermission(); }
+  if (id === 'chat') {
+    loadHostChat();
+    document.getElementById('chatBadge').style.display = 'none';
+    markChatSeen();
+    // Round 42 — no auto permission prompt any more. The Avvisi card
+    // has an explicit button (required inside a click handler on iOS).
+    initNotifCard();
+  }
   if (id === 'guestanalytics') loadGuestAnalytics();
   if (id === 'contacts') loadMarketingContacts();
   if (id === 'calendar') renderCalendarPanel(); // Round 40 T5
@@ -4671,6 +4700,54 @@ async function renderDashboard() {
     const topCats = _gpgTopRecoCategories(g.events);
     const action = _gpgActionPrompt(status, eng, topCats, isPreCheckin, summary.hasDocs);
     rows.push({ code, summary, status, eng, topCats, action });
+  }
+
+  // Round 42.1 — resolve the current escalation state per booking_code
+  // from chat_messages. Analytics events only record escalations, never
+  // resolutions, so the "help request" banner never cleared once the
+  // host replied. Same rule as loadHostChat / _notify-host.js: the
+  // latest system message decides — escalat/i means open, resolved or
+  // "returned to AI" means closed.
+  const escalatedCodes = new Set();
+  try {
+    const codesWithEscs = rows.filter(r => r.eng && r.eng.escs > 0).map(r => r.code);
+    if (codesWithEscs.length > 0) {
+      const { data: sysMsgs } = await sb.from('chat_messages')
+        .select('booking_code, message, created_at')
+        .eq('property_id', propertyId)
+        .eq('sender', 'system')
+        .eq('is_test', false)
+        .is('deleted_at', null)
+        .in('booking_code', codesWithEscs)
+        .order('created_at', { ascending: false })
+        .limit(500);
+      const latestByCode = {};
+      for (const m of (sysMsgs || [])) {
+        const code = m.booking_code;
+        if (!code || latestByCode[code]) continue;
+        const msg = String(m.message || '');
+        if (!/escalat|resolved|returned to ai/i.test(msg)) continue;
+        latestByCode[code] = msg;
+      }
+      for (const [code, msg] of Object.entries(latestByCode)) {
+        if (/resolved|returned to ai/i.test(msg)) continue;
+        if (/escalat/i.test(msg)) escalatedCodes.add(code);
+      }
+    }
+  } catch (e) { console.warn('[dashboard] escalation state fetch failed:', e); }
+
+  // Zero the escs count on rows whose conversation is no longer
+  // escalated. Recompute the action so the "urgent" prompt falls back
+  // to whatever's next in _gpgActionPrompt's chain (attention / normal
+  // / opportunity) instead of disappearing entirely for guests who
+  // still need something else.
+  for (const r of rows) {
+    if (r.eng && r.eng.escs > 0 && !escalatedCodes.has(r.code)) {
+      r.eng.escs = 0;
+      if (r.action && r.action.tone === 'urgent') {
+        r.action = _gpgActionPrompt(r.status, r.eng, r.topCats, false, r.summary.hasDocs);
+      }
+    }
   }
 
   // Round 38.1 — reservations whose stay window includes today (or has
@@ -9468,9 +9545,15 @@ function renderExportChecklist() {
   const rows = Array.isArray(allCheckins) ? allCheckins : [];
   const today = new Date().toISOString().slice(0, 10);
   const cutoff48h = new Date(Date.now() - 48 * 3600 * 1000).toISOString().slice(0, 10);
+  // Round 42.1 — count only guests who have arrived and are inside the
+  // 24 h filing window. Excludes future arrivals (their deadline hasn't
+  // started) and rows past the 48 h grace window (visible in the
+  // export list anyway). Keep in sync with paintNavBadges.
   const overdueAll = rows.filter(c =>
     c.submitted_at &&
-    (c.arrival_date || c.submitted_at.slice(0, 10)) >= cutoff48h &&
+    c.arrival_date &&
+    c.arrival_date <= today &&
+    c.arrival_date >= cutoff48h &&
     c.alloggiati_status !== 'filed'
   ).length;
 
@@ -10021,18 +10104,394 @@ function renderQR(url) {
 }
 
 /* ══════════════════════════════════════
+   Round 42 — Avvisi card (Web Push / Telegram / Email)
+════════════════════════════════════════════════════════
+   All host-facing alerts routing is configured here.
+   • Push: subscribe/unsubscribe via web-push + /sw-host.js
+   • Telegram: link via /api/telegram-link → t.me/...
+   • Email: mode select + address override
+   Reads/writes host_notification_settings and push_subscriptions
+   via `sb` under the host's own JWT (RLS enforces host_id).
+   Hidden in admin view (?p=), see _isAdminView. */
+let _notifState = null;      // { settings, subs, currentEndpoint }
+let _notifSWReg = null;      // ServiceWorkerRegistration for /sw-host.js
+window._notifHasLocalSub = false;
+
+function _isAdminView() {
+  try { return new URLSearchParams(window.location.search).get('p'); }
+  catch (_) { return null; }
+}
+
+async function initNotifCard() {
+  if (_isAdminView()) return;
+  const card = document.getElementById('notifCard');
+  if (!card) return;
+  try {
+    const uid = await _notifCurrentUid();
+    if (!uid) return;
+    const [settingsRes, subsRes] = await Promise.all([
+      sb.from('host_notification_settings').select('*').eq('host_id', uid).maybeSingle(),
+      sb.from('push_subscriptions').select('id,endpoint,device_label,last_success_at,created_at').eq('host_id', uid).order('created_at', { ascending: false }),
+    ]);
+    const settings = settingsRes.data || _notifDefaults();
+    const subs = Array.isArray(subsRes.data) ? subsRes.data : [];
+    _notifState = { uid, settings, subs, swRegistered: false };
+
+    // Detect whether THIS device already has a subscription (so we can
+    // suppress the in-tab Notification duplicate).
+    await _notifDetectLocalSub();
+
+    card.style.display = 'block';
+    // Collapsed once any channel is active — otherwise open so hosts see
+    // the setup path immediately.
+    const anyActive = settings.push_enabled && subs.length > 0
+                   || settings.telegram_enabled
+                   || settings.email_mode !== 'off';
+    card.open = !anyActive;
+    renderNotifCard();
+  } catch (e) {
+    console.warn('[notif] init failed:', e);
+  }
+}
+
+async function _notifCurrentUid() {
+  try {
+    const { data } = await sb.auth.getUser();
+    return data?.user?.id || null;
+  } catch (_) { return null; }
+}
+function _notifDefaults() {
+  return {
+    notify_scope: 'escalated', push_enabled: true,
+    telegram_chat_id: null, telegram_enabled: false,
+    email_mode: 'fallback', notify_email: null,
+    throttle_minutes: 10,
+  };
+}
+
+async function _notifDetectLocalSub() {
+  window._notifHasLocalSub = false;
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    const reg = await navigator.serviceWorker.getRegistration('/sw-host.js') || await navigator.serviceWorker.getRegistration('/');
+    if (!reg) return;
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return;
+    const known = (_notifState?.subs || []).some(r => r.endpoint === sub.endpoint);
+    window._notifHasLocalSub = known;
+    if (_notifState) _notifState.currentEndpoint = sub.endpoint;
+  } catch (_) {}
+}
+
+function renderNotifCard() {
+  const card = document.getElementById('notifCard');
+  const body = document.getElementById('notifCardBody');
+  const sum  = document.getElementById('notifCardSummary');
+  if (!card || !body || !_notifState) return;
+  const it = hostLang === 'it';
+  const s = _notifState.settings;
+  const subs = _notifState.subs;
+
+  // Summary line: chip-list of active channels.
+  const chips = [];
+  if (s.push_enabled && subs.length > 0) chips.push(it ? 'Push (' + subs.length + ')' : 'Push (' + subs.length + ')');
+  if (s.telegram_enabled)                chips.push('Telegram');
+  if (s.email_mode !== 'off')            chips.push(it ? 'Email' : 'Email');
+  sum.textContent = chips.length ? '· ' + chips.join(' · ') : (it ? '· da configurare' : '· not set up');
+
+  // Feature detection for iOS Home-Screen case.
+  const hasSW    = 'serviceWorker' in navigator;
+  const hasPush  = 'PushManager' in window;
+  const hasNotif = 'Notification' in window;
+  const isIOS    = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const inStandalone = (navigator.standalone === true) || matchMedia('(display-mode: standalone)').matches;
+  const iOSNeedsInstall = isIOS && !inStandalone;
+
+  const denied = hasNotif && Notification.permission === 'denied';
+  const perm   = hasNotif ? Notification.permission : 'unsupported';
+
+  // ── Push block ────────────────────────────────────────────────────
+  let pushBlock = '';
+  if (!hasSW || !hasPush || !hasNotif) {
+    pushBlock = `<div style="color:var(--ink-soft);">${it ? 'Le notifiche push non sono supportate su questo browser.' : 'Push notifications aren\'t supported on this browser.'}</div>`;
+  } else if (iOSNeedsInstall) {
+    pushBlock = `<div style="padding:10px 12px;background:rgba(0,91,255,0.05);border:1px solid rgba(0,91,255,0.15);border-radius:8px;color:var(--ink);">
+      <strong>${it ? 'Su iPhone' : 'On iPhone'}:</strong> ${it ? 'Condividi → Aggiungi a Home, poi apri WelcomeBnB dall\'icona e accedi.' : 'Share → Add to Home Screen, then open WelcomeBnB from the icon and sign in.'}
+    </div>`;
+  } else if (denied) {
+    pushBlock = `<div style="padding:10px 12px;background:rgba(224,90,90,0.05);border:1px solid rgba(224,90,90,0.25);border-radius:8px;color:#b03939;">
+      ${it ? 'Notifiche bloccate dal browser. Riabilitale nelle impostazioni del sito.' : 'Notifications blocked by the browser. Re-enable them in the site settings.'}
+    </div>`;
+  } else {
+    pushBlock = `<button class="btn btn-primary btn-sm" onclick="notifEnablePush(this)" style="margin-bottom:10px;">${it ? '🔔 Attiva avvisi su questo dispositivo' : '🔔 Enable alerts on this device'}</button>`;
+  }
+  const subsList = subs.length === 0
+    ? `<div style="font-size:0.78rem;color:var(--ink-soft);">${it ? 'Nessun dispositivo collegato.' : 'No devices linked yet.'}</div>`
+    : `<ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px;">${subs.map(sub => {
+        const isCurrent = sub.endpoint === _notifState.currentEndpoint;
+        return `<li style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:${isCurrent ? 'rgba(0,91,255,0.05)' : 'var(--cream-2)'};border-radius:6px;">
+          <span style="flex:1;font-size:0.82rem;">${_notifEsc(sub.device_label || 'device')}${isCurrent ? ` <span style="font-size:0.7rem;color:var(--warm);">· ${it ? 'questo' : 'this'}</span>` : ''}</span>
+          <button class="btn btn-secondary btn-sm" onclick="notifRemoveSub('${sub.id}', ${isCurrent ? 'true' : 'false'})">${it ? 'Rimuovi' : 'Remove'}</button>
+        </li>`;
+      }).join('')}</ul>`;
+
+  // ── Telegram block ────────────────────────────────────────────────
+  const tgBlock = s.telegram_enabled
+    ? `<div style="display:flex;align-items:center;gap:10px;">
+        <span style="flex:1;font-size:0.84rem;">${it ? 'Telegram collegato ✓' : 'Telegram linked ✓'}</span>
+        <button class="btn btn-secondary btn-sm" onclick="notifUnlinkTelegram()">${it ? 'Scollega' : 'Unlink'}</button>
+      </div>`
+    : `<button class="btn btn-secondary btn-sm" onclick="notifLinkTelegram(this)">${it ? 'Collega Telegram' : 'Link Telegram'}</button>`;
+
+  // ── Email + scope + throttle ──────────────────────────────────────
+  const emailBlock = `
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+      <label style="font-size:0.78rem;color:var(--ink-soft);">${it ? 'Modalità email' : 'Email mode'}</label>
+      <select onchange="notifSaveField('email_mode', this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;">
+        <option value="off"      ${s.email_mode==='off'?'selected':''}>${it ? 'Off' : 'Off'}</option>
+        <option value="fallback" ${s.email_mode==='fallback'?'selected':''}>${it ? 'Solo se gli altri avvisi non arrivano' : 'Only if other alerts fail'}</option>
+        <option value="always"   ${s.email_mode==='always'?'selected':''}>${it ? 'Sempre' : 'Always'}</option>
+      </select>
+      <input type="email" placeholder="${_notifEsc(it ? 'Indirizzo email (opzionale)' : 'Email address (optional)')}"
+        value="${_notifEsc(s.notify_email || '')}"
+        onchange="notifSaveField('notify_email', this.value.trim() || null)"
+        style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;min-width:220px;flex:1;">
+    </div>`;
+
+  const scopeBlock = `
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+      <label style="font-size:0.78rem;color:var(--ink-soft);">${it ? 'Quando avvisare' : 'When to alert'}</label>
+      <select onchange="notifSaveField('notify_scope', this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;">
+        <option value="escalated" ${s.notify_scope==='escalated'?'selected':''}>${it ? 'Solo quando l\'ospite chiede di te' : 'Only when the guest asks for you'}</option>
+        <option value="all"       ${s.notify_scope==='all'?'selected':''}>${it ? 'Ogni messaggio dell\'ospite' : 'Every guest message'}</option>
+      </select>
+    </div>`;
+
+  const throttleBlock = `
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+      <label style="font-size:0.78rem;color:var(--ink-soft);">${it ? 'Anti-ripetizione' : 'Throttle'}</label>
+      <select onchange="notifSaveField('throttle_minutes', Number(this.value))" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;">
+        ${[5,10,15,30].map(n => `<option value="${n}" ${s.throttle_minutes===n?'selected':''}>${n} min</option>`).join('')}
+      </select>
+    </div>`;
+
+  body.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <section>
+        <div style="font-weight:600;font-size:0.82rem;margin-bottom:6px;">${it ? 'Push su questo dispositivo' : 'Push on this device'}</div>
+        ${pushBlock}
+        <div style="font-weight:600;font-size:0.78rem;color:var(--ink-soft);margin-top:10px;margin-bottom:6px;">${it ? 'Dispositivi collegati' : 'Linked devices'}</div>
+        ${subsList}
+      </section>
+      <section>
+        <div style="font-weight:600;font-size:0.82rem;margin-bottom:6px;">Telegram</div>
+        ${tgBlock}
+      </section>
+      <section>
+        <div style="font-weight:600;font-size:0.82rem;margin-bottom:6px;">Email</div>
+        ${emailBlock}
+      </section>
+      <section>${scopeBlock}</section>
+      <section>${throttleBlock}</section>
+      <section style="display:flex;align-items:center;gap:10px;">
+        <button class="btn btn-secondary btn-sm" onclick="notifSendTest(this)">${it ? '📤 Invia avviso di prova' : '📤 Send test alert'}</button>
+        <span id="notifTestResult" style="font-size:0.78rem;color:var(--ink-soft);"></span>
+      </section>
+    </div>`;
+}
+
+async function notifSaveField(field, value) {
+  if (!_notifState) return;
+  const uid = _notifState.uid;
+  const patch = { host_id: uid, [field]: value, updated_at: new Date().toISOString() };
+  const { data, error } = await sb.from('host_notification_settings').upsert(patch, { onConflict: 'host_id' }).select();
+  if (error) { toast(hostLang === 'it' ? 'Errore salvataggio: ' + error.message : 'Save failed: ' + error.message); return; }
+  if (!data || data.length === 0) { toast(hostLang === 'it' ? 'Salvataggio bloccato (RLS?)' : 'Save blocked (RLS?)'); return; }
+  _notifState.settings = data[0];
+  renderNotifCard();
+}
+
+async function notifEnablePush(btn) {
+  const it = hostLang === 'it';
+  btn.disabled = true; const origLbl = btn.textContent;
+  btn.textContent = it ? 'Attivazione…' : 'Enabling…';
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+      throw new Error(it ? 'Non supportato' : 'Not supported');
+    }
+    // Permission MUST be requested inside the click handler on iOS.
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') throw new Error(it ? 'Permesso negato' : 'Permission denied');
+
+    // Register /sw-host.js. Try scoped first, fall back to root scope.
+    let reg = null;
+    try { reg = await navigator.serviceWorker.register('/sw-host.js', { scope: '/host-console.html' }); }
+    catch (_) { reg = await navigator.serviceWorker.register('/sw-host.js', { scope: '/' }); }
+    await navigator.serviceWorker.ready;
+    _notifSWReg = reg;
+
+    // Fetch VAPID public key and subscribe.
+    const cfg = await fetch('/api/push-config').then(r => r.json());
+    const vapidKey = cfg?.vapidPublicKey;
+    if (!vapidKey) throw new Error('no VAPID key');
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: _notifUrlBase64ToUint8(vapidKey),
+    });
+    const raw = sub.toJSON();
+    const label = _notifDeviceLabel();
+    const row = {
+      host_id: _notifState.uid,
+      endpoint: raw.endpoint,
+      p256dh: raw.keys?.p256dh || '',
+      auth: raw.keys?.auth || '',
+      device_label: label,
+    };
+    const { data, error } = await sb.from('push_subscriptions').upsert(row, { onConflict: 'endpoint' }).select();
+    if (error) throw error;
+    // Ensure push is on in settings (default is true, but write to make it explicit).
+    await notifSaveField('push_enabled', true);
+    hostNotifGranted = true;
+    toast(it ? 'Avvisi push attivati.' : 'Push alerts enabled.');
+    await _reloadNotifState();
+  } catch (e) {
+    toast((it ? 'Errore: ' : 'Error: ') + (e?.message || e));
+  } finally {
+    btn.disabled = false; btn.textContent = origLbl;
+  }
+}
+
+async function notifRemoveSub(id, isCurrent) {
+  if (!_notifState) return;
+  const it = hostLang === 'it';
+  const { data, error } = await sb.from('push_subscriptions').delete().eq('id', id).select();
+  if (error) { toast((it ? 'Errore: ' : 'Error: ') + error.message); return; }
+  if (isCurrent) {
+    try {
+      const reg = await navigator.serviceWorker.getRegistration('/sw-host.js') || await navigator.serviceWorker.getRegistration('/');
+      const sub = reg && await reg.pushManager.getSubscription();
+      if (sub) await sub.unsubscribe();
+    } catch (_) {}
+  }
+  toast(it ? 'Dispositivo rimosso.' : 'Device removed.');
+  await _reloadNotifState();
+}
+
+async function notifLinkTelegram(btn) {
+  const it = hostLang === 'it';
+  const origLbl = btn.textContent;
+  btn.disabled = true; btn.textContent = it ? 'Attendo…' : 'Working…';
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const jwt = session?.access_token;
+    if (!jwt) throw new Error('no session');
+    const r = await fetch('/api/telegram-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
+      body: '{}',
+    });
+    const j = await r.json();
+    if (!r.ok || !j.url) throw new Error(j.error || ('HTTP ' + r.status));
+    window.open(j.url, '_blank', 'noopener');
+    toast(it ? 'Apri Telegram e premi Start per collegare.' : 'Open Telegram and press Start to link.');
+  } catch (e) {
+    toast((it ? 'Errore: ' : 'Error: ') + (e?.message || e));
+  } finally {
+    btn.disabled = false; btn.textContent = origLbl;
+  }
+}
+
+async function notifUnlinkTelegram() {
+  const it = hostLang === 'it';
+  const { error } = await sb.from('host_notification_settings').update({
+    telegram_enabled: false, telegram_chat_id: null, updated_at: new Date().toISOString(),
+  }).eq('host_id', _notifState.uid).select();
+  if (error) { toast((it ? 'Errore: ' : 'Error: ') + error.message); return; }
+  toast(it ? 'Telegram scollegato.' : 'Telegram unlinked.');
+  await _reloadNotifState();
+}
+
+async function notifSendTest(btn) {
+  const it = hostLang === 'it';
+  const origLbl = btn.textContent;
+  btn.disabled = true; btn.textContent = it ? 'Invio…' : 'Sending…';
+  const out = document.getElementById('notifTestResult');
+  out.textContent = '';
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    const jwt = session?.access_token;
+    if (!jwt) throw new Error('no session');
+    const r = await fetch('/api/notify-test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
+      body: '{}',
+    });
+    const j = await r.json();
+    if (r.status === 429) { out.textContent = it ? 'Troppe prove. Riprova più tardi.' : 'Too many tests. Try again later.'; return; }
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    const parts = (j.results || []).map(x => `${x.channel}:${x.status}`).join('  ');
+    out.textContent = parts || (it ? 'Nessun canale attivo.' : 'No channels active.');
+  } catch (e) {
+    out.textContent = (it ? 'Errore: ' : 'Error: ') + (e?.message || e);
+  } finally {
+    btn.disabled = false; btn.textContent = origLbl;
+  }
+}
+
+async function _reloadNotifState() {
+  const uid = _notifState?.uid;
+  if (!uid) return;
+  const [settingsRes, subsRes] = await Promise.all([
+    sb.from('host_notification_settings').select('*').eq('host_id', uid).maybeSingle(),
+    sb.from('push_subscriptions').select('id,endpoint,device_label,last_success_at,created_at').eq('host_id', uid).order('created_at', { ascending: false }),
+  ]);
+  _notifState.settings = settingsRes.data || _notifDefaults();
+  _notifState.subs = Array.isArray(subsRes.data) ? subsRes.data : [];
+  await _notifDetectLocalSub();
+  renderNotifCard();
+}
+
+function _notifDeviceLabel() {
+  const ua = navigator.userAgent || '';
+  const os = /iPad|iPhone|iPod/.test(ua) ? 'iPhone'
+           : /Android/.test(ua)          ? 'Android'
+           : /Windows/.test(ua)          ? 'Windows'
+           : /Mac OS X/.test(ua)         ? 'Mac'
+           : /Linux/.test(ua)            ? 'Linux'
+           : 'Device';
+  const br = /Chrome\//.test(ua) && !/Edg\//.test(ua) ? 'Chrome'
+           : /Firefox\//.test(ua)                     ? 'Firefox'
+           : /Edg\//.test(ua)                         ? 'Edge'
+           : /Safari\//.test(ua)                      ? 'Safari'
+           : 'Browser';
+  return `${os} · ${br}`;
+}
+
+function _notifUrlBase64ToUint8(b64) {
+  const padding = '='.repeat((4 - (b64.length % 4)) % 4);
+  const base64 = (b64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+function _notifEsc(s) {
+  return String(s == null ? '' : s).replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ══════════════════════════════════════
    HOST CHAT — real-time guest messaging
 ══════════════════════════════════════ */
 let hostChatSub = null;
 let hostNotifGranted = false;
 let notifTitleInterval = null;
 
-// Request on first user interaction (browsers require gesture)
-document.addEventListener('click', function askNotif() {
-  requestNotifPermission();
-  document.removeEventListener('click', askNotif);
-}, { once: true });
-
+// Round 42 — the auto permission prompt on first click is gone. The
+// host now grants Notification explicitly via the "Attiva avvisi su
+// questo dispositivo" button in the Avvisi card on the Chat tab.
+// requestNotifPermission stays as a helper that button and old code
+// paths can call — it's just no longer auto-fired.
 async function requestNotifPermission() {
   if (!('Notification' in window)) { console.log('🔔 Notifications not supported'); return; }
   if (Notification.permission === 'granted') { hostNotifGranted = true; console.log('🔔 Notifications: granted'); return; }
@@ -10048,10 +10507,15 @@ async function requestNotifPermission() {
 function showHostNotification(title, body) {
   console.log('🔔 Notification:', title, body);
 
-  // 1. Browser notification (works when tab is open but not focused)
-  if (hostNotifGranted) {
+  // Round 42 — only fire the in-tab Notification when this device has NO
+  // active push subscription. Otherwise the host would receive two
+  // notifications for the same message (the SW push + this one). The
+  // beep and title flash below still fire — they're useful even with
+  // push enabled and the tab focused.
+  const hasLocalPush = window._notifHasLocalSub === true;
+  if (hostNotifGranted && !hasLocalPush) {
     try {
-      const n = new Notification(title, { body, icon: '🏠', tag: 'wbnb-chat', renotify: true });
+      const n = new Notification(title, { body, icon: '/icon-192.png', tag: 'wbnb-chat', renotify: true });
       n.onclick = () => { window.focus(); showPanel('chat', document.querySelector('[onclick*=chat]')); n.close(); };
     } catch (e) { console.warn('🔔 Notification error:', e); }
   }
@@ -11538,6 +12002,43 @@ async function init() {
     }
   }
 
+  // Round 42 — deep-link handler for push / email / telegram alert
+  // clicks. Runs BEFORE the section-restore below so it wins. The
+  // notify_prop query param must resolve to a property the current
+  // host owns; otherwise the whole trio is ignored silently
+  // (a malicious link can't jump the host into someone else's chat).
+  try {
+    const qs = new URLSearchParams(window.location.search);
+    const notifyProp = qs.get('notify_prop');
+    const openParam  = qs.get('open');
+    const convParam  = qs.get('conv');
+    if (notifyProp && openParam === 'chat') {
+      const owned = Array.isArray(allProperties) && allProperties.some(p => p.id === notifyProp);
+      if (owned) {
+        if (notifyProp !== propertyId && typeof switchProperty === 'function') {
+          await switchProperty(notifyProp);
+        }
+        showSection('ospiti', 'chat');
+        // Set the conversation filter if it exists in the dropdown.
+        setTimeout(() => {
+          const sel = document.getElementById('hostChatFilter');
+          if (sel && convParam) {
+            const target = convParam === '_no_code' ? '_no_code' : convParam;
+            for (const o of sel.options) { if (o.value === target) { sel.value = target; break; } }
+            if (typeof loadHostChat === 'function') loadHostChat();
+          }
+        }, 60);
+        // Strip the params so a reload doesn't re-trigger the deep link.
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete('notify_prop');
+        cleanUrl.searchParams.delete('open');
+        cleanUrl.searchParams.delete('conv');
+        history.replaceState(null, '', cleanUrl.toString());
+        return; // skip the section-restore below
+      }
+    }
+  } catch (e) { console.warn('[notif] deep-link handler failed:', e); }
+
   // Round 40 Task 4 — restore the last visible section/tab across
   // reloads. Panels other than dashboard start hidden until an explicit
   // showPanel is called, so we need to fire one at boot regardless.
@@ -11760,10 +12261,17 @@ function paintNavBadges() {
     ).length;
     _setBadge('navBadge-oggi', staying);
 
+    // Round 42.1 — Alloggiati filing badge counts only guests who have
+    // ACTUALLY ARRIVED and aren't yet filed. Previously the filter
+    // matched every future arrival too (arrival_date >= cutoff48h is
+    // true for any date after 48h ago, including next week's guests),
+    // so the badge red-flagged reservations that aren't due yet.
     const cutoff48h = new Date(Date.now() - 48 * 3600 * 1000).toISOString().slice(0, 10);
     const overdue = rows.filter(c =>
       c.submitted_at &&
-      (c.arrival_date || c.submitted_at.slice(0, 10)) >= cutoff48h &&
+      c.arrival_date &&
+      c.arrival_date <= today &&
+      c.arrival_date >= cutoff48h &&
       c.alloggiati_status !== 'filed'
     ).length;
     _setBadge('navBadge-conf', overdue);

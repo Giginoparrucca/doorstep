@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "WelcomeBnB — API server dependencies. See CHANGELOG Round 42 for the addition rationale.",
+  "dependencies": {
+    "web-push": "^3.6.7"
+  }
+}

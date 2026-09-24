@@ -65,6 +65,65 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 42 — Host alerts: Web Push + Telegram + Email _(2026-09-23)_
+Hosts now find out a guest needs them without keeping a browser tab open. Three parallel transports (Web Push primary, Telegram optional, Email fallback) fire from the same server-side notifier the moment a guest message lands in `chat_messages` — with a hard GDPR-driven content rule: **the alert only ever says "Un ospite ha bisogno di te · {property name}" plus a deep link.** Message text, guest name and booking code never leave our server for a push service, Telegram, or Resend.
+
+**Trigger logic** (`api/_notify-host.js`, called from `api/guest-chat.js`):
+- **Escalation** (sender=`system`, body matches `/escalat/i` and NOT `/resolved|returned to AI/i`) — always alerts, bypasses throttle.
+- **Guest message** — filtered by host's `notify_scope` (`escalated` = only when the guest asks for you; `all` = every guest message) and by throttle (default 10 min, configurable 1–120). Throttle key is `property_id + booking_code || '_no_code'`; skipped if the host has already been alerted or replied inside the window.
+- **Test** flag (`is_test=true`) never fires alerts.
+- All channels run under `Promise.allSettled` with a 4-second hard cap; the request never blocks the guest's send even if a channel is slow.
+
+**Channels:**
+- **Web Push** via the `web-push` npm package + VAPID. Subscription flow: host taps "Enable alerts on this device" in the Avvisi card → registers `/sw-host.js` → `pushManager.subscribe` with `applicationServerKey=VAPID_PUBLIC_KEY` → row upserted into `push_subscriptions` (endpoint UNIQUE). 404/410 responses from the push service delete the subscription; other errors bump `failure_count`. iOS is supported once the host adds the site to Home Screen — the manifest + apple-mobile-web-app metadata are wired.
+- **Telegram** via `TELEGRAM_BOT_TOKEN`. Linking: host taps "Link Telegram" → `api/telegram-link` mints a 15-min single-use token → opens `t.me/<bot>?start=<token>` → the webhook (`api/telegram-webhook`) binds `chat_id` to `host_id` and enables it. `/stop` inside the chat unlinks. Webhook auth: constant-time compare of `X-Telegram-Bot-Api-Secret-Token` against `TELEGRAM_WEBHOOK_SECRET`. Message sent via `sendMessage` with an inline `Apri chat` button.
+- **Email** via Resend. Two modes: `always` (send every time) or `fallback` (send only if neither push nor Telegram delivered). Address defaults to `properties.reminder_email`, override in `host_notification_settings.notify_email`. Language follows `properties.host_language`.
+
+**Schema** (`migration_round42_host_notifications.sql`):
+- `host_notification_settings` (host_id PK → auth.users, `notify_scope` `escalated|all`, `push_enabled`, `telegram_chat_id`, `telegram_enabled`, `email_mode` `off|fallback|always`, `notify_email`, `throttle_minutes` 1..120).
+- `push_subscriptions` (endpoint UNIQUE, `p256dh`, `auth`, `device_label`, `last_success_at`, `failure_count`).
+- `notification_log` (bigserial, `trigger IN escalation|guest_message|test`, `channel IN push|telegram|email|none`, `status IN sent|failed|skipped`, `detail` jsonb, `conversation_key` for throttle lookups).
+- `telegram_link_tokens` (token PK, `expires_at`, `used_at`, service_role only — no anon or authenticated grants).
+- RLS + explicit `GRANT` on all four (Round 20.2 lesson: tables via SQL don't inherit grants). Anon has zero grants. Authenticated has scoped CRUD via `host_id = auth.uid()`. Service-role has full CRUD for the notifier + webhook.
+
+**Front-end** (`host-console.html`):
+- **Avvisi card** — collapsible `<details>` at the top of the Chat panel. Summary shows a chip list of active channels. Body has: push button (with iOS-install hint when applicable and a "blocked" hint when `Notification.permission==='denied'`), a list of linked devices with per-device Remove, Telegram link/unlink, email mode + address, scope selector, throttle selector, and "Send test alert".
+- **Auto permission prompt removed.** The old `document.addEventListener('click', ...)` on first click is gone. iOS requires the permission request to sit inside a real gesture handler, so the button in the Avvisi card owns it.
+- **Duplicate-alert guard.** When the tab is open and the host also has a local push subscription on this device, `showHostNotification` no longer fires the in-tab `new Notification()` — otherwise the host would see two toasts for the same event (SW push + in-tab). Beep and title-flash still fire.
+- **Deep-link handler.** Alerts carry `?notify_prop=<uuid>&open=chat&conv=<key>`. On boot, if the current host owns `notify_prop`, switch property, open Ospiti → Chat, preselect the conversation. Params are then stripped with `history.replaceState`. Malicious links pointing to someone else's property are ignored. `?p=` (admin view) is never affected because the handler runs after `allProperties` is loaded, and admin view never carries `notify_prop` in its own URLs.
+- **PWA metadata** — `/host-manifest.webmanifest` (standalone, portrait, background+theme colours, 192+512 icons), Apple touch icon, `apple-mobile-web-app-capable`. Necessary for iOS Web Push.
+
+**Service worker** (`sw-host.js`, scope requested at `/host-console.html` with `/` fallback):
+- No fetch listener, no caching, no `skipWaiting`. Nothing about the guest app changes.
+- `push` handler **always** calls `showNotification` — iOS revokes subscriptions if a push is silent, and browsers throttle subscriptions that never render.
+- `notificationclick` focuses an existing `/host-console.html` client if one is open (and navigates it to `event.notification.data.url`), or opens a new window otherwise.
+
+**Endpoints:**
+- `POST /api/push-config` → `{vapidPublicKey}`. No auth. CORS allow-listed.
+- `POST /api/telegram-link` → mints a token + returns `t.me/<bot>?start=<token>`. Host JWT required. 5/host/hour.
+- `POST /api/telegram-webhook` — Telegram-only, secret-token authenticated, always 200 after auth so Telegram doesn't back off.
+- `POST /api/notify-test` → sends a "Notifica di prova" through every enabled channel. Host JWT required. 3/host/10 min.
+
+**Removed:** the old `notifyTelegram(...)` call sites and function body in `api/chat.js`. That code path used a single admin chat and predated the per-host setting. `TELEGRAM_CHAT_ID` env var is no longer read — safe to delete on Vercel.
+
+**Non-obvious choices:**
+- Alert body is fixed. Never templatised on message content. This is a GDPR / data-transfer decision, not a taste choice. If we ever want to include content, it needs a separate per-host consent flag and a separate cost/legal review — do not silently unblock it.
+- Throttle skip must also count host chat messages in the same conversation. If the host already replied inside the window they don't need another alert.
+- `push_enabled` defaults to true, but a row is only inserted when the host actually saves a setting, so absence of a row is equivalent to defaults.
+- `web-push` needs `VAPID_SUBJECT` — a `mailto:` string identifying who to contact if a push endpoint misbehaves. Set to `mailto:welcomebnbadmin@gmail.com`.
+
+**Deployment** (must be done in this order, before the round is usable):
+1. Apply the migration in Supabase (already done via MCP; verification query passes).
+2. Generate VAPID keys once: `npx web-push generate-vapid-keys`. Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT=mailto:welcomebnbadmin@gmail.com` on Vercel.
+3. Create the Telegram bot with @BotFather. Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_BOT_USERNAME`.
+4. Pick a random `TELEGRAM_WEBHOOK_SECRET` (base64, ≥32 bytes). Set on Vercel.
+5. Register the webhook: `curl "https://api.telegram.org/bot$TOKEN/setWebhook" -d "url=https://welcomebnb.vercel.app/api/telegram-webhook&secret_token=$SECRET"`.
+6. Set `APP_BASE_URL=https://welcomebnb.vercel.app` if not already set.
+7. Verify the preview deployment renders the Avvisi card, "Send test alert" succeeds, and every pre-existing endpoint still responds — `package.json` is new to the repo and Vercel will now run `npm install` for the first time.
+8. Optionally delete `TELEGRAM_CHAT_ID` (no longer read).
+
+**Files touched:** `migration_round42_host_notifications.sql`, `api/_notify-host.js`, `api/push-config.js`, `api/telegram-link.js`, `api/telegram-webhook.js`, `api/notify-test.js`, `api/guest-chat.js`, `api/chat.js` (removal), `sw-host.js`, `host-manifest.webmanifest`, `icon-192.png`, `icon-512.png`, `package.json`, `host-console.html`.
+
 ### Round 41 — Guest app polish _(2026-09-23)_
 Six-task pass to correct visible defects across the guest-facing app without any redesign. Every task is independently shippable; all six merged separately with hotfixes along the way.
 

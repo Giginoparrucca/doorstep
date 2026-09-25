@@ -4457,8 +4457,13 @@ const SECTIONS = {
   // contacts because that's where the host thinks about individual guests.
   // Condividi keeps qrlink alone (single-panel section — the tab strip
   // auto-hides when there's only one panel).
-  ospiti: { panels: ['checkins', 'calendar', 'guestanalytics', 'contacts', 'chat'] },
-  conf:   { panels: ['export', 'compliance'] },
+  // Round 42.3 — check-in data moved to Conformità. The Alloggiati
+  // filing badge fires there; hosts were bouncing to Ospiti to mark
+  // each check-in as filed, then back to Conformità. Checkins lives
+  // where filing lives now. Ospiti keeps the individual-guest views
+  // (calendar, chat, analytics, contacts).
+  ospiti: { panels: ['calendar', 'chat', 'guestanalytics', 'contacts'] },
+  conf:   { panels: ['checkins', 'export', 'compliance'] },
   prop:   { panels: ['property', 'rules', 'recos'] },
   cond:   { panels: ['qrlink'] },
 };

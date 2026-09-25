@@ -7971,20 +7971,50 @@ function fmtDateIT(isoDate) {
 function exportAlloggiati() {
   if (allCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato check-in da esportare!' : 'No check-in data to export!'); return; }
 
-  // Default: last 48 hours from now
+  // Round 42.1 — Alloggiati Web rejects any row whose arrival is in the
+  // future. Guests can pre-check-in days ahead of time, so an unfiltered
+  // export blows up when it mixes today's arrivals with a reservation
+  // for next week. Rule now: only include guests who have arrived
+  // (arrival_date <= today), and default to the last 48 h window since
+  // that's the actionable set for the 24 h filing deadline. Future
+  // arrivals will surface here again after their arrival date passes,
+  // and the filing_reminder email cron already re-fires per row on
+  // arrival_date + 1.
+  const today = new Date().toISOString().split('T')[0];
   const cutoff48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const hasArrived = c => {
+    const arr = c.arrival_date || c.submitted_at?.split('T')[0] || '';
+    return arr && arr <= today;
+  };
   const recentGuests = allCheckins.filter(c => {
+    if (!hasArrived(c)) return false;
     const arr = c.arrival_date || c.submitted_at?.split('T')[0] || '';
     return arr >= cutoff48h;
   });
 
-  // If no recent guests, offer to export all
+  // If no recent arrivals, offer to export every arrived guest — never
+  // future ones (Alloggiati would reject the whole batch).
   let toExport = recentGuests;
   if (recentGuests.length === 0) {
+    const arrivedAll = allCheckins.filter(hasArrived);
+    const futureCount = allCheckins.length - arrivedAll.length;
+    if (arrivedAll.length === 0) {
+      toast(hostLang === 'it'
+        ? (futureCount > 0
+            ? `Nessun ospite ancora arrivato. ${futureCount} check-in futuri esclusi.`
+            : 'Nessun ospite arrivato da esportare.')
+        : (futureCount > 0
+            ? `No guests have arrived yet. ${futureCount} future check-in(s) excluded.`
+            : 'No arrived guests to export.'));
+      return;
+    }
+    const suffix = futureCount > 0
+      ? (hostLang === 'it' ? ` (${futureCount} check-in futuri esclusi)` : ` (${futureCount} future check-in(s) excluded)`)
+      : '';
     if (!confirm(hostLang === 'it'
-      ? `Nessun ospite nelle ultime 48 ore. Esportare tutti i ${allCheckins.length} ospiti?`
-      : `No guests in the last 48 hours. Export all ${allCheckins.length} guests?`)) return;
-    toExport = allCheckins;
+      ? `Nessun ospite nelle ultime 48 ore. Esportare tutti i ${arrivedAll.length} ospiti già arrivati?${suffix}`
+      : `No guests in the last 48 hours. Export all ${arrivedAll.length} arrived guest(s)?${suffix}`)) return;
+    toExport = arrivedAll;
   }
 
   // Round 40 T2 — block generation if any guest in the selected set has

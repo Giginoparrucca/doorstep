@@ -4419,6 +4419,14 @@ function setHostLang(l) {
   renderRecos();
   if (typeof renderCompliance === 'function') renderCompliance();
   if (typeof renderPropertySwitcher === 'function') renderPropertySwitcher(); // Round 21
+  // Round 42.5 — the Avvisi card body is built from `it ? ... : ...`
+  // ternaries at render time, so a language flip after the card is
+  // open would leave the previous language stuck. Only repaint when
+  // the card exists and has state (avoids a first-load flash before
+  // initNotifCard runs).
+  if (typeof renderNotifCard === 'function' && typeof _notifState !== 'undefined' && _notifState) {
+    renderNotifCard();
+  }
   // Round 11.4: action board cards are built from h() — re-render them too,
   // but ONLY if the analytics panel is currently visible (otherwise we'd
   // trigger an unnecessary Supabase fetch).
@@ -10268,8 +10276,32 @@ function renderNotifCard() {
       <strong>${it ? 'Su iPhone' : 'On iPhone'}:</strong> ${it ? 'Condividi → Aggiungi a Home, poi apri WelcomeBnB dall\'icona e accedi.' : 'Share → Add to Home Screen, then open WelcomeBnB from the icon and sign in.'}
     </div>`;
   } else if (denied) {
-    pushBlock = `<div style="padding:10px 12px;background:rgba(224,90,90,0.05);border:1px solid rgba(224,90,90,0.25);border-radius:8px;color:#b03939;">
-      ${it ? 'Notifiche bloccate dal browser. Riabilitale nelle impostazioni del sito.' : 'Notifications blocked by the browser. Re-enable them in the site settings.'}
+    // Round 42.5 — hosts couldn't figure out where "site settings" lives.
+    // Actionable step-by-step for every major browser, both languages,
+    // rendered as an expandable list so the panel doesn't get too tall.
+    pushBlock = `<div style="padding:12px 14px;background:rgba(224,90,90,0.05);border:1px solid rgba(224,90,90,0.25);border-radius:8px;color:#b03939;">
+      <strong>${it ? 'Notifiche bloccate dal browser.' : 'Notifications blocked by the browser.'}</strong>
+      <div style="margin-top:6px;color:var(--ink);font-size:0.82rem;">
+        ${it
+          ? 'Devi riabilitarle dalle impostazioni del sito. Ecco dove trovarle:'
+          : 'You need to re-enable them from your site settings. Here\'s where to find them:'}
+      </div>
+      <ul style="margin:8px 0 0;padding-left:18px;color:var(--ink);font-size:0.8rem;line-height:1.5;">
+        <li><strong>Chrome / Edge:</strong> ${it
+          ? 'clicca l\'icona 🔒 (lucchetto) a sinistra dell\'indirizzo → <em>Impostazioni sito</em> → <em>Notifiche</em> → <em>Consenti</em> → ricarica la pagina.'
+          : 'click the 🔒 (padlock) icon at the left of the address bar → <em>Site settings</em> → <em>Notifications</em> → <em>Allow</em> → reload the page.'}</li>
+        <li><strong>Safari:</strong> ${it
+          ? 'menu <em>Safari</em> → <em>Impostazioni per welcomebnb.vercel.app…</em> → <em>Notifiche</em> → <em>Consenti</em> → ricarica.'
+          : 'menu <em>Safari</em> → <em>Settings for welcomebnb.vercel.app…</em> → <em>Notifications</em> → <em>Allow</em> → reload.'}</li>
+        <li><strong>Firefox:</strong> ${it
+          ? 'clicca l\'icona 🔒 (lucchetto) a sinistra dell\'indirizzo → <em>Autorizzazioni</em> → togli il blocco su <em>Invio notifiche</em> → ricarica.'
+          : 'click the 🔒 (padlock) icon at the left of the address bar → <em>Permissions</em> → clear the block on <em>Send notifications</em> → reload.'}</li>
+      </ul>
+      <div style="margin-top:8px;font-size:0.76rem;color:var(--ink-soft);">
+        ${it
+          ? 'Dopo la ricarica, torna qui e clicca "Attiva avvisi su questo dispositivo".'
+          : 'After reloading, come back here and click "Enable alerts on this device".'}
+      </div>
     </div>`;
   } else {
     pushBlock = `<button class="btn btn-primary btn-sm" onclick="notifEnablePush(this)" style="margin-bottom:10px;">${it ? '🔔 Attiva avvisi su questo dispositivo' : '🔔 Enable alerts on this device'}</button>`;

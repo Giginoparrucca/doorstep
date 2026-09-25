@@ -580,6 +580,14 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   padding: 1px 7px; border-radius: 10px;
 }
 .section-tab.active .tab-badge { background: var(--warm); color: #fff; }
+/* Round 42.4 — per-tab "action needed" red dot. Same visual language
+   as the sidebar chat dot so hosts recognise it as "attention" not
+   count. Rendered inside each .section-tab and toggled by
+   paintTabBadges(). */
+.section-tab .tab-badge-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: #E0455E; margin-left: 2px; flex-shrink: 0;
+}
 
 /* ── RESPONSIVE ── */
 /* ══════════════════════════════════════
@@ -4550,13 +4558,18 @@ function _renderSectionTabs(sectionId, activePanelId) {
     return;
   }
   strip.style.display = '';
+  // Round 42.4 — every tab gets a hidden dot placeholder. paintTabBadges()
+  // reads the current state and toggles each one on/off. Placeholders
+  // are rendered here so a tab strip repaint always contains fresh DOM
+  // nodes for paintTabBadges to look up.
   const btnHtml = section.panels.map(p => {
     const label = h(titlesMap[p][0]);
     const active = p === activePanelId ? ' active' : '';
-    const badgeId = p === 'export' || p === 'compliance' ? '' : ''; // future per-tab badges
-    return `<button type="button" class="section-tab${active}" data-panel="${p}" onclick="showPanel('${p}')">${label}${badgeId}</button>`;
+    const dot = `<span class="tab-badge-dot" id="tabBadge-${p}" style="display:none;" aria-label="Action needed"></span>`;
+    return `<button type="button" class="section-tab${active}" data-panel="${p}" onclick="showPanel('${p}')">${label}${dot}</button>`;
   }).join('');
   strip.innerHTML = btnHtml;
+  paintTabBadges();
 }
 
 function showPanel(id, btn) {
@@ -4613,6 +4626,7 @@ function showPanel(id, btn) {
     loadHostChat();
     document.getElementById('chatBadge').style.display = 'none';
     markChatSeen();
+    paintTabBadges();
     // Round 42 — no auto permission prompt any more. The Avvisi card
     // has an explicit button (required inside a click handler on iOS).
     initNotifCard();
@@ -10826,6 +10840,7 @@ async function refreshChatBadge() {
   if (document.getElementById('panel-chat')?.classList.contains('active')) {
     badge.style.display = 'none';
     markChatSeen();
+    paintTabBadges();
     return;
   }
   const key = _chatCursorKey(propertyId);
@@ -10838,9 +10853,10 @@ async function refreshChatBadge() {
     const stored = localStorage.getItem(key) || '';
     // If no cursor yet, initialize it to latest (treat as seen — avoids a
     // dot the first time you ever view a property).
-    if (!stored && latest) { localStorage.setItem(key, latest); badge.style.display = 'none'; return; }
+    if (!stored && latest) { localStorage.setItem(key, latest); badge.style.display = 'none'; paintTabBadges(); return; }
     badge.style.display = (latest && latest > stored) ? 'block' : 'none';
   } catch (e) { badge.style.display = 'none'; }
+  paintTabBadges();
 }
 
 function startHostChatSubscription() {
@@ -10880,6 +10896,7 @@ function startHostChatSubscription() {
           console.log('🔔 New guest message detected:', data[0].message.substring(0, 40));
           localStorage.setItem(key, latest);
           document.getElementById('chatBadge').style.display = 'block';
+          paintTabBadges();
           showHostNotification(
             hostLang === 'it' ? '💬 Nuovo messaggio ospite' : '💬 New guest message',
             data[0].message.substring(0, 100)
@@ -11398,6 +11415,7 @@ async function uploadFilingReceipt(scope, ids, inputEl, groupStampFromCaller) {
 
   renderCheckins();
   renderDashboard?.();
+  paintNavBadges();
 }
 
 // Group-scoped "mark filed without receipt" — same fan-out semantics as
@@ -11455,6 +11473,7 @@ async function markGroupFiledWithoutReceipt(scope, arg1, arg2) {
 
   renderCheckins();
   renderDashboard?.();
+  paintNavBadges();
 }
 
 /* ══════════════════════════════════════
@@ -12311,12 +12330,56 @@ function paintNavBadges() {
     ).length;
     _setBadge('navBadge-conf', overdue);
   } catch (e) { console.warn('paintNavBadges failed:', e); }
+  paintTabBadges();
 }
 function _setBadge(id, count) {
   const el = document.getElementById(id);
   if (!el) return;
   if (count > 0) { el.textContent = String(count); el.style.display = ''; }
   else            { el.style.display = 'none'; }
+}
+
+// Round 42.4 — red dot next to each tab that currently has work
+// waiting for the host. Same rule set the sidebar section badges use,
+// but at tab granularity so the host knows WHERE inside a section to
+// go. The dot is a pure "attention" marker (no count) — the section
+// badge already carries the number when one exists.
+//
+// Mapping:
+//   Ospiti      → Chat            unread guest message (chatBadge state)
+//   Conformità  → Check-in Data   unfiled Alloggiati in the 48h window
+//   Conformità  → Export & Comp.  same set (both actions are pending
+//                                 until alloggiati_status flips to filed)
+// Every other tab has nothing time-critical for the host, so it stays
+// dotless. Called from _renderSectionTabs (each tab strip repaint),
+// paintNavBadges (each cache refresh) and refreshChatBadge (each
+// chat-state check).
+function paintTabBadges() {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const cutoff48h = new Date(Date.now() - 48 * 3600 * 1000).toISOString().slice(0, 10);
+    const rows = Array.isArray(allCheckins) ? allCheckins : [];
+    const filingDue = rows.some(c =>
+      c.submitted_at &&
+      c.arrival_date &&
+      c.arrival_date <= today &&
+      c.arrival_date >= cutoff48h &&
+      c.alloggiati_status !== 'filed'
+    );
+    _setTabDot('tabBadge-checkins', filingDue);
+    _setTabDot('tabBadge-export',   filingDue);
+
+    // Chat dot mirrors the sidebar chatBadge — same "unread since last
+    // seen" cursor, no double-source-of-truth.
+    const chatDot = document.getElementById('chatBadge');
+    const chatShown = !!(chatDot && chatDot.style.display && chatDot.style.display !== 'none');
+    _setTabDot('tabBadge-chat', chatShown);
+  } catch (e) { console.warn('paintTabBadges failed:', e); }
+}
+function _setTabDot(id, on) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = on ? 'inline-block' : 'none';
 }
 
 async function loadPropertyData() {

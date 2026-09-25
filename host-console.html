@@ -10510,6 +10510,10 @@ async function notifSendTest(btn) {
     const j = await r.json();
     if (r.status === 429) { out.textContent = it ? 'Troppe prove. Riprova più tardi.' : 'Too many tests. Try again later.'; return; }
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    // Round 42.8 — the server can return 200 with { ok:false, error }
+    // when the notifier itself hit an internal problem. Show that
+    // error instead of the misleading "No channels active" fallback.
+    if (j.ok === false && j.error) throw new Error(j.error);
     const parts = (j.results || []).map(x => `${x.channel}:${x.status}`).join('  ');
     out.textContent = parts || (it ? 'Nessun canale attivo.' : 'No channels active.');
   } catch (e) {

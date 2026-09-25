@@ -144,7 +144,7 @@ export async function sendTestNotification(hostId) {
     // Any property the host owns → use its language + name for the payload.
     // If they own none, the test still fires but says "WelcomeBnB".
     const prop = await pgrestGET(
-      `properties?owner_id=eq.${encodeURIComponent(hostId)}&is.deleted_at=null&select=id,name,host_language,reminder_email&limit=1`,
+      `properties?owner_id=eq.${encodeURIComponent(hostId)}&deleted_at=is.null&select=id,name,host_language,reminder_email&limit=1`,
     );
     const p = Array.isArray(prop) ? prop[0] : null;
     const propertyId   = p?.id || null;

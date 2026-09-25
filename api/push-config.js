@@ -1,15 +1,19 @@
 // api/push-config.js — Round 42.
 // Returns { vapidPublicKey } for the host console. The public key is
-// safe to expose — it's the browser-facing half of the VAPID pair.
-// CORS still enforced so admin.html / index.html origins can call from
-// the same allowlist as the rest of the API.
+// safe to expose — it's the browser-facing half of the VAPID pair, and
+// any web-push spec-compliant client is supposed to fetch it publicly.
+//
+// Round 42.6 — do NOT gate this on Origin. Same-origin browser GETs
+// omit the Origin header per spec, so a strict CORS reject bounced
+// the host console's own fetch('/api/push-config') call. applyCors
+// still fires so the response carries Vary/Access-Control-* headers,
+// but a missing/unknown origin is not a reason to refuse.
 
 import { applyCors } from './_cors.js';
 
 export default async function handler(req, res) {
-  const allowed = applyCors(req, res);
-  if (req.method === 'OPTIONS') return res.status(allowed ? 200 : 403).end();
-  if (!allowed) return res.status(403).json({ error: 'Origin not allowed' });
+  applyCors(req, res);
+  if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'GET or POST' });
   }

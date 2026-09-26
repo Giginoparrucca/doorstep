@@ -1844,7 +1844,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       <div class="alert alert-info" data-h="export_info"></div>
 
       <!-- ─── Axis 1: Police · National ─── -->
-      <div class="export-axis">
+      <div class="export-axis" data-guide="export-axis-police">
         <div class="export-axis-head">
           <span class="export-axis-tag police" data-h="export_axis_police_tag">Police · National</span>
           <span class="export-axis-title" data-h="export_axis_police_title">Guest registration</span>
@@ -1858,8 +1858,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <p data-h="export_police_tourism_desc"></p>
           </div>
           <div class="tile-actions">
-            <button class="btn btn-primary" onclick="exportAlloggiati()" data-h="btn_gen_alloggiati">📥 Generate Guest File (.txt)</button>
-            <a href="https://alloggiatiweb.poliziadistato.it" target="_blank" rel="noopener" class="export-portal-link">
+            <button class="btn btn-primary" onclick="exportAlloggiati()" data-h="btn_gen_alloggiati" data-guide="export-alloggiati-btn">📥 Generate Guest File (.txt)</button>
+            <a href="https://alloggiatiweb.poliziadistato.it" target="_blank" rel="noopener" class="export-portal-link" data-guide="export-alloggiati-link">
               🔗 <span data-h="link_alloggiati">Open Alloggiati Web</span> ↗
             </a>
           </div>
@@ -1970,7 +1970,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
     <!-- ════════════ COMPLIANCE GUIDE (static reference) ════════════ -->
     <div class="panel" id="panel-compliance">
-      <div class="alert alert-info" data-h="cmp_intro"></div>
+      <div class="alert alert-info" data-h="cmp_intro" data-guide="compliance-intro"></div>
       <div id="complianceContent"></div>
     </div>
 
@@ -2152,7 +2152,7 @@ See you soon!</textarea>
       <!-- Round 42 — Avvisi card. Push / Telegram / Email settings for
            the host. Hidden in admin view (?p=). Collapsed by default
            once any channel is active. Populated by renderNotifCard(). -->
-      <details id="notifCard" class="notif-card" style="display:none;margin-bottom:14px;background:var(--white);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+      <details id="notifCard" class="notif-card" data-guide="chat-alerts-card" style="display:none;margin-bottom:14px;background:var(--white);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
         <summary style="cursor:pointer;list-style:none;padding:12px 16px;display:flex;align-items:center;gap:10px;font-weight:600;font-size:0.92rem;">
           <span aria-hidden="true">🔔</span>
           <span data-h="notif_card_title">Alerts</span>
@@ -2175,7 +2175,7 @@ See you soon!</textarea>
               <input type="checkbox" id="hostChatViewArchived" onchange="onHostChatFilterChange()" style="cursor:pointer;">
               <span data-h="chat_view_archived">View archived</span>
             </label>
-            <select id="hostChatFilter" onchange="loadHostChat()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;font-family:'DM Sans',sans-serif;color:var(--ink);max-width:280px;">
+            <select id="hostChatFilter" data-guide="chat-picker" onchange="loadHostChat()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:0.82rem;font-family:'DM Sans',sans-serif;color:var(--ink);max-width:280px;">
             </select>
             <button id="hostChatArchiveBtn" onclick="archiveCurrentChat()" title="Archive this conversation" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--white);color:var(--ink-soft);font-size:0.78rem;cursor:pointer;font-family:'DM Sans',sans-serif;" data-h="chat_archive">📁 Archive</button>
           </div>
@@ -2185,8 +2185,8 @@ See you soon!</textarea>
         </div>
         <div style="display:flex;gap:8px;margin-top:12px;flex-shrink:0;">
           <input class="form-input" id="hostChatInput" style="flex:1;min-height:48px;font-size:0.92rem;" placeholder="Type your reply…" onkeydown="if(event.key==='Enter')sendHostReply()">
-          <button class="btn btn-primary" onclick="sendHostReply()" style="min-height:48px;padding:0 20px;" data-h="chat_send">Send</button>
-          <button class="btn btn-secondary" onclick="resolveChat()" style="min-height:48px;padding:0 16px;color:var(--green);border-color:rgba(76,175,125,0.3);" data-h="chat_resolve">✓ Resolve</button>
+          <button class="btn btn-primary" onclick="sendHostReply()" style="min-height:48px;padding:0 20px;" data-h="chat_send" data-guide="chat-send">Send</button>
+          <button class="btn btn-secondary" onclick="resolveChat()" style="min-height:48px;padding:0 16px;color:var(--green);border-color:rgba(76,175,125,0.3);" data-h="chat_resolve" data-guide="chat-resolve">✓ Resolve</button>
         </div>
       </div>
     </div>
@@ -4455,6 +4455,12 @@ function setHostLang(l) {
   if (activePanel === 'calendar' && typeof renderCalendarPanel === 'function') {
     renderCalendarPanel();
   }
+  // Round 43 · Guide pill label + open guide (if any) follow the flip.
+  if (window.HG && typeof window.HG.onLangSwitch === 'function') {
+    window.HG.onLangSwitch();
+  } else if (activePanel && typeof _hgEnsurePill === 'function') {
+    _hgEnsurePill(activePanel);
+  }
 }
 
 /* ══════════════════════════════════════
@@ -4657,7 +4663,70 @@ function showPanel(id, btn) {
   if (id === 'guestanalytics') loadGuestAnalytics();
   if (id === 'contacts') loadMarketingContacts();
   if (id === 'calendar') renderCalendarPanel(); // Round 40 T5
+  // Round 43 — "Come funziona" pill next to the panel title. Uses a
+  // lightweight loader pill until host-guides.js is lazy-loaded on
+  // first click. Once HG is available, its own mountPill takes over.
+  if (typeof _hgEnsurePill === 'function') _hgEnsurePill(id);
   trackPanelSwitch(id);
+}
+
+/* ══════════════════════════════════════
+   Round 43 — Guide pill loader
+══════════════════════════════════════
+   Keeps host-console.html footprint tiny: renders a placeholder pill
+   next to #panelTitle for every guide-covered panel; on click, injects
+   /host-guides.js once and hands control off to HG.mountPill + HG.openGuide.
+*/
+const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','rules','recos','qrlink'];
+let _hgLoadPromise = null;
+function _hgLoad() {
+  if (window.HG) return Promise.resolve();
+  if (_hgLoadPromise) return _hgLoadPromise;
+  _hgLoadPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = '/host-guides.js';
+    s.async = true;
+    s.onload = resolve;
+    s.onerror = (e) => { _hgLoadPromise = null; reject(e); };
+    document.head.appendChild(s);
+  });
+  return _hgLoadPromise;
+}
+function _hgEnsurePill(panelId) {
+  if (!panelId || !_HG_PANELS.includes(panelId)) return;
+  if (window.HG) { window.HG.mountPill(panelId); return; }
+  // Placeholder pill (only rendered until HG lazy-loads).
+  const prev = document.querySelector('.cf-pill');
+  if (prev && prev.parentNode) prev.parentNode.removeChild(prev);
+  const title = document.getElementById('panelTitle');
+  if (!title) return;
+  const it = hostLang === 'it';
+  const seenKey = 'wbnb_guide_seen_' + panelId;
+  let seen = false; try { seen = !!localStorage.getItem(seenKey); } catch (_) {}
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.setAttribute('aria-label', it ? 'Apri la guida' : 'Open the guide');
+  btn.style.cssText = 'display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px 0 5px;border-radius:999px;border:1px solid ' + (seen ? 'transparent' : 'rgba(0,91,255,0.4)') + ';background:' + (seen ? 'transparent' : '#EAF3FF') + ';color:' + (seen ? '#6B7A90' : '#005BFF') + ';font-family:inherit;font-size:13px;font-weight:' + (seen ? '500' : '600') + ';white-space:nowrap;cursor:pointer;margin-left:12px;vertical-align:middle;line-height:1';
+  btn.className = 'cf-pill' + (seen ? ' cf-seen' : ' cf-new');
+  const q = document.createElement('span');
+  q.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:' + (seen ? 'transparent' : '#005BFF') + ';color:' + (seen ? '#6B7A90' : '#fff') + ';font-weight:700;font-size:13px;flex-shrink:0;' + (seen ? 'border:1.5px solid #D7E7FF' : '');
+  q.textContent = '?';
+  const lbl = document.createElement('span');
+  lbl.textContent = seen
+    ? (it ? 'Come funziona' : 'How it works')
+    : (it ? 'Nuovo? Guida da 1 minuto' : 'New? 1-minute guide');
+  btn.appendChild(q); btn.appendChild(lbl);
+  btn.addEventListener('click', () => {
+    btn.disabled = true;
+    _hgLoad().then(() => {
+      if (window.HG) { window.HG.mountPill(panelId); window.HG.openGuide(panelId); }
+    }).catch(err => {
+      console.warn('[HG] load failed:', err);
+      btn.disabled = false;
+      alert(it ? 'Impossibile caricare la guida. Riprova.' : 'Couldn’t load the guide. Please retry.');
+    });
+  });
+  title.parentNode.insertBefore(btn, title.nextSibling);
 }
 
 /* ══════════════════════════════════════
@@ -5515,7 +5584,7 @@ async function _renderUpcomingCalendarBody(buildHeader) {
       // Base cell (all viewports). Bars overlay on desktop; badge shows on mobile.
       cells.push(`
         <button type="button" class="cal-day-cell${outside ? ' cal-outside' : ''}${isToday ? ' cal-today' : ''}${isSelected ? ' cal-selected' : ''}"
-                data-cal-day="${safe(iso)}"
+                data-cal-day="${safe(iso)}" data-guide="cal-day"
                 onclick="_upcomingCalSelectDay('${safe(iso)}')">
           <span class="cal-day-num">${day.getDate()}</span>
           ${arrivalsCount > 0 ? `<span class="cal-day-badge cal-day-badge-${arrivalsToday[0].checkedIn && arrivalsToday.every(a => a.checkedIn) ? 'in' : 'wait'}">${arrivalsCount}</span>` : ''}
@@ -5539,6 +5608,7 @@ async function _renderUpcomingCalendarBody(buildHeader) {
       // one click away from that popup via its "Open" button.
       bars.push(`
         <button type="button" class="cal-bar cal-bar-${tone}"
+           data-guide="cal-bar"
            title="${title}"
            onclick="event.stopPropagation();_showReservationDetail('${safe(b.r.id)}');"
            style="left:${leftPct.toFixed(4)}%;width:${widthPct.toFixed(4)}%;top:${28 + b.track * 20}px;">${safe(b.label)}</button>`);
@@ -5584,7 +5654,7 @@ async function _renderUpcomingCalendarBody(buildHeader) {
 
   // Nav bar (month label + prev / today / next).
   const nav = `
-    <div class="cal-nav">
+    <div class="cal-nav" data-guide="cal-nav">
       <button type="button" onclick="_upcomingCalGoto(-1)" class="cal-nav-btn" aria-label="prev">‹</button>
       <div class="cal-nav-label">${safe(monthLabel)}</div>
       <button type="button" onclick="_upcomingCalGoto(1)" class="cal-nav-btn" aria-label="next">›</button>
@@ -5808,10 +5878,10 @@ function renderCheckins() {
 
     // Status pill for the group header
     const groupPill = allFiled
-      ? `<span style="display:inline-block;font-size:0.66rem;padding:3px 10px;background:rgba(47,122,68,0.14);color:#2f7a44;border-radius:12px;font-weight:600;letter-spacing:0.04em;">${it ? '✓ Inviato Alloggiati' : '✓ Filed on Alloggiati'}</span>`
+      ? `<span data-guide="checkin-row-status" style="display:inline-block;font-size:0.66rem;padding:3px 10px;background:rgba(47,122,68,0.14);color:#2f7a44;border-radius:12px;font-weight:600;letter-spacing:0.04em;">${it ? '✓ Inviato Alloggiati' : '✓ Filed on Alloggiati'}</span>`
       : anyFiled
-        ? `<span style="display:inline-block;font-size:0.66rem;padding:3px 10px;background:rgba(232,184,75,0.16);color:#9a6b00;border-radius:12px;font-weight:600;letter-spacing:0.04em;">${it ? '⚠ Parziale' : '⚠ Partial'}</span>`
-        : `<span style="display:inline-block;font-size:0.66rem;padding:3px 10px;background:rgba(176,57,57,0.12);color:#b03939;border-radius:12px;font-weight:600;letter-spacing:0.04em;">${it ? '⚠ Da inviare' : '⚠ Not filed yet'}</span>`;
+        ? `<span data-guide="checkin-row-status" style="display:inline-block;font-size:0.66rem;padding:3px 10px;background:rgba(232,184,75,0.16);color:#9a6b00;border-radius:12px;font-weight:600;letter-spacing:0.04em;">${it ? '⚠ Parziale' : '⚠ Partial'}</span>`
+        : `<span data-guide="checkin-row-status" style="display:inline-block;font-size:0.66rem;padding:3px 10px;background:rgba(176,57,57,0.12);color:#b03939;border-radius:12px;font-weight:600;letter-spacing:0.04em;">${it ? '⚠ Da inviare' : '⚠ Not filed yet'}</span>`;
     const noReceiptNote = (allFiled && !anyReceipt)
       ? ` <span style="font-size:0.66rem;color:#9a6b00;background:rgba(232,184,75,0.14);border-radius:8px;padding:2px 8px;">${it ? 'nessuna ricevuta caricata' : 'no receipt on file'}</span>`
       : '';
@@ -5824,7 +5894,7 @@ function renderCheckins() {
       ? `data-scope="checkin" data-id="${rows[0].id}"`
       : `data-scope="group" data-booking="${bookingCode}" data-property="${propertyId}"`;
     const uploadBtn = `
-      <label style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--warm);color:#fff;border-radius:6px;font-size:0.78rem;cursor:pointer;font-family:inherit;position:relative;">
+      <label data-guide="checkin-receipt-btn" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--warm);color:#fff;border-radius:6px;font-size:0.78rem;cursor:pointer;font-family:inherit;position:relative;">
         <span>${it ? '📎 Ricevuta' : '📎 Receipt'}</span>
         <input type="file" id="receiptFileInput_${groupToken}" accept=".pdf,image/*"
           ${scopeAttr}
@@ -5832,7 +5902,7 @@ function renderCheckins() {
           style="position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;">
       </label>`;
     const markBtn = allFiled ? '' : `
-      <button type="button" onclick="markGroupFiledWithoutReceipt(${isSolo ? `'checkin','${rows[0].id}'` : `'group','${bookingCode}','${propertyId}'`})"
+      <button type="button" data-guide="checkin-markfiled-btn" onclick="markGroupFiledWithoutReceipt(${isSolo ? `'checkin','${rows[0].id}'` : `'group','${bookingCode}','${propertyId}'`})"
         style="padding:6px 12px;background:transparent;color:var(--ink-soft);border:1px solid var(--border);border-radius:6px;font-size:0.78rem;cursor:pointer;font-family:inherit;">
         ${it ? 'Segna inviato' : 'Mark filed'}
       </button>`;

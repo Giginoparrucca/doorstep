@@ -1247,13 +1247,15 @@ window.HG = {
   closeGuide,
   checkGuides,
   guides: GUIDES,       // read-only reference for tests
-  version: '43.0',
+  version: '43.2',
 };
 // Alias for the console-side dev command name the spec asks for.
 window.__checkGuides = checkGuides;
 
-// If the host console loaded this file AFTER the initial panel paint,
-// mount immediately on the current panel.
-try { mountPill(currentActivePanelId()); } catch (_) {}
+// Do NOT auto-mount from here — the loader in host-console.html calls
+// HG.setLang(hostLang) followed by HG.mountPill(panelId) once the file
+// has actually finished loading. Auto-mounting here would race with
+// setLang: _currentLang still defaults to 'it' when the IIFE runs, so
+// the first pill paint would end up in Italian even for EN hosts.
 
 })();

@@ -4680,13 +4680,16 @@ function showPanel(id, btn) {
    /host-guides.js once and hands control off to HG.mountPill + HG.openGuide.
 */
 const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','rules','recos','qrlink'];
+// Bump on every host-guides.js change so browsers never see a stale
+// copy even if their cache is aggressive.
+const _HG_VERSION = '43.2';
 let _hgLoadPromise = null;
 function _hgLoad() {
   if (window.HG) return Promise.resolve();
   if (_hgLoadPromise) return _hgLoadPromise;
   _hgLoadPromise = new Promise((resolve, reject) => {
     const s = document.createElement('script');
-    s.src = '/host-guides.js';
+    s.src = '/host-guides.js?v=' + _HG_VERSION;
     s.async = true;
     s.onload = () => {
       // Host console's `hostLang` is a script-scoped `let`, so HG can't

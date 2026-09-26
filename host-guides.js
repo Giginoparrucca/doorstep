@@ -32,7 +32,16 @@
 
 if (window.HG) return;                        // idempotent load
 const NS  = 'http://www.w3.org/2000/svg';
-const HOSTLANG = () => (typeof window.hostLang === 'string' ? window.hostLang : 'it');
+// Current language is passed in explicitly by host-console.html via
+// HG.setLang(hostLang). We can't read `hostLang` from window because it
+// is declared with `let` in the console and let-bindings at top level
+// are script-scoped, not properties of window. `HG.setLang` and
+// `HG.onLangSwitch` update this value.
+let _currentLang = 'it';
+// Best-effort initial guess — the console will overwrite this the first
+// time it calls setLang/onLangSwitch.
+try { if (typeof window.hostLang === 'string') _currentLang = window.hostLang; } catch (_) {}
+const HOSTLANG = () => _currentLang;
 const IS_IT = () => HOSTLANG() === 'it';
 const IS_ADMIN = () => {
   try {
@@ -1170,16 +1179,23 @@ function mountPill(panelId) {
   title.parentNode.insertBefore(pill, title.nextSibling);
 }
 
+// Set the current language. Called by host-console.html once when HG
+// finishes loading (via HG.setLang), and again on every EN/IT toggle
+// (via HG.onLangSwitch). Both update _currentLang before repainting.
+function setLang(l) {
+  if (l === 'en' || l === 'it') _currentLang = l;
+}
+
 // Language flip while a guide is open.
-function onLangSwitch() {
+function onLangSwitch(l) {
+  setLang(l);
   // Re-mount the pill to update its label and pulse state.
   const active = currentActivePanelId();
   if (active) mountPill(active);
   // Repaint the drawer/sheet in place if open.
   if (_openState) {
-    const wasStep = null;                // preserve scroll
     const panelId = _openState.panel;
-    openGuide2(panelId, wasStep != null ? { activeStep: wasStep } : {});
+    openGuide2(panelId);
   }
 }
 
@@ -1224,6 +1240,7 @@ injectStyle();
 
 // Public API — everything else stays inside the closure.
 window.HG = {
+  setLang,
   mountPill,
   onLangSwitch,
   openGuide: openGuide2,

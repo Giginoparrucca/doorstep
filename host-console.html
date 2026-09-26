@@ -4456,8 +4456,10 @@ function setHostLang(l) {
     renderCalendarPanel();
   }
   // Round 43 · Guide pill label + open guide (if any) follow the flip.
+  // We pass `hostLang` in explicitly — the guide module can't read the
+  // console's script-scoped `let hostLang` from `window`.
   if (window.HG && typeof window.HG.onLangSwitch === 'function') {
-    window.HG.onLangSwitch();
+    window.HG.onLangSwitch(hostLang);
   } else if (activePanel && typeof _hgEnsurePill === 'function') {
     _hgEnsurePill(activePanel);
   }
@@ -4686,7 +4688,12 @@ function _hgLoad() {
     const s = document.createElement('script');
     s.src = '/host-guides.js';
     s.async = true;
-    s.onload = resolve;
+    s.onload = () => {
+      // Host console's `hostLang` is a script-scoped `let`, so HG can't
+      // reach it via window. Push the current value in on load.
+      if (window.HG && typeof window.HG.setLang === 'function') window.HG.setLang(hostLang);
+      resolve();
+    };
     s.onerror = (e) => { _hgLoadPromise = null; reject(e); };
     document.head.appendChild(s);
   });

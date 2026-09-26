@@ -5967,10 +5967,25 @@ async function deleteCheckin(id, name) {
   if (!confirm(h('delete_confirm').replace('{name}', name))) return;
 
   // Find the row so we know its booking_code (to clean analytics too)
-  const row = allCheckins.find(c => c.id === id);
+  const rowIdx = allCheckins.findIndex(c => c.id === id);
+  const row = rowIdx >= 0 ? allCheckins[rowIdx] : null;
   const bookingCode = row?.booking_code || null;
+  const propertyIdOfRow = row?.property_id || null;
 
   console.log('🗑 Deleting checkin:', id, name, 'booking', bookingCode);
+
+  // Round 42.9 — optimistic UI. Remove the row from state and repaint
+  // BEFORE the network call so the button returns to interactive in
+  // one paint (Chrome INP was flagging 3.7 s of blocked UI). If the
+  // Supabase delete errors or returns 0 rows, we restore the row and
+  // surface the error. Analytics cleanup is fire-and-forget — it never
+  // blocks the primary delete's success signal.
+  if (row) {
+    allCheckins = allCheckins.filter(c => c.id !== id);
+    renderCheckins();
+    renderDashboard();
+  }
+
   // Round 20.2: request the deleted rows back so we can confirm the DB
   // actually deleted something. A 0-row delete (RLS blocked) returns
   // error:null + data:[] — previously this silently "succeeded" in the
@@ -5979,29 +5994,33 @@ async function deleteCheckin(id, name) {
     .delete()
     .eq('id', id)
     .select();
-  if (error) { console.error('Delete error:', error); toast('Error: ' + error.message); return; }
+  if (error) {
+    console.error('Delete error:', error);
+    if (row) { allCheckins.splice(rowIdx, 0, row); renderCheckins(); renderDashboard(); }
+    toast('Error: ' + error.message);
+    return;
+  }
   if (!deleted || deleted.length === 0) {
+    if (row) { allCheckins.splice(rowIdx, 0, row); renderCheckins(); renderDashboard(); }
     toast(hostLang === 'it'
       ? '⚠ Nessuna riga eliminata — permessi insufficienti. Esegui la migrazione 20.2.'
       : '⚠ No row deleted — permission blocked. Run migration 20.2.');
     return;
   }
 
-  // Also clear the analytics events for this booking so their clicks
-  // don't linger in the dashboard / analytics. Best-effort.
-  if (bookingCode && row?.property_id) {
-    const { error: aErr } = await sb.from('analytics_events')
-      .delete()
-      .eq('property_id', row.property_id)
-      .eq('booking_code', bookingCode);
-    if (aErr) console.warn('Analytics cleanup failed (non-fatal):', aErr);
-  }
-
-  allCheckins = allCheckins.filter(c => c.id !== id);
-  renderCheckins();
-  renderDashboard();
   toast(h('deleted_record').replace('{name}', name));
   track('delete_checkin', { name });
+
+  // Analytics cleanup — fire-and-forget so the click handler ends here.
+  // A stale analytics_events row is a cosmetic issue (shows up in
+  // Guest Analytics until the daily purge), never a data-integrity one.
+  if (bookingCode && propertyIdOfRow) {
+    sb.from('analytics_events')
+      .delete()
+      .eq('property_id', propertyIdOfRow)
+      .eq('booking_code', bookingCode)
+      .then(({ error: aErr }) => { if (aErr) console.warn('Analytics cleanup failed (non-fatal):', aErr); });
+  }
 }
 
 async function deleteAllCheckins() {

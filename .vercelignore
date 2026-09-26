@@ -1,0 +1,19 @@
+# Files/folders in this list are excluded from the Vercel deploy bundle.
+# They still live in the repo so the team can read them; Vercel just
+# never builds or serves them.
+
+# Round 43 — design reference (Claude Design export, React source of truth for
+# the look of the "Come funziona" guides). We port the visuals to vanilla JS
+# in host-guides.js; the raw .jsx files never ship.
+design-ref/
+
+# Round-planning docs, human-only artefacts.
+PLAN_rounds_33_35.md
+RELEASE.md
+SPEC_*.md
+
+# Migrations run against Supabase directly (via MCP or the SQL editor).
+# The deployed bundle doesn't need them, and shipping them makes it
+# easier for someone to guess at internals.
+migration_*.sql
+seed_*.sql

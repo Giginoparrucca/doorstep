@@ -5825,9 +5825,21 @@ function _closeRowMenus() {
 function _toggleRowMenu(btn) {
   const menu = btn.parentElement.querySelector('.row-menu');
   if (!menu) return;
-  const open = menu.style.display !== 'none';
+  const wasOpen = menu.style.display && menu.style.display !== 'none';
   _closeRowMenus();
-  if (!open) menu.style.display = 'block';
+  if (wasOpen) return;
+  // Round 43.6 — the check-in table lives inside .table-wrap with
+  // overflow-x:auto, which clips a position:absolute dropdown. Portal
+  // the menu with position:fixed anchored to the button's viewport
+  // rect so the overflow can't hide it.
+  const r = btn.getBoundingClientRect();
+  const menuWidth = menu.offsetWidth || 150;
+  menu.style.position = 'fixed';
+  menu.style.top = (r.bottom + 4) + 'px';
+  menu.style.right = 'auto';
+  menu.style.left = Math.max(8, Math.min(r.right - menuWidth, window.innerWidth - menuWidth - 8)) + 'px';
+  menu.style.margin = '0';
+  menu.style.display = 'block';
 }
 if (typeof window !== 'undefined') {
   // Bubble phase, not capture — the kebab and menu-item handlers stop

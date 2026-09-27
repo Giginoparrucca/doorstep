@@ -5819,8 +5819,26 @@ function _guestTypeLabel(t) {
 }
 // Round 40 T6 — row kebab menu open/close. Only one menu open at a
 // time; a click anywhere else closes it (window listener below).
+// Round 43.8 — physically portal the menu into document.body on open.
+// Every previous attempt used position:fixed but the menu remained a
+// descendant of .table-wrap / .panel, and something in that chain
+// (transform, filter, will-change or contain) was creating a new
+// containing block for `fixed` and clipping to it. Moving the node
+// itself to <body> escapes the chain completely.
+//
+// Behaviour: on open, we remember the menu's original parent, move it
+// under <body>, set position:fixed + measured coords, and restore
+// original parent on close so the next click on ⋯ still finds it via
+// btn.parentElement.querySelector('.row-menu').
 function _closeRowMenus() {
-  document.querySelectorAll('.row-menu').forEach(m => { m.style.display = 'none'; });
+  document.querySelectorAll('.row-menu').forEach(m => {
+    m.style.display = 'none';
+    const original = m._hgOriginalParent;
+    if (original && m.parentElement === document.body) {
+      original.appendChild(m);
+      delete m._hgOriginalParent;
+    }
+  });
 }
 function _toggleRowMenu(btn) {
   const menu = btn.parentElement.querySelector('.row-menu');
@@ -5828,19 +5846,15 @@ function _toggleRowMenu(btn) {
   const wasOpen = menu.style.display && menu.style.display !== 'none';
   _closeRowMenus();
   if (wasOpen) return;
-  // Round 43.6/7 — the check-in table lives inside .table-wrap with
-  // overflow-x:auto, which clips a position:absolute dropdown. Portal
-  // the menu with position:fixed anchored to the button's viewport
-  // rect. Anchor by `right:` distance from the viewport edge instead
-  // of `left: r.right - menuWidth`, because menu.offsetWidth is 0
-  // while display:none and estimating it wrong pushes the menu past
-  // the viewport. Right-anchoring can never overflow.
   const r = btn.getBoundingClientRect();
+  menu._hgOriginalParent = menu.parentElement;
+  document.body.appendChild(menu);
   menu.style.position = 'fixed';
   menu.style.top = (r.bottom + 4) + 'px';
   menu.style.left = 'auto';
   menu.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
   menu.style.margin = '0';
+  menu.style.zIndex = '9999';
   menu.style.display = 'block';
 }
 if (typeof window !== 'undefined') {

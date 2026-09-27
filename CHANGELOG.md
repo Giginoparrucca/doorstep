@@ -65,6 +65,37 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 43 — "Come funziona" in-context guides _(2026-09-27)_
+Every host-console panel now has a **? Come funziona** pill next to its title. The pill opens a short illustrated guide (3–5 picture steps + FAQ) that explains what the page is for, when to use it, and how to complete the main action. Each step has a **Mostrami** button that dims the page, scrolls the real target into view, draws a blue ring around it and shows a "Premi qui" tooltip for 4 seconds — with a **Torna alla guida** floating pill that jumps back to the same step. Writing rules per `design-ref/guides/sheet.jsx`: `tu` form, ≤15 words per step, verbs first, at most one *Attenzione* per guide (only for legal obligations, deadlines or irreversible actions).
+
+**All 12 panels covered.** Priority-1 = Check-in Data, Export & Compliance, Compliance Guide. Priority-2 = Calendar, Guest Chat. Priority-3 = Today, Guest Analytics, Marketing Contacts, Property Details (with iCal FAQ), House Rules, Recommendations, QR Code & Link.
+
+**Architecture.** All CSS + illustration kit + guide data + drawer/sheet/spotlight/feedback/dev-checker live in a new `host-guides.js` (~86 KB, under the 90 KB budget). host-console.html grew by ~110 lines — a placeholder pill next to `#panelTitle`, a lazy `<script src>` injected on first pill click with a `?v=` cache-buster, and `data-guide` attributes on the 26 target elements the guides reference. The React sources in `design-ref/guides/*.jsx` are the visual truth; the ship code is vanilla, uses `createElement`/`textContent` for HTML and `createElementNS` for SVG, and never `innerHTML`s dynamic values.
+
+**Illustration kit** (`Kit.*`): 320×200 frames with `card`, `page`, `row`, `btn`, `marker`, `cursor`, `arrow`, `file`, `qr`, `phone`, `bar`. Palette in one place (`K.*`). Words inside drawings are separate `<text>` nodes fed from `FL[lang]` so a re-render swaps the language cleanly. 42 frames, mostly composed by hand for the shipped panels — the rest reuse a `simpleTargetFrame(pageLabel, buttonLabel)` helper for "click this button on this page" cases.
+
+**Drawer / sheet.** Drawer at ≥720 px (420 px wide, right-anchored), bottom sheet below that. `role="dialog"`, `aria-modal`, focus trap, Esc closes, focus returns to the pill. 44 px touch targets. `prefers-reduced-motion` disables slide + pulse.
+
+**Spotlight.** On Mostrami: navigate cross-panel with `showPanel` if needed, poll `[data-guide=<target>]` for up to 2 s, scroll the target into view, dim the page (`.sp-dim`), draw a two-tone ring around the target's bounding rect, position a tooltip above (or below, if the target is near the top). 4-second timer, "Torna alla guida" resume pill in the bottom-right (bottom-full-width on mobile). Empty target (list not populated yet) → inline `emptyHint` written next to the step in the guide, not a silent no-op.
+
+**Feedback.** 👍/👎 at the bottom of each guide inserts one row into `guide_feedback` (`host_id`, `panel`, `helpful`, `lang`). One vote per session per panel, then `Grazie!` replaces the buttons. Skipped in admin view (`?p=<uuid>` OR `IS_ADMIN_VIEW`). Table has RLS: hosts insert their own rows, admins SELECT via `is_admin()`, service_role full CRUD, anon zero.
+
+**Dev checker.** `window.__checkGuides()` walks every guide's steps, checks each step's `data-guide` target on the current panel and returns `{missingTargets, panelsWithoutGuide, guideCount, stepCount}`. Cross-panel targets are correctly ignored (they can't be in the DOM here).
+
+**Language handling.** Flipping EN/IT calls `HG.onLangSwitch(hostLang)` which updates the module's `_currentLang` before repainting both the pill and any open guide. Loading the module reads `hostLang` from the console's `let hostLang` — which is script-scoped and *not* on `window` — so we pass it in explicitly via `HG.setLang(hostLang)` inside the `<script>`'s `onload` handler. The illustrations' inline text follows too, since `frame(id)` reads `FL[_currentLang]` at render time.
+
+**Bugs picked up along the way** (Step 0 investigation surfaced them):
+- **Language switch didn't repaint section tabs or the calendar.** `setHostLang` now re-runs `_renderSectionTabs` for the current section, and `renderCalendarPanel()` when Calendar is the active panel. Fixes month name / weekday headers / "Today" button all staying in the previous language.
+- **`btn_copy_link` was hardcoded English** (`📋 Copy Link`) while the `btn_copy_link` i18n key already existed. Added `data-h`.
+- **`btn_save_property` rendered as `💾 💾 Salva Dettagli Proprietà`** because the emoji was in both the markup and the dictionary value. Moved `data-h` to the button itself.
+- **Migrations were being served publicly at `/migration_round42_...sql`** (200 OK). New `.vercelignore` hides them plus `design-ref/`, `PLAN_*.md`, `RELEASE.md`, `SPEC_*.md`, `seed_*.sql`. Side benefit: the React design source doesn't ship to production.
+- **Investigation debunked one item.** Daniele suspected the calendar's month/weekday/Today button were leaking English on IT — but the source was clean (`locale = it ? 'it-IT' : 'en-GB'`). The visible leak was `setHostLang` not re-rendering after the flip — see the first item above.
+- **Corrections table** (labels the initial draft got wrong): `checkin-row-status` EN is `"⚠ Not filed yet"` not `"To file"`; `rules-presets` is `«Aggiungi regole comuni»`, separate from `«+ Aggiungi Regola»`; QR link generation asks for nothing (one-click); chat escalation shows an amber banner not just a chip; `«📋 Esportazione Dati»` is the IT tile heading (not "Raw Data Export"); Guest Analytics per-guest board *does* show capofamiglia names when a booking code is known.
+
+**Files touched:** `migration_round43_guide_feedback.sql`, `host-guides.js`, `host-console.html`, `.vercelignore`, `RELEASE.md`, `design-ref/` (from the Claude Design export).
+
+**Maintenance rule** (added to `RELEASE.md`): if a round changes the host-console UI, update the matching guide in `host-guides.js` and run `window.__checkGuides()` before shipping. Bump `_HG_VERSION` in host-console.html and the `version` string in host-guides.js on every change so browsers get a fresh URL.
+
 ### Round 42 — Host alerts: Web Push + Telegram + Email _(2026-09-23)_
 Hosts now find out a guest needs them without keeping a browser tab open. Three parallel transports (Web Push primary, Telegram optional, Email fallback) fire from the same server-side notifier the moment a guest message lands in `chat_messages` — with a hard GDPR-driven content rule: **the alert only ever says "Un ospite ha bisogno di te · {property name}" plus a deep link.** Message text, guest name and booking code never leave our server for a push service, Telegram, or Resend.
 

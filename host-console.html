@@ -1240,9 +1240,9 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           <div style="font-family:'Playfair Display',serif;font-weight:600;font-size:1rem;" data-h="prop_header_title">Property details</div>
           <div style="font-size:0.72rem;color:var(--ink-soft);" data-h="prop_header_hint">View mode</div>
         </div>
-        <button type="button" class="btn btn-secondary btn-sm" onclick="openPreviewAsGuest()" data-h="btn_preview_guest" title="Open the guest app in test mode (no analytics)">🧪 Preview as guest</button>
-        <button type="button" id="propertyEditBtn" class="btn btn-secondary btn-sm" onclick="startPropertyEdit()">✏️ <span data-h="btn_edit_list">Edit</span></button>
-        <button type="button" id="propertySaveBtn" class="btn btn-primary btn-sm" onclick="savePropertyEdit()" style="display:none;" data-h="btn_save_property">💾 Save Property Details</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="openPreviewAsGuest()" data-h="btn_preview_guest" data-guide="prop-preview" title="Open the guest app in test mode (no analytics)">🧪 Preview as guest</button>
+        <button type="button" id="propertyEditBtn" class="btn btn-secondary btn-sm" onclick="startPropertyEdit()" data-guide="prop-edit">✏️ <span data-h="btn_edit_list">Edit</span></button>
+        <button type="button" id="propertySaveBtn" class="btn btn-primary btn-sm" onclick="savePropertyEdit()" style="display:none;" data-h="btn_save_property" data-guide="prop-save">💾 Save Property Details</button>
         <button type="button" id="propertyCancelBtn" class="btn btn-secondary btn-sm" onclick="cancelPropertyEdit()" style="display:none;"><span data-h="btn_cancel_edit">Cancel</span></button>
       </div>
 
@@ -1300,7 +1300,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div style="margin-top:8px;font-size:0.6rem;color:var(--ink-soft)" id="coverPhotoStatus"></div>
       </div>
 
-      <div class="form-card">
+      <div class="form-card" data-guide="prop-basic">
         <div class="form-card-title" data-h="prop_basic">Basic Information</div>
         <div class="form-card-desc" data-h="prop_basic_desc">This information will appear on the guest welcome screen.</div>
         <div class="form-grid">
@@ -1615,7 +1615,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div id="icalFeedsList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
           <button type="button" class="btn btn-secondary" onclick="addIcalFeed()" data-h="ical_add">+ Add feed</button>
-          <button type="button" class="btn btn-primary" onclick="syncIcalNow()" data-h="ical_sync_now">🔄 Sync now</button>
+          <button type="button" class="btn btn-primary" onclick="syncIcalNow()" data-h="ical_sync_now" data-guide="ical-sync">🔄 Sync now</button>
           <span id="icalLastSynced" style="font-size:0.74rem;color:var(--ink-soft);"></span>
         </div>
         <div id="icalSyncResult" style="margin-top:10px;font-size:0.82rem;color:var(--ink-soft);"></div>
@@ -1699,7 +1699,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         ℹ️ These rules appear in the guest app's "Rules" tab. Pick from common rules below, or add your own custom rules.
       </div>
 
-      <div data-rules-edit-only style="margin-bottom:16px;display:none;">
+      <div data-rules-edit-only data-guide="rules-presets" style="margin-bottom:16px;display:none;">
         <div style="font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;" data-h="rules_preset_label">Quick-add common rules</div>
         <div id="presetRulesGrid" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
       </div>
@@ -1709,15 +1709,15 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
       <!-- Round 37.1 — single action row at the bottom, in flow. -->
       <div class="panel-actions">
-        <button id="rulesEditToggle" class="btn btn-secondary" onclick="toggleRulesEditMode()">✏️ <span data-h="btn_edit_list">Edit</span></button>
-        <button class="btn btn-secondary" onclick="addRule()" data-h="btn_add_rule" data-rules-edit-only style="display:none;">+ Add Custom Rule</button>
+        <button id="rulesEditToggle" class="btn btn-secondary" onclick="toggleRulesEditMode()" data-guide="rules-edit">✏️ <span data-h="btn_edit_list">Edit</span></button>
+        <button class="btn btn-secondary" onclick="addRule()" data-h="btn_add_rule" data-guide="rules-add-custom" data-rules-edit-only style="display:none;">+ Add Custom Rule</button>
         <!-- Round 41 Task 5 — auto-suggest severity. Runs a small
              title-match heuristic (parties, smoking, pets, noise, quiet
              hours + IT variants) and flips is_important on matching
              rules to true, everything else to false. Non-destructive:
              the host reviews and hits Save. -->
-        <button class="btn btn-secondary" onclick="autoSuggestRuleSeverity()" data-h="btn_suggest_sev" data-rules-edit-only style="display:none;">✨ Suggest severity</button>
-        <button class="btn btn-primary" onclick="saveRules()" data-h="btn_save_rules" data-rules-edit-only style="display:none;">💾 Save Rules</button>
+        <button class="btn btn-secondary" onclick="autoSuggestRuleSeverity()" data-h="btn_suggest_sev" data-guide="rules-suggest-sev" data-rules-edit-only style="display:none;">✨ Suggest severity</button>
+        <button class="btn btn-primary" onclick="saveRules()" data-h="btn_save_rules" data-guide="rules-save" data-rules-edit-only style="display:none;">💾 Save Rules</button>
       </div>
     </div>
 
@@ -1726,7 +1726,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       <div class="alert alert-info" data-h="recos_info">
       </div>
 
-      <div class="panel-tabs" id="recoTabs">
+      <div class="panel-tabs" id="recoTabs" data-guide="recos-tabs">
         <button class="panel-tab active" onclick="setRecoCat('food',this)" data-h="tab_food">🍝 Food</button>
         <button class="panel-tab" onclick="setRecoCat('drink',this)" data-h="tab_drink">🍷 Drinks</button>
         <button class="panel-tab" onclick="setRecoCat('see',this)" data-h="tab_see">👁 Sights</button>
@@ -1740,8 +1740,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       <!-- Round 37.1 — single action row at the bottom, in flow. -->
       <div class="panel-actions">
         <button id="recosEditToggle" class="btn btn-secondary" onclick="toggleRecosEditMode()">✏️ <span data-h="btn_edit_list">Edit</span></button>
-        <button class="btn btn-secondary" onclick="addReco()" data-h="btn_add_reco" data-recos-edit-only style="display:none;">+ Add Recommendation</button>
-        <button class="btn btn-primary" onclick="saveRecos()" data-h="btn_save_recos" data-recos-edit-only style="display:none;">💾 Save</button>
+        <button class="btn btn-secondary" onclick="addReco()" data-h="btn_add_reco" data-guide="recos-add" data-recos-edit-only style="display:none;">+ Add Recommendation</button>
+        <button class="btn btn-primary" onclick="saveRecos()" data-h="btn_save_recos" data-guide="recos-save" data-recos-edit-only style="display:none;">💾 Save</button>
       </div>
     </div>
 
@@ -1811,10 +1811,10 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="table-header">
           <div class="table-title" id="contactsTitle" data-h="contacts_title">Marketing Contacts</div>
           <div style="display:flex;gap:8px;align-items:center;">
-            <button class="btn btn-secondary btn-sm" onclick="exportContactsCSV()" data-h="btn_dl_contacts_csv">📥 Download CSV</button>
+            <button class="btn btn-secondary btn-sm" onclick="exportContactsCSV()" data-h="btn_dl_contacts_csv" data-guide="contacts-download">📥 Download CSV</button>
           </div>
         </div>
-        <table>
+        <table data-guide="contacts-table">
           <thead>
             <tr>
               <th data-h="th_contact_name">Guest</th>
@@ -1988,13 +1988,13 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           <h3 id="qrGenTitle">Guest App Link</h3>
           <p id="qrGenDesc">Each booking gets a unique link. Generate a new code for each guest/group, then share before arrival.</p>
           <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
-            <button class="btn btn-primary btn-sm" onclick="generateBookingCode()" id="genBookingBtn">🔑 Generate New Booking Link</button>
+            <button class="btn btn-primary btn-sm" onclick="generateBookingCode()" id="genBookingBtn" data-guide="qr-gen-booking">🔑 Generate New Booking Link</button>
           </div>
           <div id="bookingLinkSection" style="display:none;">
             <div style="font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px;" id="bookingCodeLabel">Booking Code</div>
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
               <code style="background:var(--bg);padding:6px 12px;border-radius:6px;font-size:0.9rem;font-weight:600;color:var(--warm);letter-spacing:0.1em;" id="bookingCodeDisplay">—</code>
-              <button class="btn btn-secondary btn-sm" onclick="copyLink()" style="white-space:nowrap;" data-h="btn_copy_link">📋 Copy Link</button>
+              <button class="btn btn-secondary btn-sm" onclick="copyLink()" style="white-space:nowrap;" data-h="btn_copy_link" data-guide="qr-copy-link">📋 Copy Link</button>
             </div>
             <div class="qr-link" id="guestLink" style="font-size:0.65rem;word-break:break-all;">https://welcomebnb.vercel.app</div>
           </div>
@@ -2005,7 +2005,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       </div>
 
       <!-- Apartment QR — generic property link for printing -->
-      <div class="form-card" style="margin-top:16px;">
+      <div class="form-card" style="margin-top:16px;" data-guide="qr-apartment">
         <div class="form-card-title" data-h="qr_apartment_title">🏠 QR Code for Apartment</div>
         <div class="form-card-desc" data-h="qr_apartment_desc">Print this QR code and place it in your property. Guests who scan it can browse property info, house rules, and recommendations — and look up their check-in with surname + arrival date.</div>
         <div style="display:flex;align-items:center;gap:12px;">
@@ -2018,7 +2018,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       <div class="form-card" style="margin-top:16px;background:rgba(232,184,75,0.06);border:1px dashed rgba(232,184,75,0.4);">
         <div class="form-card-title" data-h="qr_preview_title">🧪 Preview as guest</div>
         <div class="form-card-desc" data-h="qr_preview_desc">Open the guest app in test mode. Your activity won't be tracked in analytics — useful for checking layout, copy, and features without polluting your data.</div>
-        <button class="btn btn-secondary btn-sm" onclick="openPreviewAsGuest()" data-h="qr_preview_btn">🧪 Open in test mode</button>
+        <button class="btn btn-secondary btn-sm" onclick="openPreviewAsGuest()" data-h="qr_preview_btn" data-guide="qr-preview">🧪 Open in test mode</button>
       </div>
 
       <div id="pastBookingCodes" style="margin-top:16px;display:none;">
@@ -2038,7 +2038,7 @@ It takes about 2 minutes and is required by Italian law. You'll also find WiFi d
 
 See you soon!</textarea>
         <div style="margin-top:12px;">
-          <button class="btn btn-secondary btn-sm" onclick="copyTemplate()">📋 Copy Template</button>
+          <button class="btn btn-secondary btn-sm" onclick="copyTemplate()" data-h="btn_copy_template" data-guide="qr-copy-template">📋 Copy Template</button>
         </div>
       </div>
     </div>
@@ -2051,7 +2051,7 @@ See you soon!</textarea>
       </div>
 
       <div class="ga-toolbar">
-        <div class="ga-range-group" role="tablist">
+        <div class="ga-range-group" role="tablist" data-guide="ga-range">
           <button class="ga-range-btn" data-ga-range="7"  data-h="ga_range_7"  onclick="setGaRange(7)">7 days</button>
           <button class="ga-range-btn active" data-ga-range="30" data-h="ga_range_30" onclick="setGaRange(30)">30 days</button>
           <button class="ga-range-btn" data-ga-range="90" data-h="ga_range_90" onclick="setGaRange(90)">90 days</button>
@@ -2074,7 +2074,7 @@ See you soon!</textarea>
       <div id="gaContent" style="display:none;">
         <!-- Row 1 — Funnel + Top Recos -->
         <div class="ga-grid">
-          <div class="ga-card">
+          <div class="ga-card" data-guide="ga-funnel">
             <div class="ga-card-title" data-h="ga_funnel_title">Check-in funnel</div>
             <div class="ga-card-sub"   data-h="ga_funnel_sub">How many guests who opened the link completed their check-in</div>
             <div id="gaFunnel" class="ga-funnel"></div>
@@ -2126,7 +2126,7 @@ See you soon!</textarea>
         </div>
         <!-- Row 4 — Per-Guest Action Board (Round 11) -->
         <div class="ga-grid">
-          <div class="ga-card full">
+          <div class="ga-card full" data-guide="ga-guest-board">
             <div class="ga-card-title" data-h="ga_guest_breakdown_title">Per-guest action board</div>
             <div class="ga-card-sub" data-h="ga_guest_breakdown_sub">One row per guest — what to do next, prioritised by urgency</div>
             <div id="gaGuestBreakdown" class="ga-guest-list"></div>
@@ -4682,7 +4682,7 @@ function showPanel(id, btn) {
 const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','rules','recos','qrlink'];
 // Bump on every host-guides.js change so browsers never see a stale
 // copy even if their cache is aggressive.
-const _HG_VERSION = '43.2';
+const _HG_VERSION = '43.3';
 let _hgLoadPromise = null;
 function _hgLoad() {
   if (window.HG) return Promise.resolve();
@@ -5029,7 +5029,7 @@ async function renderDashboard() {
   };
 
   const urgentPanel = urgent.length === 0 ? '' : `
-    <div style="margin-bottom:18px;">
+    <div style="margin-bottom:18px;" data-guide="dash-urgent">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
         <span style="font-size:1rem;">🔴</span>
         <h3 style="margin:0;font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--ink);font-weight:600;">${h('dash_needs_attention') || 'Needs your attention'}</h3>
@@ -5039,7 +5039,7 @@ async function renderDashboard() {
     </div>`;
 
   const stayingPanel = staying.length === 0 ? '' : `
-    <div style="margin-bottom:18px;">
+    <div style="margin-bottom:18px;" data-guide="dash-staying">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
         <span style="font-size:1rem;">🟢</span>
         <h3 style="margin:0;font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--ink);font-weight:600;">${h('dash_currently_staying') || 'Currently staying'}</h3>
@@ -5049,7 +5049,7 @@ async function renderDashboard() {
     </div>`;
 
   const allCaughtUp = (urgent.length === 0 && staying.length === 0) ? `
-    <div style="text-align:center;padding:48px 20px;background:var(--white);border:1px solid var(--border);border-radius:10px;">
+    <div style="text-align:center;padding:48px 20px;background:var(--white);border:1px solid var(--border);border-radius:10px;" data-guide="dash-all-caught-up">
       <div style="font-size:2.4rem;margin-bottom:12px;">✨</div>
       <h3 style="margin:0 0 6px;font-family:'Playfair Display',serif;font-size:1.3rem;color:var(--ink);font-weight:600;">${h('dash_all_caught_up') || "You're all caught up"}</h3>
       <p style="margin:0;font-size:0.86rem;color:var(--ink-soft);">${h('dash_nothing_pending') || 'No urgent items, no guests currently staying.'}</p>

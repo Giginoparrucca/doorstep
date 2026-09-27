@@ -12,6 +12,10 @@ PLAN_rounds_33_35.md
 RELEASE.md
 SPEC_*.md
 
+# Round 44 — Alloggiati Web Service reference material (official manual,
+# WSDL, notes). Human-only; never ship to the deploy bundle.
+docs/
+
 # Migrations run against Supabase directly (via MCP or the SQL editor).
 # The deployed bundle doesn't need them, and shipping them makes it
 # easier for someone to guess at internals.

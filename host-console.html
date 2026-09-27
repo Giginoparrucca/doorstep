@@ -193,20 +193,33 @@ body { display: flex; overflow: hidden; }
    under the sticky main-header. Mobile: full-width strip fixed
    to the bottom. Only the active .panel's actions render — inactive
    panels are display:none and their fixed children don't paint. */
+/* Round 43.4 — action rows are now a sticky in-panel-header bar
+   (`.panel-header-actions`) that sits at the top of the panel body
+   and scrolls in flow. Round 40 T8 introduced this on Property to
+   avoid the old floating pill overlapping the main-header language
+   toggle; Round 43.4 extends the same pattern to Rules and Recos so
+   every panel with edit actions looks identical.
+
+   `.panel-actions` is kept as an alias for backwards compatibility
+   (any legacy markup still works, but new code uses
+   `.panel-header-actions`). */
+.panel-header-actions,
 .panel-actions {
-  position: fixed;
-  top: 88px;
-  right: 28px;
-  z-index: 90;
-  display: flex; gap: 8px; flex-wrap: wrap;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.96);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--white);
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-  max-width: min(560px, calc(100vw - 340px));
-  justify-content: flex-end;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
+.panel-header-actions .btn,
 .panel-actions .btn { flex: 0 0 auto; }
 
 /* ── PANELS ── */
@@ -713,25 +726,13 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   /* Sidebar items — bigger touch targets */
   .sidebar-item { padding: 12px 18px; font-size: 0.9rem; min-height: 44px; }
 
-  /* Round 37.2 — mobile action bar: fixed at the bottom, full width,
-     always in reach. .content grows a bottom padding to keep the
-     last card from being trapped underneath. */
-  .panel-actions {
-    position: fixed;
-    top: auto; right: 0; bottom: 0; left: 0;
-    z-index: 40;
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-    margin: 0;
-    background: var(--cream);
-    border-top: 1px solid var(--border);
-    border-radius: 0;
-    box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.06);
-    display: flex; gap: 8px; flex-wrap: nowrap; overflow-x: auto;
-    max-width: none;
-    justify-content: flex-start;
-  }
-  .panel-actions .btn { flex: 1 1 0; min-width: 96px; justify-content: center; min-height: 48px; font-size: 0.88rem; padding: 10px 12px; }
-  .content { padding-bottom: 90px; }
+  /* Round 43.4 — mobile keeps the action rows sticky-in-flow at the
+     panel top, matching Property. The old Round 37.2 fixed-bottom
+     bar overlapped the on-screen keyboard on form panels and was
+     dropped when `.panel-actions` and `.panel-header-actions` were
+     unified. Buttons wrap onto two rows if the panel is narrow. */
+  .panel-header-actions .btn,
+  .panel-actions .btn { min-height: 44px; font-size: 0.86rem; padding: 8px 12px; }
 }
 .mobile-toggle {
   display: none; align-items: center; justify-content: center;
@@ -1232,10 +1233,10 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     <!-- ════════════ PROPERTY DETAILS ════════════ -->
     <div class="panel" id="panel-property">
 
-      <!-- Round 40 Task 8 — sticky in-panel header bar. Sits at the top
-           of the panel body and sticks to the top on scroll. Replaces
-           the floating .panel-actions pill that overlapped the content. -->
-      <div class="panel-header-actions" style="position:sticky;top:0;z-index:5;background:var(--white);border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin-bottom:16px;display:flex;flex-wrap:wrap;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+      <!-- Round 40 T8 → 43.4 — sticky in-panel header bar. Styles now
+           live on the .panel-header-actions class (Round 43.4 unified
+           it with .panel-actions on Rules/Recos). -->
+      <div class="panel-header-actions">
         <div style="flex:1;min-width:0;">
           <div style="font-family:'Playfair Display',serif;font-weight:600;font-size:1rem;" data-h="prop_header_title">Property details</div>
           <div style="font-size:0.72rem;color:var(--ink-soft);" data-h="prop_header_hint">View mode</div>
@@ -1695,6 +1696,23 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
     <!-- ════════════ HOUSE RULES ════════════ -->
     <div class="panel" id="panel-rules">
+
+      <!-- Round 43.4 — action row now sits at the top of the panel body,
+           sticky in flow, matching Property. Avoids the old
+           .panel-actions floating pill overlapping the language toggle
+           on desktop. -->
+      <div class="panel-header-actions">
+        <div style="flex:1;min-width:0;">
+          <div style="font-family:'Playfair Display',serif;font-weight:600;font-size:1rem;" data-h="t_rules">House Rules</div>
+          <div style="font-size:0.72rem;color:var(--ink-soft);" data-h="prop_header_hint">View mode</div>
+        </div>
+        <button id="rulesEditToggle" class="btn btn-secondary btn-sm" onclick="toggleRulesEditMode()" data-guide="rules-edit">✏️ <span data-h="btn_edit_list">Edit</span></button>
+        <button class="btn btn-secondary btn-sm" onclick="addRule()" data-h="btn_add_rule" data-guide="rules-add-custom" data-rules-edit-only style="display:none;">+ Add Custom Rule</button>
+        <!-- Round 41 Task 5 — auto-suggest severity. -->
+        <button class="btn btn-secondary btn-sm" onclick="autoSuggestRuleSeverity()" data-h="btn_suggest_sev" data-guide="rules-suggest-sev" data-rules-edit-only style="display:none;">✨ Suggest severity</button>
+        <button class="btn btn-primary btn-sm" onclick="saveRules()" data-h="btn_save_rules" data-guide="rules-save" data-rules-edit-only style="display:none;">💾 Save Rules</button>
+      </div>
+
       <div class="alert alert-info" data-h="rules_info">
         ℹ️ These rules appear in the guest app's "Rules" tab. Pick from common rules below, or add your own custom rules.
       </div>
@@ -1706,23 +1724,22 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
       <div style="font-size:0.68rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;" data-h="rules_your_rules">Your rules</div>
       <div class="edit-list" id="rulesList"></div>
-
-      <!-- Round 37.1 — single action row at the bottom, in flow. -->
-      <div class="panel-actions">
-        <button id="rulesEditToggle" class="btn btn-secondary" onclick="toggleRulesEditMode()" data-guide="rules-edit">✏️ <span data-h="btn_edit_list">Edit</span></button>
-        <button class="btn btn-secondary" onclick="addRule()" data-h="btn_add_rule" data-guide="rules-add-custom" data-rules-edit-only style="display:none;">+ Add Custom Rule</button>
-        <!-- Round 41 Task 5 — auto-suggest severity. Runs a small
-             title-match heuristic (parties, smoking, pets, noise, quiet
-             hours + IT variants) and flips is_important on matching
-             rules to true, everything else to false. Non-destructive:
-             the host reviews and hits Save. -->
-        <button class="btn btn-secondary" onclick="autoSuggestRuleSeverity()" data-h="btn_suggest_sev" data-guide="rules-suggest-sev" data-rules-edit-only style="display:none;">✨ Suggest severity</button>
-        <button class="btn btn-primary" onclick="saveRules()" data-h="btn_save_rules" data-guide="rules-save" data-rules-edit-only style="display:none;">💾 Save Rules</button>
-      </div>
     </div>
 
     <!-- ════════════ RECOMMENDATIONS ════════════ -->
     <div class="panel" id="panel-recos">
+
+      <!-- Round 43.4 — sticky in-flow header, matching Property + Rules. -->
+      <div class="panel-header-actions">
+        <div style="flex:1;min-width:0;">
+          <div style="font-family:'Playfair Display',serif;font-weight:600;font-size:1rem;" data-h="t_recos">Recommendations</div>
+          <div style="font-size:0.72rem;color:var(--ink-soft);" data-h="prop_header_hint">View mode</div>
+        </div>
+        <button id="recosEditToggle" class="btn btn-secondary btn-sm" onclick="toggleRecosEditMode()">✏️ <span data-h="btn_edit_list">Edit</span></button>
+        <button class="btn btn-secondary btn-sm" onclick="addReco()" data-h="btn_add_reco" data-guide="recos-add" data-recos-edit-only style="display:none;">+ Add Recommendation</button>
+        <button class="btn btn-primary btn-sm" onclick="saveRecos()" data-h="btn_save_recos" data-guide="recos-save" data-recos-edit-only style="display:none;">💾 Save</button>
+      </div>
+
       <div class="alert alert-info" data-h="recos_info">
       </div>
 
@@ -1736,13 +1753,6 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       </div>
 
       <div class="edit-list" id="recoList"></div>
-
-      <!-- Round 37.1 — single action row at the bottom, in flow. -->
-      <div class="panel-actions">
-        <button id="recosEditToggle" class="btn btn-secondary" onclick="toggleRecosEditMode()">✏️ <span data-h="btn_edit_list">Edit</span></button>
-        <button class="btn btn-secondary" onclick="addReco()" data-h="btn_add_reco" data-guide="recos-add" data-recos-edit-only style="display:none;">+ Add Recommendation</button>
-        <button class="btn btn-primary" onclick="saveRecos()" data-h="btn_save_recos" data-guide="recos-save" data-recos-edit-only style="display:none;">💾 Save</button>
-      </div>
     </div>
 
     <!-- ════════════ CHECK-IN DATA ════════════ -->
@@ -4682,7 +4692,7 @@ function showPanel(id, btn) {
 const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','rules','recos','qrlink'];
 // Bump on every host-guides.js change so browsers never see a stale
 // copy even if their cache is aggressive.
-const _HG_VERSION = '43.3';
+const _HG_VERSION = '43.4';
 let _hgLoadPromise = null;
 function _hgLoad() {
   if (window.HG) return Promise.resolve();

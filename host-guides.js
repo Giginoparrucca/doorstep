@@ -1183,6 +1183,7 @@ function renderFoot(panelId, lang, u) {
   const subject = encodeURIComponent('Guida ' + panelId);
   helpRow.appendChild(el('a', {
     class: 'cf-contact', href: 'mailto:info@welcomebnb.it?subject=' + subject,
+    target: '_blank', rel: 'noopener',
   }, [icon('mail', 18), document.createTextNode(u.contact)]));
   foot.appendChild(helpRow);
   return foot;
@@ -1528,7 +1529,7 @@ window.HG = {
   closeGuide,
   checkGuides,
   guides: GUIDES,       // read-only reference for tests
-  version: '43.4',
+  version: '43.5',
 };
 // Alias for the console-side dev command name the spec asks for.
 window.__checkGuides = checkGuides;

@@ -1,31 +1,6 @@
-// host-guides.js — Round 43 · "Come funziona" guide layer for the host console.
-//
-// One "?" pill next to every panel title opens a short illustrated guide
-// (3–5 picture steps + FAQ). Each step has a "Mostrami" button that
-// dims the page, scrolls the real target into view, draws a ring and
-// shows a "Premi qui" tooltip. Feedback (👍/👎) is written to the
-// guide_feedback table (Round 43 migration).
-//
-// Loaded lazily by host-console.html on the first pill click. All CSS
-// is injected once here so the console's own stylesheet stays clean.
-//
-// Contract with the console:
-//   - `hostLang`, `sb`, `showPanel(id)`, `showSection(sec, tab)`,
-//     `panelSection(id)`, `_isAdminView()`, `IS_ADMIN_VIEW` (optional).
-//   - Panel target elements carry `data-guide="<id>"`.
-//   - setHostLang() calls HG.onLangSwitch() when the guide is open so
-//     the drawer/sheet repaints in the new language.
-//   - showPanel() calls HG.mountPill(activePanelId) after the tab strip
-//     repaints so the pill lands next to the current title.
-//
-// Safety:
-//   - All DOM built with createElement/textContent; SVG via createElementNS.
-//     No innerHTML with any user-derived value.
-//   - Feedback insert is skipped in admin view.
-//   - Every step's Mostrami has an emptyHint that fires when the target
-//     isn't in the DOM yet (e.g. a list is empty).
-//
-// Size budget: 90 KB unminified. Current file well under.
+// host-guides.js — Round 43 · "Come funziona" guide layer.
+// Lazy-loaded on first pill click. Reads sb / hostLang from the console.
+// See design-ref/guides/*.jsx for the source design.
 
 (function () {
 'use strict';
@@ -51,10 +26,8 @@ const IS_ADMIN = () => {
   return false;
 };
 
-// ═════════════════════════════════════════════════════════════════════
 // 1 · CSS  (ported from design-ref/Come funziona guides.html + tuned
 //   for the console's own tokens)
-// ═════════════════════════════════════════════════════════════════════
 const CSS = `
 .cf-pill{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px 0 5px;border-radius:999px;border:1px solid rgba(0,91,255,.12);background:#fff;color:#005BFF;font-family:'DM Sans',system-ui,sans-serif;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer;transition:background .15s,border-color .15s;line-height:1;vertical-align:middle;margin-left:12px}
 .cf-pill:hover{background:#EAF3FF;border-color:#005BFF}
@@ -125,7 +98,6 @@ const CSS = `
 .cf-vote:disabled{opacity:.5;cursor:default}
 .cf-contact{display:inline-flex;align-items:center;gap:7px;min-height:40px;padding:0 14px;border-radius:8px;border:none;background:#EAF3FF;color:#0047CC;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none}
 .cf-thanks{color:#2E9E6B;font-weight:600}
-/* Spotlight */
 .sp-dim{position:fixed;inset:0;background:rgba(6,26,61,.55);z-index:1800;pointer-events:auto;cursor:pointer;animation:cfFade .18s ease-out}
 .sp-ring{position:fixed;border-radius:12px;box-shadow:0 0 0 4px #fff,0 0 0 8px #005BFF,0 0 0 16px rgba(0,91,255,.25);z-index:1850;pointer-events:none;animation:spIn .32s ease-out}
 @keyframes spIn{from{box-shadow:0 0 0 4px #fff,0 0 0 30px rgba(0,91,255,0)}to{box-shadow:0 0 0 4px #fff,0 0 0 8px #005BFF,0 0 0 16px rgba(0,91,255,.25)}}
@@ -142,9 +114,7 @@ const CSS = `
 .sp-resume-l{display:block;font-size:15px;font-weight:700;color:#0047CC}
 `;
 
-// ═════════════════════════════════════════════════════════════════════
 // 2 · Tiny DOM helpers
-// ═════════════════════════════════════════════════════════════════════
 function el(tag, attrs, children) {
   const n = document.createElement(tag);
   if (attrs) for (const k in attrs) {
@@ -181,9 +151,7 @@ function appendKids(parent, kids) {
 function frag(kids) { const f = document.createDocumentFragment(); appendKids(f, kids); return f; }
 const $ = (sel, root) => (root || document).querySelector(sel);
 
-// ═════════════════════════════════════════════════════════════════════
 // 3 · Icons  (2-arg SVG factory; kept small)
-// ═════════════════════════════════════════════════════════════════════
 const ICO = {
   q:    () => [svg('path', { d: 'M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01' })],
   clock:() => [svg('circle', { cx: 12, cy: 12, r: 9 }), svg('path', { d: 'M12 7v5l3 2' })],
@@ -207,11 +175,9 @@ function icon(name, size, sw) {
   return s;
 }
 
-// ═════════════════════════════════════════════════════════════════════
 // 4 · Illustration kit  (all primitives return SVG nodes; frame is 320×200)
 //   Palette lives here so a repalette is one line. Words in drawings are
 //   translatable strings passed as arguments.
-// ═════════════════════════════════════════════════════════════════════
 const K = {
   bg: '#F8FBFF', t1: '#EAF3FF', t2: '#D7E7FF', white: '#FFFFFF',
   blue: '#005BFF', ink: '#061A3D', soft: '#6B7A90',
@@ -337,12 +303,10 @@ const Kit = {
   },
 };
 
-// ═════════════════════════════════════════════════════════════════════
 // 5 · Step frames  (a factory per id; label object supplies translated
 //   words. Frames named ci* = check-in, ex* = export, cm* = compliance,
 //   ct* = chat, cl* = calendar. Only the labels used by the built
 //   guides are declared here — new guides can register more.)
-// ═════════════════════════════════════════════════════════════════════
 const FRAMES = {};
 
 // Reusable guest-list card with an optional highlight + status pill.
@@ -568,11 +532,172 @@ function simpleTargetFrame(pageTitleLabel, buttonLabel) {
   ]);
 }
 
-// ═════════════════════════════════════════════════════════════════════
+// ─── dashboard ─────────────────────────────────────────────────────
+FRAMES.db1 = (L) => Kit.frame(L.title_db1, [
+  Kit.page(),
+  Kit.card(20, 42, 280, 40, { fill: 'rgba(224,90,90,0.06)', stroke: 'rgba(224,90,90,0.35)' }),
+  (() => { const t = svg('text', { x: 34, y: 60, 'font-family': K.font, 'font-size': 11, 'font-weight': 700, fill: '#b03939' }); t.textContent = '\u{1F534} ' + L.urgent; return t; })(),
+  Kit.bar(34, 68, 200, 5, K.t2),
+  Kit.card(20, 92, 280, 44),
+  Kit.bar(34, 106, 140, 5, K.t2),
+  Kit.bar(34, 118, 120, 5, K.t1),
+  Kit.marker(20, 42, 1),
+]);
+FRAMES.db2 = (L) => Kit.frame(L.title_db2, [
+  Kit.page(),
+  Kit.card(20, 42, 280, 40, { fill: 'rgba(46,158,107,0.06)', stroke: 'rgba(46,158,107,0.4)' }),
+  (() => { const t = svg('text', { x: 34, y: 60, 'font-family': K.font, 'font-size': 11, 'font-weight': 700, fill: K.green }); t.textContent = '\u{1F7E2} ' + L.staying; return t; })(),
+  Kit.bar(34, 68, 180, 5, K.t2),
+  Kit.card(20, 92, 280, 44),
+  Kit.bar(34, 106, 140, 5, K.t2),
+  Kit.marker(20, 42, 2),
+]);
+FRAMES.db3 = (L) => Kit.frame(L.title_db3, [
+  Kit.page(),
+  Kit.card(20, 42, 280, 60, { sw: 1.6, stroke: K.blue }),
+  Kit.bar(34, 56, 120, 6, K.blue),
+  Kit.bar(34, 70, 200, 5, K.t2),
+  Kit.bar(34, 82, 140, 5, K.t1),
+  Kit.cursor(160, 72),
+  Kit.marker(20, 42, 3),
+]);
+FRAMES.db4 = (L) => Kit.frame(L.title_db4, [
+  Kit.page(),
+  Kit.card(20, 42, 280, 146, { fill: K.bg }),
+  (() => { const t = svg('text', { x: 160, y: 100, 'text-anchor': 'middle', 'font-family': 'Playfair Display, serif', 'font-size': 16, 'font-weight': 500, fill: K.green }); t.textContent = '✨ ' + L.done; return t; })(),
+  Kit.bar(70, 118, 180, 5, K.t1),
+  Kit.marker(20, 42, 4),
+]);
+
+// ─── guest analytics ──────────────────────────────────────────────
+FRAMES.ga1 = (L) => Kit.frame(L.title_ga1, [
+  Kit.page(),
+  Kit.card(20, 42, 280, 146),
+  Kit.btn(30, 56, 60, 22, { label: L.d7, active: false }),
+  Kit.btn(94, 56, 60, 22, { label: L.d30 }),
+  Kit.btn(158, 56, 60, 22, { label: L.d90, active: false }),
+  Kit.cursor(124, 68),
+  Kit.marker(94, 56, 1),
+]);
+FRAMES.ga2 = (L) => Kit.frame(L.title_ga2, [
+  Kit.page(),
+  Kit.card(20, 42, 280, 146),
+  Kit.bar(34, 60, 220, 12, K.blue),
+  Kit.bar(34, 80, 180, 12, 'rgba(0,91,255,0.6)'),
+  Kit.bar(34, 100, 120, 12, 'rgba(0,91,255,0.4)'),
+  (() => { const t = svg('text', { x: 264, y: 70, 'text-anchor': 'end', 'font-family': K.font, 'font-size': 10, 'font-weight': 700, fill: K.white }); t.textContent = '100%'; return t; })(),
+  (() => { const t = svg('text', { x: 224, y: 90, 'text-anchor': 'end', 'font-family': K.font, 'font-size': 10, 'font-weight': 700, fill: K.white }); t.textContent = '82%'; return t; })(),
+  (() => { const t = svg('text', { x: 164, y: 110, 'text-anchor': 'end', 'font-family': K.font, 'font-size': 10, 'font-weight': 700, fill: K.white }); t.textContent = '55%'; return t; })(),
+  Kit.marker(20, 42, 2),
+]);
+FRAMES.ga3 = (L) => Kit.frame(L.title_ga3, [
+  Kit.page(),
+  Kit.card(20, 42, 280, 146),
+  Kit.row(30, 60, 260, { status: 'amber', statusLabel: L.needsYou }),
+  Kit.row(30, 92, 260, {}),
+  Kit.row(30, 124, 260, { faded: true }),
+  Kit.marker(20, 42, 3),
+]);
+
+// ─── contacts ─────────────────────────────────────────────────────
+FRAMES.co1 = (L) => Kit.frame(L.title_co1, [
+  Kit.page(),
+  Kit.card(20, 42, 280, 146),
+  Kit.bar(34, 56, 80, 7),
+  Kit.row(30, 84, 260, {}),
+  Kit.row(30, 116, 260, {}),
+  Kit.row(30, 148, 260, {}),
+  Kit.marker(20, 42, 1),
+]);
+FRAMES.co2 = (L) => simpleTargetFrame(L.title_co2, L.dlCsv);
+
+// ─── property ─────────────────────────────────────────────────────
+FRAMES.pr1 = (L) => Kit.frame(L.title_pr1, [
+  Kit.page(),
+  Kit.card(20, 42, 280, 146),
+  Kit.bar(34, 56, 130, 7),
+  Kit.btn(210, 50, 78, 22, { label: L.edit }),
+  Kit.cursor(258, 62),
+  Kit.marker(210, 50, 1),
+]);
+FRAMES.pr2 = (L) => Kit.frame(L.title_pr2, [
+  Kit.page(),
+  Kit.card(20, 42, 280, 146, { sw: 1.6, stroke: K.blue }),
+  Kit.bar(34, 56, 120, 6, K.blue),
+  Kit.bar(34, 74, 100, 5, K.soft),
+  svg('rect', { x: 34, y: 84, width: 244, height: 18, rx: 4, fill: K.t1 }),
+  Kit.bar(34, 116, 90, 5, K.soft),
+  svg('rect', { x: 34, y: 126, width: 244, height: 18, rx: 4, fill: K.t1 }),
+  Kit.bar(34, 158, 60, 5, K.soft),
+  svg('rect', { x: 34, y: 168, width: 244, height: 18, rx: 4, fill: K.t1 }),
+  Kit.marker(20, 42, 2),
+]);
+FRAMES.pr3 = (L) => simpleTargetFrame(L.title_pr3, L.save);
+FRAMES.pr4 = (L) => simpleTargetFrame(L.title_pr4, L.preview);
+
+// ─── rules ────────────────────────────────────────────────────────
+FRAMES.ru1 = (L) => Kit.frame(L.title_ru1, [
+  Kit.page(),
+  Kit.card(20, 42, 280, 146),
+  Kit.bar(34, 56, 130, 7),
+  Kit.btn(210, 50, 78, 22, { label: L.edit }),
+  Kit.cursor(258, 62),
+  Kit.marker(210, 50, 1),
+]);
+FRAMES.ru2 = (L) => Kit.frame(L.title_ru2, [
+  Kit.page(),
+  Kit.card(20, 42, 280, 146),
+  Kit.bar(34, 56, 130, 6, K.soft),
+  Kit.btn(30, 74, 74, 22, { label: '\u{1F6AD} ' + L.smoke, active: false }),
+  Kit.btn(114, 74, 74, 22, { label: '\u{1F510} ' + L.party, active: false }),
+  Kit.btn(198, 74, 74, 22, { label: '\u{1F515} ' + L.noise, active: false }),
+  Kit.cursor(160, 86),
+  Kit.marker(114, 74, 2),
+]);
+FRAMES.ru3 = (L) => simpleTargetFrame(L.title_ru3, L.addRule);
+FRAMES.ru4 = (L) => simpleTargetFrame(L.title_ru4, L.save);
+
+// ─── recos ────────────────────────────────────────────────────────
+FRAMES.rc1 = (L) => Kit.frame(L.title_rc1, [
+  Kit.page(),
+  Kit.card(20, 42, 280, 146),
+  Kit.btn(30, 54, 60, 22, { label: '\u{1F35D}' }),
+  Kit.btn(94, 54, 60, 22, { label: '\u{1F377}', active: false }),
+  Kit.btn(158, 54, 60, 22, { label: '\u{1F441}', active: false }),
+  Kit.btn(222, 54, 60, 22, { label: '\u{1F3D6}', active: false }),
+  Kit.cursor(60, 66),
+  Kit.marker(30, 54, 1),
+]);
+FRAMES.rc2 = (L) => simpleTargetFrame(L.title_rc2, L.addReco);
+FRAMES.rc3 = (L) => simpleTargetFrame(L.title_rc3, L.save);
+
+// ─── qr link ──────────────────────────────────────────────────────
+FRAMES.qr1 = (L) => simpleTargetFrame(L.title_qr1_new, L.genLink);
+FRAMES.qr2 = (L) => simpleTargetFrame(L.title_qr2_copy, L.copyTpl);
+FRAMES.qr3 = (L) => Kit.frame(L.title_qr3_paste, [
+  Kit.phone(102, 10, 116, 184, [
+    svg('rect', { x: 112, y: 22, width: 96, height: 60, rx: 8, fill: K.t1 }),
+    Kit.bar(120, 34, 80, 5, K.t2),
+    Kit.bar(120, 46, 60, 5, K.t2),
+    Kit.bar(120, 58, 70, 5, K.t2),
+    svg('rect', { x: 112, y: 100, width: 96, height: 60, rx: 8, fill: K.blue }),
+    Kit.bar(120, 112, 80, 5, K.white),
+    Kit.bar(120, 124, 40, 5, 'rgba(255,255,255,0.6)'),
+    Kit.bar(120, 138, 60, 5, 'rgba(255,255,255,0.6)'),
+  ]),
+  Kit.marker(112, 100, 3),
+]);
+FRAMES.qr4 = (L) => Kit.frame(L.title_qr4_print, [
+  svg('rect', { x: 90, y: 30, width: 140, height: 160, rx: 4, fill: K.white, stroke: K.line }),
+  Kit.bar(110, 44, 100, 6),
+  Kit.qr(120, 62, 80, K.ink),
+  Kit.bar(110, 154, 100, 5, K.t1),
+  Kit.marker(90, 30, 4),
+]);
+
 // 6 · Guide data
 //   Keys = panel ids from SECTIONS in host-console.html.
 //   Each guide: it + en. Every step: {t, target, panel?, art, emptyHint?}.
-// ═════════════════════════════════════════════════════════════════════
 const UI = {
   it: { how: 'Come funziona', purpose: 'A cosa serve', when: 'Quando', step: 'Passo', show: 'Mostrami', faq: 'Domande frequenti', useful: 'Ti è stato utile?', yes: 'Sì', no: 'No', doubt: 'Hai ancora un dubbio?', contact: 'Scrivici', close: 'Chiudi', minute: '1 minuto', thanks: 'Grazie!', tapHere: 'Premi qui', backToGuide: 'Torna alla guida' },
   en: { how: 'How it works', purpose: 'What it’s for', when: 'When', step: 'Step', show: 'Show me', faq: 'Common questions', useful: 'Was this helpful?', yes: 'Yes', no: 'No', doubt: 'Still unsure?', contact: 'Write to us', close: 'Close', minute: '1 minute', thanks: 'Thanks!', tapHere: 'Tap here', backToGuide: 'Back to guide' },
@@ -586,10 +711,23 @@ const FL = {
     title_cm1: 'I tre obblighi', title_cm2: 'Vai a Export',
     title_ct1: 'Scegli l’ospite', title_ct2: 'Rispondi', title_ct3: 'Risolvi', title_ct4: 'Avvisi',
     title_cl1: 'Cambia mese', title_cl2: 'Colori', title_cl3: 'Dettaglio', title_cl4: 'Tocca un giorno',
+    title_db1: 'Richiede attenzione', title_db2: 'Ospiti in casa', title_db3: 'Apri una scheda', title_db4: 'Tutto in ordine',
+    title_ga1: 'Scegli il periodo', title_ga2: 'Funnel di check-in', title_ga3: 'Bacheca per ospite',
+    title_co1: 'Lista contatti', title_co2: 'Scarica CSV',
+    title_pr1: 'Modifica', title_pr2: 'Compila i campi', title_pr3: 'Salva', title_pr4: 'Anteprima',
+    title_ru1: 'Modifica', title_ru2: 'Regole comuni', title_ru3: 'Aggiungi regola', title_ru4: 'Salva',
+    title_rc1: 'Scegli categoria', title_rc2: 'Aggiungi consiglio', title_rc3: 'Salva',
+    title_qr1_new: 'Genera link', title_qr2_copy: 'Copia modello', title_qr3_paste: 'Invia in chat', title_qr4_print: 'Stampa il QR',
     new: 'Nuovo', gen: 'Genera .txt', txt: '.txt', portal: 'Alloggiati Web', sendFile: 'Invia', mark: 'Segna inviato', sent: '✓ Inviato', receipt: 'PDF', upload: 'Carica',
     openPortal: 'Apri portale', openExport: 'Apri Export',
     pick: 'Scegli ospite', needsYou: 'Ha bisogno di te', send: 'Invia', resolve: '✓ Risolvi', resolved: 'Risolto', alerts: 'Avvisi', enablePush: 'Attiva push', linkTg: 'Collega Telegram',
     month: 'settembre 2026', today: 'Oggi', checkedIn: '▬ arrivato', waiting: '▬ in attesa', openLink: 'Apri link',
+    urgent: 'Richiede la tua attenzione', staying: 'Soggiornano adesso', done: 'Tutto in ordine',
+    d7: '7 gg', d30: '30 gg', d90: '90 gg',
+    edit: 'Modifica', save: 'Salva', preview: 'Anteprima',
+    smoke: 'Vietato fumo', party: 'No feste', noise: 'Silenzio 22–08',
+    addRule: '+ Aggiungi regola', addReco: '+ Aggiungi consiglio',
+    genLink: 'Genera link', copyTpl: 'Copia modello', dlCsv: 'Scarica CSV',
   },
   en: {
     title_ci1: 'New guest in list', title_ci2: 'Generate the file', title_ci3: 'Alloggiati Web', title_ci4: 'Mark as filed', title_ci5: 'Upload receipt',
@@ -597,10 +735,23 @@ const FL = {
     title_cm1: 'Three obligations', title_cm2: 'Go to Export',
     title_ct1: 'Pick the guest', title_ct2: 'Reply', title_ct3: 'Resolve', title_ct4: 'Alerts',
     title_cl1: 'Change month', title_cl2: 'Colours', title_cl3: 'Details', title_cl4: 'Tap a day',
+    title_db1: 'Needs attention', title_db2: 'Guests in-house', title_db3: 'Open a card', title_db4: 'All caught up',
+    title_ga1: 'Pick the period', title_ga2: 'Check-in funnel', title_ga3: 'Per-guest board',
+    title_co1: 'Contacts list', title_co2: 'Download CSV',
+    title_pr1: 'Edit', title_pr2: 'Fill the fields', title_pr3: 'Save', title_pr4: 'Preview',
+    title_ru1: 'Edit', title_ru2: 'Common rules', title_ru3: 'Add rule', title_ru4: 'Save',
+    title_rc1: 'Pick a category', title_rc2: 'Add recommendation', title_rc3: 'Save',
+    title_qr1_new: 'Generate link', title_qr2_copy: 'Copy template', title_qr3_paste: 'Send in chat', title_qr4_print: 'Print the QR',
     new: 'New', gen: 'Generate .txt', txt: '.txt', portal: 'Alloggiati Web', sendFile: 'Send', mark: 'Mark filed', sent: '✓ Filed', receipt: 'PDF', upload: 'Upload',
     openPortal: 'Open portal', openExport: 'Open Export',
     pick: 'Pick guest', needsYou: 'Needs you', send: 'Send', resolve: '✓ Resolve', resolved: 'Resolved', alerts: 'Alerts', enablePush: 'Enable push', linkTg: 'Link Telegram',
     month: 'September 2026', today: 'Today', checkedIn: '▬ checked in', waiting: '▬ waiting', openLink: 'Open link',
+    urgent: 'Needs your attention', staying: 'Currently staying', done: 'All caught up',
+    d7: '7 d', d30: '30 d', d90: '90 d',
+    edit: 'Edit', save: 'Save', preview: 'Preview',
+    smoke: 'No smoking', party: 'No parties', noise: 'Quiet 10–08',
+    addRule: '+ Add rule', addReco: '+ Add recommendation',
+    genLink: 'Generate link', copyTpl: 'Copy template', dlCsv: 'Download CSV',
   },
 };
 function frame(id) { return FRAMES[id](FL[HOSTLANG()] || FL.it); }
@@ -714,14 +865,154 @@ const GUIDES = {
       { q_it: 'L’assistente risponde da solo?', a_it: 'Sì, alle domande comuni. Quando non sa, chiama te.', q_en: 'Does the assistant reply on its own?', a_en: 'Yes, to common questions. When it doesn’t know, it calls you.' },
     ],
   },
+
+  // ─── priority 3 (dashboard + property + rules + recos + qr + contacts + analytics) ──
+  dashboard: {
+    page: { it: 'Oggi', en: 'Today' },
+    title: { it: 'Cosa fare oggi', en: 'What to do today' },
+    purpose: {
+      it: 'Qui vedi in un colpo d’occhio cosa richiede la tua attenzione adesso.',
+      en: 'Here you see at a glance what needs your attention right now.',
+    },
+    when: { it: 'Ogni mattina, come prima cosa.', en: 'Every morning, first thing.' },
+    steps: [
+      { it: 'Guarda «Richiede la tua attenzione»: sono le cose urgenti.', en: 'Check “Needs your attention”: these are the urgent items.', target: 'dash-urgent', art: 'db1', emptyHint: { it: 'Il riquadro compare solo quando c’è qualcosa di urgente.', en: 'The card only appears when something is urgent.' } },
+      { it: 'Poi «Soggiornano adesso»: chi è in casa in questo momento.', en: 'Then “Currently staying”: who’s in the property right now.', target: 'dash-staying', art: 'db2', emptyHint: { it: 'Il riquadro compare quando hai ospiti in casa.', en: 'The card appears when you have guests staying.' } },
+      { it: 'Premi una scheda per aprire l’ospite e vedere cosa fare.', en: 'Press a card to open the guest and see what to do.', target: 'dash-urgent', art: 'db3' },
+      { it: 'Quando vedi «Tutto in ordine», sei in regola.', en: 'When you see “All caught up”, you’re done.', target: 'dash-all-caught-up', art: 'db4', emptyHint: { it: 'Compare solo quando non c’è niente in sospeso.', en: 'Only appears when nothing is pending.' } },
+    ],
+    tip: { it: 'Il numero rosso vicino a «Oggi» nel menu è il conteggio degli urgenti.', en: 'The red number next to “Today” in the menu is the urgent count.' },
+    faq: [
+      { q_it: 'Non vedo un ospite che dovrebbe esserci.', a_it: 'Prova a ricaricare. Se manca ancora, apri «Calendario» in Ospiti per controllare le date.', q_en: 'A guest I expect isn’t showing.', a_en: 'Try reloading. If still missing, open Calendar under Guests to check the dates.' },
+      { q_it: 'Come nascondo una scheda?', a_it: 'Premi il cestino in alto a destra della scheda.', q_en: 'How do I hide a card?', a_en: 'Press the trash icon at the top-right of the card.' },
+    ],
+  },
+
+  guestanalytics: {
+    page: { it: 'Analisi Ospiti', en: 'Guest Analytics' },
+    title: { it: 'Come gli ospiti usano l’app', en: 'How guests use the app' },
+    purpose: {
+      it: 'Qui vedi quanti ospiti aprono l’app e cosa è utile fare per ognuno.',
+      en: 'Here you see how many guests use the app and what to do next for each.',
+    },
+    when: { it: 'Una volta a settimana è abbastanza.', en: 'Once a week is enough.' },
+    steps: [
+      { it: 'Scegli il periodo: 7, 30 o 90 giorni.', en: 'Pick the period: 7, 30 or 90 days.', target: 'ga-range', art: 'ga1' },
+      { it: 'Il «Funnel» mostra quanti hanno finito il check-in.', en: 'The funnel shows how many finished check-in.', target: 'ga-funnel', art: 'ga2' },
+      { it: 'La «Bacheca» elenca ogni ospite, in ordine di urgenza.', en: 'The board lists every guest, sorted by urgency.', target: 'ga-guest-board', art: 'ga3' },
+    ],
+    faq: [
+      { q_it: 'Vedo dati personali degli ospiti?', a_it: 'Le sessioni anonime non hanno nome. Se c’è un codice prenotazione, mostra il nome del capofamiglia per collegare la sessione.', q_en: 'Do I see personal data?', a_en: 'Anonymous sessions have no name. If a booking code is present, the head-of-group name is shown so you can attribute the session.' },
+      { q_it: 'Perché il funnel non torna?', a_it: 'A volte un ospite completa il check-in di persona: entra nel conteggio dei «completati» ma non ha mai «aperto il link».', q_en: 'The funnel numbers look off.', a_en: 'Sometimes a guest completes check-in in person: they count as completed, but never “opened the link”.' },
+    ],
+  },
+
+  contacts: {
+    page: { it: 'Contatti Marketing', en: 'Marketing Contacts' },
+    title: { it: 'Ospiti che vogliono tue notizie', en: 'Guests who want to hear from you' },
+    purpose: {
+      it: 'Qui trovi gli ospiti che hanno accettato di ricevere offerte da te.',
+      en: 'Here you find guests who agreed to receive offers from you.',
+    },
+    when: { it: 'Quando vuoi scrivere agli ospiti passati.', en: 'When you want to reach past guests.' },
+    steps: [
+      { it: 'Controlla la lista degli ospiti.', en: 'Check the list of guests.', target: 'contacts-table', art: 'co1', emptyHint: { it: 'La lista si riempie quando un ospite accetta durante il check-in.', en: 'The list fills up when a guest opts in during check-in.' } },
+      { it: 'Premi «📥 Scarica CSV» per avere la lista in un file.', en: 'Press “📥 Download CSV” to get the list as a file.', target: 'contacts-download', art: 'co2' },
+    ],
+    warn: { it: 'Scrivi solo a chi è in questa lista. Metti sempre il link per disiscriversi.', en: 'Only write to people in this list. Always include an unsubscribe link.' },
+    faq: [
+      { q_it: 'Posso scrivere agli altri ospiti?', a_it: 'No. Solo a chi ha dato il consenso qui.', q_en: 'Can I write to other guests?', a_en: 'No. Only those who consented here.' },
+    ],
+  },
+
+  property: {
+    page: { it: 'Dettagli Proprietà', en: 'Property Details' },
+    title: { it: 'Compilare la tua casa', en: 'Filling in your property' },
+    purpose: {
+      it: 'Qui inserisci le informazioni che gli ospiti vedono nell’app.',
+      en: 'Here you fill in what your guests see in the app.',
+    },
+    when: { it: 'All’inizio, e quando qualcosa cambia.', en: 'At the start, and whenever something changes.' },
+    steps: [
+      { it: 'Premi «✏️ Modifica» per iniziare.', en: 'Press “✏️ Edit” to start.', target: 'prop-edit', art: 'pr1' },
+      { it: 'Compila foto, informazioni base e orari di check-in.', en: 'Fill in photos, basic info and check-in times.', target: 'prop-basic', art: 'pr2' },
+      { it: 'Premi «💾 Salva Dettagli Proprietà».', en: 'Press “💾 Save Property Details”.', target: 'prop-save', art: 'pr3', emptyHint: { it: 'Compare dopo aver premuto «Modifica».', en: 'Appears after you press “Edit”.' } },
+      { it: 'Premi «🧪 Anteprima come ospite» per controllare il risultato.', en: 'Press “🧪 Preview as guest” to check the result.', target: 'prop-preview', art: 'pr4' },
+    ],
+    tip: { it: 'Il codice CIN serve per i file della Polizia e delle statistiche. Inseriscilo subito.', en: 'The CIN code is required for the Police and statistics files. Add it right away.' },
+    faq: [
+      { q_it: 'Come faccio ad avere le prenotazioni di Airbnb e Booking?', a_it: 'In «Sincronizzazione calendario (iCal)» incolla il link del calendario e premi «🔄 Sincronizza ora».', q_en: 'How do I get Airbnb and Booking reservations?', a_en: 'In “Calendar sync (iCal)” paste the calendar link and press “🔄 Sync now”.' },
+      { q_it: 'Dove trovo il link Google Maps?', a_it: 'In Google Maps cerca la casa, premi Condividi e poi Copia link.', q_en: 'Where do I find the Google Maps link?', a_en: 'In Google Maps search for the property, press Share, then Copy link.' },
+      { q_it: 'Cos’è il codice ROSS1000?', a_it: 'Il codice che ti dà la Regione per le statistiche. Non è il CIN.', q_en: 'What’s the ROSS1000 code?', a_en: 'The code your Region gives you for statistics. Different from the CIN.' },
+    ],
+  },
+
+  rules: {
+    page: { it: 'Regole della Casa', en: 'House Rules' },
+    title: { it: 'Le regole della casa', en: 'Your house rules' },
+    purpose: {
+      it: 'Qui scrivi le regole che gli ospiti leggono nell’app.',
+      en: 'Here you write the rules guests read in the app.',
+    },
+    when: { it: 'Una volta, poi quando cambiano.', en: 'Once, then when they change.' },
+    steps: [
+      { it: 'Premi «✏️ Modifica».', en: 'Press “✏️ Edit”.', target: 'rules-edit', art: 'ru1' },
+      { it: 'Tocca una regola in «Aggiungi regole comuni» per aggiungerla.', en: 'Tap a rule under “Quick-add common rules” to add it.', target: 'rules-presets', art: 'ru2', emptyHint: { it: 'Compare dopo aver premuto «Modifica».', en: 'Appears after you press “Edit”.' } },
+      { it: 'Oppure premi «+ Aggiungi Regola» per scriverne una tua.', en: 'Or press “+ Add Custom Rule” to write your own.', target: 'rules-add-custom', art: 'ru3', emptyHint: { it: 'Compare dopo aver premuto «Modifica».', en: 'Appears after you press “Edit”.' } },
+      { it: 'Premi «💾 Salva Regole».', en: 'Press “💾 Save Rules”.', target: 'rules-save', art: 'ru4', emptyHint: { it: 'Compare dopo aver premuto «Modifica».', en: 'Appears after you press “Edit”.' } },
+    ],
+    tip: { it: 'Regole brevi e gentili. «✨ Suggerisci gravità» segna quali sono più importanti.', en: 'Short, friendly rules. “✨ Suggest severity” marks the most important ones.' },
+    faq: [
+      { q_it: 'Cosa fa «✨ Suggerisci gravità»?', a_it: 'Riconosce parole come «fumo», «feste», «rumore» e segna quelle regole come importanti. Poi tu controlli e salvi.', q_en: 'What does “✨ Suggest severity” do?', a_en: 'It matches words like “smoking”, “parties”, “noise” and flags those rules as important. You review and save.' },
+    ],
+  },
+
+  recos: {
+    page: { it: 'Consigli', en: 'Recommendations' },
+    title: { it: 'I tuoi consigli sulla zona', en: 'Your local recommendations' },
+    purpose: {
+      it: 'Qui aggiungi ristoranti, spiagge e posti che consigli agli ospiti.',
+      en: 'Here you add restaurants, beaches and places you recommend.',
+    },
+    when: { it: 'Una volta, poi quando scopri un posto nuovo.', en: 'Once, then when you discover a new spot.' },
+    steps: [
+      { it: 'Scegli una categoria, per esempio «🍝 Cibo».', en: 'Pick a category, e.g. “🍝 Food”.', target: 'recos-tabs', art: 'rc1' },
+      { it: 'Premi «✏️ Modifica», poi «+ Aggiungi Consiglio».', en: 'Press “✏️ Edit”, then “+ Add Recommendation”.', target: 'recos-add', art: 'rc2', emptyHint: { it: 'Compare dopo aver premuto «Modifica».', en: 'Appears after you press “Edit”.' } },
+      { it: 'Premi «💾 Salva».', en: 'Press “💾 Save”.', target: 'recos-save', art: 'rc3', emptyHint: { it: 'Compare dopo aver premuto «Modifica».', en: 'Appears after you press “Edit”.' } },
+    ],
+    tip: { it: 'In «Analisi Ospiti» vedi quali consigli gli ospiti aprono di più.', en: 'In Guest Analytics you can see which recommendations guests open the most.' },
+    faq: [
+      { q_it: 'Devo aggiungere un indirizzo?', a_it: 'Sì, così l’ospite lo apre su Google Maps con un tocco.', q_en: 'Do I need to add an address?', a_en: 'Yes, so the guest can open it in Google Maps with one tap.' },
+    ],
+  },
+
+  qrlink: {
+    page: { it: 'QR Code & Link', en: 'QR Code & Link' },
+    title: { it: 'Dare l’app agli ospiti', en: 'Sharing the app with guests' },
+    purpose: {
+      it: 'Qui crei il link per ogni prenotazione e trovi il QR per la casa.',
+      en: 'Here you create the per-booking link and find the property QR.',
+    },
+    when: { it: 'Appena ricevi una prenotazione.', en: 'As soon as you get a booking.' },
+    steps: [
+      { it: 'Premi «🔑 Genera Nuovo Link Prenotazione».', en: 'Press “🔑 Generate New Booking Link”.', target: 'qr-gen-booking', art: 'qr1' },
+      { it: 'Premi «📋 Copia Modello»: prendi il messaggio pronto.', en: 'Press “📋 Copy Template”: grab the ready message.', target: 'qr-copy-template', art: 'qr2' },
+      { it: 'Incolla nella chat di Airbnb o Booking e invia.', en: 'Paste it in your Airbnb or Booking chat and send.', target: 'qr-copy-template', art: 'qr3' },
+      { it: 'Stampa il QR della casa e mettilo vicino alla porta.', en: 'Print the property QR and place it near the door.', target: 'qr-apartment', art: 'qr4' },
+    ],
+    tip: { it: 'Premi «🧪 Apri in modalità test» per vedere l’app come un ospite.', en: 'Press “🧪 Open in test mode” to see the app as a guest would.' },
+    faq: [
+      { q_it: 'Il link è diverso per ogni ospite?', a_it: 'Sì, uno per prenotazione. Il QR in casa è uguale per tutti.', q_en: 'Is the link different for each guest?', a_en: 'Yes, one per booking. The property QR is the same for everyone.' },
+      { q_it: 'L’ospite ha perso il link.', a_it: 'Può inquadrare il QR in casa e trovare il suo check-in con cognome e data di arrivo.', q_en: 'The guest lost the link.', a_en: 'They can scan the property QR and look up their check-in with surname + arrival date.' },
+      { q_it: 'Le prenotazioni da Airbnb hanno già un link?', a_it: 'Sì. Quando arrivano dalla sincronizzazione iCal, il codice è già pronto — condividi il link.', q_en: 'Do Airbnb reservations already have a link?', a_en: 'Yes. When they arrive via iCal sync, the code is already there — just share the link.' },
+    ],
+  },
 };
 
 // Helper — did the guide for this panel exist?
 function guideFor(panelId) { return GUIDES[panelId] || null; }
 
-// ═════════════════════════════════════════════════════════════════════
 // 7 · Renderer  (drawer = desktop, sheet = mobile)
-// ═════════════════════════════════════════════════════════════════════
 const MOBILE_MAX = 720;
 const isMobile = () => window.matchMedia && window.matchMedia('(max-width: ' + MOBILE_MAX + 'px)').matches;
 
@@ -953,9 +1244,7 @@ function openGuide2(panelId, opts) {
   if (opts.activeStep != null) scrollToStep(container, opts.activeStep);
 }
 
-// ═════════════════════════════════════════════════════════════════════
 // 8 · Feedback
-// ═════════════════════════════════════════════════════════════════════
 function vote(panelId, helpful, btns, thanksEl) {
   btns.forEach(b => b.setAttribute('disabled', 'disabled'));
   _feedbackSent.add(panelId);
@@ -977,9 +1266,7 @@ function vote(panelId, helpful, btns, thanksEl) {
   }).catch(err => console.warn('[HG] feedback failed:', err));
 }
 
-// ═════════════════════════════════════════════════════════════════════
 // 9 · Spotlight  ("Mostrami" → dim + ring + tooltip on the real element)
-// ═════════════════════════════════════════════════════════════════════
 let _spot = null;
 
 async function showMe(step, stepIdx) {
@@ -1134,10 +1421,8 @@ function showEmptyHint(step, stepIdx) {
   if (li.scrollIntoView) li.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-// ═════════════════════════════════════════════════════════════════════
 // 10 · Pill  (mounted next to #panelTitle by host-console.html's
 //   showPanel(). We expose mountPill(panelId) and onLangSwitch().)
-// ═════════════════════════════════════════════════════════════════════
 const SEEN_KEY = 'wbnb_guide_seen_';
 
 function seenPanels() {
@@ -1199,9 +1484,7 @@ function onLangSwitch(l) {
   }
 }
 
-// ═════════════════════════════════════════════════════════════════════
 // 11 · Dev checker  — window.__checkGuides()
-// ═════════════════════════════════════════════════════════════════════
 function checkGuides() {
   const report = { missingTargets: [], panelsWithoutGuide: [], stepCount: 0, guideCount: 0 };
   const SECTIONS = window.SECTIONS || {};
@@ -1225,9 +1508,7 @@ function checkGuides() {
   return report;
 }
 
-// ═════════════════════════════════════════════════════════════════════
 // 12 · Bootstrap
-// ═════════════════════════════════════════════════════════════════════
 function injectStyle() {
   if (document.getElementById('hg-style')) return;
   const s = document.createElement('style');
@@ -1247,7 +1528,7 @@ window.HG = {
   closeGuide,
   checkGuides,
   guides: GUIDES,       // read-only reference for tests
-  version: '43.2',
+  version: '43.3',
 };
 // Alias for the console-side dev command name the spec asks for.
 window.__checkGuides = checkGuides;

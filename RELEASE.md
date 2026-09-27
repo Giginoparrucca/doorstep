@@ -4,6 +4,19 @@ This document explains how to ship a version, how to mark versions you might
 want to return to, and how to roll back fast if something breaks in
 production. Keep it in the repo root alongside `CHANGELOG.md`.
 
+---
+
+## Round 43 maintenance rule — guides
+
+If a round changes the host-console UI, update the matching guide in
+`host-guides.js` and run `window.__checkGuides()` in DevTools before shipping.
+The report must have `missingTargets: []` on every panel a guide covers. If
+you change a button label used inside a guide (e.g. `btn_gen_alloggiati`),
+mirror the change in the guide's `steps[].it` / `.en` copy so the guide
+still names the button by its real label. When you touch `host-guides.js`,
+bump `_HG_VERSION` in `host-console.html` (and the internal `version` string)
+so every browser gets the fresh file.
+
 The golden rule: **you should always be able to get back to a known-good
 version in under a minute.** You have three independent ways to do that,
 listed below from fastest to most surgical.

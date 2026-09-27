@@ -5828,16 +5828,18 @@ function _toggleRowMenu(btn) {
   const wasOpen = menu.style.display && menu.style.display !== 'none';
   _closeRowMenus();
   if (wasOpen) return;
-  // Round 43.6 — the check-in table lives inside .table-wrap with
+  // Round 43.6/7 — the check-in table lives inside .table-wrap with
   // overflow-x:auto, which clips a position:absolute dropdown. Portal
   // the menu with position:fixed anchored to the button's viewport
-  // rect so the overflow can't hide it.
+  // rect. Anchor by `right:` distance from the viewport edge instead
+  // of `left: r.right - menuWidth`, because menu.offsetWidth is 0
+  // while display:none and estimating it wrong pushes the menu past
+  // the viewport. Right-anchoring can never overflow.
   const r = btn.getBoundingClientRect();
-  const menuWidth = menu.offsetWidth || 150;
   menu.style.position = 'fixed';
   menu.style.top = (r.bottom + 4) + 'px';
-  menu.style.right = 'auto';
-  menu.style.left = Math.max(8, Math.min(r.right - menuWidth, window.innerWidth - menuWidth - 8)) + 'px';
+  menu.style.left = 'auto';
+  menu.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
   menu.style.margin = '0';
   menu.style.display = 'block';
 }

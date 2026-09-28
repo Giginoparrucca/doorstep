@@ -519,6 +519,11 @@ FRAMES.cl4 = (L) => {
   parts.push(Kit.marker(122, 100, 4));
   return Kit.frame(L.title_cl4, parts);
 };
+// Round 45 — "+ Nuova prenotazione" and "🚫 Blocca date" steps
+// added to the calendar guide. Reuses simpleTargetFrame for the
+// generic "click this button" illustration so no new SVG art needed.
+FRAMES.cl5 = (L) => simpleTargetFrame(L.title_cl5 || 'Calendario', L.btn_new_res || '+ Nuova');
+FRAMES.cl6 = (L) => simpleTargetFrame(L.title_cl6 || 'Calendario', L.btn_block  || '🚫 Blocca');
 
 // A tiny helper for guides that just need "click this button on this page"
 function simpleTargetFrame(pageTitleLabel, buttonLabel) {
@@ -711,6 +716,7 @@ const FL = {
     title_cm1: 'I tre obblighi', title_cm2: 'Vai a Export',
     title_ct1: 'Scegli l’ospite', title_ct2: 'Rispondi', title_ct3: 'Risolvi', title_ct4: 'Avvisi',
     title_cl1: 'Cambia mese', title_cl2: 'Colori', title_cl3: 'Dettaglio', title_cl4: 'Tocca un giorno',
+    title_cl5: 'Nuova prenotazione', title_cl6: 'Blocca date', btn_new_res: '+ Nuova prenotazione', btn_block: '🚫 Blocca date',
     title_db1: 'Richiede attenzione', title_db2: 'Ospiti in casa', title_db3: 'Apri una scheda', title_db4: 'Tutto in ordine',
     title_ga1: 'Scegli il periodo', title_ga2: 'Funnel di check-in', title_ga3: 'Bacheca per ospite',
     title_co1: 'Lista contatti', title_co2: 'Scarica CSV',
@@ -735,6 +741,7 @@ const FL = {
     title_cm1: 'Three obligations', title_cm2: 'Go to Export',
     title_ct1: 'Pick the guest', title_ct2: 'Reply', title_ct3: 'Resolve', title_ct4: 'Alerts',
     title_cl1: 'Change month', title_cl2: 'Colours', title_cl3: 'Details', title_cl4: 'Tap a day',
+    title_cl5: 'New booking', title_cl6: 'Block dates', btn_new_res: '+ New booking', btn_block: '🚫 Block dates',
     title_db1: 'Needs attention', title_db2: 'Guests in-house', title_db3: 'Open a card', title_db4: 'All caught up',
     title_ga1: 'Pick the period', title_ga2: 'Check-in funnel', title_ga3: 'Per-guest board',
     title_co1: 'Contacts list', title_co2: 'Download CSV',
@@ -754,7 +761,21 @@ const FL = {
     genLink: 'Generate link', copyTpl: 'Copy template', dlCsv: 'Download CSV',
   },
 };
-function frame(id) { return FRAMES[id](FL[HOSTLANG()] || FL.it); }
+function frame(id) {
+  // Round 45 hotfix — defensive fallback. When a step's `art:` id doesn't
+  // resolve to a FRAMES entry (typo, or missing after a guide edit) we
+  // used to throw "FRAMES[id] is not a function", which took the whole
+  // openGuide() call down and popped the generic "couldn't load the
+  // guide" alert. Now we log and return a neutral placeholder frame so
+  // the guide still opens.
+  const fn = FRAMES[id];
+  const L = FL[HOSTLANG()] || FL.it;
+  if (typeof fn !== 'function') {
+    try { console.warn('[HG] missing frame art:', id); } catch (_) {}
+    return Kit.frame('', [Kit.page(), Kit.card(20, 42, 280, 146)]);
+  }
+  return fn(L);
+}
 
 // The guides. Kept flat for readability. Panel names match SECTIONS[].panels.
 const GUIDES = {
@@ -1536,7 +1557,7 @@ window.HG = {
   closeGuide,
   checkGuides,
   guides: GUIDES,       // read-only reference for tests
-  version: '45.4',
+  version: '45.5',
 };
 // Alias for the console-side dev command name the spec asks for.
 window.__checkGuides = checkGuides;

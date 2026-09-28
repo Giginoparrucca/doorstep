@@ -948,7 +948,7 @@ const GUIDES = {
     faq: [
       { q_it: 'Come faccio ad avere le prenotazioni di Airbnb e Booking?', a_it: 'In «Sincronizzazione calendario (iCal)» incolla il link del calendario e premi «🔄 Sincronizza ora».', q_en: 'How do I get Airbnb and Booking reservations?', a_en: 'In “Calendar sync (iCal)” paste the calendar link and press “🔄 Sync now”.' },
       { q_it: 'Come faccio a bloccare Airbnb / Booking quando aggiungo una prenotazione WhatsApp?', a_it: 'In «Esporta il calendario ai tuoi OTA» copia l\'URL e incollalo una volta nelle impostazioni «Importa calendario» di Airbnb, Booking e Vrbo. Da quel momento in poi ogni prenotazione diretta o data bloccata verrà propagata in automatico (Airbnb e Booking controllano il calendario ogni 2–4 ore).', q_en: 'How do I block Airbnb / Booking when I add a WhatsApp booking?', a_en: 'Under “Export calendar to your OTAs” copy the URL and paste it once into Airbnb, Booking and Vrbo\'s “Import calendar” settings. From then on every direct booking or blocked date propagates automatically (Airbnb and Booking poll the calendar every 2–4 hours).' },
-      { q_it: 'A cosa serve «Ruota token»?', a_it: 'Se sospetti che qualcuno ha copiato l\'URL, ruotalo. Il vecchio link smette di funzionare subito e devi incollare il nuovo URL negli OTA a cui l\'avevi collegato.', q_en: 'What is “Rotate token” for?', a_en: 'If you think the URL has been shared, rotate it. The old link stops working immediately and you need to paste the new URL into every OTA where you had it connected.' },
+      { q_it: 'A cosa serve «Genera nuovo URL»?', a_it: 'Solo per casi estremi: se hai condiviso l\'URL per errore o vuoi bloccare qualcuno che ce l\'aveva. Crea un URL nuovo e chiude subito il vecchio, quindi devi rifare l\'installazione su Airbnb, Booking e Vrbo. Da non toccare senza motivo.', q_en: 'What is “Generate new URL” for?', a_en: 'Extreme cases only: if you shared the URL by mistake, or need to lock someone out. It creates a new URL and immediately closes the old one, so you must re-do the setup on Airbnb, Booking and Vrbo. Don\'t press it without a reason.' },
       { q_it: 'Dove trovo il link Google Maps?', a_it: 'In Google Maps cerca la casa, premi Condividi e poi Copia link.', q_en: 'Where do I find the Google Maps link?', a_en: 'In Google Maps search for the property, press Share, then Copy link.' },
       { q_it: 'Cos’è il codice ROSS1000?', a_it: 'Il codice che ti dà la Regione per le statistiche. Non è il CIN.', q_en: 'What’s the ROSS1000 code?', a_en: 'The code your Region gives you for statistics. Different from the CIN.' },
     ],
@@ -1536,7 +1536,7 @@ window.HG = {
   closeGuide,
   checkGuides,
   guides: GUIDES,       // read-only reference for tests
-  version: '45.3',
+  version: '45.4',
 };
 // Alias for the console-side dev command name the spec asks for.
 window.__checkGuides = checkGuides;

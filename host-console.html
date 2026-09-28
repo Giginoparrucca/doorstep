@@ -1722,8 +1722,9 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             style="flex:1;min-width:280px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:monospace;font-size:0.78rem;background:#F8FBFF;color:var(--ink);"
             data-h-title="ical_export_url_title">
           <button type="button" class="btn btn-secondary btn-sm" onclick="copyIcalExportUrl(this)" data-h="ical_export_copy">🔗 Copy URL</button>
-          <button type="button" class="btn btn-secondary btn-sm" onclick="rotateIcalExportToken()" data-h="ical_export_rotate" style="color:#9a6b00;border-color:rgba(232,184,75,0.4);">♻️ Rotate token</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="rotateIcalExportToken()" data-h="ical_export_rotate" style="color:#9a6b00;border-color:rgba(232,184,75,0.4);">🔑 Generate new URL</button>
         </div>
+        <div style="font-size:0.7rem;color:var(--ink-soft);margin:-4px 0 10px;line-height:1.4;" data-h="ical_export_rotate_hint">⚠️ "Generate new URL" is only for extreme cases (e.g. the URL was shared by mistake). It immediately kills the current URL, so you'd have to re-paste the new one into every OTA — Airbnb, Booking and Vrbo.</div>
         <div style="font-size:0.72rem;color:var(--ink-soft);line-height:1.5;">
           <div style="margin-bottom:4px;"><strong data-h="ical_export_how">How to connect:</strong></div>
           <div style="margin:2px 0;"><strong>Airbnb:</strong> <span data-h="ical_export_airbnb">Calendar → Availability → Connect calendars → Import calendar → paste the URL.</span></div>
@@ -4042,7 +4043,8 @@ const HT = {
     ical_export_desc: 'Copy this URL and paste it into Airbnb / Booking / Vrbo\'s "Import calendar" screen. Every direct booking and blocked date you save will automatically become unavailable on those OTAs — no guest names or details are shared, only the dates.',
     ical_export_url_title: 'Your property\'s outbound iCal URL — keep it private.',
     ical_export_copy: '🔗 Copy URL',
-    ical_export_rotate: '♻️ Rotate token',
+    ical_export_rotate: '🔑 Generate new URL',
+    ical_export_rotate_hint: '⚠️ "Generate new URL" is only for extreme cases (e.g. the URL was shared by mistake). It immediately kills the current URL, so you\'d have to re-paste the new one into every OTA — Airbnb, Booking and Vrbo.',
     ical_export_how: 'How to connect:',
     ical_export_airbnb: 'Calendar → Availability → Connect calendars → Import calendar → paste the URL.',
     ical_export_booking: 'Rates & Availability → Sync calendars → Import calendar → paste the URL.',
@@ -4531,7 +4533,8 @@ const HT = {
     ical_export_desc: 'Copia questo URL e incollalo nello schermata "Importa calendario" di Airbnb / Booking / Vrbo. Ogni prenotazione diretta e ogni data bloccata che salvi diventerà automaticamente non disponibile su quegli OTA — non vengono condivisi nome ospite o dettagli, solo le date.',
     ical_export_url_title: 'URL iCal in uscita della tua proprietà — tienilo privato.',
     ical_export_copy: '🔗 Copia URL',
-    ical_export_rotate: '♻️ Ruota token',
+    ical_export_rotate: '🔑 Genera nuovo URL',
+    ical_export_rotate_hint: '⚠️ «Genera nuovo URL» è solo per casi estremi (es. hai condiviso l\'URL per errore). Chiude subito l\'URL attuale, quindi dovrai reincollare il nuovo su ogni OTA — Airbnb, Booking e Vrbo.',
     ical_export_how: 'Come collegarlo:',
     ical_export_airbnb: 'Calendario → Disponibilità → Collega calendari → Importa calendario → incolla l\'URL.',
     ical_export_booking: 'Tariffe e Disponibilità → Sincronizza calendari → Importa calendario → incolla l\'URL.',
@@ -4943,7 +4946,7 @@ function showPanel(id, btn) {
 const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','settings','rules','recos','qrlink'];
 // Bump on every host-guides.js change so browsers never see a stale
 // copy even if their cache is aggressive.
-const _HG_VERSION = '45.3';
+const _HG_VERSION = '45.4';
 let _hgLoadPromise = null;
 function _hgLoad() {
   if (window.HG) return Promise.resolve();
@@ -7929,8 +7932,8 @@ async function rotateIcalExportToken() {
   if (!propertyId) return;
   const it = hostLang === 'it';
   const confirmMsg = it
-    ? 'Ruotando il token invaliderai IMMEDIATAMENTE il link esistente. Ogni OTA a cui l\'hai già collegato smetterà di aggiornarsi finché non incollerai il nuovo URL. Continuare?'
-    : 'Rotating the token IMMEDIATELY invalidates the existing link. Every OTA you already connected it to will stop updating until you paste the new URL. Continue?';
+    ? 'Attenzione: questa azione è per casi estremi (es. hai condiviso l\'URL per errore). Crea un NUOVO URL e chiude IMMEDIATAMENTE quello attuale. Ogni OTA (Airbnb, Booking, Vrbo) a cui avevi collegato il vecchio URL smetterà di aggiornarsi finché non incolli il nuovo. Continuare?'
+    : 'Warning: this is for extreme cases only (e.g. the URL was shared by mistake). It creates a NEW URL and IMMEDIATELY closes the current one. Every OTA (Airbnb, Booking, Vrbo) you had connected to the old URL will stop updating until you paste the new one. Continue?';
   if (!confirm(confirmMsg)) return;
 
   // Ask Postgres for a fresh uuid via gen_random_uuid(). Doing this
@@ -7962,7 +7965,7 @@ async function rotateIcalExportToken() {
     if (data && data.ical_export_token) {
       propertyData = { ...(propertyData || {}), ical_export_token: data.ical_export_token };
       renderIcalExportCard();
-      toast(it ? 'Token ruotato. Ricopia il nuovo URL.' : 'Token rotated. Copy the new URL.');
+      toast(it ? '✓ Nuovo URL creato. Copia il nuovo URL e incollalo su ogni OTA.' : '✓ New URL created. Copy it and paste it into every OTA.');
       try { track('ical_export_rotate', {}); } catch(_) {}
     }
   } catch (e) {

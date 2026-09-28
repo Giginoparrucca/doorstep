@@ -203,6 +203,63 @@ body { display: flex; overflow: hidden; }
    `.panel-actions` is kept as an alias for backwards compatibility
    (any legacy markup still works, but new code uses
    `.panel-header-actions`). */
+/* Round 45 hotfix — clear view/edit visual state.
+ * Panels that support an Edit lifecycle set data-edit-mode="view|edit" on
+ * their root .panel div. In view mode disabled inputs render as flat
+ * read-only text (no borders, transparent background) so they don't
+ * mimic a live form. In edit mode the panel gets a subtle warm ring and
+ * the toolbar gets an amber tint so hosts always know which mode they're
+ * in. Applies to Property, Impostazioni, House Rules and Recommendations
+ * — anywhere the pattern is used.
+ */
+.panel[data-edit-mode="view"] fieldset[disabled] .form-input,
+.panel[data-edit-mode="view"] fieldset[disabled] .form-select,
+.panel[data-edit-mode="view"] fieldset[disabled] .form-textarea,
+.panel[data-edit-mode="view"] fieldset[disabled] input:not([type="checkbox"]):not([type="radio"]),
+.panel[data-edit-mode="view"] fieldset[disabled] select,
+.panel[data-edit-mode="view"] fieldset[disabled] textarea {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: var(--ink) !important;
+  cursor: default;
+  padding-left: 0;
+  padding-right: 0;
+  opacity: 1;
+  box-shadow: none;
+}
+.panel[data-edit-mode="view"] fieldset[disabled] .form-input::placeholder,
+.panel[data-edit-mode="view"] fieldset[disabled] .form-textarea::placeholder {
+  color: rgba(107,122,144,0.45);
+}
+/* Dim any action buttons that live inside a view-mode disabled fieldset. */
+.panel[data-edit-mode="view"] fieldset[disabled] button {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+/* Edit mode — amber ring on the toolbar makes the state obvious. */
+.panel[data-edit-mode="edit"] > .panel-header-actions,
+.panel[data-edit-mode="edit"] > .panel-actions {
+  background: rgba(232,184,75,0.10);
+  border-color: rgba(232,184,75,0.55);
+  box-shadow: 0 1px 4px rgba(232,184,75,0.14);
+}
+/* View-mode pill next to the panel title tells the host their current state. */
+.mode-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.mode-chip.view { background: rgba(107,122,144,0.14); color: var(--ink-soft); }
+.mode-chip.edit { background: rgba(232,184,75,0.20); color: #9a6b00; }
+
 .panel-header-actions,
 .panel-actions {
   position: sticky;
@@ -1237,7 +1294,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     </div>
 
     <!-- ════════════ PROPERTY DETAILS ════════════ -->
-    <div class="panel" id="panel-property">
+    <div class="panel" id="panel-property" data-edit-mode="view">
 
       <!-- Round 40 T8 → 43.4 — sticky in-panel header bar. Styles now
            live on the .panel-header-actions class (Round 43.4 unified
@@ -1519,7 +1576,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
          host contacts). Everything the host configures for the platform
          itself (calendar sync in and out, tourist tax, arrival
          reminders, privacy notice, bulk data actions) lives here. -->
-    <div class="panel" id="panel-settings">
+    <div class="panel" id="panel-settings" data-edit-mode="view">
       <!-- Round 45 hotfix — Impostazioni now follows the same view→edit
            lifecycle as Dettagli Proprietà. In view mode the settingsFormBody
            fieldset is disabled; Edit toggles it live, Save fires the
@@ -1748,7 +1805,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     </div>
 
     <!-- ════════════ HOUSE RULES ════════════ -->
-    <div class="panel" id="panel-rules">
+    <div class="panel" id="panel-rules" data-edit-mode="view">
 
       <!-- Round 43.4 — action row now sits at the top of the panel body,
            sticky in flow, matching Property. Avoids the old
@@ -1780,7 +1837,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     </div>
 
     <!-- ════════════ RECOMMENDATIONS ════════════ -->
-    <div class="panel" id="panel-recos">
+    <div class="panel" id="panel-recos" data-edit-mode="view">
 
       <!-- Round 43.4 — sticky in-flow header, matching Property + Rules. -->
       <div class="panel-header-actions">
@@ -8121,6 +8178,8 @@ function confirmDeleteReco(globalIdx) {
 // view; Cancel restores the last known propertyData into the form.
 let propertyEditMode = false;
 function _setPropertyEditControls(editing) {
+  const panel = document.getElementById('panel-property');
+  if (panel) panel.setAttribute('data-edit-mode', editing ? 'edit' : 'view');
   const fs = document.getElementById('propertyFormBody');
   if (fs) fs.disabled = !editing;
   // The cover-photo upload zone is a plain <div onclick=…>, so a disabled
@@ -8173,6 +8232,8 @@ async function savePropertyEdit() {
 // by its own confirm dialog anyway.
 let settingsEditMode = false;
 function _setSettingsEditControls(editing) {
+  const panel = document.getElementById('panel-settings');
+  if (panel) panel.setAttribute('data-edit-mode', editing ? 'edit' : 'view');
   document.querySelectorAll('#panel-settings .settings-edit-fieldset').forEach(fs => {
     fs.disabled = !editing;
   });
@@ -8275,6 +8336,8 @@ const _rulesSafe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<'
 function _setRulesEditControls(visible) {
   // Round 37.1 — toggle back to the element's CSS default rather than
   // guessing 'block' vs 'flex'; buttons stay inline-flex from .btn.
+  const panel = document.getElementById('panel-rules');
+  if (panel) panel.setAttribute('data-edit-mode', visible ? 'edit' : 'view');
   document.querySelectorAll('#panel-rules [data-rules-edit-only]').forEach(el => {
     el.style.display = visible ? '' : 'none';
   });
@@ -8294,6 +8357,8 @@ function toggleRulesEditMode() {
 
 function _setRecosEditControls(visible) {
   // Round 37.1 — same treatment as _setRulesEditControls.
+  const panel = document.getElementById('panel-recos');
+  if (panel) panel.setAttribute('data-edit-mode', visible ? 'edit' : 'view');
   document.querySelectorAll('#panel-recos [data-recos-edit-only]').forEach(el => {
     el.style.display = visible ? '' : 'none';
   });

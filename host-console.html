@@ -1592,6 +1592,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <button type="button" id="settingsCancelBtn" class="btn btn-secondary btn-sm" onclick="cancelSettingsEdit()" style="display:none;"><span data-h="btn_cancel_edit">Cancel</span></button>
       </div>
 
+      <fieldset class="settings-edit-fieldset" disabled style="border:0;padding:0;margin:0;min-width:0;">
       <div class="form-card">
         <div class="form-card-title" data-h="prop_tax_title">Tourist Tax Configuration</div>
         <div class="form-card-desc" data-h="prop_tax_desc">Used by the tourist-tax declaration helper in Export. Enter the values from your comune's tourist-tax resolution (delibera). Leave empty if your comune doesn't levy a tourist tax.</div>
@@ -1690,6 +1691,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           <div id="propTaxLivePreviewBody" style="line-height:1.5;color:var(--ink-soft);"></div>
         </div>
       </div>
+      </fieldset>
 
       <fieldset class="settings-edit-fieldset" disabled style="border:0;padding:0;margin:0;min-width:0;">
       <div class="form-card">
@@ -8269,10 +8271,13 @@ function cancelSettingsEdit() {
   _setSettingsEditControls(false);
 }
 async function saveSettingsEdit() {
-  // The only "form-shape" card in the fieldsets is Arrival Reminders.
-  // iCal feed changes (add / remove / sync) already write to the DB the
-  // moment the host acts on them, so there's nothing else to persist.
-  const ok = await saveArrivalReminders(null);
+  // Round 45 hotfix — Tourist Tax + Arrival Reminders live on the same
+  // properties row. saveProperty() already reads every property field
+  // from the DOM (including tax_* + reminder_email + timezone) and
+  // sends one merged PATCH, so we reuse it. iCal feed changes (add /
+  // remove / sync) write themselves the moment the host acts on them,
+  // so nothing extra is needed for that card.
+  const ok = await saveProperty();
   if (ok === false) return;
   settingsEditMode = false;
   _setSettingsEditControls(false);

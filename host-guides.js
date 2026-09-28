@@ -1536,7 +1536,7 @@ window.HG = {
   closeGuide,
   checkGuides,
   guides: GUIDES,       // read-only reference for tests
-  version: '45.2',
+  version: '45.3',
 };
 // Alias for the console-side dev command name the spec asks for.
 window.__checkGuides = checkGuides;

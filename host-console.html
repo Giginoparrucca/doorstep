@@ -5078,12 +5078,16 @@ async function renderDashboard() {
   // "Awaiting check-in" pill and a hint to send the guest their link.
   try {
     const todayISO = new Date().toISOString().slice(0, 10);
+    // Round 45 Step 4 — covered_by_reservation_id IS NULL so an OTA
+    // echo linked to a direct booking doesn't produce a second phantom
+    // "Awaiting check-in" tile for the same stay.
     const { data: activeRes } = await sb.from('ota_reservations')
       .select('id, platform, guest_name, checkin_date, checkout_date, booking_code')
       .eq('property_id', propertyId)
       .eq('entry_type', 'reservation')
       .eq('status', 'active')
       .is('deleted_at', null)
+      .is('covered_by_reservation_id', null)
       .lte('checkin_date', todayISO)
       .gt('checkout_date', todayISO);
     for (const r of (activeRes || [])) {
@@ -5316,12 +5320,16 @@ async function renderUpcomingReservationsPanel() {
   const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
   let rows = [];
   try {
+    // Round 45 Step 4 — covered_by_reservation_id IS NULL so an OTA
+    // echo linked to a direct booking doesn't show as a second row in
+    // "Prossime prenotazioni" — the direct row already represents it.
     const { data, error } = await sb.from('ota_reservations')
       .select('id, platform, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code, checkin_reopened_at')
       .eq('property_id', propertyId)
       .eq('entry_type', 'reservation')
       .eq('status', 'active')
       .is('deleted_at', null)
+      .is('covered_by_reservation_id', null)
       // Round 32.2 — strictly future arrivals only. The earlier filter
       // (`checkout_date >= today`) also matched anyone still staying or
       // arriving today, which duplicated them into Upcoming alongside
@@ -5478,14 +5486,18 @@ let _upcomingRowsById = {};
 function _renderReservationCard(r, todayISO) {
   const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
   const isHeadType = t => t === 'single' || t === 'head' || t === 'group';
+  // Round 45 Step 4 — 'direct' bookings get their own label + purple
+  // palette so hosts distinguish them from OTA rows at a glance.
   const platformLabel = p => (p === 'airbnb' ? 'Airbnb'
                             : p === 'booking' ? 'Booking.com'
                             : p === 'vrbo' ? 'Vrbo'
+                            : p === 'direct' ? (hostLang === 'it' ? 'Diretta' : 'Direct')
                             : (p ? p[0].toUpperCase() + p.slice(1) : 'Other'));
   const platformStyle = p => (
     p === 'airbnb'  ? { color: '#FF5A5F', tint: 'rgba(255,90,95,0.12)' } :
     p === 'booking' ? { color: '#003580', tint: 'rgba(0,53,128,0.12)' }  :
     p === 'vrbo'    ? { color: '#245ABC', tint: 'rgba(36,90,188,0.12)' } :
+    p === 'direct'  ? { color: '#7c3aed', tint: 'rgba(139,92,246,0.14)' } :
                       { color: '#6B7A90', tint: 'rgba(107,122,144,0.14)' }
   );
   const nightsOf = (a, b) => {
@@ -6346,6 +6358,13 @@ async function ensureReservationBookingCodes(rows) {
   const codeLen = _rotatingCodeLength();
 
   for (const r of (rows || [])) {
+    // Round 45 Step 4 — skip rows that shouldn't get a guest link:
+    //   - blocks are not bookings, they're host-set unavailability
+    //   - covered OTA echoes are shadowed by their direct row; the
+    //     direct row owns the code, giving the echo one would fan out
+    //     the guest URL to two places.
+    if (r.entry_type === 'block') continue;
+    if (r.covered_by_reservation_id) continue;
     const patch = {};
     if (!r.booking_code) patch.booking_code = `${propInit}-${rand6()}`;
     if (rotating && !r.keybox_code) patch.keybox_code = _randRotatingCode(codeLen);
@@ -7102,10 +7121,14 @@ async function regenerateRotatingCodesForLengthChange(oldLen, newLen) {
   // ensureReservationBookingCodes, which reads the new length itself.
   let resRows = [];
   try {
+    // Round 45 Step 4 — covered_by_reservation_id IS NULL. A covered
+    // echo shouldn't get its own rotating code; the direct row owns
+    // the guest link and, transitively, the keybox code.
     const { data, error } = await sb.from('ota_reservations')
       .select('id, booking_code, checkout_date, keybox_code')
       .eq('property_id', propertyId)
       .is('deleted_at', null)
+      .is('covered_by_reservation_id', null)
       .not('keybox_code', 'is', null)
       .gte('checkout_date', todayISO);
     if (error) throw error;

@@ -296,12 +296,18 @@ async function mergeBookingRollingUIDs(propertyId, incoming, apikey, bearer, see
     if (r.entry_type !== 'reservation') { keptRows.push(r); continue; }
     let matchList = [];
     try {
+      // Round 45 Step 4 — covered_by_reservation_id=is.null. A covered
+      // Booking echo (already linked to a direct booking) must not be
+      // matched as the "same" reservation for a UID rotation — that
+      // would silently move the covered link onto a live incoming
+      // booking, breaking both.
       const q = 'ota_reservations?'
         + `property_id=eq.${encodeURIComponent(propertyId)}`
         + `&platform=eq.booking`
         + `&entry_type=eq.reservation`
         + `&status=eq.active`
         + `&deleted_at=is.null`
+        + `&covered_by_reservation_id=is.null`
         + `&checkout_date=eq.${encodeURIComponent(r.checkout_date)}`
         + `&uid=neq.${encodeURIComponent(r.uid)}`
         + `&select=id,uid,checkin_date`;

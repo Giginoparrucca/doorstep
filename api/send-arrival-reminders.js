@@ -148,10 +148,14 @@ export default async function handler(req, res) {
 async function runArrivalPass(p, tomorrow, dry) {
   let reservations;
   try {
+    // Round 45 Step 4 — covered_by_reservation_id=is.null so a
+    // covered OTA echo doesn't trigger a second reminder for the same
+    // direct booking. The direct row is the one the host acts on.
     reservations = await pgrestGET(
       `ota_reservations?property_id=eq.${p.id}` +
       `&entry_type=eq.reservation&status=eq.active` +
       `&deleted_at=is.null` +
+      `&covered_by_reservation_id=is.null` +
       `&arrival_reminder_sent_at=is.null` +
       `&checkin_date=eq.${tomorrow}` +
       `&select=id,platform,guest_name,checkin_date,checkout_date,booking_code`,
@@ -362,7 +366,14 @@ function renderArrivalHTML(property, rows, lang) {
   };
   const propName = esc(property.name || T.yourProp);
   const list = rows.map(r => {
-    const platform = ({ airbnb: 'Airbnb', booking: 'Booking.com', vrbo: 'Vrbo' })[r.platform]
+    // Round 45 Step 4 — 'direct' bookings get a proper localised label
+    // instead of the raw string 'direct' appearing in the host's email.
+    const platform = ({
+      airbnb: 'Airbnb',
+      booking: 'Booking.com',
+      vrbo: 'Vrbo',
+      direct: isIT ? 'Diretta' : 'Direct',
+    })[r.platform]
       || (r.platform || (isIT ? 'Prenotazione' : 'Reservation'));
     const guest = r.guest_name ? esc(r.guest_name) : T.guest;
     const link = r.booking_code

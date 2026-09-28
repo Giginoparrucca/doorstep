@@ -2626,21 +2626,28 @@ async function _upcomingCalSelectDay(iso) {
   await _upcomingRepaint();
 }
 async function _upcomingRepaint() {
-  // Round 45 hotfix — the calendar nav (‹ › and day cells) lives inside
-  // Ospiti → Calendario (panel-calendar / #calendarPanelBody) since
-  // Round 40 T5. The dashboard's upcoming panel (#upcomingPanelWrap)
-  // is list-only and doesn't carry these controls anymore. Refresh
-  // whichever surface is actually mounted right now — if we only
-  // refreshed the dashboard wrap, clicking the calendar arrows would
-  // silently move state without repainting until the user changed tab.
-  const calBody = document.getElementById('calendarPanelBody');
-  if (calBody && typeof renderCalendarPanel === 'function') {
-    try { await renderCalendarPanel(); } catch (_) {}
+  // Round 45 hotfix (v2) — only refresh the surface the host is
+  // actually looking at. The dashboard's upcoming panel and the
+  // Ospiti → Calendario body both write to the SHARED
+  // _upcomingRowsById map that _showReservationDetail reads. If we
+  // refresh both, the dashboard's narrower query (arrivals in the next
+  // 60 days, reservations only) overwrites the calendar's wider one
+  // (month-overlap, reservations + blocks), and bars in the calendar
+  // whose id fell out of the dashboard window become unclickable.
+  const activeId = document.querySelector('.panel.active')?.id;
+  if (activeId === 'panel-calendar') {
+    if (typeof renderCalendarPanel === 'function') {
+      try { await renderCalendarPanel(); } catch (_) {}
+    }
+    return;
   }
-  const wrap = document.getElementById('upcomingPanelWrap');
-  if (wrap) {
-    const html = await renderUpcomingReservationsPanel();
-    wrap.outerHTML = html;
+  if (activeId === 'panel-dashboard') {
+    const wrap = document.getElementById('upcomingPanelWrap');
+    if (wrap) {
+      const html = await renderUpcomingReservationsPanel();
+      wrap.outerHTML = html;
+    }
+    return;
   }
 }
 

@@ -7314,7 +7314,10 @@ function _icalExportUrl() {
   // that preview's hostname, so hosts testing on a preview URL don't
   // get a stale production reference.
   const origin = window.location.origin.replace(/\/$/, '');
-  return `${origin}/api/property-ical?t=${encodeURIComponent(t)}`;
+  // Round 45 Step 4.5 (b) — outbound export lives inside /api/ical-sync
+  // (same file, same domain, GET + ?t=<token>) so the deployment stays
+  // under Vercel's Hobby-plan cap of 12 serverless functions.
+  return `${origin}/api/ical-sync?t=${encodeURIComponent(t)}`;
 }
 
 function renderIcalExportCard() {

@@ -334,12 +334,19 @@ body { display: flex; overflow: hidden; }
 .cal-mobile-name { font-weight: 600; }
 .cal-mobile-dates { font-family: monospace; font-size: 0.72rem; color: var(--ink-soft); }
 
-/* Mobile: swap bars for count badges + show tap-selected list. */
+/* Mobile: same continuous bars as desktop + a tap-selected list. */
 @media (max-width: 639px) {
   .cal-nav-label { min-width: 0; flex: 1; text-align: left; font-size: 0.92rem; }
-  .cal-day-cell { min-height: 54px; padding: 4px 3px; }
-  .cal-bar { display: none; }
-  .cal-day-badge { display: inline-block; }
+  /* Round 45 hotfix — the mobile view used to hide bars in favour of a
+     tiny "1"/"2" badge on each day, which made multi-day stays look
+     like unrelated single days. Now bars render on mobile too and span
+     the full stay length, matching desktop. The numeric day badge
+     stays hidden — the bar already carries that information. Day
+     cells get more headroom (74px) so up to two stacked tracks fit
+     without pushing the day-number label out of alignment. */
+  .cal-day-cell { min-height: 74px; padding: 4px 3px; }
+  .cal-bar { font-size: 0.62rem; height: 16px; line-height: 16px; padding: 0 4px; }
+  .cal-day-badge { display: none; }
   .cal-mobile-list { display: block; margin-top: 10px; background: var(--white); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
   .cal-wh-cell { font-size: 0.6rem; padding: 4px 2px; }
 }
@@ -2624,6 +2631,15 @@ async function _upcomingCalToday() {
 async function _upcomingCalSelectDay(iso) {
   _upcomingCalSelectedDay = iso;
   await _upcomingRepaint();
+  // Round 45 hotfix — the selected-day arrivals list renders below the
+  // month grid on mobile; scroll it into view so the host doesn't have
+  // to hunt for their tapped day's bookings.
+  try {
+    const list = document.querySelector('#panel-calendar .cal-mobile-list');
+    if (list && typeof list.scrollIntoView === 'function') {
+      list.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  } catch (_) {}
 }
 async function _upcomingRepaint() {
   // Round 45 hotfix (v2) — only refresh the surface the host is

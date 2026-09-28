@@ -843,7 +843,7 @@ const GUIDES = {
     faq: [
       { q_it: 'Perché vedo un codice invece del nome?', a_it: 'Da Airbnb e Booking arrivano solo le date. Il nome compare quando l’ospite fa il check-in.', q_en: 'Why do I see a code instead of a name?', a_en: 'Airbnb and Booking only send dates. The name appears once the guest checks in.' },
       { q_it: 'Manca una prenotazione.', a_it: 'In «Dettagli Proprietà», nella sezione «Sincronizzazione calendario (iCal)», premi «🔄 Sincronizza ora».', q_en: 'A booking is missing.', a_en: 'In Property Details, under Calendar sync (iCal), press “🔄 Sync now”.' },
-      { q_it: 'Se aggiungo una prenotazione diretta, viene bloccata su Airbnb?', a_it: 'Non ancora automaticamente — per ora blocca tu le date sui portali. In un aggiornamento a breve pubblicheremo un feed che Airbnb, Booking e Vrbo leggono da soli.', q_en: 'If I add a direct booking, does it block Airbnb?', a_en: 'Not automatically yet — for now block the dates on your OTAs yourself. A coming update will publish a feed that Airbnb, Booking and Vrbo read on their own.' },
+      { q_it: 'Se aggiungo una prenotazione diretta, viene bloccata su Airbnb?', a_it: 'Sì, se hai configurato «Esporta il calendario ai tuoi OTA» nei Dettagli Proprietà. Airbnb, Booking e Vrbo controllano il tuo calendario ogni poche ore e bloccano le date da soli.', q_en: 'If I add a direct booking, does it block Airbnb?', a_en: 'Yes, if you\'ve set up "Export calendar to your OTAs" in Property Details. Airbnb, Booking and Vrbo poll your calendar every few hours and block the dates on their own.' },
       { q_it: 'Che differenza c’è tra «Nuova prenotazione» e «Blocca date»?', a_it: '«Nuova prenotazione» è per un ospite vero: chiede nome, canale, contatti, note. «Blocca date» è per rendere non prenotabili delle date (soggiorno personale, manutenzione): serve solo un motivo.', q_en: 'What’s the difference between “New booking” and “Block dates”?', a_en: '“New booking” is for a real guest: name, channel, contacts, notes. “Block dates” makes dates unbookable (own stay, maintenance): just a reason.' },
       { q_it: 'Telefono e note delle prenotazioni dirette li vede qualcuno?', a_it: 'No. Restano solo con te — mai nell’app ospiti, mai negli export, mai nei promemoria.', q_en: 'Are direct-booking phone and notes visible to anyone else?', a_en: 'No. They stay with you — never in the guest app, never in exports, never in reminders.' },
     ],
@@ -947,6 +947,8 @@ const GUIDES = {
     tip: { it: 'Il codice CIN serve per i file della Polizia e delle statistiche. Inseriscilo subito.', en: 'The CIN code is required for the Police and statistics files. Add it right away.' },
     faq: [
       { q_it: 'Come faccio ad avere le prenotazioni di Airbnb e Booking?', a_it: 'In «Sincronizzazione calendario (iCal)» incolla il link del calendario e premi «🔄 Sincronizza ora».', q_en: 'How do I get Airbnb and Booking reservations?', a_en: 'In “Calendar sync (iCal)” paste the calendar link and press “🔄 Sync now”.' },
+      { q_it: 'Come faccio a bloccare Airbnb / Booking quando aggiungo una prenotazione WhatsApp?', a_it: 'In «Esporta il calendario ai tuoi OTA» copia l\'URL e incollalo una volta nelle impostazioni «Importa calendario» di Airbnb, Booking e Vrbo. Da quel momento in poi ogni prenotazione diretta o data bloccata verrà propagata in automatico (Airbnb e Booking controllano il calendario ogni 2–4 ore).', q_en: 'How do I block Airbnb / Booking when I add a WhatsApp booking?', a_en: 'Under “Export calendar to your OTAs” copy the URL and paste it once into Airbnb, Booking and Vrbo\'s “Import calendar” settings. From then on every direct booking or blocked date propagates automatically (Airbnb and Booking poll the calendar every 2–4 hours).' },
+      { q_it: 'A cosa serve «Ruota token»?', a_it: 'Se sospetti che qualcuno ha copiato l\'URL, ruotalo. Il vecchio link smette di funzionare subito e devi incollare il nuovo URL negli OTA a cui l\'avevi collegato.', q_en: 'What is “Rotate token” for?', a_en: 'If you think the URL has been shared, rotate it. The old link stops working immediately and you need to paste the new URL into every OTA where you had it connected.' },
       { q_it: 'Dove trovo il link Google Maps?', a_it: 'In Google Maps cerca la casa, premi Condividi e poi Copia link.', q_en: 'Where do I find the Google Maps link?', a_en: 'In Google Maps search for the property, press Share, then Copy link.' },
       { q_it: 'Cos’è il codice ROSS1000?', a_it: 'Il codice che ti dà la Regione per le statistiche. Non è il CIN.', q_en: 'What’s the ROSS1000 code?', a_en: 'The code your Region gives you for statistics. Different from the CIN.' },
     ],
@@ -1534,7 +1536,7 @@ window.HG = {
   closeGuide,
   checkGuides,
   guides: GUIDES,       // read-only reference for tests
-  version: '45.1',
+  version: '45.2',
 };
 // Alias for the console-side dev command name the spec asks for.
 window.__checkGuides = checkGuides;

@@ -1622,6 +1622,31 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div id="icalSyncResult" style="margin-top:10px;font-size:0.82rem;color:var(--ink-soft);"></div>
       </div>
 
+      <!-- Round 45 Step 4.5 — outbound iCal feed. Hosts paste this URL
+           into Airbnb / Booking / Vrbo's "Import calendar" so their
+           direct bookings and blocks propagate to those OTAs. The URL
+           carries a per-property secret token; rotating the token
+           invalidates any existing imports. The feed emits ZERO PII —
+           only date ranges + a generic "Blocked" label. -->
+      <div class="form-card" data-guide="ical-export">
+        <div class="form-card-title" data-h="ical_export_title">Export calendar to your OTAs</div>
+        <div class="form-card-desc" data-h="ical_export_desc">Copy this URL and paste it into Airbnb / Booking / Vrbo's "Import calendar" screen. Every direct booking and blocked date you save will automatically become "unavailable" on those OTAs — no guest names or details are shared, only the dates.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+          <input type="text" id="icalExportUrl" readonly onclick="this.select()" value=""
+            style="flex:1;min-width:280px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:monospace;font-size:0.78rem;background:#F8FBFF;color:var(--ink);"
+            data-h-title="ical_export_url_title">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="copyIcalExportUrl(this)" data-h="ical_export_copy">🔗 Copy URL</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="rotateIcalExportToken()" data-h="ical_export_rotate" style="color:#9a6b00;border-color:rgba(232,184,75,0.4);">♻️ Rotate token</button>
+        </div>
+        <div style="font-size:0.72rem;color:var(--ink-soft);line-height:1.5;">
+          <div style="margin-bottom:4px;"><strong data-h="ical_export_how">How to connect:</strong></div>
+          <div style="margin:2px 0;"><strong>Airbnb:</strong> <span data-h="ical_export_airbnb">Calendar → Availability → Connect calendars → Import calendar → paste the URL.</span></div>
+          <div style="margin:2px 0;"><strong>Booking.com:</strong> <span data-h="ical_export_booking">Rates & Availability → Sync calendars → Import calendar → paste the URL.</span></div>
+          <div style="margin:2px 0;"><strong>Vrbo:</strong> <span data-h="ical_export_vrbo">Calendar → Import/Export → Import calendar → paste the URL.</span></div>
+          <div style="margin-top:8px;color:#9a6b00;" data-h="ical_export_delay">OTAs poll external calendars every 2–4 hours, so a new direct booking may take that long to appear as blocked on Airbnb / Booking / Vrbo.</div>
+        </div>
+      </div>
+
       <div class="form-card">
         <div class="form-card-title" data-h="reminder_title">Arrival reminders</div>
         <div class="form-card-desc" data-h="reminder_desc">Every day at 07:00 in the property's timezone, WelcomeBnB emails you a digest of guests arriving tomorrow with their unique booking links, so you can forward them by WhatsApp or email. Leave the email blank to turn reminders off.</div>
@@ -3589,7 +3614,7 @@ const HT = {
     rf_err_overlap: 'These dates overlap with an existing booking or block. Please review.',
     rf_err_generic: 'Could not save the booking. Please try again.',
     rf_overlap_hint: '⚠️ Overlap with an existing booking or block on these dates.',
-    rf_ota_hint: 'Remember to block these dates on Airbnb / Booking / Vrbo yourself for now. An automatic feed that keeps them in sync is coming shortly.',
+    rf_ota_hint: 'To keep Airbnb / Booking / Vrbo in sync automatically, set up "Export calendar to your OTAs" once in Property Details — this booking will then propagate on their next poll (usually within a few hours).',
     rf_saved_ok: 'Saved.',
     rf_privacy_hint: '🔒 Contact and notes stay with you. They never appear in the guest app, exports or reminders.',
     admin_enable_edit: 'Enable editing',
@@ -3920,6 +3945,17 @@ const HT = {
     // Round 26 — iCal sync (single-line values; applyLang collapses newlines)
     ical_title: 'Calendar sync (iCal)',
     ical_desc: 'Paste your Airbnb / Booking.com / Vrbo iCal export URLs. WelcomeBnB pulls upcoming reservations into your dashboard. Only dates come from these feeds — guest names and counts arrive when guests complete check-in.',
+    // Round 45 Step 4.5 — outbound iCal export
+    ical_export_title: 'Export calendar to your OTAs',
+    ical_export_desc: 'Copy this URL and paste it into Airbnb / Booking / Vrbo\'s "Import calendar" screen. Every direct booking and blocked date you save will automatically become unavailable on those OTAs — no guest names or details are shared, only the dates.',
+    ical_export_url_title: 'Your property\'s outbound iCal URL — keep it private.',
+    ical_export_copy: '🔗 Copy URL',
+    ical_export_rotate: '♻️ Rotate token',
+    ical_export_how: 'How to connect:',
+    ical_export_airbnb: 'Calendar → Availability → Connect calendars → Import calendar → paste the URL.',
+    ical_export_booking: 'Rates & Availability → Sync calendars → Import calendar → paste the URL.',
+    ical_export_vrbo: 'Calendar → Import/Export → Import calendar → paste the URL.',
+    ical_export_delay: 'OTAs poll external calendars every 2–4 hours, so a new direct booking may take that long to appear as blocked on Airbnb / Booking / Vrbo.',
     ical_where: 'Airbnb: Calendar → Availability → Connect calendars → Export. Booking.com: Calendar → Sync calendars. Vrbo: Calendar → Import/Export → Export calendar.',
     ical_platform: 'Platform',
     ical_url: 'iCal URL',
@@ -4075,7 +4111,7 @@ const HT = {
     rf_err_overlap: 'Queste date si sovrappongono a un\'altra prenotazione o blocco. Verifica.',
     rf_err_generic: 'Impossibile salvare la prenotazione. Riprova.',
     rf_overlap_hint: '⚠️ Sovrapposizione con una prenotazione o un blocco esistente su queste date.',
-    rf_ota_hint: 'Per ora, ricordati di bloccare tu queste date su Airbnb / Booking / Vrbo. A breve aggiungeremo un feed automatico che li terrà in sincronia.',
+    rf_ota_hint: 'Per tenere Airbnb / Booking / Vrbo sincronizzati automaticamente, configura una volta «Esporta il calendario ai tuoi OTA» nei Dettagli Proprietà — questa prenotazione si propagherà al prossimo controllo (di solito entro poche ore).',
     rf_saved_ok: 'Salvato.',
     rf_privacy_hint: '🔒 Contatti e note restano con te. Non appaiono mai nell\'app ospiti, negli export o nei promemoria.',
     admin_enable_edit: 'Abilita modifica',
@@ -4393,6 +4429,17 @@ const HT = {
     // Round 26 — Sync iCal
     ical_title: 'Sincronizzazione calendario (iCal)',
     ical_desc: 'Incolla gli URL di esportazione iCal di Airbnb / Booking.com / Vrbo. WelcomeBnB scarica le prenotazioni imminenti nella tua dashboard. Da questi feed arrivano solo le date — i nomi e il numero degli ospiti si aggiungono quando completano il check-in.',
+    // Round 45 Step 4.5 — esportazione iCal in uscita
+    ical_export_title: 'Esporta il calendario ai tuoi OTA',
+    ical_export_desc: 'Copia questo URL e incollalo nello schermata "Importa calendario" di Airbnb / Booking / Vrbo. Ogni prenotazione diretta e ogni data bloccata che salvi diventerà automaticamente non disponibile su quegli OTA — non vengono condivisi nome ospite o dettagli, solo le date.',
+    ical_export_url_title: 'URL iCal in uscita della tua proprietà — tienilo privato.',
+    ical_export_copy: '🔗 Copia URL',
+    ical_export_rotate: '♻️ Ruota token',
+    ical_export_how: 'Come collegarlo:',
+    ical_export_airbnb: 'Calendario → Disponibilità → Collega calendari → Importa calendario → incolla l\'URL.',
+    ical_export_booking: 'Tariffe e Disponibilità → Sincronizza calendari → Importa calendario → incolla l\'URL.',
+    ical_export_vrbo: 'Calendario → Import/Export → Importa calendario → incolla l\'URL.',
+    ical_export_delay: 'Gli OTA scaricano i calendari esterni ogni 2–4 ore, quindi una nuova prenotazione diretta potrebbe impiegare quel tempo per comparire come bloccata su Airbnb / Booking / Vrbo.',
     ical_where: 'Airbnb: Calendario → Disponibilità → Collega calendari → Esporta. Booking.com: Calendario → Sincronizza calendari. Vrbo: Calendario → Importa/Esporta → Esporta calendario.',
     ical_platform: 'Piattaforma',
     ical_url: 'URL iCal',
@@ -4798,7 +4845,7 @@ function showPanel(id, btn) {
 const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','rules','recos','qrlink'];
 // Bump on every host-guides.js change so browsers never see a stale
 // copy even if their cache is aggressive.
-const _HG_VERSION = '45.1';
+const _HG_VERSION = '45.2';
 let _hgLoadPromise = null;
 function _hgLoad() {
   if (window.HG) return Promise.resolve();
@@ -7248,6 +7295,96 @@ async function syncIcalNow() {
     if (resEl) resEl.textContent = h('ical_sync_failed') + ': ' + (e?.message || e);
   } finally {
     if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Round 45 Step 4.5 — outbound iCal export.
+   Hosts paste the URL into Airbnb / Booking / Vrbo's "Import calendar".
+   The token is a per-property UUID that guards /api/property-ical.
+   Rotating the token invalidates any existing OTA imports (they'll
+   start 404-ing) and the host must repaste the new URL everywhere.
+══════════════════════════════════════════════════════════════════════ */
+
+function _icalExportUrl() {
+  const t = propertyData?.ical_export_token;
+  if (!t) return '';
+  // Use the same origin as the console. On the live production domain
+  // this is https://welcomebnb.vercel.app; on a preview branch it's
+  // that preview's hostname, so hosts testing on a preview URL don't
+  // get a stale production reference.
+  const origin = window.location.origin.replace(/\/$/, '');
+  return `${origin}/api/property-ical?t=${encodeURIComponent(t)}`;
+}
+
+function renderIcalExportCard() {
+  const input = document.getElementById('icalExportUrl');
+  if (!input) return;
+  const url = _icalExportUrl();
+  input.value = url || (hostLang === 'it'
+    ? 'Salva la proprietà per generare il link…'
+    : 'Save the property to generate the link…');
+  input.style.color = url ? 'var(--ink)' : 'var(--ink-soft)';
+}
+
+async function copyIcalExportUrl(btn) {
+  const url = _icalExportUrl();
+  if (!url) return;
+  try {
+    await navigator.clipboard.writeText(url);
+    const original = btn.textContent;
+    btn.textContent = hostLang === 'it' ? '✓ Copiato' : '✓ Copied';
+    btn.disabled = true;
+    setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1400);
+    try { track('ical_export_copy', {}); } catch(_) {}
+  } catch (_) {
+    toast(hostLang === 'it' ? 'Copia fallita' : 'Copy failed');
+  }
+}
+
+async function rotateIcalExportToken() {
+  if (!propertyId) return;
+  const it = hostLang === 'it';
+  const confirmMsg = it
+    ? 'Ruotando il token invaliderai IMMEDIATAMENTE il link esistente. Ogni OTA a cui l\'hai già collegato smetterà di aggiornarsi finché non incollerai il nuovo URL. Continuare?'
+    : 'Rotating the token IMMEDIATELY invalidates the existing link. Every OTA you already connected it to will stop updating until you paste the new URL. Continue?';
+  if (!confirm(confirmMsg)) return;
+
+  // Ask Postgres for a fresh uuid via gen_random_uuid(). Doing this
+  // client-side (crypto.randomUUID) would work too, but the DB path
+  // keeps the source of randomness consistent with initial seeding
+  // and works even when the browser's Web Crypto is disabled.
+  //
+  // pgrest doesn't expose gen_random_uuid() directly, so we let the
+  // client mint and PATCH: crypto.randomUUID is available in every
+  // browser we support (Round 40 dropped IE).
+  const fresh = (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : null;
+  if (!fresh) {
+    toast(it ? 'Impossibile generare il token in questo browser.' : 'Cannot generate token in this browser.');
+    return;
+  }
+  try {
+    const { data, error } = await sb.from('properties')
+      .update({ ical_export_token: fresh })
+      .eq('id', propertyId)
+      .select('ical_export_token')
+      .maybeSingle();
+    if (error) {
+      console.warn('[ical-export] rotate failed:', error.message);
+      toast(it ? 'Rotazione fallita.' : 'Rotation failed.');
+      return;
+    }
+    if (data && data.ical_export_token) {
+      propertyData = { ...(propertyData || {}), ical_export_token: data.ical_export_token };
+      renderIcalExportCard();
+      toast(it ? 'Token ruotato. Ricopia il nuovo URL.' : 'Token rotated. Copy the new URL.');
+      try { track('ical_export_rotate', {}); } catch(_) {}
+    }
+  } catch (e) {
+    console.warn('[ical-export] rotate exception:', e);
+    toast(it ? 'Rotazione fallita.' : 'Rotation failed.');
   }
 }
 
@@ -13096,6 +13233,7 @@ function fillPropertyForm(data) {
   if (el('propPhone')) el('propPhone').value = data.host_phone || '';
   if (el('propHostNames')) el('propHostNames').value = data.host_names || '';
   if (typeof renderIcalFeeds === 'function') renderIcalFeeds();
+  if (typeof renderIcalExportCard === 'function') renderIcalExportCard();
   if (el('propReminderEmail')) el('propReminderEmail').value = data.reminder_email || '';
   if (el('propTimezone')) el('propTimezone').value = data.timezone || 'Europe/Rome';
   if (data.hero_image_url) {

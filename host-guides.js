@@ -827,20 +827,25 @@ const GUIDES = {
     page: { it: 'Calendario', en: 'Calendar' },
     title: { it: 'Le tue prenotazioni', en: 'Your bookings' },
     purpose: {
-      it: 'Qui vedi tutte le prenotazioni del mese, giorno per giorno.',
-      en: 'Here you see every booking of the month, day by day.',
+      it: 'Qui vedi tutte le prenotazioni del mese, giorno per giorno. Puoi anche aggiungere prenotazioni dirette (WhatsApp, Instagram, passaparola) e bloccare date.',
+      en: 'Here you see every booking of the month, day by day. You can also add direct bookings (WhatsApp, Instagram, word of mouth) and block dates.',
     },
-    when: { it: 'Quando vuoi sapere chi arriva e chi manca al check-in.', en: 'When you want to know who’s arriving and who’s missing their check-in.' },
+    when: { it: 'Quando vuoi sapere chi arriva, aggiungere una prenotazione diretta o bloccare date.', en: 'When you want to know who’s arriving, add a direct booking or block dates.' },
     steps: [
       { it: 'Premi ‹ o › per cambiare mese. «Oggi» torna a oggi.', en: 'Press ‹ or › to change month. “Today” returns to today.', target: 'cal-nav', art: 'cl1' },
       { it: 'Verde: l’ospite ha fatto il check-in. Giallo: non ancora.', en: 'Green: the guest has checked in. Amber: not yet.', target: 'cal-bar', art: 'cl2', emptyHint: { it: 'Le barre compaiono quando hai prenotazioni questo mese.', en: 'The bars appear when you have bookings this month.' } },
       { it: 'Premi una prenotazione per vedere dettagli e link dell’ospite.', en: 'Press a booking to see details and the guest link.', target: 'cal-bar', art: 'cl3' },
+      { it: 'Premi «+ Nuova prenotazione» per una prenotazione WhatsApp, Instagram, passaparola o dal tuo sito.', en: 'Press “+ New booking” for a WhatsApp, Instagram, word-of-mouth or own-website booking.', target: 'direct-new', art: 'cl5' },
+      { it: 'Premi «🚫 Blocca date» per soggiorno personale o manutenzione — appare nel calendario a strisce grigie.', en: 'Press “🚫 Block dates” for own stay or maintenance — it shows as grey stripes on the calendar.', target: 'direct-block', art: 'cl6' },
       { it: 'Sul telefono, tocca un giorno per vedere chi c’è.', en: 'On phone, tap a day to see who’s there.', target: 'cal-day', art: 'cl4', emptyHint: { it: 'Solo su telefono. Su computer, le barre bastano.', en: 'Phone only. On desktop the bars are enough.' } },
     ],
     tip: { it: 'Collega Airbnb o Booking da «Dettagli Proprietà»: le prenotazioni arrivano qui da sole.', en: 'Link Airbnb or Booking from Property Details: bookings arrive here automatically.' },
     faq: [
       { q_it: 'Perché vedo un codice invece del nome?', a_it: 'Da Airbnb e Booking arrivano solo le date. Il nome compare quando l’ospite fa il check-in.', q_en: 'Why do I see a code instead of a name?', a_en: 'Airbnb and Booking only send dates. The name appears once the guest checks in.' },
       { q_it: 'Manca una prenotazione.', a_it: 'In «Dettagli Proprietà», nella sezione «Sincronizzazione calendario (iCal)», premi «🔄 Sincronizza ora».', q_en: 'A booking is missing.', a_en: 'In Property Details, under Calendar sync (iCal), press “🔄 Sync now”.' },
+      { q_it: 'Se aggiungo una prenotazione diretta, viene bloccata su Airbnb?', a_it: 'Sì, se hai configurato «Esporta il calendario ai tuoi OTA» nei Dettagli Proprietà. Airbnb, Booking e Vrbo controllano il tuo calendario ogni poche ore e bloccano le date da soli.', q_en: 'If I add a direct booking, does it block Airbnb?', a_en: 'Yes, if you\'ve set up "Export calendar to your OTAs" in Property Details. Airbnb, Booking and Vrbo poll your calendar every few hours and block the dates on their own.' },
+      { q_it: 'Che differenza c’è tra «Nuova prenotazione» e «Blocca date»?', a_it: '«Nuova prenotazione» è per un ospite vero: chiede nome, canale, contatti, note. «Blocca date» è per rendere non prenotabili delle date (soggiorno personale, manutenzione): serve solo un motivo.', q_en: 'What’s the difference between “New booking” and “Block dates”?', a_en: '“New booking” is for a real guest: name, channel, contacts, notes. “Block dates” makes dates unbookable (own stay, maintenance): just a reason.' },
+      { q_it: 'Telefono e note delle prenotazioni dirette li vede qualcuno?', a_it: 'No. Restano solo con te — mai nell’app ospiti, mai negli export, mai nei promemoria.', q_en: 'Are direct-booking phone and notes visible to anyone else?', a_en: 'No. They stay with you — never in the guest app, never in exports, never in reminders.' },
     ],
   },
 
@@ -942,6 +947,8 @@ const GUIDES = {
     tip: { it: 'Il codice CIN serve per i file della Polizia e delle statistiche. Inseriscilo subito.', en: 'The CIN code is required for the Police and statistics files. Add it right away.' },
     faq: [
       { q_it: 'Come faccio ad avere le prenotazioni di Airbnb e Booking?', a_it: 'In «Sincronizzazione calendario (iCal)» incolla il link del calendario e premi «🔄 Sincronizza ora».', q_en: 'How do I get Airbnb and Booking reservations?', a_en: 'In “Calendar sync (iCal)” paste the calendar link and press “🔄 Sync now”.' },
+      { q_it: 'Come faccio a bloccare Airbnb / Booking quando aggiungo una prenotazione WhatsApp?', a_it: 'In «Esporta il calendario ai tuoi OTA» copia l\'URL e incollalo una volta nelle impostazioni «Importa calendario» di Airbnb, Booking e Vrbo. Da quel momento in poi ogni prenotazione diretta o data bloccata verrà propagata in automatico (Airbnb e Booking controllano il calendario ogni 2–4 ore).', q_en: 'How do I block Airbnb / Booking when I add a WhatsApp booking?', a_en: 'Under “Export calendar to your OTAs” copy the URL and paste it once into Airbnb, Booking and Vrbo\'s “Import calendar” settings. From then on every direct booking or blocked date propagates automatically (Airbnb and Booking poll the calendar every 2–4 hours).' },
+      { q_it: 'A cosa serve «Genera nuovo URL»?', a_it: 'Solo per casi estremi: se hai condiviso l\'URL per errore o vuoi bloccare qualcuno che ce l\'aveva. Crea un URL nuovo e chiude subito il vecchio, quindi devi rifare l\'installazione su Airbnb, Booking e Vrbo. Da non toccare senza motivo.', q_en: 'What is “Generate new URL” for?', a_en: 'Extreme cases only: if you shared the URL by mistake, or need to lock someone out. It creates a new URL and immediately closes the old one, so you must re-do the setup on Airbnb, Booking and Vrbo. Don\'t press it without a reason.' },
       { q_it: 'Dove trovo il link Google Maps?', a_it: 'In Google Maps cerca la casa, premi Condividi e poi Copia link.', q_en: 'Where do I find the Google Maps link?', a_en: 'In Google Maps search for the property, press Share, then Copy link.' },
       { q_it: 'Cos’è il codice ROSS1000?', a_it: 'Il codice che ti dà la Regione per le statistiche. Non è il CIN.', q_en: 'What’s the ROSS1000 code?', a_en: 'The code your Region gives you for statistics. Different from the CIN.' },
     ],
@@ -1529,7 +1536,7 @@ window.HG = {
   closeGuide,
   checkGuides,
   guides: GUIDES,       // read-only reference for tests
-  version: '43.5',
+  version: '45.4',
 };
 // Alias for the console-side dev command name the spec asks for.
 window.__checkGuides = checkGuides;

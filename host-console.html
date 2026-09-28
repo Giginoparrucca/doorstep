@@ -203,6 +203,63 @@ body { display: flex; overflow: hidden; }
    `.panel-actions` is kept as an alias for backwards compatibility
    (any legacy markup still works, but new code uses
    `.panel-header-actions`). */
+/* Round 45 hotfix — clear view/edit visual state.
+ * Panels that support an Edit lifecycle set data-edit-mode="view|edit" on
+ * their root .panel div. In view mode disabled inputs render as flat
+ * read-only text (no borders, transparent background) so they don't
+ * mimic a live form. In edit mode the panel gets a subtle warm ring and
+ * the toolbar gets an amber tint so hosts always know which mode they're
+ * in. Applies to Property, Impostazioni, House Rules and Recommendations
+ * — anywhere the pattern is used.
+ */
+.panel[data-edit-mode="view"] fieldset[disabled] .form-input,
+.panel[data-edit-mode="view"] fieldset[disabled] .form-select,
+.panel[data-edit-mode="view"] fieldset[disabled] .form-textarea,
+.panel[data-edit-mode="view"] fieldset[disabled] input:not([type="checkbox"]):not([type="radio"]),
+.panel[data-edit-mode="view"] fieldset[disabled] select,
+.panel[data-edit-mode="view"] fieldset[disabled] textarea {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: var(--ink) !important;
+  cursor: default;
+  padding-left: 0;
+  padding-right: 0;
+  opacity: 1;
+  box-shadow: none;
+}
+.panel[data-edit-mode="view"] fieldset[disabled] .form-input::placeholder,
+.panel[data-edit-mode="view"] fieldset[disabled] .form-textarea::placeholder {
+  color: rgba(107,122,144,0.45);
+}
+/* Dim any action buttons that live inside a view-mode disabled fieldset. */
+.panel[data-edit-mode="view"] fieldset[disabled] button {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+/* Edit mode — amber ring on the toolbar makes the state obvious. */
+.panel[data-edit-mode="edit"] > .panel-header-actions,
+.panel[data-edit-mode="edit"] > .panel-actions {
+  background: rgba(232,184,75,0.10);
+  border-color: rgba(232,184,75,0.55);
+  box-shadow: 0 1px 4px rgba(232,184,75,0.14);
+}
+/* View-mode pill next to the panel title tells the host their current state. */
+.mode-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.mode-chip.view { background: rgba(107,122,144,0.14); color: var(--ink-soft); }
+.mode-chip.edit { background: rgba(232,184,75,0.20); color: #9a6b00; }
+
 .panel-header-actions,
 .panel-actions {
   position: sticky;
@@ -257,8 +314,14 @@ body { display: flex; overflow: hidden; }
 .cal-day-badge-wait { background: rgba(232,184,75,0.18); color: #9a6b00; }
 
 .cal-bar { position: absolute; height: 18px; line-height: 18px; padding: 0 6px; font-size: 0.7rem; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: inherit; text-decoration: none; box-sizing: border-box; z-index: 1; cursor: pointer; text-align: left; }
-.cal-bar-in   { background: rgba(109,191,130,0.28); color: #235a34; border: 1px solid rgba(47,122,68,0.4); }
-.cal-bar-wait { background: rgba(232,184,75,0.28); color: #7d5e10; border: 1px solid rgba(154,107,0,0.4); }
+.cal-bar-in     { background: rgba(109,191,130,0.28); color: #235a34; border: 1px solid rgba(47,122,68,0.4); }
+.cal-bar-wait   { background: rgba(232,184,75,0.28); color: #7d5e10; border: 1px solid rgba(154,107,0,0.4); }
+/* Round 45 · direct-booking bar (purple) + block bar (grey hatched). */
+.cal-bar-direct { background: rgba(139,92,246,0.20); color: #4c1d95; border: 1px solid rgba(109,40,217,0.45); }
+.cal-bar-block  { background: repeating-linear-gradient(45deg, rgba(107,122,144,0.16), rgba(107,122,144,0.16) 5px, rgba(107,122,144,0.06) 5px, rgba(107,122,144,0.06) 10px); color: #4a5468; border: 1px dashed rgba(107,122,144,0.55); cursor: pointer; }
+/* Coverage-candidate pill overlaid on top of a covered-echo bar. */
+.cal-cover-pill { position: absolute; z-index: 3; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.02em; padding: 2px 6px; border-radius: 999px; background: rgba(232,184,75,0.95); color: #5c3d00; border: 1px solid rgba(154,107,0,0.5); cursor: pointer; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+.cal-cover-pill:hover { filter: brightness(0.95); }
 .cal-bar:hover { filter: brightness(0.95); }
 
 .cal-empty { padding: 22px 16px; text-align: center; color: var(--ink-soft); font-size: 0.82rem; border-top: 1px solid rgba(107,122,144,0.08); }
@@ -1231,7 +1294,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     </div>
 
     <!-- ════════════ PROPERTY DETAILS ════════════ -->
-    <div class="panel" id="panel-property">
+    <div class="panel" id="panel-property" data-edit-mode="view">
 
       <!-- Round 40 T8 → 43.4 — sticky in-panel header bar. Styles now
            live on the .panel-header-actions class (Round 43.4 unified
@@ -1456,16 +1519,12 @@ tr:hover td { background: rgba(250,246,240,0.6); }
                  checkin_instructions_en columns. -->
             <div class="i18n-pill" data-field="checkin_instructions"></div>
             <textarea class="form-textarea" id="propCheckinInstructions" rows="6" maxlength="2000" placeholder="e.g., Walk past the green gate on Via Roma. The lockbox is on the left wall next to the bell. Code on arrival day below." data-i18n-field="checkin_instructions"></textarea>
-            <div class="form-hint" data-h="prop_checkin_inst_hint">Step-by-step instructions for arrival. Write in your preferred language — guests can use their browser's translate feature if needed (long-press on iOS, three-dot menu on Android).</div>
-            <div style="margin-top:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="offerLangSplit('checkin_instructions')" data-h="btn_split_langs">✂ Split existing content by language</button></div>
-          </div>
+            <div class="form-hint" data-h="prop_checkin_inst_hint">Step-by-step instructions for arrival. Write in your preferred language — guests can use their browser's translate feature if needed (long-press on iOS, three-dot menu on Android).</div>          </div>
           <div class="form-group full">
             <label class="form-label" data-h="prop_checkout_inst">Check-out instructions</label>
             <div class="i18n-pill" data-field="checkout_instructions"></div>
             <textarea class="form-textarea" id="propCheckoutInstructions" rows="6" maxlength="2000" placeholder="e.g., Leave keys on the kitchen table. Don't lock the door — it locks itself. Open windows to air the apartment if possible." data-i18n-field="checkout_instructions"></textarea>
-            <div class="form-hint" data-h="prop_checkout_inst_hint">What guests should do before leaving.</div>
-            <div style="margin-top:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="offerLangSplit('checkout_instructions')" data-h="btn_split_langs">✂ Split existing content by language</button></div>
-          </div>
+            <div class="form-hint" data-h="prop_checkout_inst_hint">What guests should do before leaving.</div>          </div>
         </div>
       </div>
 
@@ -1476,12 +1535,64 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <label class="form-label" data-h="prop_transport">Parking, public transport & taxis</label>
             <div class="i18n-pill" data-field="transport_info"></div>
             <textarea class="form-textarea" id="propTransportInfo" rows="6" maxlength="2000" placeholder="e.g., Free street parking on Via Roma after 8pm. Bus #20 to the centre stops 50m away (every 15 min). Taxi: Radio Taxi Bari +39 080 5210500. Airport: 40 min by taxi (~€35) or the Tempesta shuttle from the station." data-i18n-field="transport_info"></textarea>
-            <div class="form-hint" data-h="prop_transport_hint">Parking situation, nearest bus/metro/train, taxi numbers, airport transfers. Shown to guests in the "Staying" section. Write in your preferred language — guests can browser-translate.</div>
-            <div style="margin-top:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="offerLangSplit('transport_info')" data-h="btn_split_langs">✂ Split existing content by language</button></div>
+            <div class="form-hint" data-h="prop_transport_hint">Parking situation, nearest bus/metro/train, taxi numbers, airport transfers. Shown to guests in the "Staying" section. Write in your preferred language — guests can browser-translate.</div>          </div>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <div class="form-card-title" data-h="prop_wifi">WiFi & Essentials</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label" data-h="prop_wifi_name">WiFi Network</label>
+            <input class="form-input" value="" id="propWifiName">
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-h="prop_wifi_pass">WiFi Password</label>
+            <input class="form-input" value="" id="propWifiPass">
+          </div>
+          <div class="form-group full">
+            <label class="form-label" data-h="prop_welcome">Host Welcome Message</label>
+            <div class="i18n-pill" data-field="welcome_message"></div>
+            <textarea class="form-textarea" id="propWelcome" data-i18n-field="welcome_message"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-h="prop_emergency">Emergency Phone</label>
+            <input class="form-input" value="" id="propPhone">
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-h="prop_host">Host Name(s)</label>
+            <input class="form-input" value="" id="propHostNames">
           </div>
         </div>
       </div>
 
+      </fieldset>
+    </div>
+
+    <!-- ════════════ SETTINGS ════════════
+         Round 45 Step 4.6 — settings/integrations moved out of Property
+         Details so the property panel only holds the guest-facing
+         attributes (name, address, photos, welcome message, transport,
+         host contacts). Everything the host configures for the platform
+         itself (calendar sync in and out, tourist tax, arrival
+         reminders, privacy notice, bulk data actions) lives here. -->
+    <div class="panel" id="panel-settings" data-edit-mode="view">
+      <!-- Round 45 hotfix — Impostazioni now follows the same view→edit
+           lifecycle as Dettagli Proprietà. In view mode the settingsFormBody
+           fieldset is disabled; Edit toggles it live, Save fires the
+           card-level save helpers, Cancel reloads propertyData. Tourist
+           Tax keeps its own edit lifecycle from Round 37 (redux). -->
+      <div class="panel-header-actions">
+        <div style="flex:1;min-width:0;">
+          <div style="font-family:'Playfair Display',serif;font-weight:600;font-size:1rem;" data-h="settings_header_title">Settings</div>
+          <div style="font-size:0.72rem;color:var(--ink-soft);" data-h="settings_header_hint">Integrations, tourist tax, reminders, privacy</div>
+        </div>
+        <button type="button" id="settingsEditBtn" class="btn btn-secondary btn-sm" onclick="startSettingsEdit()">✏️ <span data-h="btn_edit_list">Edit</span></button>
+        <button type="button" id="settingsSaveBtn" class="btn btn-primary btn-sm" onclick="saveSettingsEdit()" style="display:none;" data-h="btn_save_settings">💾 Save Settings</button>
+        <button type="button" id="settingsCancelBtn" class="btn btn-secondary btn-sm" onclick="cancelSettingsEdit()" style="display:none;"><span data-h="btn_cancel_edit">Cancel</span></button>
+      </div>
+
+      <fieldset class="settings-edit-fieldset" disabled style="border:0;padding:0;margin:0;min-width:0;">
       <div class="form-card">
         <div class="form-card-title" data-h="prop_tax_title">Tourist Tax Configuration</div>
         <div class="form-card-desc" data-h="prop_tax_desc">Used by the tourist-tax declaration helper in Export. Enter the values from your comune's tourist-tax resolution (delibera). Leave empty if your comune doesn't levy a tourist tax.</div>
@@ -1580,35 +1691,9 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           <div id="propTaxLivePreviewBody" style="line-height:1.5;color:var(--ink-soft);"></div>
         </div>
       </div>
+      </fieldset>
 
-      <div class="form-card">
-        <div class="form-card-title" data-h="prop_wifi">WiFi & Essentials</div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label" data-h="prop_wifi_name">WiFi Network</label>
-            <input class="form-input" value="" id="propWifiName">
-          </div>
-          <div class="form-group">
-            <label class="form-label" data-h="prop_wifi_pass">WiFi Password</label>
-            <input class="form-input" value="" id="propWifiPass">
-          </div>
-          <div class="form-group full">
-            <label class="form-label" data-h="prop_welcome">Host Welcome Message</label>
-            <div class="i18n-pill" data-field="welcome_message"></div>
-            <textarea class="form-textarea" id="propWelcome" data-i18n-field="welcome_message"></textarea>
-            <div style="margin-top:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="offerLangSplit('welcome_message')" data-h="btn_split_langs">✂ Split existing content by language</button></div>
-          </div>
-          <div class="form-group">
-            <label class="form-label" data-h="prop_emergency">Emergency Phone</label>
-            <input class="form-input" value="" id="propPhone">
-          </div>
-          <div class="form-group">
-            <label class="form-label" data-h="prop_host">Host Name(s)</label>
-            <input class="form-input" value="" id="propHostNames">
-          </div>
-        </div>
-      </div>
-
+      <fieldset class="settings-edit-fieldset" disabled style="border:0;padding:0;margin:0;min-width:0;">
       <div class="form-card">
         <div class="form-card-title" data-h="ical_title">Calendar sync (iCal)</div>
         <div class="form-card-desc" data-h="ical_desc">Paste your Airbnb / Booking.com / Vrbo iCal export URLs. WelcomeBnB pulls upcoming reservations into your dashboard. Only dates come from these feeds — guest names and counts arrive when guests complete check-in.</div>
@@ -1621,7 +1706,35 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
         <div id="icalSyncResult" style="margin-top:10px;font-size:0.82rem;color:var(--ink-soft);"></div>
       </div>
+      </fieldset>
 
+      <!-- Round 45 Step 4.5 — outbound iCal feed. Hosts paste this URL
+           into Airbnb / Booking / Vrbo's "Import calendar" so their
+           direct bookings and blocks propagate to those OTAs. The URL
+           carries a per-property secret token; rotating the token
+           invalidates any existing imports. The feed emits ZERO PII —
+           only date ranges + a generic "Blocked" label. -->
+      <div class="form-card" data-guide="ical-export">
+        <div class="form-card-title" data-h="ical_export_title">Export calendar to your OTAs</div>
+        <div class="form-card-desc" data-h="ical_export_desc">Copy this URL and paste it into Airbnb / Booking / Vrbo's "Import calendar" screen. Every direct booking and blocked date you save will automatically become "unavailable" on those OTAs — no guest names or details are shared, only the dates.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+          <input type="text" id="icalExportUrl" readonly onclick="this.select()" value=""
+            style="flex:1;min-width:280px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:monospace;font-size:0.78rem;background:#F8FBFF;color:var(--ink);"
+            data-h-title="ical_export_url_title">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="copyIcalExportUrl(this)" data-h="ical_export_copy">🔗 Copy URL</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="rotateIcalExportToken()" data-h="ical_export_rotate" style="color:#9a6b00;border-color:rgba(232,184,75,0.4);">🔑 Generate new URL</button>
+        </div>
+        <div style="font-size:0.7rem;color:var(--ink-soft);margin:-4px 0 10px;line-height:1.4;" data-h="ical_export_rotate_hint">⚠️ "Generate new URL" is only for extreme cases (e.g. the URL was shared by mistake). It immediately kills the current URL, so you'd have to re-paste the new one into every OTA — Airbnb, Booking and Vrbo.</div>
+        <div style="font-size:0.72rem;color:var(--ink-soft);line-height:1.5;">
+          <div style="margin-bottom:4px;"><strong data-h="ical_export_how">How to connect:</strong></div>
+          <div style="margin:2px 0;"><strong>Airbnb:</strong> <span data-h="ical_export_airbnb">Calendar → Availability → Connect calendars → Import calendar → paste the URL.</span></div>
+          <div style="margin:2px 0;"><strong>Booking.com:</strong> <span data-h="ical_export_booking">Rates & Availability → Sync calendars → Import calendar → paste the URL.</span></div>
+          <div style="margin:2px 0;"><strong>Vrbo:</strong> <span data-h="ical_export_vrbo">Calendar → Import/Export → Import calendar → paste the URL.</span></div>
+          <div style="margin-top:8px;color:#9a6b00;" data-h="ical_export_delay">OTAs poll external calendars every 2–4 hours, so a new direct booking may take that long to appear as blocked on Airbnb / Booking / Vrbo.</div>
+        </div>
+      </div>
+
+      <fieldset class="settings-edit-fieldset" disabled style="border:0;padding:0;margin:0;min-width:0;">
       <div class="form-card">
         <div class="form-card-title" data-h="reminder_title">Arrival reminders</div>
         <div class="form-card-desc" data-h="reminder_desc">Every day at 07:00 in the property's timezone, WelcomeBnB emails you a digest of guests arriving tomorrow with their unique booking links, so you can forward them by WhatsApp or email. Leave the email blank to turn reminders off.</div>
@@ -1652,14 +1765,14 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <div class="form-hint" data-h="reminder_tz_hint">Used to compute "tomorrow" — reminders always fire at 07:00 local.</div>
           </div>
         </div>
+        <!-- Round 45 hotfix — Arrival Reminders is now gated by the
+             panel-level Impostazioni Edit/Save/Cancel toolbar; the
+             inline Save button that used to live here was removed. -->
+        <div id="reminderSaveResult" style="margin-top:8px;font-size:0.78rem;color:var(--ink-soft);"></div>
       </div>
-
       </fieldset>
 
-      <!-- Round 38 — Guest privacy notice preview + empty-field warning.
-           Sits OUTSIDE the disabled fieldset so it stays interactive
-           in view mode: this is a read/preview surface, not something
-           the host edits inline. -->
+      <!-- Round 38 — Guest privacy notice preview + empty-field warning. -->
       <div class="form-card">
         <div class="form-card-title" data-h="prop_privacy_title">Guest privacy notice</div>
         <div class="form-card-desc" data-h="prop_privacy_desc">Generated from your property details. Under GDPR you are the data controller (titolare del trattamento) — guests are shown this notice, and can download a copy.</div>
@@ -1695,7 +1808,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     </div>
 
     <!-- ════════════ HOUSE RULES ════════════ -->
-    <div class="panel" id="panel-rules">
+    <div class="panel" id="panel-rules" data-edit-mode="view">
 
       <!-- Round 43.4 — action row now sits at the top of the panel body,
            sticky in flow, matching Property. Avoids the old
@@ -1727,7 +1840,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     </div>
 
     <!-- ════════════ RECOMMENDATIONS ════════════ -->
-    <div class="panel" id="panel-recos">
+    <div class="panel" id="panel-recos" data-edit-mode="view">
 
       <!-- Round 43.4 — sticky in-flow header, matching Property + Rules. -->
       <div class="panel-header-actions">
@@ -1798,11 +1911,21 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       </div>
     </div>
 
-    <!-- Round 40 Task 4 — Calendar tab placeholder. Task 5 will move the
+    <!-- Round 40 Task 4 — Calendar tab placeholder. Task 5 moved the
          existing calendar rendering (_renderUpcomingCalendarBody) into
-         this panel and make List the dashboard default. Kept empty here
-         so the sidebar/tab restructure ships cleanly on its own. -->
+         this panel and made List the dashboard default.
+         Round 45 — added "+ New booking" / "🚫 Block dates" buttons in
+         a panel-header-actions bar above the calendar body. The buttons
+         open openReservationForm() in mode='reservation' or 'block'. -->
     <div class="panel" id="panel-calendar">
+      <div class="panel-header-actions">
+        <div style="flex:1;min-width:0;">
+          <div style="font-family:'Playfair Display',serif;font-weight:600;font-size:1rem;" data-h="cal_header_title">Calendar</div>
+          <div style="font-size:0.72rem;color:var(--ink-soft);" data-h="cal_header_hint">Direct bookings + OTA syncs</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="openReservationForm({ mode: 'block' })" data-h="btn_block_dates" data-guide="direct-block">🚫 Block dates</button>
+        <button class="btn btn-primary btn-sm" onclick="openReservationForm({ mode: 'reservation' })" data-h="btn_new_reservation" data-guide="direct-new">+ New booking</button>
+      </div>
       <div id="calendarPanelBody" style="padding:16px 18px;background:var(--white);border:1px solid var(--border);border-radius:10px;font-size:0.82rem;color:var(--ink-soft);">
         <span data-h="cal_panel_placeholder">Calendar view coming here.</span>
       </div>
@@ -2503,10 +2626,22 @@ async function _upcomingCalSelectDay(iso) {
   await _upcomingRepaint();
 }
 async function _upcomingRepaint() {
+  // Round 45 hotfix — the calendar nav (‹ › and day cells) lives inside
+  // Ospiti → Calendario (panel-calendar / #calendarPanelBody) since
+  // Round 40 T5. The dashboard's upcoming panel (#upcomingPanelWrap)
+  // is list-only and doesn't carry these controls anymore. Refresh
+  // whichever surface is actually mounted right now — if we only
+  // refreshed the dashboard wrap, clicking the calendar arrows would
+  // silently move state without repainting until the user changed tab.
+  const calBody = document.getElementById('calendarPanelBody');
+  if (calBody && typeof renderCalendarPanel === 'function') {
+    try { await renderCalendarPanel(); } catch (_) {}
+  }
   const wrap = document.getElementById('upcomingPanelWrap');
-  if (!wrap) return;
-  const html = await renderUpcomingReservationsPanel();
-  wrap.outerHTML = html;
+  if (wrap) {
+    const html = await renderUpcomingReservationsPanel();
+    wrap.outerHTML = html;
+  }
 }
 
 function setGaRange(days) {
@@ -3530,10 +3665,58 @@ const HT = {
     sidebar_oggi_title:   'Today',      sidebar_oggi_sub:   'What needs your attention right now',
     sidebar_ospiti_title: 'Guests',     sidebar_ospiti_sub: 'Check-ins, calendar, analytics and contacts',
     sidebar_conf_title:   'Compliance', sidebar_conf_sub:   'Filings for the Italian authorities',
-    sidebar_prop_title:   'Property',   sidebar_prop_sub:   'Details, rules and recommendations',
+    sidebar_prop_title:   'Property',   sidebar_prop_sub:   'Details, settings, rules and recommendations',
     sidebar_cond_title:   'Share',      sidebar_cond_sub:   'Guest link and chat',
     t_calendar: 'Calendar', s_calendar: 'Bookings by month',
     cal_panel_placeholder: 'Calendar view is coming here in the next update.',
+    cal_header_title: 'Calendar',
+    cal_header_hint: 'Direct bookings + OTA syncs',
+    btn_new_reservation: '+ New booking',
+    btn_block_dates: '🚫 Block dates',
+    // Round 45 — direct-booking + block-dates form
+    rf_title_new_res: 'New direct booking',
+    rf_title_edit_res: 'Edit direct booking',
+    rf_title_new_block: 'Block dates',
+    rf_title_edit_block: 'Edit blocked dates',
+    rf_channel_lbl: 'Where did the booking come from?',
+    rf_channel_placeholder: 'Choose a channel…',
+    rf_channel_website: 'Our own website',
+    rf_channel_instagram: 'Instagram',
+    rf_channel_whatsapp_phone: 'WhatsApp / Phone',
+    rf_channel_word_of_mouth: 'Word of mouth',
+    rf_channel_returning_guest: 'Returning guest',
+    rf_channel_other_platform: 'Other platform',
+    rf_channel_other: 'Other',
+    rf_block_reason_lbl: 'Reason for blocking',
+    rf_block_reason_placeholder: 'Choose a reason…',
+    rf_block_reason_own_stay: 'Own stay',
+    rf_block_reason_maintenance: 'Maintenance / cleaning',
+    rf_block_reason_other: 'Other',
+    rf_guest_name_lbl: 'Guest name',
+    rf_guest_name_ph: 'e.g. Rossi Mario',
+    rf_dates_lbl: 'Dates',
+    rf_checkin_lbl: 'Check-in',
+    rf_checkout_lbl: 'Check-out',
+    rf_guest_count_lbl: 'Number of guests',
+    rf_contact_phone_lbl: 'Phone (host-only, never shared)',
+    rf_contact_email_lbl: 'Email (host-only, never shared)',
+    rf_notes_lbl: 'Notes (host-only)',
+    rf_notes_ph: 'Private notes — never shown to the guest.',
+    rf_save: 'Save',
+    rf_cancel: 'Cancel',
+    rf_saving: 'Saving…',
+    rf_err_missing_guest_name: 'Please enter the guest name.',
+    rf_err_missing_channel: 'Please pick a channel.',
+    rf_err_missing_reason: 'Please pick a reason.',
+    rf_err_missing_dates: 'Please pick both check-in and check-out dates.',
+    rf_err_bad_dates: 'Check-out must be after check-in.',
+    rf_err_past_checkin: 'Check-in cannot be in the past.',
+    rf_err_overlap: 'These dates overlap with an existing booking or block. Please review.',
+    rf_err_generic: 'Could not save the booking. Please try again.',
+    rf_overlap_hint: '⚠️ Overlap with an existing booking or block on these dates.',
+    rf_ota_hint: 'To keep Airbnb / Booking / Vrbo in sync automatically, set up "Export calendar to your OTAs" once in Property Details — this booking will then propagate on their next poll (usually within a few hours).',
+    rf_saved_ok: 'Saved.',
+    rf_privacy_hint: '🔒 Contact and notes stay with you. They never appear in the guest app, exports or reminders.',
     admin_enable_edit: 'Enable editing',
     admin_close: 'Close',
     cmp_intro: 'A plain-language guide to the three compliance obligations for short-term rentals in Italy. This is reference information — verify the specifics for your region and comune.',
@@ -3550,6 +3733,11 @@ const HT = {
     dash_all_caught_up: "You're all caught up",
     dash_nothing_pending: 'No urgent items, no guests currently staying.',
     t_property: 'Property Details', s_property: 'Edit your property information',
+    t_settings: 'Settings', s_settings: 'Integrations, tourist tax, reminders, privacy',
+    settings_header_title: 'Settings',
+    settings_header_hint: 'Integrations, tourist tax, reminders, privacy',
+    btn_save_reminders: '💾 Save reminder settings',
+    btn_save_settings: '💾 Save Settings',
     t_guest_analytics: 'Guest Analytics', s_guest_analytics: 'How your guests use the app',
     ga_range_7: '7 days', ga_range_30: '30 days', ga_range_90: '90 days',
     ga_funnel_title: 'Check-in funnel', ga_funnel_sub: 'How many guests who opened the link completed their check-in',
@@ -3862,6 +4050,18 @@ const HT = {
     // Round 26 — iCal sync (single-line values; applyLang collapses newlines)
     ical_title: 'Calendar sync (iCal)',
     ical_desc: 'Paste your Airbnb / Booking.com / Vrbo iCal export URLs. WelcomeBnB pulls upcoming reservations into your dashboard. Only dates come from these feeds — guest names and counts arrive when guests complete check-in.',
+    // Round 45 Step 4.5 — outbound iCal export
+    ical_export_title: 'Export calendar to your OTAs',
+    ical_export_desc: 'Copy this URL and paste it into Airbnb / Booking / Vrbo\'s "Import calendar" screen. Every direct booking and blocked date you save will automatically become unavailable on those OTAs — no guest names or details are shared, only the dates.',
+    ical_export_url_title: 'Your property\'s outbound iCal URL — keep it private.',
+    ical_export_copy: '🔗 Copy URL',
+    ical_export_rotate: '🔑 Generate new URL',
+    ical_export_rotate_hint: '⚠️ "Generate new URL" is only for extreme cases (e.g. the URL was shared by mistake). It immediately kills the current URL, so you\'d have to re-paste the new one into every OTA — Airbnb, Booking and Vrbo.',
+    ical_export_how: 'How to connect:',
+    ical_export_airbnb: 'Calendar → Availability → Connect calendars → Import calendar → paste the URL.',
+    ical_export_booking: 'Rates & Availability → Sync calendars → Import calendar → paste the URL.',
+    ical_export_vrbo: 'Calendar → Import/Export → Import calendar → paste the URL.',
+    ical_export_delay: 'OTAs poll external calendars every 2–4 hours, so a new direct booking may take that long to appear as blocked on Airbnb / Booking / Vrbo.',
     ical_where: 'Airbnb: Calendar → Availability → Connect calendars → Export. Booking.com: Calendar → Sync calendars. Vrbo: Calendar → Import/Export → Export calendar.',
     ical_platform: 'Platform',
     ical_url: 'iCal URL',
@@ -3968,10 +4168,58 @@ const HT = {
     sidebar_oggi_title:   'Oggi',       sidebar_oggi_sub:   'Cosa richiede la tua attenzione adesso',
     sidebar_ospiti_title: 'Ospiti',     sidebar_ospiti_sub: 'Check-in, calendario, analisi e contatti',
     sidebar_conf_title:   'Conformità', sidebar_conf_sub:   'Adempimenti per le autorità italiane',
-    sidebar_prop_title:   'Proprietà',  sidebar_prop_sub:   'Dettagli, regole e consigli',
+    sidebar_prop_title:   'Proprietà',  sidebar_prop_sub:   'Dettagli, impostazioni, regole e consigli',
     sidebar_cond_title:   'Condividi',  sidebar_cond_sub:   'Link per gli ospiti e chat',
     t_calendar: 'Calendario', s_calendar: 'Prenotazioni per mese',
     cal_panel_placeholder: 'La vista calendario arriverà qui nel prossimo aggiornamento.',
+    cal_header_title: 'Calendario',
+    cal_header_hint: 'Prenotazioni dirette + sync OTA',
+    btn_new_reservation: '+ Nuova prenotazione',
+    btn_block_dates: '🚫 Blocca date',
+    // Round 45 — modulo prenotazione diretta + blocco date
+    rf_title_new_res: 'Nuova prenotazione diretta',
+    rf_title_edit_res: 'Modifica prenotazione diretta',
+    rf_title_new_block: 'Blocca date',
+    rf_title_edit_block: 'Modifica date bloccate',
+    rf_channel_lbl: 'Da dove arriva la prenotazione?',
+    rf_channel_placeholder: 'Scegli un canale…',
+    rf_channel_website: 'Il nostro sito',
+    rf_channel_instagram: 'Instagram',
+    rf_channel_whatsapp_phone: 'WhatsApp / Telefono',
+    rf_channel_word_of_mouth: 'Passaparola',
+    rf_channel_returning_guest: 'Ospite di ritorno',
+    rf_channel_other_platform: 'Altra piattaforma',
+    rf_channel_other: 'Altro',
+    rf_block_reason_lbl: 'Motivo del blocco',
+    rf_block_reason_placeholder: 'Scegli un motivo…',
+    rf_block_reason_own_stay: 'Soggiorno personale',
+    rf_block_reason_maintenance: 'Manutenzione / pulizie',
+    rf_block_reason_other: 'Altro',
+    rf_guest_name_lbl: 'Nome ospite',
+    rf_guest_name_ph: 'es. Rossi Mario',
+    rf_dates_lbl: 'Date',
+    rf_checkin_lbl: 'Check-in',
+    rf_checkout_lbl: 'Check-out',
+    rf_guest_count_lbl: 'Numero di ospiti',
+    rf_contact_phone_lbl: 'Telefono (solo host, mai condiviso)',
+    rf_contact_email_lbl: 'Email (solo host, mai condivisa)',
+    rf_notes_lbl: 'Note (solo host)',
+    rf_notes_ph: 'Note private — mai mostrate all\'ospite.',
+    rf_save: 'Salva',
+    rf_cancel: 'Annulla',
+    rf_saving: 'Salvataggio…',
+    rf_err_missing_guest_name: 'Inserisci il nome dell\'ospite.',
+    rf_err_missing_channel: 'Scegli un canale.',
+    rf_err_missing_reason: 'Scegli un motivo.',
+    rf_err_missing_dates: 'Scegli sia la data di check-in che di check-out.',
+    rf_err_bad_dates: 'Il check-out deve essere dopo il check-in.',
+    rf_err_past_checkin: 'La data di check-in non può essere nel passato.',
+    rf_err_overlap: 'Queste date si sovrappongono a un\'altra prenotazione o blocco. Verifica.',
+    rf_err_generic: 'Impossibile salvare la prenotazione. Riprova.',
+    rf_overlap_hint: '⚠️ Sovrapposizione con una prenotazione o un blocco esistente su queste date.',
+    rf_ota_hint: 'Per tenere Airbnb / Booking / Vrbo sincronizzati automaticamente, configura una volta «Esporta il calendario ai tuoi OTA» nei Dettagli Proprietà — questa prenotazione si propagherà al prossimo controllo (di solito entro poche ore).',
+    rf_saved_ok: 'Salvato.',
+    rf_privacy_hint: '🔒 Contatti e note restano con te. Non appaiono mai nell\'app ospiti, negli export o nei promemoria.',
     admin_enable_edit: 'Abilita modifica',
     admin_close: 'Chiudi',
     cmp_intro: 'Una guida in linguaggio semplice ai tre obblighi di conformità per le locazioni brevi in Italia. È informazione di riferimento — verifica i dettagli per la tua regione e il tuo comune.',
@@ -3987,6 +4235,11 @@ const HT = {
     dash_all_caught_up: 'Tutto in ordine',
     dash_nothing_pending: 'Nessuna urgenza, nessun ospite presente.',
     t_property: 'Dettagli Proprietà', s_property: 'Modifica le informazioni della proprietà',
+    t_settings: 'Impostazioni', s_settings: 'Integrazioni, tassa di soggiorno, promemoria, privacy',
+    settings_header_title: 'Impostazioni',
+    settings_header_hint: 'Integrazioni, tassa di soggiorno, promemoria, privacy',
+    btn_save_reminders: '💾 Salva promemoria',
+    btn_save_settings: '💾 Salva impostazioni',
     t_guest_analytics: 'Analisi Ospiti', s_guest_analytics: 'Come gli ospiti usano l\'app',
     ga_range_7: '7 giorni', ga_range_30: '30 giorni', ga_range_90: '90 giorni',
     ga_funnel_title: 'Funnel di check-in', ga_funnel_sub: 'Quanti ospiti che hanno aperto il link hanno completato il check-in',
@@ -4287,6 +4540,18 @@ const HT = {
     // Round 26 — Sync iCal
     ical_title: 'Sincronizzazione calendario (iCal)',
     ical_desc: 'Incolla gli URL di esportazione iCal di Airbnb / Booking.com / Vrbo. WelcomeBnB scarica le prenotazioni imminenti nella tua dashboard. Da questi feed arrivano solo le date — i nomi e il numero degli ospiti si aggiungono quando completano il check-in.',
+    // Round 45 Step 4.5 — esportazione iCal in uscita
+    ical_export_title: 'Esporta il calendario ai tuoi OTA',
+    ical_export_desc: 'Copia questo URL e incollalo nello schermata "Importa calendario" di Airbnb / Booking / Vrbo. Ogni prenotazione diretta e ogni data bloccata che salvi diventerà automaticamente non disponibile su quegli OTA — non vengono condivisi nome ospite o dettagli, solo le date.',
+    ical_export_url_title: 'URL iCal in uscita della tua proprietà — tienilo privato.',
+    ical_export_copy: '🔗 Copia URL',
+    ical_export_rotate: '🔑 Genera nuovo URL',
+    ical_export_rotate_hint: '⚠️ «Genera nuovo URL» è solo per casi estremi (es. hai condiviso l\'URL per errore). Chiude subito l\'URL attuale, quindi dovrai reincollare il nuovo su ogni OTA — Airbnb, Booking e Vrbo.',
+    ical_export_how: 'Come collegarlo:',
+    ical_export_airbnb: 'Calendario → Disponibilità → Collega calendari → Importa calendario → incolla l\'URL.',
+    ical_export_booking: 'Tariffe e Disponibilità → Sincronizza calendari → Importa calendario → incolla l\'URL.',
+    ical_export_vrbo: 'Calendario → Import/Export → Importa calendario → incolla l\'URL.',
+    ical_export_delay: 'Gli OTA scaricano i calendari esterni ogni 2–4 ore, quindi una nuova prenotazione diretta potrebbe impiegare quel tempo per comparire come bloccata su Airbnb / Booking / Vrbo.',
     ical_where: 'Airbnb: Calendario → Disponibilità → Collega calendari → Esporta. Booking.com: Calendario → Sincronizza calendari. Vrbo: Calendario → Importa/Esporta → Esporta calendario.',
     ical_platform: 'Piattaforma',
     ical_url: 'URL iCal',
@@ -4481,6 +4746,7 @@ function setHostLang(l) {
 const titlesMap = {
   dashboard: ['t_dashboard', 's_dashboard'],
   property: ['t_property', 's_property'],
+  settings: ['t_settings', 's_settings'],
   rules: ['t_rules', 's_rules'],
   recos: ['t_recos', 's_recos'],
   checkins: ['t_checkins', 's_checkins'],
@@ -4513,7 +4779,7 @@ const SECTIONS = {
   // (calendar, chat, analytics, contacts).
   ospiti: { panels: ['calendar', 'chat', 'guestanalytics', 'contacts'] },
   conf:   { panels: ['checkins', 'export', 'compliance'] },
-  prop:   { panels: ['property', 'rules', 'recos'] },
+  prop:   { panels: ['property', 'settings', 'rules', 'recos'] },
   cond:   { panels: ['qrlink'] },
 };
 const SECTION_TITLES = {
@@ -4689,10 +4955,10 @@ function showPanel(id, btn) {
    next to #panelTitle for every guide-covered panel; on click, injects
    /host-guides.js once and hands control off to HG.mountPill + HG.openGuide.
 */
-const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','rules','recos','qrlink'];
+const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','settings','rules','recos','qrlink'];
 // Bump on every host-guides.js change so browsers never see a stale
 // copy even if their cache is aggressive.
-const _HG_VERSION = '43.5';
+const _HG_VERSION = '45.4';
 let _hgLoadPromise = null;
 function _hgLoad() {
   if (window.HG) return Promise.resolve();
@@ -4889,12 +5155,16 @@ async function renderDashboard() {
   // "Awaiting check-in" pill and a hint to send the guest their link.
   try {
     const todayISO = new Date().toISOString().slice(0, 10);
+    // Round 45 Step 4 — covered_by_reservation_id IS NULL so an OTA
+    // echo linked to a direct booking doesn't produce a second phantom
+    // "Awaiting check-in" tile for the same stay.
     const { data: activeRes } = await sb.from('ota_reservations')
       .select('id, platform, guest_name, checkin_date, checkout_date, booking_code')
       .eq('property_id', propertyId)
       .eq('entry_type', 'reservation')
       .eq('status', 'active')
       .is('deleted_at', null)
+      .is('covered_by_reservation_id', null)
       .lte('checkin_date', todayISO)
       .gt('checkout_date', todayISO);
     for (const r of (activeRes || [])) {
@@ -5069,6 +5339,12 @@ async function renderDashboard() {
   // "currently staying" block: today's guests first, planning next.
   const upcomingPanel = await renderUpcomingReservationsPanel();
 
+  // Round 45 Step 5 — coverage-lost banner. When cancel-sweep flips a
+  // linked OTA echo to cancelled it stamps coverage_lost_at on that
+  // echo. Surface the direct booking whose block just went away so
+  // the host knows to re-block manually before someone double-books.
+  const coverageLostBanner = await renderCoverageLostBanner();
+
   // Round 41 T4.3 — top-of-dashboard help-request alert. Sums all rows
   // whose action prompt is a "reply to help request" (tone === 'urgent'
   // and eng.escs > 0). Shows a single clickable banner that jumps
@@ -5103,12 +5379,113 @@ async function renderDashboard() {
   el.innerHTML = `
     <div style="max-width:920px;">
       ${helpBanner}
+      ${coverageLostBanner}
       ${urgentPanel}
       ${stayingPanel}
       ${upcomingPanel}
       ${allCaughtUp}
     </div>
   `;
+}
+
+// Round 45 Step 5 — coverage-lost banner. Reads OTA rows on the current
+// property that are covered + coverage_lost_at set. For each, resolves
+// the direct row it points at (name + dates) and paints a warning card
+// telling the host to re-block on the OTA. Dismissing an entry clears
+// the coverage_lost_at flag; the OTA row stays cancelled. If Airbnb
+// re-blocks the dates later a fresh OTA row arrives with its own UID
+// and the host re-links via the calendar coverage pill.
+async function renderCoverageLostBanner() {
+  if (!propertyId) return '';
+  const it = hostLang === 'it';
+  const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  let echoes = [];
+  try {
+    const { data, error } = await sb.from('ota_reservations')
+      .select('id, platform, coverage_lost_at, covered_by_reservation_id')
+      .eq('property_id', propertyId)
+      .is('deleted_at', null)
+      .not('covered_by_reservation_id', 'is', null)
+      .not('coverage_lost_at', 'is', null)
+      .order('coverage_lost_at', { ascending: false })
+      .limit(20);
+    if (error) { console.warn('[coverage-lost] fetch failed:', error.message); return ''; }
+    echoes = data || [];
+  } catch (e) {
+    console.warn('[coverage-lost] exception:', e);
+    return '';
+  }
+  if (echoes.length === 0) return '';
+
+  // Batch-fetch the direct rows the echoes point at.
+  const directIds = [...new Set(echoes.map(e => e.covered_by_reservation_id))];
+  let directs = [];
+  try {
+    const { data } = await sb.from('ota_reservations')
+      .select('id, guest_name, checkin_date, checkout_date, status')
+      .in('id', directIds)
+      .eq('status', 'active')
+      .is('deleted_at', null);
+    directs = data || [];
+  } catch (_) {}
+  const directById = {};
+  for (const d of directs) directById[d.id] = d;
+
+  const rows = echoes
+    .map(e => ({ echo: e, direct: directById[e.covered_by_reservation_id] }))
+    .filter(x => x.direct); // hide entries whose direct row is gone.
+  if (rows.length === 0) return '';
+
+  const platformLabel = p => (p === 'airbnb' ? 'Airbnb' : p === 'booking' ? 'Booking.com' : p === 'vrbo' ? 'Vrbo' : (p ? p[0].toUpperCase() + p.slice(1) : 'OTA'));
+  const fmt = d => d ? new Date(d + 'T00:00:00').toLocaleDateString(it ? 'it-IT' : 'en-GB', { day: '2-digit', month: 'short' }) : '—';
+
+  const cards = rows.map(({ echo, direct }) => {
+    const who = direct.guest_name || (it ? 'prenotazione diretta' : 'direct booking');
+    const dates = `${fmt(direct.checkin_date)} → ${fmt(direct.checkout_date)}`;
+    const line = it
+      ? `Il blocco su ${platformLabel(echo.platform)} per ${who} (${dates}) è scomparso dal calendario dell\'OTA. Rimettilo manualmente su ${platformLabel(echo.platform)} per evitare doppie prenotazioni.`
+      : `The ${platformLabel(echo.platform)} block for ${who} (${dates}) is no longer in the OTA\'s feed. Re-add it manually on ${platformLabel(echo.platform)} to avoid double-bookings.`;
+    return `
+      <div style="display:flex;gap:12px;align-items:flex-start;padding:12px 14px;background:rgba(232,184,75,0.12);border:1px solid rgba(232,184,75,0.4);border-radius:10px;margin-bottom:8px;">
+        <span style="font-size:1.1rem;line-height:1;">⚠️</span>
+        <div style="flex:1;min-width:0;font-size:0.86rem;color:#7d5e10;line-height:1.4;">${safe(line)}</div>
+        <button type="button" onclick="dismissCoverageLost('${safe(echo.id)}', this)"
+          style="padding:4px 10px;background:transparent;border:1px solid rgba(154,107,0,0.35);border-radius:6px;font-size:0.72rem;cursor:pointer;color:#7d5e10;font-family:inherit;white-space:nowrap;">
+          ${safe(it ? 'Ignora' : 'Dismiss')}
+        </button>
+      </div>`;
+  }).join('');
+
+  return `
+    <div style="margin-bottom:14px;">
+      ${cards}
+    </div>`;
+}
+
+// Round 45 Step 5 — clears coverage_lost_at on the given OTA echo,
+// hiding the warning card. The row stays cancelled + linked; the flag
+// only exists to say "surface this to the host". If the block
+// reappears in the feed later a brand new row arrives and — via the
+// calendar pill — can be re-linked to the direct booking.
+async function dismissCoverageLost(otaId, btn) {
+  if (!otaId) return;
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+  try {
+    const { error } = await sb.from('ota_reservations')
+      .update({ coverage_lost_at: null })
+      .eq('id', otaId);
+    if (error) {
+      console.warn('[coverage-lost] dismiss failed:', error.message);
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+      return;
+    }
+    try { track('coverage_lost_dismissed', {}); } catch(_) {}
+    // Simplest, most reliable UI update: re-render the dashboard.
+    try { if (typeof renderDashboard === 'function') await renderDashboard(); } catch(_) {}
+  } catch (e) {
+    console.warn('[coverage-lost] dismiss exception:', e);
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+  }
 }
 
 /* ══════════════════════════════════════
@@ -5127,12 +5504,16 @@ async function renderUpcomingReservationsPanel() {
   const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
   let rows = [];
   try {
+    // Round 45 Step 4 — covered_by_reservation_id IS NULL so an OTA
+    // echo linked to a direct booking doesn't show as a second row in
+    // "Prossime prenotazioni" — the direct row already represents it.
     const { data, error } = await sb.from('ota_reservations')
       .select('id, platform, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code, checkin_reopened_at')
       .eq('property_id', propertyId)
       .eq('entry_type', 'reservation')
       .eq('status', 'active')
       .is('deleted_at', null)
+      .is('covered_by_reservation_id', null)
       // Round 32.2 — strictly future arrivals only. The earlier filter
       // (`checkout_date >= today`) also matched anyone still staying or
       // arriving today, which duplicated them into Upcoming alongside
@@ -5289,14 +5670,18 @@ let _upcomingRowsById = {};
 function _renderReservationCard(r, todayISO) {
   const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
   const isHeadType = t => t === 'single' || t === 'head' || t === 'group';
+  // Round 45 Step 4 — 'direct' bookings get their own label + purple
+  // palette so hosts distinguish them from OTA rows at a glance.
   const platformLabel = p => (p === 'airbnb' ? 'Airbnb'
                             : p === 'booking' ? 'Booking.com'
                             : p === 'vrbo' ? 'Vrbo'
+                            : p === 'direct' ? (hostLang === 'it' ? 'Diretta' : 'Direct')
                             : (p ? p[0].toUpperCase() + p.slice(1) : 'Other'));
   const platformStyle = p => (
     p === 'airbnb'  ? { color: '#FF5A5F', tint: 'rgba(255,90,95,0.12)' } :
     p === 'booking' ? { color: '#003580', tint: 'rgba(0,53,128,0.12)' }  :
     p === 'vrbo'    ? { color: '#245ABC', tint: 'rgba(36,90,188,0.12)' } :
+    p === 'direct'  ? { color: '#7c3aed', tint: 'rgba(139,92,246,0.14)' } :
                       { color: '#6B7A90', tint: 'rgba(107,122,144,0.14)' }
   );
   const nightsOf = (a, b) => {
@@ -5436,14 +5821,133 @@ function _renderReservationCard(r, todayISO) {
 // view (and mobile row taps) open this modal instead of jumping
 // straight to the guest link. Same card as the list view; the guest
 // link is one click deeper via the "Open" button on the card.
-function _showReservationDetail(reservationId) {
+async function _showReservationDetail(reservationId) {
   const r = _upcomingRowsById && _upcomingRowsById[reservationId];
   if (!r) return;
   const closeExisting = document.getElementById('reservationDetailModal');
   if (closeExisting) closeExisting.remove();
-  const card = _renderReservationCard(r);
   const it = hostLang === 'it';
-  const title = it ? 'Dettagli prenotazione' : 'Reservation details';
+  const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+
+  // Round 45 Step 6 — when the popup opens on a direct row, fetch the
+  // full record so we can show the host-only extras (channel, guest
+  // count, contact info, notes) and any linked OTA echoes. The list
+  // and calendar queries don't pull those columns.
+  let full = r;
+  let coveredEchoes = [];
+  const isDirect = r.platform === 'direct';
+  const isBlock  = r.entry_type === 'block';
+  if (isDirect) {
+    try {
+      const { data } = await sb.from('ota_reservations')
+        .select('id, platform, entry_type, channel, guest_name, guest_count, contact_phone, contact_email, notes, checkin_date, checkout_date, booking_code, keybox_code, link_sent_at, created_by')
+        .eq('id', reservationId).maybeSingle();
+      if (data) full = { ...r, ...data };
+    } catch (_) {}
+    // Fetch OTA echoes that point at this direct row.
+    try {
+      const { data } = await sb.from('ota_reservations')
+        .select('id, platform, checkin_date, checkout_date, status')
+        .eq('covered_by_reservation_id', reservationId)
+        .is('deleted_at', null);
+      coveredEchoes = data || [];
+    } catch (_) {}
+  }
+
+  // Base card — the same one the list uses. Blocks bypass the card
+  // (no guest correlation, no guest link) and get a minimal panel
+  // instead so the popup doesn't try to render a reservation shape.
+  let bodyHtml;
+  if (isBlock) {
+    const blockLabels = {
+      own_stay:    it ? 'Soggiorno personale' : 'Own stay',
+      maintenance: it ? 'Manutenzione / pulizie' : 'Maintenance / cleaning',
+      other:       it ? 'Altro' : 'Other',
+    };
+    const reason = full.channel ? (blockLabels[full.channel] || full.channel) : (it ? 'Blocco' : 'Blocked');
+    const dateRange = `${safe(full.checkin_date)} → ${safe(full.checkout_date)}`;
+    const notesBlock = full.notes ? `
+      <div style="margin-top:10px;padding:8px 10px;background:var(--cream-2);border-radius:8px;font-size:0.82rem;color:var(--ink);white-space:pre-wrap;">${safe(full.notes)}</div>` : '';
+    bodyHtml = `
+      <div style="padding:14px 16px;background:var(--white);border:1px dashed rgba(107,122,144,0.5);border-radius:10px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+          <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#4a5468;background:rgba(107,122,144,0.14);padding:2px 8px;border-radius:4px;">🚫 ${safe(it ? 'Bloccato' : 'Blocked')}</span>
+          <span style="font-weight:600;color:var(--ink);">${dateRange}</span>
+        </div>
+        <div style="font-size:0.82rem;color:var(--ink-soft);">${safe(it ? 'Motivo' : 'Reason')}: <strong style="color:var(--ink);">${safe(reason)}</strong></div>
+        ${notesBlock}
+      </div>`;
+  } else {
+    const card = _renderReservationCard(full);
+    bodyHtml = card.html;
+  }
+
+  // Round 45 Step 6 — extras block for direct reservations (host-only).
+  let directExtras = '';
+  if (isDirect && !isBlock) {
+    const chLabels = {
+      website: it ? 'Il nostro sito' : 'Our own website',
+      instagram: 'Instagram',
+      whatsapp_phone: it ? 'WhatsApp / Telefono' : 'WhatsApp / Phone',
+      word_of_mouth: it ? 'Passaparola' : 'Word of mouth',
+      returning_guest: it ? 'Ospite di ritorno' : 'Returning guest',
+      other_platform: it ? 'Altra piattaforma' : 'Other platform',
+      other: it ? 'Altro' : 'Other',
+    };
+    const rows = [];
+    if (full.channel)       rows.push([it ? 'Canale' : 'Channel', chLabels[full.channel] || full.channel]);
+    if (full.guest_count)   rows.push([it ? 'Ospiti' : 'Guests', String(full.guest_count)]);
+    if (full.contact_phone) rows.push([it ? 'Telefono' : 'Phone', full.contact_phone]);
+    if (full.contact_email) rows.push([it ? 'Email' : 'Email', full.contact_email]);
+    const notesHtml = full.notes ? `
+      <div style="margin-top:8px;padding:8px 10px;background:var(--cream-2);border-radius:8px;font-size:0.82rem;color:var(--ink);white-space:pre-wrap;">${safe(full.notes)}</div>` : '';
+    if (rows.length > 0 || full.notes) {
+      directExtras = `
+        <div style="margin-top:12px;padding:10px 14px;background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.18);border-radius:10px;">
+          <div style="font-size:0.68rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#5b21b6;margin-bottom:8px;">🔒 ${safe(it ? 'Dettagli privati (solo host)' : 'Private details (host-only)')}</div>
+          ${rows.map(([k, v]) => `<div style="display:flex;gap:10px;font-size:0.82rem;margin:3px 0;"><span style="min-width:80px;color:var(--ink-soft);">${safe(k)}:</span><span style="color:var(--ink);flex:1;min-width:0;word-break:break-word;">${safe(v)}</span></div>`).join('')}
+          ${notesHtml}
+        </div>`;
+    }
+  }
+
+  // Round 45 Step 6 — linked OTA echoes list. Only shown on direct
+  // reservations that have at least one covered echo. Each entry has
+  // an Unlink button that clears covered_by_reservation_id + revives
+  // the echo (status='active' if it was cancelled by the sweep) so
+  // it re-enters normal display.
+  let echoesBlock = '';
+  if (isDirect && !isBlock && coveredEchoes.length > 0) {
+    const platformLabel = p => (p === 'airbnb' ? 'Airbnb' : p === 'booking' ? 'Booking.com' : p === 'vrbo' ? 'Vrbo' : (p ? p[0].toUpperCase() + p.slice(1) : 'OTA'));
+    const rowsHtml = coveredEchoes.map(e => `
+      <div style="display:flex;gap:8px;align-items:center;padding:6px 0;font-size:0.82rem;">
+        <span style="flex:1;min-width:0;color:var(--ink);">🔗 ${safe(platformLabel(e.platform))} · ${safe(e.checkin_date)} → ${safe(e.checkout_date)} <span style="color:var(--ink-soft);font-size:0.72rem;">(${safe(e.status)})</span></span>
+        <button type="button" onclick="unlinkCoverage('${safe(e.id)}', this)"
+          style="padding:3px 8px;background:transparent;border:1px solid var(--border);border-radius:6px;font-size:0.7rem;cursor:pointer;color:var(--ink);font-family:inherit;">
+          ${safe(it ? 'Scollega' : 'Unlink')}
+        </button>
+      </div>`).join('');
+    echoesBlock = `
+      <div style="margin-top:12px;padding:10px 14px;background:var(--cream-2);border-radius:10px;">
+        <div style="font-size:0.68rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px;">${safe(it ? 'Blocchi OTA collegati' : 'Linked OTA blocks')}</div>
+        ${rowsHtml}
+      </div>`;
+  }
+
+  // Round 45 Step 6 — action buttons for direct rows: Edit + Cancel.
+  // OTA rows keep the existing "Open" / "Copy" from _renderReservationCard.
+  let actionsBlock = '';
+  if (isDirect) {
+    actionsBlock = `
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:12px;border-top:1px solid rgba(107,122,144,0.15);">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="editDirectReservation('${safe(reservationId)}')">✏️ ${safe(it ? 'Modifica' : 'Edit')}</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="cancelDirectReservation('${safe(reservationId)}')" style="color:var(--red);border-color:rgba(224,69,94,0.35);">${safe(it ? 'Annulla prenotazione' : 'Cancel booking')}</button>
+      </div>`;
+  }
+
+  const title = isBlock
+    ? (it ? 'Dettagli blocco' : 'Block details')
+    : (it ? 'Dettagli prenotazione' : 'Reservation details');
   const closeLbl = it ? 'Chiudi' : 'Close';
   const modal = document.createElement('div');
   modal.id = 'reservationDetailModal';
@@ -5455,12 +5959,470 @@ function _showReservationDetail(reservationId) {
         <h3 style="font-family:'Playfair Display',serif;font-weight:600;font-size:1.05rem;color:var(--ink);margin:0;">${title}</h3>
         <button type="button" onclick="_closeReservationDetail()" aria-label="${closeLbl}" style="background:none;border:none;font-size:1.4rem;color:var(--ink-soft);cursor:pointer;padding:2px 8px;line-height:1;">×</button>
       </div>
-      ${card.html}
+      ${bodyHtml}
+      ${directExtras}
+      ${echoesBlock}
+      ${actionsBlock}
     </div>`;
   document.body.appendChild(modal);
 }
 function _closeReservationDetail() {
   document.getElementById('reservationDetailModal')?.remove();
+}
+
+// Round 45 Step 6 — direct-reservation edit. Fetches the full row so
+// the form pre-fills every host-only field, then opens the shared
+// openReservationForm() from Step 1 in edit mode.
+async function editDirectReservation(id) {
+  if (!id) return;
+  const it = hostLang === 'it';
+  try {
+    const { data, error } = await sb.from('ota_reservations')
+      .select('id, entry_type, channel, guest_name, guest_count, contact_phone, contact_email, notes, checkin_date, checkout_date')
+      .eq('id', id).maybeSingle();
+    if (error || !data) {
+      toast(it ? 'Caricamento fallito.' : 'Load failed.');
+      return;
+    }
+    _closeReservationDetail();
+    openReservationForm({
+      mode: data.entry_type === 'block' ? 'block' : 'reservation',
+      reservationId: id,
+      prefill: {
+        channel:       data.channel,
+        guest_name:    data.guest_name,
+        guest_count:   data.guest_count,
+        contact_phone: data.contact_phone,
+        contact_email: data.contact_email,
+        notes:         data.notes,
+        checkin_date:  data.checkin_date,
+        checkout_date: data.checkout_date,
+      },
+    });
+  } catch (e) {
+    console.warn('[direct] edit fetch exception:', e);
+    toast(it ? 'Caricamento fallito.' : 'Load failed.');
+  }
+}
+
+// Round 45 Step 6 — cancel a direct reservation/block. Soft cancel
+// (status='cancelled', not a row delete) so it stops surfacing but
+// stays as an audit trail. If the row had covered echoes, they stay
+// linked but the direct target is now cancelled; the coverage-lost
+// banner will not fire for them (that only triggers when the ECHO
+// vanishes from the feed, not when the direct target changes).
+async function cancelDirectReservation(id) {
+  if (!id) return;
+  const it = hostLang === 'it';
+  const q = it
+    ? 'Annullare questa prenotazione? Verrà nascosta ovunque, ma resta nel database. L\'ospite non riceverà più promemoria.'
+    : 'Cancel this booking? It disappears everywhere but stays in the database. The guest will not receive further reminders.';
+  if (!confirm(q)) return;
+  try {
+    const { error } = await sb.from('ota_reservations')
+      .update({ status: 'cancelled' })
+      .eq('id', id);
+    if (error) {
+      console.warn('[direct] cancel failed:', error.message);
+      toast(it ? 'Annullamento fallito.' : 'Cancel failed.');
+      return;
+    }
+    _closeReservationDetail();
+    toast(it ? '✓ Prenotazione annullata.' : '✓ Booking cancelled.');
+    try { track('direct_reservation_cancelled', {}); } catch(_) {}
+    try { if (typeof renderCalendarPanel === 'function') await renderCalendarPanel(); } catch(_) {}
+    try { if (typeof renderDashboard === 'function') await renderDashboard(); } catch(_) {}
+  } catch (e) {
+    console.warn('[direct] cancel exception:', e);
+    toast(it ? 'Annullamento fallito.' : 'Cancel failed.');
+  }
+}
+
+// Round 45 Step 6 — unlink coverage. Reverses _confirmCoverage: clears
+// covered_by_reservation_id + coverage_lost_at on the OTA row. If the
+// row was cancelled by the sweep after coverage was lost, revive it
+// so the host sees it back on the calendar. Booking_code was wiped
+// when we linked; unlinking doesn't restore it (it was Airbnb's echo,
+// no guest link belongs to it anyway).
+async function unlinkCoverage(otaId, btn) {
+  if (!otaId) return;
+  const it = hostLang === 'it';
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+  try {
+    // Read status first so we know whether to also revive.
+    const { data: cur } = await sb.from('ota_reservations')
+      .select('status').eq('id', otaId).maybeSingle();
+    const patch = { covered_by_reservation_id: null, coverage_lost_at: null };
+    if (cur && cur.status === 'cancelled') patch.status = 'active';
+    const { error } = await sb.from('ota_reservations').update(patch).eq('id', otaId);
+    if (error) {
+      console.warn('[coverage] unlink failed:', error.message);
+      toast(it ? 'Scollegamento fallito.' : 'Unlink failed.');
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+      return;
+    }
+    _closeReservationDetail();
+    toast(it ? '✓ Scollegato.' : '✓ Unlinked.');
+    try { track('coverage_unlinked', {}); } catch(_) {}
+    try { if (typeof renderCalendarPanel === 'function') await renderCalendarPanel(); } catch(_) {}
+    try { if (typeof renderDashboard === 'function') await renderDashboard(); } catch(_) {}
+  } catch (e) {
+    console.warn('[coverage] unlink exception:', e);
+    toast(it ? 'Scollegamento fallito.' : 'Unlink failed.');
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Round 45 — Direct-booking / block-dates form.
+   ─────────────────────────────────────────────────────────────────────
+   openReservationForm({ mode, prefill, reservationId })
+     - mode='reservation'  → channel dropdown + guest name + guest count
+                             + contact fields + notes + dates.
+                             Saves platform='direct', entry_type='reservation'.
+     - mode='block'        → reason dropdown + notes + dates.
+                             Saves platform='direct', entry_type='block'.
+   The row is inserted with a synthetic uid ('direct_' + random) so it
+   never collides with an OTA-imported UID in UNIQUE(property_id,platform,uid).
+   Reservations also get a fresh booking_code minted in the same
+   PROPINIT-XXXXXX format the OTA sync uses.
+   Contact phone/email and notes are host-only and never surface in the
+   guest app, exports or reminders (verified in the Step 0 audit —
+   nothing reads those columns in guest-facing code paths).
+════════════════════════════════════════════════════════════════════════ */
+
+function _mintDirectUid() {
+  // 128-bit ish random suffix, base32 alphabet, prefixed so we can spot
+  // direct rows at a glance in the DB.
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let tail = '';
+  for (let i = 0; i < 12; i++) tail += chars[Math.floor(Math.random() * chars.length)];
+  return 'direct_' + tail;
+}
+
+function _mintDirectBookingCode() {
+  // Match the OTA-side format: PROPINIT-XXXXXX (three letters, dash, six
+  // Crockford-ish chars). Same as ensureReservationBookingCodes.
+  const propInit = (propertyData?.name || 'DS').replace(/[^A-Za-z]/g, '').substring(0, 3).toUpperCase() || 'DS';
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let tail = '';
+  for (let i = 0; i < 6; i++) tail += chars[Math.floor(Math.random() * chars.length)];
+  return `${propInit}-${tail}`;
+}
+
+// Query ota_reservations for the current property and return any active
+// non-deleted row whose date range overlaps [checkinISO, checkoutISO).
+// Excludes `excludeId` so edit mode doesn't flag itself.
+// Return: array of { id, entry_type, guest_name, checkin_date, checkout_date, platform }.
+async function _computeReservationOverlap(propId, checkinISO, checkoutISO, excludeId) {
+  if (!propId || !checkinISO || !checkoutISO) return [];
+  try {
+    const q = sb.from('ota_reservations')
+      .select('id, entry_type, guest_name, checkin_date, checkout_date, platform')
+      .eq('property_id', propId)
+      .eq('status', 'active')
+      .is('deleted_at', null)
+      .lt('checkin_date', checkoutISO)   // existing starts before our end
+      .gt('checkout_date', checkinISO);  // existing ends after our start
+    const { data, error } = await q;
+    if (error) { console.warn('[direct] overlap query failed:', error.message); return []; }
+    return (data || []).filter(r => r.id !== excludeId);
+  } catch (e) {
+    console.warn('[direct] overlap exception:', e);
+    return [];
+  }
+}
+
+// Central open/close pair for the direct-booking + block-dates modal.
+// Two modes drive one shared form so we don't duplicate structure.
+function openReservationForm(opts) {
+  const mode = (opts && opts.mode) || 'reservation';
+  const prefill = (opts && opts.prefill) || {};
+  const reservationId = (opts && opts.reservationId) || null;
+  const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+
+  if (!propertyId) {
+    try { toast(hostLang === 'it' ? 'Seleziona prima una proprietà.' : 'Select a property first.'); } catch(_) {}
+    return;
+  }
+  document.getElementById('reservationFormModal')?.remove();
+
+  const isBlock = mode === 'block';
+  const title = h(
+    isBlock
+      ? (reservationId ? 'rf_title_edit_block' : 'rf_title_new_block')
+      : (reservationId ? 'rf_title_edit_res'   : 'rf_title_new_res')
+  );
+  const todayISO = new Date().toISOString().slice(0, 10);
+
+  const CHANNELS = [
+    ['website',         h('rf_channel_website')],
+    ['instagram',       h('rf_channel_instagram')],
+    ['whatsapp_phone',  h('rf_channel_whatsapp_phone')],
+    ['word_of_mouth',   h('rf_channel_word_of_mouth')],
+    ['returning_guest', h('rf_channel_returning_guest')],
+    ['other_platform',  h('rf_channel_other_platform')],
+    ['other',           h('rf_channel_other')],
+  ];
+  const BLOCK_REASONS = [
+    ['own_stay',     h('rf_block_reason_own_stay')],
+    ['maintenance',  h('rf_block_reason_maintenance')],
+    ['other',        h('rf_block_reason_other')],
+  ];
+
+  const channelOpts = CHANNELS
+    .map(([v, l]) => `<option value="${safe(v)}"${prefill.channel === v ? ' selected' : ''}>${safe(l)}</option>`).join('');
+  // Block reason maps to `channel` on the DB row too — it's a short taxonomy;
+  // dedicating a separate column for 3 values isn't worth it.
+  const reasonOpts = BLOCK_REASONS
+    .map(([v, l]) => `<option value="${safe(v)}"${prefill.channel === v ? ' selected' : ''}>${safe(l)}</option>`).join('');
+
+  const reservationBlock = isBlock ? '' : `
+    <label style="display:block;margin-top:12px;">
+      <span style="display:block;font-size:0.78rem;color:var(--ink-soft);margin-bottom:4px;">${safe(h('rf_channel_lbl'))} *</span>
+      <select id="rfChannel" required style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9rem;background:var(--white);">
+        <option value="">${safe(h('rf_channel_placeholder'))}</option>
+        ${channelOpts}
+      </select>
+    </label>
+    <label style="display:block;margin-top:12px;">
+      <span style="display:block;font-size:0.78rem;color:var(--ink-soft);margin-bottom:4px;">${safe(h('rf_guest_name_lbl'))} *</span>
+      <input id="rfGuestName" type="text" required maxlength="200" placeholder="${safe(h('rf_guest_name_ph'))}" value="${safe(prefill.guest_name || '')}"
+        style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9rem;">
+    </label>
+    <label style="display:block;margin-top:12px;">
+      <span style="display:block;font-size:0.78rem;color:var(--ink-soft);margin-bottom:4px;">${safe(h('rf_guest_count_lbl'))}</span>
+      <input id="rfGuestCount" type="number" min="1" max="50" step="1" value="${safe(prefill.guest_count || '')}"
+        style="width:120px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9rem;">
+    </label>
+    <label style="display:block;margin-top:12px;">
+      <span style="display:block;font-size:0.78rem;color:var(--ink-soft);margin-bottom:4px;">${safe(h('rf_contact_phone_lbl'))}</span>
+      <input id="rfContactPhone" type="tel" maxlength="40" autocomplete="off" value="${safe(prefill.contact_phone || '')}"
+        style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9rem;">
+    </label>
+    <label style="display:block;margin-top:12px;">
+      <span style="display:block;font-size:0.78rem;color:var(--ink-soft);margin-bottom:4px;">${safe(h('rf_contact_email_lbl'))}</span>
+      <input id="rfContactEmail" type="email" maxlength="200" autocomplete="off" value="${safe(prefill.contact_email || '')}"
+        style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9rem;">
+    </label>`;
+
+  const blockBlock = !isBlock ? '' : `
+    <label style="display:block;margin-top:12px;">
+      <span style="display:block;font-size:0.78rem;color:var(--ink-soft);margin-bottom:4px;">${safe(h('rf_block_reason_lbl'))} *</span>
+      <select id="rfBlockReason" required style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9rem;background:var(--white);">
+        <option value="">${safe(h('rf_block_reason_placeholder'))}</option>
+        ${reasonOpts}
+      </select>
+    </label>`;
+
+  const modal = document.createElement('div');
+  modal.id = 'reservationFormModal';
+  modal.dataset.mode = mode;
+  if (reservationId) modal.dataset.reservationId = reservationId;
+  modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10000;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;';
+  modal.onclick = (e) => { if (e.target === modal) _closeReservationForm(); };
+  modal.innerHTML = `
+    <div style="background:var(--white);max-width:640px;width:100%;border-radius:14px;padding:18px 20px 16px;box-shadow:0 12px 48px rgba(0,0,0,0.25);max-height:calc(100vh - 60px);overflow-y:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:600;font-size:1.05rem;color:var(--ink);margin:0;">${safe(title)}</h3>
+        <button type="button" onclick="_closeReservationForm()" aria-label="${safe(h('rf_cancel'))}" style="background:none;border:none;font-size:1.4rem;color:var(--ink-soft);cursor:pointer;padding:2px 8px;line-height:1;">×</button>
+      </div>
+      <form id="reservationForm" onsubmit="saveDirectReservation(event); return false;">
+        ${reservationBlock}
+        ${blockBlock}
+        <div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;">
+          <label style="flex:1;min-width:150px;">
+            <span style="display:block;font-size:0.78rem;color:var(--ink-soft);margin-bottom:4px;">${safe(h('rf_checkin_lbl'))} *</span>
+            <input id="rfCheckin" type="date" required min="${safe(isBlock ? '' : todayISO)}" value="${safe(prefill.checkin_date || '')}"
+              onchange="_reservationFormOverlapCheck()"
+              style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9rem;">
+          </label>
+          <label style="flex:1;min-width:150px;">
+            <span style="display:block;font-size:0.78rem;color:var(--ink-soft);margin-bottom:4px;">${safe(h('rf_checkout_lbl'))} *</span>
+            <input id="rfCheckout" type="date" required min="${safe(isBlock ? '' : todayISO)}" value="${safe(prefill.checkout_date || '')}"
+              onchange="_reservationFormOverlapCheck()"
+              style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9rem;">
+          </label>
+        </div>
+        <div id="rfOverlapHint" style="display:none;margin-top:8px;padding:6px 10px;background:rgba(232,184,75,0.14);border:1px solid rgba(232,184,75,0.4);border-radius:6px;font-size:0.78rem;color:#9a6b00;">${safe(h('rf_overlap_hint'))}</div>
+        <label style="display:block;margin-top:12px;">
+          <span style="display:block;font-size:0.78rem;color:var(--ink-soft);margin-bottom:4px;">${safe(h('rf_notes_lbl'))}</span>
+          <textarea id="rfNotes" rows="3" maxlength="2000" placeholder="${safe(h('rf_notes_ph'))}"
+            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9rem;resize:vertical;">${safe(prefill.notes || '')}</textarea>
+        </label>
+        ${!isBlock ? `<div style="margin-top:10px;font-size:0.72rem;color:var(--ink-soft);">${safe(h('rf_privacy_hint'))}</div>` : ''}
+        ${!isBlock ? `<div style="margin-top:6px;padding:6px 10px;background:rgba(0,91,255,0.06);border-left:3px solid rgba(0,91,255,0.4);border-radius:0 6px 6px 0;font-size:0.72rem;color:var(--ink-soft);">${safe(h('rf_ota_hint'))}</div>` : ''}
+        <div id="rfError" style="display:none;margin-top:10px;padding:6px 10px;background:rgba(207,68,68,0.10);border:1px solid rgba(207,68,68,0.35);border-radius:6px;font-size:0.78rem;color:#b03939;"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="_closeReservationForm()">${safe(h('rf_cancel'))}</button>
+          <button type="submit" id="rfSaveBtn" class="btn btn-primary btn-sm">${safe(h('rf_save'))}</button>
+        </div>
+      </form>
+    </div>`;
+  document.body.appendChild(modal);
+  // Focus the first input.
+  setTimeout(() => {
+    const first = modal.querySelector('select, input[type="text"], input[type="date"]');
+    if (first) first.focus();
+  }, 40);
+}
+
+function _closeReservationForm() {
+  document.getElementById('reservationFormModal')?.remove();
+}
+
+// Round 45 Step 3 — coverage confirmation. Called from the calendar's
+// "🔗 Same booking?" pill on an OTA row that overlaps a direct
+// reservation. Confirms with the host, then:
+//   1. sets ota_reservations.covered_by_reservation_id on the OTA row
+//   2. wipes the OTA row's booking_code (the direct row owns the guest
+//      link — a single URL per stay, no fan-out)
+//   3. clears any coverage_lost_at flag on the OTA row
+//   4. re-renders the calendar + dashboard so the linked echo drops out
+//      immediately (its row is now filtered by the covered_by IS NULL
+//      predicate everywhere).
+async function _confirmCoverage(otaRowId, directRowId) {
+  if (!otaRowId || !directRowId) return;
+  const it = hostLang === 'it';
+  const q = it
+    ? 'Confermi che questa riga OTA è la stessa prenotazione diretta? Verrà nascosta dal calendario e dai promemoria — la prenotazione diretta la rappresenta. Puoi annullare il collegamento dai dettagli della prenotazione OTA.'
+    : 'Confirm that this OTA row is the same as the direct booking? It will disappear from the calendar and reminders — the direct booking represents it. You can unlink from the OTA row\'s detail popup.';
+  if (!confirm(q)) return;
+
+  try {
+    const { error } = await sb.from('ota_reservations')
+      .update({
+        covered_by_reservation_id: directRowId,
+        booking_code: null,
+        coverage_lost_at: null,
+      })
+      .eq('id', otaRowId)
+      .select('id')
+      .maybeSingle();
+    if (error) {
+      console.warn('[coverage] link failed:', error.message);
+      toast(it ? 'Collegamento fallito.' : 'Link failed.');
+      return;
+    }
+    toast(it ? '✓ Collegato.' : '✓ Linked.');
+    try { track('coverage_linked', {}); } catch(_) {}
+    try { if (typeof renderCalendarPanel === 'function') await renderCalendarPanel(); } catch(_) {}
+    try { if (typeof renderDashboard === 'function') await renderDashboard(); } catch(_) {}
+  } catch (e) {
+    console.warn('[coverage] link exception:', e);
+    toast(it ? 'Collegamento fallito.' : 'Link failed.');
+  }
+}
+
+// Live overlap indicator — reads dates from the form and hits the DB.
+// Debounced by the browser's own change semantics (change fires on
+// blur, not per-keystroke), so no explicit debounce needed.
+async function _reservationFormOverlapCheck() {
+  const ci = document.getElementById('rfCheckin')?.value;
+  const co = document.getElementById('rfCheckout')?.value;
+  const hint = document.getElementById('rfOverlapHint');
+  if (!hint || !ci || !co || co <= ci) { if (hint) hint.style.display = 'none'; return; }
+  const modal = document.getElementById('reservationFormModal');
+  const excludeId = modal?.dataset?.reservationId || null;
+  const rows = await _computeReservationOverlap(propertyId, ci, co, excludeId);
+  hint.style.display = rows.length > 0 ? 'block' : 'none';
+}
+
+// Save handler for the reservation / block form.
+// Validates → dedupe check (soft warn only, host can still save) →
+// INSERT (or UPDATE in edit mode). On success closes the modal, toasts,
+// and re-renders the calendar + dashboard so the new row appears
+// immediately without a full page reload.
+async function saveDirectReservation(ev) {
+  if (ev && ev.preventDefault) ev.preventDefault();
+  const modal = document.getElementById('reservationFormModal');
+  if (!modal) return;
+  const mode = modal.dataset.mode || 'reservation';
+  const reservationId = modal.dataset.reservationId || null;
+  const isBlock = mode === 'block';
+  const errEl = document.getElementById('rfError');
+  const saveBtn = document.getElementById('rfSaveBtn');
+  const setErr = (k) => {
+    if (!errEl) return;
+    errEl.textContent = h(k);
+    errEl.style.display = 'block';
+  };
+  if (errEl) errEl.style.display = 'none';
+
+  const ci = document.getElementById('rfCheckin')?.value || '';
+  const co = document.getElementById('rfCheckout')?.value || '';
+  const notes = (document.getElementById('rfNotes')?.value || '').trim();
+  const channel = isBlock
+    ? (document.getElementById('rfBlockReason')?.value || '')
+    : (document.getElementById('rfChannel')?.value || '');
+  const guestName = isBlock ? '' : (document.getElementById('rfGuestName')?.value || '').trim();
+  const guestCountRaw = isBlock ? '' : (document.getElementById('rfGuestCount')?.value || '').trim();
+  const contactPhone = isBlock ? '' : (document.getElementById('rfContactPhone')?.value || '').trim();
+  const contactEmail = isBlock ? '' : (document.getElementById('rfContactEmail')?.value || '').trim();
+
+  // Validate.
+  if (!ci || !co)       return setErr('rf_err_missing_dates');
+  if (co <= ci)         return setErr('rf_err_bad_dates');
+  const todayISO = new Date().toISOString().slice(0, 10);
+  // Blocks may legitimately start in the past (host retroactively marks
+  // days as unavailable). Reservations can't.
+  if (!isBlock && ci < todayISO && !reservationId) return setErr('rf_err_past_checkin');
+  if (!channel) return setErr(isBlock ? 'rf_err_missing_reason' : 'rf_err_missing_channel');
+  if (!isBlock && !guestName) return setErr('rf_err_missing_guest_name');
+
+  // Build payload.
+  const guestCount = guestCountRaw ? Math.max(1, Math.min(50, parseInt(guestCountRaw, 10) || 0)) : null;
+  const payload = {
+    property_id:   propertyId,
+    platform:      'direct',
+    entry_type:    isBlock ? 'block' : 'reservation',
+    status:        'active',
+    checkin_date:  ci,
+    checkout_date: co,
+    channel:       channel,
+    notes:         notes || null,
+  };
+  if (!isBlock) {
+    payload.guest_name    = guestName;
+    payload.guest_count   = guestCount;
+    payload.contact_phone = contactPhone || null;
+    payload.contact_email = contactEmail || null;
+  }
+  // Fresh rows also need a synthetic uid and (for reservations) a
+  // booking_code so the guest link works. Edits keep whatever was there.
+  if (!reservationId) {
+    payload.uid = _mintDirectUid();
+    if (!isBlock) payload.booking_code = _mintDirectBookingCode();
+    try { payload.created_by = (await sb.auth.getUser())?.data?.user?.id || null; } catch(_) {}
+  }
+
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = h('rf_saving'); }
+  try {
+    let error;
+    if (reservationId) {
+      const upd = await sb.from('ota_reservations').update(payload).eq('id', reservationId).select('id');
+      error = upd.error;
+    } else {
+      const ins = await sb.from('ota_reservations').insert(payload).select('id');
+      error = ins.error;
+    }
+    if (error) {
+      console.warn('[direct] save failed:', error.message);
+      if (errEl) { errEl.textContent = error.message || h('rf_err_generic'); errEl.style.display = 'block'; }
+      return;
+    }
+    _closeReservationForm();
+    try { toast(h('rf_saved_ok')); } catch(_) {}
+    try { track('direct_reservation_saved', { mode, edit: !!reservationId, channel }); } catch(_) {}
+    // Refresh the surfaces that show reservations.
+    try { if (typeof renderCalendarPanel === 'function') await renderCalendarPanel(); } catch(_) {}
+    try { if (typeof renderDashboard === 'function') await renderDashboard(); } catch(_) {}
+  } catch (e) {
+    console.warn('[direct] save exception:', e);
+    if (errEl) { errEl.textContent = h('rf_err_generic'); errEl.style.display = 'block'; }
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = h('rf_save'); }
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -5494,16 +6456,22 @@ async function _renderUpcomingCalendarBody(buildHeader) {
   const monthStartISO = _r39IsoDate(monthStart);
   const monthEndISO   = _r39IsoDate(monthEnd);
 
-  // Fetch overlapping reservations. Different from the list query on
-  // purpose — do not unify the two.
+  // Fetch overlapping reservations AND blocks. Different from the list
+  // query on purpose — do not unify the two.
+  // Round 45 Step 3 — includes entry_type='block' so host-set blocks
+  // and OTA-imported blocks (Airbnb "unavailable", Booking "CLOSED")
+  // both render as grey hatched bars. Excludes covered_by_reservation_id
+  // rows: those are OTA echoes of a direct booking already represented
+  // by the direct row, so painting them would double-book the day.
   let rows = [];
   try {
     const { data, error } = await sb.from('ota_reservations')
-      .select('id, platform, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code')
+      .select('id, platform, entry_type, channel, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code, covered_by_reservation_id')
       .eq('property_id', propertyId)
-      .eq('entry_type', 'reservation')
+      .in('entry_type', ['reservation', 'block'])
       .eq('status', 'active')
       .is('deleted_at', null)
+      .is('covered_by_reservation_id', null)
       .lte('checkin_date',  monthEndISO)
       .gte('checkout_date', monthStartISO)
       .order('checkin_date', { ascending: true });
@@ -5521,33 +6489,85 @@ async function _renderUpcomingCalendarBody(buildHeader) {
   _upcomingRowsById = {};
   for (const r of rows) _upcomingRowsById[r.id] = r;
 
-  // Enrich each row with { name, checkedIn }. Correlation logic
+  // Enrich each row with { name, checkedIn, tone }. Correlation logic
   // matches the list — booking_code first, then date overlap fallback.
+  // Round 45 Step 3 adds two new bar tones:
+  //   'direct' → purple for platform='direct' entry_type='reservation'
+  //   'block'  → grey hatched for entry_type='block' (any platform)
+  // The existing 'in' / 'wait' tones stay for OTA reservations.
   const dated = (allCheckins || []).filter(c => c.arrival_date);
   const isHeadType = t => t === 'single' || t === 'head' || t === 'group';
   const enriched = rows.map(r => {
-    let matched = r.booking_code ? dated.filter(c => c.booking_code === r.booking_code) : [];
-    if (matched.length === 0) {
-      matched = dated.filter(c =>
-        c.arrival_date < r.checkout_date &&
-        (!c.departure_date || c.departure_date > r.checkin_date)
-      );
-    }
+    const isBlock  = r.entry_type === 'block';
+    const isDirect = r.platform === 'direct';
     let name = null, checkedIn = false;
-    if (matched.length > 0) {
-      const head = matched.find(c => isHeadType(c.guest_type)) || matched[0];
-      const nm = `${head.surname || ''} ${head.name || ''}`.trim();
-      name = nm || null;
-      checkedIn = true;
+    if (isBlock) {
+      // Blocks never correlate to guests. Label reflects the reason
+      // (from channel for host-set blocks, or a generic OTA block
+      // label for imported ones).
+      const blockLabels = {
+        own_stay:    it ? 'Soggiorno personale' : 'Own stay',
+        maintenance: it ? 'Manutenzione'        : 'Maintenance',
+        other:       it ? 'Blocco'              : 'Blocked',
+      };
+      name = isDirect
+        ? (blockLabels[r.channel] || (it ? 'Blocco' : 'Blocked'))
+        : (it ? 'Non disponibile' : 'Unavailable');
     } else {
-      name = _cleanOtaGuestName(r.guest_name);
+      let matched = r.booking_code ? dated.filter(c => c.booking_code === r.booking_code) : [];
+      if (matched.length === 0) {
+        matched = dated.filter(c =>
+          c.arrival_date < r.checkout_date &&
+          (!c.departure_date || c.departure_date > r.checkin_date)
+        );
+      }
+      if (matched.length > 0) {
+        const head = matched.find(c => isHeadType(c.guest_type)) || matched[0];
+        const nm = `${head.surname || ''} ${head.name || ''}`.trim();
+        name = nm || null;
+        checkedIn = true;
+      } else {
+        name = _cleanOtaGuestName(r.guest_name);
+      }
     }
-    const label = name || r.booking_code || (it ? 'Prenotazione' : 'Reservation');
-    const link = r.booking_code
+    const fallback = isBlock
+      ? (it ? 'Blocco' : 'Blocked')
+      : (isDirect ? (it ? 'Diretta' : 'Direct') : (it ? 'Prenotazione' : 'Reservation'));
+    const label = name || r.booking_code || fallback;
+    // Bar tone selection.
+    let tone;
+    if (isBlock)         tone = 'block';
+    else if (isDirect)   tone = 'direct';
+    else                 tone = checkedIn ? 'in' : 'wait';
+    const link = (!isBlock && r.booking_code)
       ? `https://welcomebnb.vercel.app/?b=${encodeURIComponent(r.booking_code)}&p=${encodeURIComponent(propertyId)}`
       : '';
-    return { r, label, checkedIn, link };
+    return { r, label, checkedIn, link, tone, isBlock, isDirect };
   });
+
+  // Round 45 Step 3 — coverage-candidate detection. When an OTA row
+  // (Airbnb / Booking / Vrbo, either reservation or block) has NOT
+  // been linked yet and overlaps with a direct reservation on the
+  // same property + dates, tag the OTA row so the calendar paints a
+  // "Same booking?" pill on it. Host confirms → covered_by_reservation_id
+  // is set + the echo's booking_code is wiped (see _confirmCoverage).
+  const directRes = enriched.filter(e =>
+    e.isDirect && e.r.entry_type === 'reservation'
+  );
+  if (directRes.length > 0) {
+    for (const e of enriched) {
+      if (e.isDirect) continue;                       // only OTA rows.
+      if (e.r.covered_by_reservation_id) continue;    // already linked.
+      const overlap = directRes.find(d =>
+        d.r.checkin_date  <  e.r.checkout_date &&
+        d.r.checkout_date >  e.r.checkin_date
+      );
+      if (overlap) {
+        e.coverCandidateFor = overlap.r.id;
+        e.coverCandidateLabel = overlap.label;
+      }
+    }
+  }
 
   // Layout constants.
   const firstDayCol = _r39DowMon(monthStart);
@@ -5621,17 +6641,37 @@ async function _renderUpcomingCalendarBody(buildHeader) {
       const spanCols = Math.max(1, Math.round((segEndEx - segStart) / 86400000));
       const leftPct  = colStart * (100 / 7);
       const widthPct = spanCols * (100 / 7);
-      const tone     = b.checkedIn ? 'in' : 'wait';
+      // Round 45 Step 3 — b.tone was assigned during enrichment
+      // ('in' | 'wait' | 'direct' | 'block'). Blocks show a lock
+      // emoji so hosts see at a glance that these dates are unavailable
+      // (not a real booking).
+      const tone     = b.tone || (b.checkedIn ? 'in' : 'wait');
       const title    = safe(`${b.label} · ${b.r.checkin_date} → ${b.r.checkout_date}`);
+      const barLabel = b.isBlock ? `🚫 ${safe(b.label)}` : safe(b.label);
+      const topPx    = 28 + b.track * 20;
       // Round 39.1 — bar click opens the reservation-detail popup
-      // (same card the list view renders). The guest link is still
-      // one click away from that popup via its "Open" button.
+      // (same card the list view renders). Blocks open it too so the
+      // host can edit / cancel from there.
       bars.push(`
         <button type="button" class="cal-bar cal-bar-${tone}"
            data-guide="cal-bar"
            title="${title}"
            onclick="event.stopPropagation();_showReservationDetail('${safe(b.r.id)}');"
-           style="left:${leftPct.toFixed(4)}%;width:${widthPct.toFixed(4)}%;top:${28 + b.track * 20}px;">${safe(b.label)}</button>`);
+           style="left:${leftPct.toFixed(4)}%;width:${widthPct.toFixed(4)}%;top:${topPx}px;">${barLabel}</button>`);
+      // Round 45 Step 3 — coverage-candidate pill. Painted on top of
+      // the OTA row (not the direct one) at the right edge of its
+      // first weekly segment. Click → _confirmCoverage() opens a
+      // simple confirm dialog, links the two rows, wipes the echo's
+      // booking_code and re-renders the calendar.
+      if (b.coverCandidateFor && !b.isDirect) {
+        const pillLabel = it ? '🔗 Stessa prenotazione?' : '🔗 Same booking?';
+        const pillTitle = safe((it ? 'Collega a: ' : 'Link to: ') + b.coverCandidateLabel);
+        bars.push(`
+          <button type="button" class="cal-cover-pill"
+             title="${pillTitle}"
+             onclick="event.stopPropagation();_confirmCoverage('${safe(b.r.id)}','${safe(b.coverCandidateFor)}');"
+             style="left:${leftPct.toFixed(4)}%;top:${topPx - 12}px;">${pillLabel}</button>`);
+      }
     }
     weekRows.push(`
       <div class="cal-week" style="min-height:${Math.max(70, 28 + maxTracks * 20 + 6)}px;">
@@ -5727,6 +6767,13 @@ async function ensureReservationBookingCodes(rows) {
   const codeLen = _rotatingCodeLength();
 
   for (const r of (rows || [])) {
+    // Round 45 Step 4 — skip rows that shouldn't get a guest link:
+    //   - blocks are not bookings, they're host-set unavailability
+    //   - covered OTA echoes are shadowed by their direct row; the
+    //     direct row owns the code, giving the echo one would fan out
+    //     the guest URL to two places.
+    if (r.entry_type === 'block') continue;
+    if (r.covered_by_reservation_id) continue;
     const patch = {};
     if (!r.booking_code) patch.booking_code = `${propInit}-${rand6()}`;
     if (rotating && !r.keybox_code) patch.keybox_code = _randRotatingCode(codeLen);
@@ -6250,7 +7297,13 @@ function _i18nRenderPill(field, active) {
   if (!pill) return;
   const activeStyle = 'background:var(--white);color:var(--warm);box-shadow:0 1px 3px rgba(6,26,61,0.08);';
   const inactiveStyle = 'background:none;color:var(--ink-soft);';
-  const btn = (lg) => `<button type="button" onclick="_i18nSetLang('${field}','${lg}')" style="padding:4px 12px;border-radius:14px;font-size:0.68rem;font-weight:600;letter-spacing:0.06em;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;${lg === active ? activeStyle : inactiveStyle}">${lg.toUpperCase()}</button>`;
+  // Round 45 (Round 4.6 hotfix) — was <button>, which is a form control
+  // and inherits the parent fieldset[disabled]. That made the IT/EN
+  // toggle unresponsive in view mode. <span role="button"> is not a
+  // form control, so it stays clickable regardless of fieldset state
+  // and hosts can switch between the two language slots while merely
+  // browsing (the underlying textarea still respects the fieldset).
+  const btn = (lg) => `<span role="button" tabindex="0" onclick="_i18nSetLang('${field}','${lg}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();_i18nSetLang('${field}','${lg}');}" style="padding:4px 12px;border-radius:14px;font-size:0.68rem;font-weight:600;letter-spacing:0.06em;cursor:pointer;font-family:'DM Sans',sans-serif;user-select:none;${lg === active ? activeStyle : inactiveStyle}">${lg.toUpperCase()}</span>`;
   pill.style.cssText = 'display:inline-flex;align-items:center;background:var(--cream-2);border-radius:20px;padding:3px;gap:2px;border:1px solid var(--border);margin-bottom:6px;';
   pill.innerHTML = btn('it') + btn('en');
 }
@@ -6483,10 +7536,14 @@ async function regenerateRotatingCodesForLengthChange(oldLen, newLen) {
   // ensureReservationBookingCodes, which reads the new length itself.
   let resRows = [];
   try {
+    // Round 45 Step 4 — covered_by_reservation_id IS NULL. A covered
+    // echo shouldn't get its own rotating code; the direct row owns
+    // the guest link and, transitively, the keybox code.
     const { data, error } = await sb.from('ota_reservations')
       .select('id, booking_code, checkout_date, keybox_code')
       .eq('property_id', propertyId)
       .is('deleted_at', null)
+      .is('covered_by_reservation_id', null)
       .not('keybox_code', 'is', null)
       .gte('checkout_date', todayISO);
     if (error) throw error;
@@ -6836,6 +7893,99 @@ async function syncIcalNow() {
   }
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   Round 45 Step 4.5 — outbound iCal export.
+   Hosts paste the URL into Airbnb / Booking / Vrbo's "Import calendar".
+   The token is a per-property UUID that guards /api/property-ical.
+   Rotating the token invalidates any existing OTA imports (they'll
+   start 404-ing) and the host must repaste the new URL everywhere.
+══════════════════════════════════════════════════════════════════════ */
+
+function _icalExportUrl() {
+  const t = propertyData?.ical_export_token;
+  if (!t) return '';
+  // Use the same origin as the console. On the live production domain
+  // this is https://welcomebnb.vercel.app; on a preview branch it's
+  // that preview's hostname, so hosts testing on a preview URL don't
+  // get a stale production reference.
+  const origin = window.location.origin.replace(/\/$/, '');
+  // Round 45 Step 4.5 (b) — outbound export lives inside /api/ical-sync
+  // (same file, same domain, GET + ?t=<token>) so the deployment stays
+  // under Vercel's Hobby-plan cap of 12 serverless functions.
+  return `${origin}/api/ical-sync?t=${encodeURIComponent(t)}`;
+}
+
+function renderIcalExportCard() {
+  const input = document.getElementById('icalExportUrl');
+  if (!input) return;
+  const url = _icalExportUrl();
+  input.value = url || (hostLang === 'it'
+    ? 'Salva la proprietà per generare il link…'
+    : 'Save the property to generate the link…');
+  input.style.color = url ? 'var(--ink)' : 'var(--ink-soft)';
+}
+
+async function copyIcalExportUrl(btn) {
+  const url = _icalExportUrl();
+  if (!url) return;
+  try {
+    await navigator.clipboard.writeText(url);
+    const original = btn.textContent;
+    btn.textContent = hostLang === 'it' ? '✓ Copiato' : '✓ Copied';
+    btn.disabled = true;
+    setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1400);
+    try { track('ical_export_copy', {}); } catch(_) {}
+  } catch (_) {
+    toast(hostLang === 'it' ? 'Copia fallita' : 'Copy failed');
+  }
+}
+
+async function rotateIcalExportToken() {
+  if (!propertyId) return;
+  const it = hostLang === 'it';
+  const confirmMsg = it
+    ? 'Attenzione: questa azione è per casi estremi (es. hai condiviso l\'URL per errore). Crea un NUOVO URL e chiude IMMEDIATAMENTE quello attuale. Ogni OTA (Airbnb, Booking, Vrbo) a cui avevi collegato il vecchio URL smetterà di aggiornarsi finché non incolli il nuovo. Continuare?'
+    : 'Warning: this is for extreme cases only (e.g. the URL was shared by mistake). It creates a NEW URL and IMMEDIATELY closes the current one. Every OTA (Airbnb, Booking, Vrbo) you had connected to the old URL will stop updating until you paste the new one. Continue?';
+  if (!confirm(confirmMsg)) return;
+
+  // Ask Postgres for a fresh uuid via gen_random_uuid(). Doing this
+  // client-side (crypto.randomUUID) would work too, but the DB path
+  // keeps the source of randomness consistent with initial seeding
+  // and works even when the browser's Web Crypto is disabled.
+  //
+  // pgrest doesn't expose gen_random_uuid() directly, so we let the
+  // client mint and PATCH: crypto.randomUUID is available in every
+  // browser we support (Round 40 dropped IE).
+  const fresh = (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : null;
+  if (!fresh) {
+    toast(it ? 'Impossibile generare il token in questo browser.' : 'Cannot generate token in this browser.');
+    return;
+  }
+  try {
+    const { data, error } = await sb.from('properties')
+      .update({ ical_export_token: fresh })
+      .eq('id', propertyId)
+      .select('ical_export_token')
+      .maybeSingle();
+    if (error) {
+      console.warn('[ical-export] rotate failed:', error.message);
+      toast(it ? 'Rotazione fallita.' : 'Rotation failed.');
+      return;
+    }
+    if (data && data.ical_export_token) {
+      propertyData = { ...(propertyData || {}), ical_export_token: data.ical_export_token };
+      renderIcalExportCard();
+      toast(it ? '✓ Nuovo URL creato. Copia il nuovo URL e incollalo su ogni OTA.' : '✓ New URL created. Copy it and paste it into every OTA.');
+      try { track('ical_export_rotate', {}); } catch(_) {}
+    }
+  } catch (e) {
+    console.warn('[ical-export] rotate exception:', e);
+    toast(it ? 'Rotazione fallita.' : 'Rotation failed.');
+  }
+}
+
 /* ══════════════════════════════════════
    RULES EDITOR — connected to DB
 ══════════════════════════════════════ */
@@ -7045,6 +8195,8 @@ function confirmDeleteReco(globalIdx) {
 // view; Cancel restores the last known propertyData into the form.
 let propertyEditMode = false;
 function _setPropertyEditControls(editing) {
+  const panel = document.getElementById('panel-property');
+  if (panel) panel.setAttribute('data-edit-mode', editing ? 'edit' : 'view');
   const fs = document.getElementById('propertyFormBody');
   if (fs) fs.disabled = !editing;
   // The cover-photo upload zone is a plain <div onclick=…>, so a disabled
@@ -7088,6 +8240,112 @@ async function savePropertyEdit() {
   _setPropertyEditControls(false);
 }
 
+// Round 45 hotfix — Impostazioni gets the same view→edit lifecycle as
+// Dettagli Proprietà. In view mode every editable settings input +
+// button (Add feed, Sync now, Remove, reminder email/timezone) is
+// gated by the panel's disabled fieldsets. Tourist Tax keeps its own
+// Edit lifecycle from Round 37 (redux). iCal export stays outside the
+// fieldset so the URL is always visible + copyable — Rotate is guarded
+// by its own confirm dialog anyway.
+let settingsEditMode = false;
+function _setSettingsEditControls(editing) {
+  const panel = document.getElementById('panel-settings');
+  if (panel) panel.setAttribute('data-edit-mode', editing ? 'edit' : 'view');
+  document.querySelectorAll('#panel-settings .settings-edit-fieldset').forEach(fs => {
+    fs.disabled = !editing;
+  });
+  const editBtn   = document.getElementById('settingsEditBtn');
+  const saveBtn   = document.getElementById('settingsSaveBtn');
+  const cancelBtn = document.getElementById('settingsCancelBtn');
+  if (editBtn)   editBtn.style.display   = editing ? 'none' : '';
+  if (saveBtn)   saveBtn.style.display   = editing ? '' : 'none';
+  if (cancelBtn) cancelBtn.style.display = editing ? '' : 'none';
+}
+function startSettingsEdit() {
+  settingsEditMode = true;
+  _setSettingsEditControls(true);
+  // Round 25 mirror — an admin viewer without _adminEditEnabled must
+  // stay locked even when the host-side edit toggle fires.
+  if (typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled) {
+    setTimeout(() => setConsoleReadOnly(true), 0);
+  }
+}
+function cancelSettingsEdit() {
+  settingsEditMode = false;
+  // Reload the visible values from propertyData so any in-progress
+  // edits are discarded. iCal feeds re-render from propertyData too.
+  if (propertyData) {
+    const emailEl = document.getElementById('propReminderEmail');
+    const tzEl    = document.getElementById('propTimezone');
+    if (emailEl) emailEl.value = propertyData.reminder_email || '';
+    if (tzEl)    tzEl.value    = propertyData.timezone || 'Europe/Rome';
+    try { if (typeof renderIcalFeeds === 'function') renderIcalFeeds(); } catch (_) {}
+  }
+  const result = document.getElementById('reminderSaveResult');
+  if (result) result.textContent = '';
+  _setSettingsEditControls(false);
+}
+async function saveSettingsEdit() {
+  // Round 45 hotfix — Tourist Tax + Arrival Reminders live on the same
+  // properties row. saveProperty() already reads every property field
+  // from the DOM (including tax_* + reminder_email + timezone) and
+  // sends one merged PATCH, so we reuse it. iCal feed changes (add /
+  // remove / sync) write themselves the moment the host acts on them,
+  // so nothing extra is needed for that card.
+  const ok = await saveProperty();
+  if (ok === false) return;
+  settingsEditMode = false;
+  _setSettingsEditControls(false);
+}
+
+// Round 45 Step 4.6 — Arrival Reminders lives in the Impostazioni tab
+// now, outside the property fieldset that gated its inputs before, so
+// it gets its own tiny inline Save. Two fields, direct UPDATE, no
+// permission dance.
+async function saveArrivalReminders(btn) {
+  if (!propertyId) return false;
+  const it = hostLang === 'it';
+  const resultEl = document.getElementById('reminderSaveResult');
+  const emailEl = document.getElementById('propReminderEmail');
+  const tzEl    = document.getElementById('propTimezone');
+  if (!emailEl || !tzEl) return false;
+
+  const email = (emailEl.value || '').trim();
+  const timezone = (tzEl.value || 'Europe/Rome').trim();
+  // Light email format guard — an empty value is the documented way to
+  // turn reminders off, so blank passes.
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (resultEl) { resultEl.textContent = it ? 'Email non valida.' : 'Invalid email.'; resultEl.style.color = '#b03939'; }
+    return false;
+  }
+
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+  if (resultEl) { resultEl.textContent = it ? 'Salvataggio…' : 'Saving…'; resultEl.style.color = 'var(--ink-soft)'; }
+  try {
+    const { data, error } = await sb.from('properties')
+      .update({ reminder_email: email || null, timezone })
+      .eq('id', propertyId)
+      .select('reminder_email, timezone')
+      .maybeSingle();
+    if (error) {
+      console.warn('[reminders] save failed:', error.message);
+      if (resultEl) { resultEl.textContent = (it ? 'Salvataggio fallito: ' : 'Save failed: ') + error.message; resultEl.style.color = '#b03939'; }
+      return false;
+    }
+    if (data) propertyData = { ...(propertyData || {}), ...data };
+    if (resultEl) { resultEl.textContent = it ? '✓ Salvato.' : '✓ Saved.'; resultEl.style.color = 'var(--green)'; }
+    try { track('reminders_saved', {}); } catch(_) {}
+    setTimeout(() => { if (resultEl) resultEl.textContent = ''; }, 2500);
+    return true;
+  } catch (e) {
+    console.warn('[reminders] save exception:', e);
+    if (resultEl) { resultEl.textContent = it ? 'Salvataggio fallito.' : 'Save failed.'; resultEl.style.color = '#b03939'; }
+    return false;
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+  }
+}
+
 // Round 32.4 — Rules & Recommendations default to a read-only list; the
 // host clicks Edit to reveal the form + preset chips + Add/Save. Save
 // flips back to view mode automatically.
@@ -7098,6 +8356,8 @@ const _rulesSafe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<'
 function _setRulesEditControls(visible) {
   // Round 37.1 — toggle back to the element's CSS default rather than
   // guessing 'block' vs 'flex'; buttons stay inline-flex from .btn.
+  const panel = document.getElementById('panel-rules');
+  if (panel) panel.setAttribute('data-edit-mode', visible ? 'edit' : 'view');
   document.querySelectorAll('#panel-rules [data-rules-edit-only]').forEach(el => {
     el.style.display = visible ? '' : 'none';
   });
@@ -7117,6 +8377,8 @@ function toggleRulesEditMode() {
 
 function _setRecosEditControls(visible) {
   // Round 37.1 — same treatment as _setRulesEditControls.
+  const panel = document.getElementById('panel-recos');
+  if (panel) panel.setAttribute('data-edit-mode', visible ? 'edit' : 'view');
   document.querySelectorAll('#panel-recos [data-recos-edit-only]').forEach(el => {
     el.style.display = visible ? '' : 'none';
   });
@@ -12681,6 +13943,7 @@ function fillPropertyForm(data) {
   if (el('propPhone')) el('propPhone').value = data.host_phone || '';
   if (el('propHostNames')) el('propHostNames').value = data.host_names || '';
   if (typeof renderIcalFeeds === 'function') renderIcalFeeds();
+  if (typeof renderIcalExportCard === 'function') renderIcalExportCard();
   if (el('propReminderEmail')) el('propReminderEmail').value = data.reminder_email || '';
   if (el('propTimezone')) el('propTimezone').value = data.timezone || 'Europe/Rome';
   if (data.hero_image_url) {

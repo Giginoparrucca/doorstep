@@ -33,13 +33,26 @@ const CRON_SECRET = process.env.CRON_SECRET;
 
 const FETCH_TIMEOUT_MS = 10_000;
 
+// Round 45 Step 4.5 — outbound iCal export mode. A GET with a valid
+// ?t=<uuid> is the property-ical feed: no login required, the token
+// IS the auth. Consolidated into this file (rather than a separate
+// endpoint) so we stay under the Hobby-plan 12-function cap.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST' && req.method !== 'GET') {
+  if (req.method !== 'POST' && req.method !== 'GET' && req.method !== 'HEAD') {
     return res.status(405).json({ error: 'GET or POST only' });
+  }
+
+  // OUTBOUND EXPORT mode — GET /api/ical-sync?t=<property_ical_export_token>
+  // Public feed guarded by the per-property token; emits ZERO PII.
+  const exportToken = String((req.query || {}).t || (req.query || {}).token || '').trim();
+  if ((req.method === 'GET' || req.method === 'HEAD') && UUID_RE.test(exportToken)) {
+    return await handleOutboundExport(req, res, exportToken);
   }
 
   const auth = req.headers['authorization'] || req.headers['Authorization'];
@@ -207,7 +220,12 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
 
   // Cancel active future rows whose UID vanished from the feed. Only run
   // per-platform where we successfully fetched something.
+  // Round 45 Step 5 — covered rows (linked to a direct booking) get
+  // coverage_lost_at stamped alongside the cancellation so the dashboard
+  // can surface a "⚠️ Airbnb block for <guest> is gone" warning on the
+  // direct row. Normal rows just flip to cancelled as before.
   const todayISO = new Date().toISOString().slice(0, 10);
+  const nowISO = new Date().toISOString();
   let cancelled = 0;
   for (const [platform, uids] of Object.entries(seenByPlatform)) {
     try {
@@ -215,22 +233,38 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
         `ota_reservations?property_id=eq.${encodeURIComponent(propertyId)}` +
         `&platform=eq.${encodeURIComponent(platform)}` +
         `&status=eq.active&checkin_date=gte.${todayISO}` +
-        `&select=id,uid`,
+        `&select=id,uid,covered_by_reservation_id`,
         apikey, bearer,
       );
       if (!listRes.ok) continue;
       const candidates = await listRes.json();
-      const toCancel = candidates.filter(r => !uids.has(r.uid)).map(r => r.id);
-      if (toCancel.length === 0) continue;
-      const ids = toCancel.map(id => `"${id}"`).join(',');
-      const cancelRes = await pgrestPATCH(
-        `ota_reservations?id=in.(${ids})`,
-        { status: 'cancelled' },
-        apikey, bearer,
-      );
-      if (cancelRes.ok) {
-        const updated = await cancelRes.json();
-        cancelled += Array.isArray(updated) ? updated.length : toCancel.length;
+      const gone = candidates.filter(r => !uids.has(r.uid));
+      const coveredIds = gone.filter(r => r.covered_by_reservation_id).map(r => r.id);
+      const plainIds   = gone.filter(r => !r.covered_by_reservation_id).map(r => r.id);
+
+      if (plainIds.length > 0) {
+        const ids = plainIds.map(id => `"${id}"`).join(',');
+        const cancelRes = await pgrestPATCH(
+          `ota_reservations?id=in.(${ids})`,
+          { status: 'cancelled' },
+          apikey, bearer,
+        );
+        if (cancelRes.ok) {
+          const updated = await cancelRes.json();
+          cancelled += Array.isArray(updated) ? updated.length : plainIds.length;
+        }
+      }
+      if (coveredIds.length > 0) {
+        const ids = coveredIds.map(id => `"${id}"`).join(',');
+        const cancelRes = await pgrestPATCH(
+          `ota_reservations?id=in.(${ids})`,
+          { status: 'cancelled', coverage_lost_at: nowISO },
+          apikey, bearer,
+        );
+        if (cancelRes.ok) {
+          const updated = await cancelRes.json();
+          cancelled += Array.isArray(updated) ? updated.length : coveredIds.length;
+        }
       }
     } catch (e) {
       errors.push({ platform, error: 'Cancel sweep failed: ' + String(e) });
@@ -283,12 +317,18 @@ async function mergeBookingRollingUIDs(propertyId, incoming, apikey, bearer, see
     if (r.entry_type !== 'reservation') { keptRows.push(r); continue; }
     let matchList = [];
     try {
+      // Round 45 Step 4 — covered_by_reservation_id=is.null. A covered
+      // Booking echo (already linked to a direct booking) must not be
+      // matched as the "same" reservation for a UID rotation — that
+      // would silently move the covered link onto a live incoming
+      // booking, breaking both.
       const q = 'ota_reservations?'
         + `property_id=eq.${encodeURIComponent(propertyId)}`
         + `&platform=eq.booking`
         + `&entry_type=eq.reservation`
         + `&status=eq.active`
         + `&deleted_at=is.null`
+        + `&covered_by_reservation_id=is.null`
         + `&checkout_date=eq.${encodeURIComponent(r.checkout_date)}`
         + `&uid=neq.${encodeURIComponent(r.uid)}`
         + `&select=id,uid,checkin_date`;
@@ -501,3 +541,152 @@ function normalizePlatform(p) {
 // Named exports for local testing. Vercel serverless functions only use the
 // default export; these are inert at runtime and only touched by tests.
 export { parseICS, vEventToRow, icsDateToISO, normalizePlatform };
+
+/* ══════════════════════════════════════════════════════════════════════
+   Round 45 Step 4.5 — OUTBOUND iCal EXPORT
+   ─────────────────────────────────────────────────────────────────────
+   URL: GET /api/ical-sync?t=<properties.ical_export_token>
+   Host pastes this URL into Airbnb/Booking/Vrbo's "Import calendar".
+   Emits RFC-5545 iCal with ZERO PII (no guest names, no contacts, no
+   booking codes) — only date ranges + generic "Blocked"/"Reserved".
+════════════════════════════════════════════════════════════════════════ */
+
+const OUTBOUND_PAST_WINDOW_DAYS   = 30;
+const OUTBOUND_FUTURE_HORIZON_DAYS = 730;
+
+function _outboundISOStamp(d) {
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}T${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}Z`;
+}
+function _outboundISODate(yyyyMmDd) {
+  if (!yyyyMmDd) return null;
+  return String(yyyyMmDd).replace(/-/g, '').slice(0, 8);
+}
+function _outboundIcsEscape(s) {
+  return String(s == null ? '' : s)
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\r?\n/g, '\\n');
+}
+function _outboundFoldLine(line) {
+  const OCTET_LIMIT = 74;
+  if (line.length <= OCTET_LIMIT) return line;
+  const out = [];
+  let start = 0;
+  while (start < line.length) {
+    out.push((start === 0 ? '' : ' ') + line.slice(start, start + OCTET_LIMIT));
+    start += OCTET_LIMIT;
+  }
+  return out.join('\r\n');
+}
+async function _outboundSbGetJSON(pathAndQuery) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${pathAndQuery}`, {
+    method: 'GET',
+    headers: {
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      Accept: 'application/json',
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Supabase ${res.status}: ${text.slice(0, 200)}`);
+  }
+  return res.json();
+}
+function _outboundSummaryFor(row, hostLang) {
+  const isBlock = row.entry_type === 'block';
+  if (hostLang === 'it') return isBlock ? 'Bloccato' : 'Prenotato';
+  return isBlock ? 'Blocked' : 'Reserved';
+}
+
+async function handleOutboundExport(req, res, token) {
+  if (!SERVICE_KEY) {
+    console.error('[ical-export] SUPABASE_SERVICE_ROLE_KEY missing');
+    return res.status(500).send('Server misconfigured');
+  }
+
+  let property;
+  try {
+    const rows = await _outboundSbGetJSON(
+      `properties?ical_export_token=eq.${encodeURIComponent(token)}&deleted_at=is.null&select=id,name,host_language,timezone&limit=1`
+    );
+    property = Array.isArray(rows) && rows[0];
+  } catch (e) {
+    console.error('[ical-export] property lookup failed:', e.message);
+    return res.status(500).send('Server error');
+  }
+  if (!property) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(404).send('Not Found');
+  }
+
+  const now = new Date();
+  const pastCutoff = new Date(now.getTime() - OUTBOUND_PAST_WINDOW_DAYS * 86400000);
+  const futureCutoff = new Date(now.getTime() + OUTBOUND_FUTURE_HORIZON_DAYS * 86400000);
+  const pastISO   = pastCutoff.toISOString().slice(0, 10);
+  const futureISO = futureCutoff.toISOString().slice(0, 10);
+
+  let rows;
+  try {
+    rows = await _outboundSbGetJSON(
+      `ota_reservations` +
+      `?property_id=eq.${encodeURIComponent(property.id)}` +
+      `&status=eq.active` +
+      `&deleted_at=is.null` +
+      `&covered_by_reservation_id=is.null` +
+      `&entry_type=in.(reservation,block)` +
+      `&checkout_date=gte.${pastISO}` +
+      `&checkin_date=lte.${futureISO}` +
+      `&select=id,uid,entry_type,checkin_date,checkout_date,updated_at` +
+      `&order=checkin_date.asc`
+    );
+  } catch (e) {
+    console.error('[ical-export] rows lookup failed:', e.message);
+    return res.status(500).send('Server error');
+  }
+
+  const hostLang = (property.host_language || 'it').toLowerCase() === 'en' ? 'en' : 'it';
+  const dtstamp = _outboundISOStamp(now);
+  const prodid = '-//WelcomeBnB//Property Calendar//EN';
+  const nameForHeader = `WelcomeBnB — ${property.name}`;
+
+  const lines = [];
+  lines.push('BEGIN:VCALENDAR');
+  lines.push('VERSION:2.0');
+  lines.push(`PRODID:${_outboundIcsEscape(prodid)}`);
+  lines.push('CALSCALE:GREGORIAN');
+  lines.push('METHOD:PUBLISH');
+  lines.push(_outboundFoldLine(`X-WR-CALNAME:${_outboundIcsEscape(nameForHeader)}`));
+  lines.push(_outboundFoldLine(`NAME:${_outboundIcsEscape(nameForHeader)}`));
+  lines.push(`X-WR-TIMEZONE:${_outboundIcsEscape(property.timezone || 'Europe/Rome')}`);
+
+  for (const r of (rows || [])) {
+    const start = _outboundISODate(r.checkin_date);
+    const end   = _outboundISODate(r.checkout_date);
+    if (!start || !end) continue;
+    const uid = `${(r.uid || r.id).replace(/[<>\s]/g, '_')}@welcomebnb.vercel.app`;
+    const summary = _outboundSummaryFor(r, hostLang);
+    const lastMod = r.updated_at ? _outboundISOStamp(new Date(r.updated_at)) : dtstamp;
+    lines.push('BEGIN:VEVENT');
+    lines.push(_outboundFoldLine(`UID:${_outboundIcsEscape(uid)}`));
+    lines.push(`DTSTAMP:${dtstamp}`);
+    lines.push(`LAST-MODIFIED:${lastMod}`);
+    lines.push(`DTSTART;VALUE=DATE:${start}`);
+    lines.push(`DTEND;VALUE=DATE:${end}`);
+    lines.push(_outboundFoldLine(`SUMMARY:${_outboundIcsEscape(summary)}`));
+    lines.push('TRANSP:OPAQUE');
+    lines.push('STATUS:CONFIRMED');
+    lines.push('END:VEVENT');
+  }
+  lines.push('END:VCALENDAR');
+
+  const body = lines.join('\r\n') + '\r\n';
+
+  res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+  res.setHeader('Content-Disposition', `inline; filename="welcomebnb-${property.id.slice(0, 8)}.ics"`);
+  res.setHeader('Cache-Control', 'public, max-age=1800');
+  if (req.method === 'HEAD') return res.status(200).end();
+  return res.status(200).send(body);
+}

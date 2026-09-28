@@ -1798,11 +1798,21 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       </div>
     </div>
 
-    <!-- Round 40 Task 4 — Calendar tab placeholder. Task 5 will move the
+    <!-- Round 40 Task 4 — Calendar tab placeholder. Task 5 moved the
          existing calendar rendering (_renderUpcomingCalendarBody) into
-         this panel and make List the dashboard default. Kept empty here
-         so the sidebar/tab restructure ships cleanly on its own. -->
+         this panel and made List the dashboard default.
+         Round 45 — added "+ New booking" / "🚫 Block dates" buttons in
+         a panel-header-actions bar above the calendar body. The buttons
+         open openReservationForm() in mode='reservation' or 'block'. -->
     <div class="panel" id="panel-calendar">
+      <div class="panel-header-actions">
+        <div style="flex:1;min-width:0;">
+          <div style="font-family:'Playfair Display',serif;font-weight:600;font-size:1rem;" data-h="cal_header_title">Calendar</div>
+          <div style="font-size:0.72rem;color:var(--ink-soft);" data-h="cal_header_hint">Direct bookings + OTA syncs</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="openReservationForm({ mode: 'block' })" data-h="btn_block_dates" data-guide="direct-block">🚫 Block dates</button>
+        <button class="btn btn-primary btn-sm" onclick="openReservationForm({ mode: 'reservation' })" data-h="btn_new_reservation" data-guide="direct-new">+ New booking</button>
+      </div>
       <div id="calendarPanelBody" style="padding:16px 18px;background:var(--white);border:1px solid var(--border);border-radius:10px;font-size:0.82rem;color:var(--ink-soft);">
         <span data-h="cal_panel_placeholder">Calendar view coming here.</span>
       </div>
@@ -3534,6 +3544,54 @@ const HT = {
     sidebar_cond_title:   'Share',      sidebar_cond_sub:   'Guest link and chat',
     t_calendar: 'Calendar', s_calendar: 'Bookings by month',
     cal_panel_placeholder: 'Calendar view is coming here in the next update.',
+    cal_header_title: 'Calendar',
+    cal_header_hint: 'Direct bookings + OTA syncs',
+    btn_new_reservation: '+ New booking',
+    btn_block_dates: '🚫 Block dates',
+    // Round 45 — direct-booking + block-dates form
+    rf_title_new_res: 'New direct booking',
+    rf_title_edit_res: 'Edit direct booking',
+    rf_title_new_block: 'Block dates',
+    rf_title_edit_block: 'Edit blocked dates',
+    rf_channel_lbl: 'Where did the booking come from?',
+    rf_channel_placeholder: 'Choose a channel…',
+    rf_channel_website: 'Our own website',
+    rf_channel_instagram: 'Instagram',
+    rf_channel_whatsapp_phone: 'WhatsApp / Phone',
+    rf_channel_word_of_mouth: 'Word of mouth',
+    rf_channel_returning_guest: 'Returning guest',
+    rf_channel_other_platform: 'Other platform',
+    rf_channel_other: 'Other',
+    rf_block_reason_lbl: 'Reason for blocking',
+    rf_block_reason_placeholder: 'Choose a reason…',
+    rf_block_reason_own_stay: 'Own stay',
+    rf_block_reason_maintenance: 'Maintenance / cleaning',
+    rf_block_reason_other: 'Other',
+    rf_guest_name_lbl: 'Guest name',
+    rf_guest_name_ph: 'e.g. Rossi Mario',
+    rf_dates_lbl: 'Dates',
+    rf_checkin_lbl: 'Check-in',
+    rf_checkout_lbl: 'Check-out',
+    rf_guest_count_lbl: 'Number of guests',
+    rf_contact_phone_lbl: 'Phone (host-only, never shared)',
+    rf_contact_email_lbl: 'Email (host-only, never shared)',
+    rf_notes_lbl: 'Notes (host-only)',
+    rf_notes_ph: 'Private notes — never shown to the guest.',
+    rf_save: 'Save',
+    rf_cancel: 'Cancel',
+    rf_saving: 'Saving…',
+    rf_err_missing_guest_name: 'Please enter the guest name.',
+    rf_err_missing_channel: 'Please pick a channel.',
+    rf_err_missing_reason: 'Please pick a reason.',
+    rf_err_missing_dates: 'Please pick both check-in and check-out dates.',
+    rf_err_bad_dates: 'Check-out must be after check-in.',
+    rf_err_past_checkin: 'Check-in cannot be in the past.',
+    rf_err_overlap: 'These dates overlap with an existing booking or block. Please review.',
+    rf_err_generic: 'Could not save the booking. Please try again.',
+    rf_overlap_hint: '⚠️ Overlap with an existing booking or block on these dates.',
+    rf_ota_hint: 'Remember to block these dates on your OTAs (Airbnb, Booking, Vrbo) to prevent double-bookings. Step 4.5 will add an automatic feed.',
+    rf_saved_ok: 'Saved.',
+    rf_privacy_hint: '🔒 Contact and notes stay with you. They never appear in the guest app, exports or reminders.',
     admin_enable_edit: 'Enable editing',
     admin_close: 'Close',
     cmp_intro: 'A plain-language guide to the three compliance obligations for short-term rentals in Italy. This is reference information — verify the specifics for your region and comune.',
@@ -3972,6 +4030,54 @@ const HT = {
     sidebar_cond_title:   'Condividi',  sidebar_cond_sub:   'Link per gli ospiti e chat',
     t_calendar: 'Calendario', s_calendar: 'Prenotazioni per mese',
     cal_panel_placeholder: 'La vista calendario arriverà qui nel prossimo aggiornamento.',
+    cal_header_title: 'Calendario',
+    cal_header_hint: 'Prenotazioni dirette + sync OTA',
+    btn_new_reservation: '+ Nuova prenotazione',
+    btn_block_dates: '🚫 Blocca date',
+    // Round 45 — modulo prenotazione diretta + blocco date
+    rf_title_new_res: 'Nuova prenotazione diretta',
+    rf_title_edit_res: 'Modifica prenotazione diretta',
+    rf_title_new_block: 'Blocca date',
+    rf_title_edit_block: 'Modifica date bloccate',
+    rf_channel_lbl: 'Da dove arriva la prenotazione?',
+    rf_channel_placeholder: 'Scegli un canale…',
+    rf_channel_website: 'Il nostro sito',
+    rf_channel_instagram: 'Instagram',
+    rf_channel_whatsapp_phone: 'WhatsApp / Telefono',
+    rf_channel_word_of_mouth: 'Passaparola',
+    rf_channel_returning_guest: 'Ospite di ritorno',
+    rf_channel_other_platform: 'Altra piattaforma',
+    rf_channel_other: 'Altro',
+    rf_block_reason_lbl: 'Motivo del blocco',
+    rf_block_reason_placeholder: 'Scegli un motivo…',
+    rf_block_reason_own_stay: 'Soggiorno personale',
+    rf_block_reason_maintenance: 'Manutenzione / pulizie',
+    rf_block_reason_other: 'Altro',
+    rf_guest_name_lbl: 'Nome ospite',
+    rf_guest_name_ph: 'es. Rossi Mario',
+    rf_dates_lbl: 'Date',
+    rf_checkin_lbl: 'Check-in',
+    rf_checkout_lbl: 'Check-out',
+    rf_guest_count_lbl: 'Numero di ospiti',
+    rf_contact_phone_lbl: 'Telefono (solo host, mai condiviso)',
+    rf_contact_email_lbl: 'Email (solo host, mai condivisa)',
+    rf_notes_lbl: 'Note (solo host)',
+    rf_notes_ph: 'Note private — mai mostrate all\'ospite.',
+    rf_save: 'Salva',
+    rf_cancel: 'Annulla',
+    rf_saving: 'Salvataggio…',
+    rf_err_missing_guest_name: 'Inserisci il nome dell\'ospite.',
+    rf_err_missing_channel: 'Scegli un canale.',
+    rf_err_missing_reason: 'Scegli un motivo.',
+    rf_err_missing_dates: 'Scegli sia la data di check-in che di check-out.',
+    rf_err_bad_dates: 'Il check-out deve essere dopo il check-in.',
+    rf_err_past_checkin: 'La data di check-in non può essere nel passato.',
+    rf_err_overlap: 'Queste date si sovrappongono a un\'altra prenotazione o blocco. Verifica.',
+    rf_err_generic: 'Impossibile salvare la prenotazione. Riprova.',
+    rf_overlap_hint: '⚠️ Sovrapposizione con una prenotazione o un blocco esistente su queste date.',
+    rf_ota_hint: 'Ricordati di bloccare queste date su Airbnb / Booking / Vrbo per evitare doppie prenotazioni. Lo Step 4.5 aggiungerà un feed automatico.',
+    rf_saved_ok: 'Salvato.',
+    rf_privacy_hint: '🔒 Contatti e note restano con te. Non appaiono mai nell\'app ospiti, negli export o nei promemoria.',
     admin_enable_edit: 'Abilita modifica',
     admin_close: 'Chiudi',
     cmp_intro: 'Una guida in linguaggio semplice ai tre obblighi di conformità per le locazioni brevi in Italia. È informazione di riferimento — verifica i dettagli per la tua regione e il tuo comune.',
@@ -4692,7 +4798,7 @@ function showPanel(id, btn) {
 const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','rules','recos','qrlink'];
 // Bump on every host-guides.js change so browsers never see a stale
 // copy even if their cache is aggressive.
-const _HG_VERSION = '43.5';
+const _HG_VERSION = '45.1';
 let _hgLoadPromise = null;
 function _hgLoad() {
   if (window.HG) return Promise.resolve();
@@ -5461,6 +5567,315 @@ function _showReservationDetail(reservationId) {
 }
 function _closeReservationDetail() {
   document.getElementById('reservationDetailModal')?.remove();
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Round 45 — Direct-booking / block-dates form.
+   ─────────────────────────────────────────────────────────────────────
+   openReservationForm({ mode, prefill, reservationId })
+     - mode='reservation'  → channel dropdown + guest name + guest count
+                             + contact fields + notes + dates.
+                             Saves platform='direct', entry_type='reservation'.
+     - mode='block'        → reason dropdown + notes + dates.
+                             Saves platform='direct', entry_type='block'.
+   The row is inserted with a synthetic uid ('direct_' + random) so it
+   never collides with an OTA-imported UID in UNIQUE(property_id,platform,uid).
+   Reservations also get a fresh booking_code minted in the same
+   PROPINIT-XXXXXX format the OTA sync uses.
+   Contact phone/email and notes are host-only and never surface in the
+   guest app, exports or reminders (verified in the Step 0 audit —
+   nothing reads those columns in guest-facing code paths).
+════════════════════════════════════════════════════════════════════════ */
+
+function _mintDirectUid() {
+  // 128-bit ish random suffix, base32 alphabet, prefixed so we can spot
+  // direct rows at a glance in the DB.
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let tail = '';
+  for (let i = 0; i < 12; i++) tail += chars[Math.floor(Math.random() * chars.length)];
+  return 'direct_' + tail;
+}
+
+function _mintDirectBookingCode() {
+  // Match the OTA-side format: PROPINIT-XXXXXX (three letters, dash, six
+  // Crockford-ish chars). Same as ensureReservationBookingCodes.
+  const propInit = (propertyData?.name || 'DS').replace(/[^A-Za-z]/g, '').substring(0, 3).toUpperCase() || 'DS';
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let tail = '';
+  for (let i = 0; i < 6; i++) tail += chars[Math.floor(Math.random() * chars.length)];
+  return `${propInit}-${tail}`;
+}
+
+// Query ota_reservations for the current property and return any active
+// non-deleted row whose date range overlaps [checkinISO, checkoutISO).
+// Excludes `excludeId` so edit mode doesn't flag itself.
+// Return: array of { id, entry_type, guest_name, checkin_date, checkout_date, platform }.
+async function _computeReservationOverlap(propId, checkinISO, checkoutISO, excludeId) {
+  if (!propId || !checkinISO || !checkoutISO) return [];
+  try {
+    const q = sb.from('ota_reservations')
+      .select('id, entry_type, guest_name, checkin_date, checkout_date, platform')
+      .eq('property_id', propId)
+      .eq('status', 'active')
+      .is('deleted_at', null)
+      .lt('checkin_date', checkoutISO)   // existing starts before our end
+      .gt('checkout_date', checkinISO);  // existing ends after our start
+    const { data, error } = await q;
+    if (error) { console.warn('[direct] overlap query failed:', error.message); return []; }
+    return (data || []).filter(r => r.id !== excludeId);
+  } catch (e) {
+    console.warn('[direct] overlap exception:', e);
+    return [];
+  }
+}
+
+// Central open/close pair for the direct-booking + block-dates modal.
+// Two modes drive one shared form so we don't duplicate structure.
+function openReservationForm(opts) {
+  const mode = (opts && opts.mode) || 'reservation';
+  const prefill = (opts && opts.prefill) || {};
+  const reservationId = (opts && opts.reservationId) || null;
+  const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+
+  if (!propertyId) {
+    try { toast(hostLang === 'it' ? 'Seleziona prima una proprietà.' : 'Select a property first.'); } catch(_) {}
+    return;
+  }
+  document.getElementById('reservationFormModal')?.remove();
+
+  const isBlock = mode === 'block';
+  const title = h(
+    isBlock
+      ? (reservationId ? 'rf_title_edit_block' : 'rf_title_new_block')
+      : (reservationId ? 'rf_title_edit_res'   : 'rf_title_new_res')
+  );
+  const todayISO = new Date().toISOString().slice(0, 10);
+
+  const CHANNELS = [
+    ['website',         h('rf_channel_website')],
+    ['instagram',       h('rf_channel_instagram')],
+    ['whatsapp_phone',  h('rf_channel_whatsapp_phone')],
+    ['word_of_mouth',   h('rf_channel_word_of_mouth')],
+    ['returning_guest', h('rf_channel_returning_guest')],
+    ['other_platform',  h('rf_channel_other_platform')],
+    ['other',           h('rf_channel_other')],
+  ];
+  const BLOCK_REASONS = [
+    ['own_stay',     h('rf_block_reason_own_stay')],
+    ['maintenance',  h('rf_block_reason_maintenance')],
+    ['other',        h('rf_block_reason_other')],
+  ];
+
+  const channelOpts = CHANNELS
+    .map(([v, l]) => `<option value="${safe(v)}"${prefill.channel === v ? ' selected' : ''}>${safe(l)}</option>`).join('');
+  // Block reason maps to `channel` on the DB row too — it's a short taxonomy;
+  // dedicating a separate column for 3 values isn't worth it.
+  const reasonOpts = BLOCK_REASONS
+    .map(([v, l]) => `<option value="${safe(v)}"${prefill.channel === v ? ' selected' : ''}>${safe(l)}</option>`).join('');
+
+  const reservationBlock = isBlock ? '' : `
+    <label style="display:block;margin-top:12px;">
+      <span style="display:block;font-size:0.78rem;color:var(--ink-soft);margin-bottom:4px;">${safe(h('rf_channel_lbl'))} *</span>
+      <select id="rfChannel" required style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9rem;background:var(--white);">
+        <option value="">${safe(h('rf_channel_placeholder'))}</option>
+        ${channelOpts}
+      </select>
+    </label>
+    <label style="display:block;margin-top:12px;">
+      <span style="display:block;font-size:0.78rem;color:var(--ink-soft);margin-bottom:4px;">${safe(h('rf_guest_name_lbl'))} *</span>
+      <input id="rfGuestName" type="text" required maxlength="200" placeholder="${safe(h('rf_guest_name_ph'))}" value="${safe(prefill.guest_name || '')}"
+        style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9rem;">
+    </label>
+    <label style="display:block;margin-top:12px;">
+      <span style="display:block;font-size:0.78rem;color:var(--ink-soft);margin-bottom:4px;">${safe(h('rf_guest_count_lbl'))}</span>
+      <input id="rfGuestCount" type="number" min="1" max="50" step="1" value="${safe(prefill.guest_count || '')}"
+        style="width:120px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9rem;">
+    </label>
+    <label style="display:block;margin-top:12px;">
+      <span style="display:block;font-size:0.78rem;color:var(--ink-soft);margin-bottom:4px;">${safe(h('rf_contact_phone_lbl'))}</span>
+      <input id="rfContactPhone" type="tel" maxlength="40" autocomplete="off" value="${safe(prefill.contact_phone || '')}"
+        style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9rem;">
+    </label>
+    <label style="display:block;margin-top:12px;">
+      <span style="display:block;font-size:0.78rem;color:var(--ink-soft);margin-bottom:4px;">${safe(h('rf_contact_email_lbl'))}</span>
+      <input id="rfContactEmail" type="email" maxlength="200" autocomplete="off" value="${safe(prefill.contact_email || '')}"
+        style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9rem;">
+    </label>`;
+
+  const blockBlock = !isBlock ? '' : `
+    <label style="display:block;margin-top:12px;">
+      <span style="display:block;font-size:0.78rem;color:var(--ink-soft);margin-bottom:4px;">${safe(h('rf_block_reason_lbl'))} *</span>
+      <select id="rfBlockReason" required style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9rem;background:var(--white);">
+        <option value="">${safe(h('rf_block_reason_placeholder'))}</option>
+        ${reasonOpts}
+      </select>
+    </label>`;
+
+  const modal = document.createElement('div');
+  modal.id = 'reservationFormModal';
+  modal.dataset.mode = mode;
+  if (reservationId) modal.dataset.reservationId = reservationId;
+  modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10000;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;';
+  modal.onclick = (e) => { if (e.target === modal) _closeReservationForm(); };
+  modal.innerHTML = `
+    <div style="background:var(--white);max-width:640px;width:100%;border-radius:14px;padding:18px 20px 16px;box-shadow:0 12px 48px rgba(0,0,0,0.25);max-height:calc(100vh - 60px);overflow-y:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:600;font-size:1.05rem;color:var(--ink);margin:0;">${safe(title)}</h3>
+        <button type="button" onclick="_closeReservationForm()" aria-label="${safe(h('rf_cancel'))}" style="background:none;border:none;font-size:1.4rem;color:var(--ink-soft);cursor:pointer;padding:2px 8px;line-height:1;">×</button>
+      </div>
+      <form id="reservationForm" onsubmit="saveDirectReservation(event); return false;">
+        ${reservationBlock}
+        ${blockBlock}
+        <div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;">
+          <label style="flex:1;min-width:150px;">
+            <span style="display:block;font-size:0.78rem;color:var(--ink-soft);margin-bottom:4px;">${safe(h('rf_checkin_lbl'))} *</span>
+            <input id="rfCheckin" type="date" required min="${safe(isBlock ? '' : todayISO)}" value="${safe(prefill.checkin_date || '')}"
+              onchange="_reservationFormOverlapCheck()"
+              style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9rem;">
+          </label>
+          <label style="flex:1;min-width:150px;">
+            <span style="display:block;font-size:0.78rem;color:var(--ink-soft);margin-bottom:4px;">${safe(h('rf_checkout_lbl'))} *</span>
+            <input id="rfCheckout" type="date" required min="${safe(isBlock ? '' : todayISO)}" value="${safe(prefill.checkout_date || '')}"
+              onchange="_reservationFormOverlapCheck()"
+              style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9rem;">
+          </label>
+        </div>
+        <div id="rfOverlapHint" style="display:none;margin-top:8px;padding:6px 10px;background:rgba(232,184,75,0.14);border:1px solid rgba(232,184,75,0.4);border-radius:6px;font-size:0.78rem;color:#9a6b00;">${safe(h('rf_overlap_hint'))}</div>
+        <label style="display:block;margin-top:12px;">
+          <span style="display:block;font-size:0.78rem;color:var(--ink-soft);margin-bottom:4px;">${safe(h('rf_notes_lbl'))}</span>
+          <textarea id="rfNotes" rows="3" maxlength="2000" placeholder="${safe(h('rf_notes_ph'))}"
+            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9rem;resize:vertical;">${safe(prefill.notes || '')}</textarea>
+        </label>
+        ${!isBlock ? `<div style="margin-top:10px;font-size:0.72rem;color:var(--ink-soft);">${safe(h('rf_privacy_hint'))}</div>` : ''}
+        ${!isBlock ? `<div style="margin-top:6px;padding:6px 10px;background:rgba(0,91,255,0.06);border-left:3px solid rgba(0,91,255,0.4);border-radius:0 6px 6px 0;font-size:0.72rem;color:var(--ink-soft);">${safe(h('rf_ota_hint'))}</div>` : ''}
+        <div id="rfError" style="display:none;margin-top:10px;padding:6px 10px;background:rgba(207,68,68,0.10);border:1px solid rgba(207,68,68,0.35);border-radius:6px;font-size:0.78rem;color:#b03939;"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="_closeReservationForm()">${safe(h('rf_cancel'))}</button>
+          <button type="submit" id="rfSaveBtn" class="btn btn-primary btn-sm">${safe(h('rf_save'))}</button>
+        </div>
+      </form>
+    </div>`;
+  document.body.appendChild(modal);
+  // Focus the first input.
+  setTimeout(() => {
+    const first = modal.querySelector('select, input[type="text"], input[type="date"]');
+    if (first) first.focus();
+  }, 40);
+}
+
+function _closeReservationForm() {
+  document.getElementById('reservationFormModal')?.remove();
+}
+
+// Live overlap indicator — reads dates from the form and hits the DB.
+// Debounced by the browser's own change semantics (change fires on
+// blur, not per-keystroke), so no explicit debounce needed.
+async function _reservationFormOverlapCheck() {
+  const ci = document.getElementById('rfCheckin')?.value;
+  const co = document.getElementById('rfCheckout')?.value;
+  const hint = document.getElementById('rfOverlapHint');
+  if (!hint || !ci || !co || co <= ci) { if (hint) hint.style.display = 'none'; return; }
+  const modal = document.getElementById('reservationFormModal');
+  const excludeId = modal?.dataset?.reservationId || null;
+  const rows = await _computeReservationOverlap(propertyId, ci, co, excludeId);
+  hint.style.display = rows.length > 0 ? 'block' : 'none';
+}
+
+// Save handler for the reservation / block form.
+// Validates → dedupe check (soft warn only, host can still save) →
+// INSERT (or UPDATE in edit mode). On success closes the modal, toasts,
+// and re-renders the calendar + dashboard so the new row appears
+// immediately without a full page reload.
+async function saveDirectReservation(ev) {
+  if (ev && ev.preventDefault) ev.preventDefault();
+  const modal = document.getElementById('reservationFormModal');
+  if (!modal) return;
+  const mode = modal.dataset.mode || 'reservation';
+  const reservationId = modal.dataset.reservationId || null;
+  const isBlock = mode === 'block';
+  const errEl = document.getElementById('rfError');
+  const saveBtn = document.getElementById('rfSaveBtn');
+  const setErr = (k) => {
+    if (!errEl) return;
+    errEl.textContent = h(k);
+    errEl.style.display = 'block';
+  };
+  if (errEl) errEl.style.display = 'none';
+
+  const ci = document.getElementById('rfCheckin')?.value || '';
+  const co = document.getElementById('rfCheckout')?.value || '';
+  const notes = (document.getElementById('rfNotes')?.value || '').trim();
+  const channel = isBlock
+    ? (document.getElementById('rfBlockReason')?.value || '')
+    : (document.getElementById('rfChannel')?.value || '');
+  const guestName = isBlock ? '' : (document.getElementById('rfGuestName')?.value || '').trim();
+  const guestCountRaw = isBlock ? '' : (document.getElementById('rfGuestCount')?.value || '').trim();
+  const contactPhone = isBlock ? '' : (document.getElementById('rfContactPhone')?.value || '').trim();
+  const contactEmail = isBlock ? '' : (document.getElementById('rfContactEmail')?.value || '').trim();
+
+  // Validate.
+  if (!ci || !co)       return setErr('rf_err_missing_dates');
+  if (co <= ci)         return setErr('rf_err_bad_dates');
+  const todayISO = new Date().toISOString().slice(0, 10);
+  // Blocks may legitimately start in the past (host retroactively marks
+  // days as unavailable). Reservations can't.
+  if (!isBlock && ci < todayISO && !reservationId) return setErr('rf_err_past_checkin');
+  if (!channel) return setErr(isBlock ? 'rf_err_missing_reason' : 'rf_err_missing_channel');
+  if (!isBlock && !guestName) return setErr('rf_err_missing_guest_name');
+
+  // Build payload.
+  const guestCount = guestCountRaw ? Math.max(1, Math.min(50, parseInt(guestCountRaw, 10) || 0)) : null;
+  const payload = {
+    property_id:   propertyId,
+    platform:      'direct',
+    entry_type:    isBlock ? 'block' : 'reservation',
+    status:        'active',
+    checkin_date:  ci,
+    checkout_date: co,
+    channel:       channel,
+    notes:         notes || null,
+  };
+  if (!isBlock) {
+    payload.guest_name    = guestName;
+    payload.guest_count   = guestCount;
+    payload.contact_phone = contactPhone || null;
+    payload.contact_email = contactEmail || null;
+  }
+  // Fresh rows also need a synthetic uid and (for reservations) a
+  // booking_code so the guest link works. Edits keep whatever was there.
+  if (!reservationId) {
+    payload.uid = _mintDirectUid();
+    if (!isBlock) payload.booking_code = _mintDirectBookingCode();
+    try { payload.created_by = (await sb.auth.getUser())?.data?.user?.id || null; } catch(_) {}
+  }
+
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = h('rf_saving'); }
+  try {
+    let error;
+    if (reservationId) {
+      const upd = await sb.from('ota_reservations').update(payload).eq('id', reservationId).select('id');
+      error = upd.error;
+    } else {
+      const ins = await sb.from('ota_reservations').insert(payload).select('id');
+      error = ins.error;
+    }
+    if (error) {
+      console.warn('[direct] save failed:', error.message);
+      if (errEl) { errEl.textContent = error.message || h('rf_err_generic'); errEl.style.display = 'block'; }
+      return;
+    }
+    _closeReservationForm();
+    try { toast(h('rf_saved_ok')); } catch(_) {}
+    try { track('direct_reservation_saved', { mode, edit: !!reservationId, channel }); } catch(_) {}
+    // Refresh the surfaces that show reservations.
+    try { if (typeof renderCalendarPanel === 'function') await renderCalendarPanel(); } catch(_) {}
+    try { if (typeof renderDashboard === 'function') await renderDashboard(); } catch(_) {}
+  } catch (e) {
+    console.warn('[direct] save exception:', e);
+    if (errEl) { errEl.textContent = h('rf_err_generic'); errEl.style.display = 'block'; }
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = h('rf_save'); }
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════════

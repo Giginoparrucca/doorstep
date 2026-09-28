@@ -5262,6 +5262,12 @@ async function renderDashboard() {
   // "currently staying" block: today's guests first, planning next.
   const upcomingPanel = await renderUpcomingReservationsPanel();
 
+  // Round 45 Step 5 — coverage-lost banner. When cancel-sweep flips a
+  // linked OTA echo to cancelled it stamps coverage_lost_at on that
+  // echo. Surface the direct booking whose block just went away so
+  // the host knows to re-block manually before someone double-books.
+  const coverageLostBanner = await renderCoverageLostBanner();
+
   // Round 41 T4.3 — top-of-dashboard help-request alert. Sums all rows
   // whose action prompt is a "reply to help request" (tone === 'urgent'
   // and eng.escs > 0). Shows a single clickable banner that jumps
@@ -5296,12 +5302,113 @@ async function renderDashboard() {
   el.innerHTML = `
     <div style="max-width:920px;">
       ${helpBanner}
+      ${coverageLostBanner}
       ${urgentPanel}
       ${stayingPanel}
       ${upcomingPanel}
       ${allCaughtUp}
     </div>
   `;
+}
+
+// Round 45 Step 5 — coverage-lost banner. Reads OTA rows on the current
+// property that are covered + coverage_lost_at set. For each, resolves
+// the direct row it points at (name + dates) and paints a warning card
+// telling the host to re-block on the OTA. Dismissing an entry clears
+// the coverage_lost_at flag; the OTA row stays cancelled. If Airbnb
+// re-blocks the dates later a fresh OTA row arrives with its own UID
+// and the host re-links via the calendar coverage pill.
+async function renderCoverageLostBanner() {
+  if (!propertyId) return '';
+  const it = hostLang === 'it';
+  const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  let echoes = [];
+  try {
+    const { data, error } = await sb.from('ota_reservations')
+      .select('id, platform, coverage_lost_at, covered_by_reservation_id')
+      .eq('property_id', propertyId)
+      .is('deleted_at', null)
+      .not('covered_by_reservation_id', 'is', null)
+      .not('coverage_lost_at', 'is', null)
+      .order('coverage_lost_at', { ascending: false })
+      .limit(20);
+    if (error) { console.warn('[coverage-lost] fetch failed:', error.message); return ''; }
+    echoes = data || [];
+  } catch (e) {
+    console.warn('[coverage-lost] exception:', e);
+    return '';
+  }
+  if (echoes.length === 0) return '';
+
+  // Batch-fetch the direct rows the echoes point at.
+  const directIds = [...new Set(echoes.map(e => e.covered_by_reservation_id))];
+  let directs = [];
+  try {
+    const { data } = await sb.from('ota_reservations')
+      .select('id, guest_name, checkin_date, checkout_date, status')
+      .in('id', directIds)
+      .eq('status', 'active')
+      .is('deleted_at', null);
+    directs = data || [];
+  } catch (_) {}
+  const directById = {};
+  for (const d of directs) directById[d.id] = d;
+
+  const rows = echoes
+    .map(e => ({ echo: e, direct: directById[e.covered_by_reservation_id] }))
+    .filter(x => x.direct); // hide entries whose direct row is gone.
+  if (rows.length === 0) return '';
+
+  const platformLabel = p => (p === 'airbnb' ? 'Airbnb' : p === 'booking' ? 'Booking.com' : p === 'vrbo' ? 'Vrbo' : (p ? p[0].toUpperCase() + p.slice(1) : 'OTA'));
+  const fmt = d => d ? new Date(d + 'T00:00:00').toLocaleDateString(it ? 'it-IT' : 'en-GB', { day: '2-digit', month: 'short' }) : '—';
+
+  const cards = rows.map(({ echo, direct }) => {
+    const who = direct.guest_name || (it ? 'prenotazione diretta' : 'direct booking');
+    const dates = `${fmt(direct.checkin_date)} → ${fmt(direct.checkout_date)}`;
+    const line = it
+      ? `Il blocco su ${platformLabel(echo.platform)} per ${who} (${dates}) è scomparso dal calendario dell\'OTA. Rimettilo manualmente su ${platformLabel(echo.platform)} per evitare doppie prenotazioni.`
+      : `The ${platformLabel(echo.platform)} block for ${who} (${dates}) is no longer in the OTA\'s feed. Re-add it manually on ${platformLabel(echo.platform)} to avoid double-bookings.`;
+    return `
+      <div style="display:flex;gap:12px;align-items:flex-start;padding:12px 14px;background:rgba(232,184,75,0.12);border:1px solid rgba(232,184,75,0.4);border-radius:10px;margin-bottom:8px;">
+        <span style="font-size:1.1rem;line-height:1;">⚠️</span>
+        <div style="flex:1;min-width:0;font-size:0.86rem;color:#7d5e10;line-height:1.4;">${safe(line)}</div>
+        <button type="button" onclick="dismissCoverageLost('${safe(echo.id)}', this)"
+          style="padding:4px 10px;background:transparent;border:1px solid rgba(154,107,0,0.35);border-radius:6px;font-size:0.72rem;cursor:pointer;color:#7d5e10;font-family:inherit;white-space:nowrap;">
+          ${safe(it ? 'Ignora' : 'Dismiss')}
+        </button>
+      </div>`;
+  }).join('');
+
+  return `
+    <div style="margin-bottom:14px;">
+      ${cards}
+    </div>`;
+}
+
+// Round 45 Step 5 — clears coverage_lost_at on the given OTA echo,
+// hiding the warning card. The row stays cancelled + linked; the flag
+// only exists to say "surface this to the host". If the block
+// reappears in the feed later a brand new row arrives and — via the
+// calendar pill — can be re-linked to the direct booking.
+async function dismissCoverageLost(otaId, btn) {
+  if (!otaId) return;
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+  try {
+    const { error } = await sb.from('ota_reservations')
+      .update({ coverage_lost_at: null })
+      .eq('id', otaId);
+    if (error) {
+      console.warn('[coverage-lost] dismiss failed:', error.message);
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+      return;
+    }
+    try { track('coverage_lost_dismissed', {}); } catch(_) {}
+    // Simplest, most reliable UI update: re-render the dashboard.
+    try { if (typeof renderDashboard === 'function') await renderDashboard(); } catch(_) {}
+  } catch (e) {
+    console.warn('[coverage-lost] dismiss exception:', e);
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+  }
 }
 
 /* ══════════════════════════════════════

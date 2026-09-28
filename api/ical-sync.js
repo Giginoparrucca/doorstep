@@ -220,7 +220,12 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
 
   // Cancel active future rows whose UID vanished from the feed. Only run
   // per-platform where we successfully fetched something.
+  // Round 45 Step 5 — covered rows (linked to a direct booking) get
+  // coverage_lost_at stamped alongside the cancellation so the dashboard
+  // can surface a "⚠️ Airbnb block for <guest> is gone" warning on the
+  // direct row. Normal rows just flip to cancelled as before.
   const todayISO = new Date().toISOString().slice(0, 10);
+  const nowISO = new Date().toISOString();
   let cancelled = 0;
   for (const [platform, uids] of Object.entries(seenByPlatform)) {
     try {
@@ -228,22 +233,38 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
         `ota_reservations?property_id=eq.${encodeURIComponent(propertyId)}` +
         `&platform=eq.${encodeURIComponent(platform)}` +
         `&status=eq.active&checkin_date=gte.${todayISO}` +
-        `&select=id,uid`,
+        `&select=id,uid,covered_by_reservation_id`,
         apikey, bearer,
       );
       if (!listRes.ok) continue;
       const candidates = await listRes.json();
-      const toCancel = candidates.filter(r => !uids.has(r.uid)).map(r => r.id);
-      if (toCancel.length === 0) continue;
-      const ids = toCancel.map(id => `"${id}"`).join(',');
-      const cancelRes = await pgrestPATCH(
-        `ota_reservations?id=in.(${ids})`,
-        { status: 'cancelled' },
-        apikey, bearer,
-      );
-      if (cancelRes.ok) {
-        const updated = await cancelRes.json();
-        cancelled += Array.isArray(updated) ? updated.length : toCancel.length;
+      const gone = candidates.filter(r => !uids.has(r.uid));
+      const coveredIds = gone.filter(r => r.covered_by_reservation_id).map(r => r.id);
+      const plainIds   = gone.filter(r => !r.covered_by_reservation_id).map(r => r.id);
+
+      if (plainIds.length > 0) {
+        const ids = plainIds.map(id => `"${id}"`).join(',');
+        const cancelRes = await pgrestPATCH(
+          `ota_reservations?id=in.(${ids})`,
+          { status: 'cancelled' },
+          apikey, bearer,
+        );
+        if (cancelRes.ok) {
+          const updated = await cancelRes.json();
+          cancelled += Array.isArray(updated) ? updated.length : plainIds.length;
+        }
+      }
+      if (coveredIds.length > 0) {
+        const ids = coveredIds.map(id => `"${id}"`).join(',');
+        const cancelRes = await pgrestPATCH(
+          `ota_reservations?id=in.(${ids})`,
+          { status: 'cancelled', coverage_lost_at: nowISO },
+          apikey, bearer,
+        );
+        if (cancelRes.ok) {
+          const updated = await cancelRes.json();
+          cancelled += Array.isArray(updated) ? updated.length : coveredIds.length;
+        }
       }
     } catch (e) {
       errors.push({ platform, error: 'Cancel sweep failed: ' + String(e) });

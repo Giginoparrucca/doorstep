@@ -347,7 +347,8 @@ body { display: flex; overflow: hidden; }
   .cal-day-cell { min-height: 74px; padding: 4px 3px; }
   .cal-bar { font-size: 0.62rem; height: 16px; line-height: 16px; padding: 0 4px; }
   .cal-day-badge { display: none; }
-  .cal-mobile-list { display: block; margin-top: 10px; background: var(--white); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  /* .cal-mobile-list removed — bars + direct day-tap now handle the
+     tap-to-detail flow that the mobile list used to serve. */
   .cal-wh-cell { font-size: 0.6rem; padding: 4px 2px; }
 }
 
@@ -2650,17 +2651,21 @@ async function _upcomingCalToday() {
   await _upcomingRepaint();
 }
 async function _upcomingCalSelectDay(iso) {
+  // Round 45 hotfix (v2) — tapping a day cell used to select the day
+  // and render a list of that day's bookings below the month grid, so
+  // the host had to tap twice to see reservation details. Now bars
+  // are already tap-friendly on mobile (previous hotfix); the day cell
+  // becomes a shortcut that opens the FIRST booking that day directly.
+  // Days with no bookings are a no-op — nothing to select for.
   _upcomingCalSelectedDay = iso;
-  await _upcomingRepaint();
-  // Round 45 hotfix — the selected-day arrivals list renders below the
-  // month grid on mobile; scroll it into view so the host doesn't have
-  // to hunt for their tapped day's bookings.
-  try {
-    const list = document.querySelector('#panel-calendar .cal-mobile-list');
-    if (list && typeof list.scrollIntoView === 'function') {
-      list.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-  } catch (_) {}
+  const hits = Object.values(_upcomingRowsById || {})
+    .filter(r => r && r.checkin_date && r.checkout_date
+      && r.checkin_date <= iso && r.checkout_date > iso)
+    .sort((a, b) => (a.checkin_date < b.checkin_date ? -1 : a.checkin_date > b.checkin_date ? 1 : 0));
+  if (hits.length > 0 && typeof _showReservationDetail === 'function') {
+    _showReservationDetail(hits[0].id);
+    return;
+  }
 }
 async function _upcomingRepaint() {
   // Round 45 hotfix (v2) — only refresh the surface the host is
@@ -6724,37 +6729,12 @@ async function _renderUpcomingCalendarBody(buildHeader) {
       </div>`);
   }
 
-  // Mobile selected-day list. Only renders when a day is selected;
-  // CSS media query hides it above 640px.
-  let selectedList = '';
-  if (_upcomingCalSelectedDay) {
-    const dayBookings = bookings.filter(b =>
-      b.r.checkin_date <= _upcomingCalSelectedDay &&
-      b.r.checkout_date > _upcomingCalSelectedDay
-    );
-    const dayHeading = _r39ParseISO(_upcomingCalSelectedDay)
-      ? _r39ParseISO(_upcomingCalSelectedDay).toLocaleDateString(locale, { weekday: 'long', day: '2-digit', month: 'long' })
-      : _upcomingCalSelectedDay;
-    if (dayBookings.length === 0) {
-      selectedList = `
-        <div class="cal-mobile-list">
-          <div class="cal-mobile-list-head">${safe(dayHeading)}</div>
-          <div style="padding:10px 12px;font-size:0.82rem;color:var(--ink-soft);">
-            ${safe(h('cal_no_arrivals') || (it ? 'Nessun arrivo' : 'No arrivals'))}
-          </div>
-        </div>`;
-    } else {
-      selectedList = `
-        <div class="cal-mobile-list">
-          <div class="cal-mobile-list-head">${safe(dayHeading)}</div>
-          ${dayBookings.map(b => `
-            <button type="button" onclick="_showReservationDetail('${safe(b.r.id)}')" class="cal-mobile-row cal-mobile-row-${b.checkedIn ? 'in' : 'wait'}">
-              <span class="cal-mobile-name">${safe(b.label)}</span>
-              <span class="cal-mobile-dates">${safe(b.r.checkin_date)} → ${safe(b.r.checkout_date)}</span>
-            </button>`).join('')}
-        </div>`;
-    }
-  }
+  // Round 45 hotfix — the "mobile selected-day list" used to render
+  // here as a secondary tap surface below the grid. Now bars are
+  // visible on mobile AND day-cell taps open the first booking's
+  // detail popup directly (see _upcomingCalSelectDay), so the list
+  // was a wasted click + wasted vertical space. Removed entirely.
+  const selectedList = '';
 
   // Nav bar (month label + prev / today / next).
   const nav = `

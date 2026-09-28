@@ -1462,16 +1462,12 @@ tr:hover td { background: rgba(250,246,240,0.6); }
                  checkin_instructions_en columns. -->
             <div class="i18n-pill" data-field="checkin_instructions"></div>
             <textarea class="form-textarea" id="propCheckinInstructions" rows="6" maxlength="2000" placeholder="e.g., Walk past the green gate on Via Roma. The lockbox is on the left wall next to the bell. Code on arrival day below." data-i18n-field="checkin_instructions"></textarea>
-            <div class="form-hint" data-h="prop_checkin_inst_hint">Step-by-step instructions for arrival. Write in your preferred language — guests can use their browser's translate feature if needed (long-press on iOS, three-dot menu on Android).</div>
-            <div style="margin-top:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="offerLangSplit('checkin_instructions')" data-h="btn_split_langs">✂ Split existing content by language</button></div>
-          </div>
+            <div class="form-hint" data-h="prop_checkin_inst_hint">Step-by-step instructions for arrival. Write in your preferred language — guests can use their browser's translate feature if needed (long-press on iOS, three-dot menu on Android).</div>          </div>
           <div class="form-group full">
             <label class="form-label" data-h="prop_checkout_inst">Check-out instructions</label>
             <div class="i18n-pill" data-field="checkout_instructions"></div>
             <textarea class="form-textarea" id="propCheckoutInstructions" rows="6" maxlength="2000" placeholder="e.g., Leave keys on the kitchen table. Don't lock the door — it locks itself. Open windows to air the apartment if possible." data-i18n-field="checkout_instructions"></textarea>
-            <div class="form-hint" data-h="prop_checkout_inst_hint">What guests should do before leaving.</div>
-            <div style="margin-top:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="offerLangSplit('checkout_instructions')" data-h="btn_split_langs">✂ Split existing content by language</button></div>
-          </div>
+            <div class="form-hint" data-h="prop_checkout_inst_hint">What guests should do before leaving.</div>          </div>
         </div>
       </div>
 
@@ -1482,8 +1478,33 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <label class="form-label" data-h="prop_transport">Parking, public transport & taxis</label>
             <div class="i18n-pill" data-field="transport_info"></div>
             <textarea class="form-textarea" id="propTransportInfo" rows="6" maxlength="2000" placeholder="e.g., Free street parking on Via Roma after 8pm. Bus #20 to the centre stops 50m away (every 15 min). Taxi: Radio Taxi Bari +39 080 5210500. Airport: 40 min by taxi (~€35) or the Tempesta shuttle from the station." data-i18n-field="transport_info"></textarea>
-            <div class="form-hint" data-h="prop_transport_hint">Parking situation, nearest bus/metro/train, taxi numbers, airport transfers. Shown to guests in the "Staying" section. Write in your preferred language — guests can browser-translate.</div>
-            <div style="margin-top:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="offerLangSplit('transport_info')" data-h="btn_split_langs">✂ Split existing content by language</button></div>
+            <div class="form-hint" data-h="prop_transport_hint">Parking situation, nearest bus/metro/train, taxi numbers, airport transfers. Shown to guests in the "Staying" section. Write in your preferred language — guests can browser-translate.</div>          </div>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <div class="form-card-title" data-h="prop_wifi">WiFi & Essentials</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label" data-h="prop_wifi_name">WiFi Network</label>
+            <input class="form-input" value="" id="propWifiName">
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-h="prop_wifi_pass">WiFi Password</label>
+            <input class="form-input" value="" id="propWifiPass">
+          </div>
+          <div class="form-group full">
+            <label class="form-label" data-h="prop_welcome">Host Welcome Message</label>
+            <div class="i18n-pill" data-field="welcome_message"></div>
+            <textarea class="form-textarea" id="propWelcome" data-i18n-field="welcome_message"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-h="prop_emergency">Emergency Phone</label>
+            <input class="form-input" value="" id="propPhone">
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-h="prop_host">Host Name(s)</label>
+            <input class="form-input" value="" id="propHostNames">
           </div>
         </div>
       </div>
@@ -1499,11 +1520,19 @@ tr:hover td { background: rgba(250,246,240,0.6); }
          itself (calendar sync in and out, tourist tax, arrival
          reminders, privacy notice, bulk data actions) lives here. -->
     <div class="panel" id="panel-settings">
+      <!-- Round 45 hotfix — Impostazioni now follows the same view→edit
+           lifecycle as Dettagli Proprietà. In view mode the settingsFormBody
+           fieldset is disabled; Edit toggles it live, Save fires the
+           card-level save helpers, Cancel reloads propertyData. Tourist
+           Tax keeps its own edit lifecycle from Round 37 (redux). -->
       <div class="panel-header-actions">
         <div style="flex:1;min-width:0;">
           <div style="font-family:'Playfair Display',serif;font-weight:600;font-size:1rem;" data-h="settings_header_title">Settings</div>
           <div style="font-size:0.72rem;color:var(--ink-soft);" data-h="settings_header_hint">Integrations, tourist tax, reminders, privacy</div>
         </div>
+        <button type="button" id="settingsEditBtn" class="btn btn-secondary btn-sm" onclick="startSettingsEdit()">✏️ <span data-h="btn_edit_list">Edit</span></button>
+        <button type="button" id="settingsSaveBtn" class="btn btn-primary btn-sm" onclick="saveSettingsEdit()" style="display:none;" data-h="btn_save_settings">💾 Save Settings</button>
+        <button type="button" id="settingsCancelBtn" class="btn btn-secondary btn-sm" onclick="cancelSettingsEdit()" style="display:none;"><span data-h="btn_cancel_edit">Cancel</span></button>
       </div>
 
       <div class="form-card">
@@ -1605,34 +1634,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
       </div>
 
-      <div class="form-card">
-        <div class="form-card-title" data-h="prop_wifi">WiFi & Essentials</div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label" data-h="prop_wifi_name">WiFi Network</label>
-            <input class="form-input" value="" id="propWifiName">
-          </div>
-          <div class="form-group">
-            <label class="form-label" data-h="prop_wifi_pass">WiFi Password</label>
-            <input class="form-input" value="" id="propWifiPass">
-          </div>
-          <div class="form-group full">
-            <label class="form-label" data-h="prop_welcome">Host Welcome Message</label>
-            <div class="i18n-pill" data-field="welcome_message"></div>
-            <textarea class="form-textarea" id="propWelcome" data-i18n-field="welcome_message"></textarea>
-            <div style="margin-top:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="offerLangSplit('welcome_message')" data-h="btn_split_langs">✂ Split existing content by language</button></div>
-          </div>
-          <div class="form-group">
-            <label class="form-label" data-h="prop_emergency">Emergency Phone</label>
-            <input class="form-input" value="" id="propPhone">
-          </div>
-          <div class="form-group">
-            <label class="form-label" data-h="prop_host">Host Name(s)</label>
-            <input class="form-input" value="" id="propHostNames">
-          </div>
-        </div>
-      </div>
-
+      <fieldset class="settings-edit-fieldset" disabled style="border:0;padding:0;margin:0;min-width:0;">
       <div class="form-card">
         <div class="form-card-title" data-h="ical_title">Calendar sync (iCal)</div>
         <div class="form-card-desc" data-h="ical_desc">Paste your Airbnb / Booking.com / Vrbo iCal export URLs. WelcomeBnB pulls upcoming reservations into your dashboard. Only dates come from these feeds — guest names and counts arrive when guests complete check-in.</div>
@@ -1645,6 +1647,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
         <div id="icalSyncResult" style="margin-top:10px;font-size:0.82rem;color:var(--ink-soft);"></div>
       </div>
+      </fieldset>
 
       <!-- Round 45 Step 4.5 — outbound iCal feed. Hosts paste this URL
            into Airbnb / Booking / Vrbo's "Import calendar" so their
@@ -1671,6 +1674,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
       </div>
 
+      <fieldset class="settings-edit-fieldset" disabled style="border:0;padding:0;margin:0;min-width:0;">
       <div class="form-card">
         <div class="form-card-title" data-h="reminder_title">Arrival reminders</div>
         <div class="form-card-desc" data-h="reminder_desc">Every day at 07:00 in the property's timezone, WelcomeBnB emails you a digest of guests arriving tomorrow with their unique booking links, so you can forward them by WhatsApp or email. Leave the email blank to turn reminders off.</div>
@@ -1701,15 +1705,12 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <div class="form-hint" data-h="reminder_tz_hint">Used to compute "tomorrow" — reminders always fire at 07:00 local.</div>
           </div>
         </div>
-        <!-- Round 45 Step 4.6 — Arrival reminders lived inside the
-             property-form fieldset and shared its Edit/Save toolbar.
-             In the new Impostazioni tab it stands alone, so it gets
-             its own inline Save button. -->
-        <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-          <button type="button" class="btn btn-primary btn-sm" onclick="saveArrivalReminders(this)" data-h="btn_save_reminders">💾 Save reminder settings</button>
-          <span id="reminderSaveResult" style="font-size:0.78rem;color:var(--ink-soft);"></span>
-        </div>
+        <!-- Round 45 hotfix — Arrival Reminders is now gated by the
+             panel-level Impostazioni Edit/Save/Cancel toolbar; the
+             inline Save button that used to live here was removed. -->
+        <div id="reminderSaveResult" style="margin-top:8px;font-size:0.78rem;color:var(--ink-soft);"></div>
       </div>
+      </fieldset>
 
       <!-- Round 38 — Guest privacy notice preview + empty-field warning. -->
       <div class="form-card">
@@ -3664,6 +3665,7 @@ const HT = {
     settings_header_title: 'Settings',
     settings_header_hint: 'Integrations, tourist tax, reminders, privacy',
     btn_save_reminders: '💾 Save reminder settings',
+    btn_save_settings: '💾 Save Settings',
     t_guest_analytics: 'Guest Analytics', s_guest_analytics: 'How your guests use the app',
     ga_range_7: '7 days', ga_range_30: '30 days', ga_range_90: '90 days',
     ga_funnel_title: 'Check-in funnel', ga_funnel_sub: 'How many guests who opened the link completed their check-in',
@@ -4164,6 +4166,7 @@ const HT = {
     settings_header_title: 'Impostazioni',
     settings_header_hint: 'Integrazioni, tassa di soggiorno, promemoria, privacy',
     btn_save_reminders: '💾 Salva promemoria',
+    btn_save_settings: '💾 Salva impostazioni',
     t_guest_analytics: 'Analisi Ospiti', s_guest_analytics: 'Come gli ospiti usano l\'app',
     ga_range_7: '7 giorni', ga_range_30: '30 giorni', ga_range_90: '90 giorni',
     ga_funnel_title: 'Funnel di check-in', ga_funnel_sub: 'Quanti ospiti che hanno aperto il link hanno completato il check-in',
@@ -7220,7 +7223,13 @@ function _i18nRenderPill(field, active) {
   if (!pill) return;
   const activeStyle = 'background:var(--white);color:var(--warm);box-shadow:0 1px 3px rgba(6,26,61,0.08);';
   const inactiveStyle = 'background:none;color:var(--ink-soft);';
-  const btn = (lg) => `<button type="button" onclick="_i18nSetLang('${field}','${lg}')" style="padding:4px 12px;border-radius:14px;font-size:0.68rem;font-weight:600;letter-spacing:0.06em;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;${lg === active ? activeStyle : inactiveStyle}">${lg.toUpperCase()}</button>`;
+  // Round 45 (Round 4.6 hotfix) — was <button>, which is a form control
+  // and inherits the parent fieldset[disabled]. That made the IT/EN
+  // toggle unresponsive in view mode. <span role="button"> is not a
+  // form control, so it stays clickable regardless of fieldset state
+  // and hosts can switch between the two language slots while merely
+  // browsing (the underlying textarea still respects the fieldset).
+  const btn = (lg) => `<span role="button" tabindex="0" onclick="_i18nSetLang('${field}','${lg}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();_i18nSetLang('${field}','${lg}');}" style="padding:4px 12px;border-radius:14px;font-size:0.68rem;font-weight:600;letter-spacing:0.06em;cursor:pointer;font-family:'DM Sans',sans-serif;user-select:none;${lg === active ? activeStyle : inactiveStyle}">${lg.toUpperCase()}</span>`;
   pill.style.cssText = 'display:inline-flex;align-items:center;background:var(--cream-2);border-radius:20px;padding:3px;gap:2px;border:1px solid var(--border);margin-bottom:6px;';
   pill.innerHTML = btn('it') + btn('en');
 }
@@ -8155,17 +8164,70 @@ async function savePropertyEdit() {
   _setPropertyEditControls(false);
 }
 
+// Round 45 hotfix — Impostazioni gets the same view→edit lifecycle as
+// Dettagli Proprietà. In view mode every editable settings input +
+// button (Add feed, Sync now, Remove, reminder email/timezone) is
+// gated by the panel's disabled fieldsets. Tourist Tax keeps its own
+// Edit lifecycle from Round 37 (redux). iCal export stays outside the
+// fieldset so the URL is always visible + copyable — Rotate is guarded
+// by its own confirm dialog anyway.
+let settingsEditMode = false;
+function _setSettingsEditControls(editing) {
+  document.querySelectorAll('#panel-settings .settings-edit-fieldset').forEach(fs => {
+    fs.disabled = !editing;
+  });
+  const editBtn   = document.getElementById('settingsEditBtn');
+  const saveBtn   = document.getElementById('settingsSaveBtn');
+  const cancelBtn = document.getElementById('settingsCancelBtn');
+  if (editBtn)   editBtn.style.display   = editing ? 'none' : '';
+  if (saveBtn)   saveBtn.style.display   = editing ? '' : 'none';
+  if (cancelBtn) cancelBtn.style.display = editing ? '' : 'none';
+}
+function startSettingsEdit() {
+  settingsEditMode = true;
+  _setSettingsEditControls(true);
+  // Round 25 mirror — an admin viewer without _adminEditEnabled must
+  // stay locked even when the host-side edit toggle fires.
+  if (typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled) {
+    setTimeout(() => setConsoleReadOnly(true), 0);
+  }
+}
+function cancelSettingsEdit() {
+  settingsEditMode = false;
+  // Reload the visible values from propertyData so any in-progress
+  // edits are discarded. iCal feeds re-render from propertyData too.
+  if (propertyData) {
+    const emailEl = document.getElementById('propReminderEmail');
+    const tzEl    = document.getElementById('propTimezone');
+    if (emailEl) emailEl.value = propertyData.reminder_email || '';
+    if (tzEl)    tzEl.value    = propertyData.timezone || 'Europe/Rome';
+    try { if (typeof renderIcalFeeds === 'function') renderIcalFeeds(); } catch (_) {}
+  }
+  const result = document.getElementById('reminderSaveResult');
+  if (result) result.textContent = '';
+  _setSettingsEditControls(false);
+}
+async function saveSettingsEdit() {
+  // The only "form-shape" card in the fieldsets is Arrival Reminders.
+  // iCal feed changes (add / remove / sync) already write to the DB the
+  // moment the host acts on them, so there's nothing else to persist.
+  const ok = await saveArrivalReminders(null);
+  if (ok === false) return;
+  settingsEditMode = false;
+  _setSettingsEditControls(false);
+}
+
 // Round 45 Step 4.6 — Arrival Reminders lives in the Impostazioni tab
 // now, outside the property fieldset that gated its inputs before, so
 // it gets its own tiny inline Save. Two fields, direct UPDATE, no
 // permission dance.
 async function saveArrivalReminders(btn) {
-  if (!propertyId) return;
+  if (!propertyId) return false;
   const it = hostLang === 'it';
   const resultEl = document.getElementById('reminderSaveResult');
   const emailEl = document.getElementById('propReminderEmail');
   const tzEl    = document.getElementById('propTimezone');
-  if (!emailEl || !tzEl) return;
+  if (!emailEl || !tzEl) return false;
 
   const email = (emailEl.value || '').trim();
   const timezone = (tzEl.value || 'Europe/Rome').trim();
@@ -8173,7 +8235,7 @@ async function saveArrivalReminders(btn) {
   // turn reminders off, so blank passes.
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     if (resultEl) { resultEl.textContent = it ? 'Email non valida.' : 'Invalid email.'; resultEl.style.color = '#b03939'; }
-    return;
+    return false;
   }
 
   if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
@@ -8187,15 +8249,17 @@ async function saveArrivalReminders(btn) {
     if (error) {
       console.warn('[reminders] save failed:', error.message);
       if (resultEl) { resultEl.textContent = (it ? 'Salvataggio fallito: ' : 'Save failed: ') + error.message; resultEl.style.color = '#b03939'; }
-      return;
+      return false;
     }
     if (data) propertyData = { ...(propertyData || {}), ...data };
     if (resultEl) { resultEl.textContent = it ? '✓ Salvato.' : '✓ Saved.'; resultEl.style.color = 'var(--green)'; }
     try { track('reminders_saved', {}); } catch(_) {}
     setTimeout(() => { if (resultEl) resultEl.textContent = ''; }, 2500);
+    return true;
   } catch (e) {
     console.warn('[reminders] save exception:', e);
     if (resultEl) { resultEl.textContent = it ? 'Salvataggio fallito.' : 'Save failed.'; resultEl.style.color = '#b03939'; }
+    return false;
   } finally {
     if (btn) { btn.disabled = false; btn.style.opacity = ''; }
   }

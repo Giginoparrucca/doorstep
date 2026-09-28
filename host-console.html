@@ -800,9 +800,30 @@ tr:hover td { background: rgba(250,246,240,0.6); }
      panel top, matching Property. The old Round 37.2 fixed-bottom
      bar overlapped the on-screen keyboard on form panels and was
      dropped when `.panel-actions` and `.panel-header-actions` were
-     unified. Buttons wrap onto two rows if the panel is narrow. */
+     unified.
+     Round 45 hotfix — force the title container to its own row (100%
+     width) so buttons can never collide with or float over the title
+     text. Buttons wrap in twos below, each sharing the row equally.
+     Applies to Property, Impostazioni, House Rules, Recommendations,
+     Calendar — every panel-header-actions bar in the console. */
+  .panel-header-actions,
+  .panel-actions { padding: 10px 12px; }
+  .panel-header-actions > div:first-child,
+  .panel-actions > div:first-child {
+    flex: 0 0 100%;
+    min-width: 0;
+  }
   .panel-header-actions .btn,
-  .panel-actions .btn { min-height: 44px; font-size: 0.86rem; padding: 8px 12px; }
+  .panel-actions .btn {
+    min-height: 44px;
+    font-size: 0.86rem;
+    padding: 8px 12px;
+    flex: 1 1 calc(50% - 5px);
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 .mobile-toggle {
   display: none; align-items: center; justify-content: center;

@@ -31,7 +31,8 @@ ALTER TABLE public.ota_reservations
   ADD COLUMN IF NOT EXISTS notes                      text,
   ADD COLUMN IF NOT EXISTS created_by                 uuid REFERENCES auth.users(id),
   ADD COLUMN IF NOT EXISTS link_sent_at               timestamptz,
-  ADD COLUMN IF NOT EXISTS covered_by_reservation_id  uuid REFERENCES public.ota_reservations(id) ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS covered_by_reservation_id  uuid REFERENCES public.ota_reservations(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS coverage_lost_at           timestamptz;
 
 COMMENT ON COLUMN public.ota_reservations.channel IS
   'For platform=direct only. How the host got the booking. NULL for OTA rows.';
@@ -47,6 +48,8 @@ COMMENT ON COLUMN public.ota_reservations.link_sent_at IS
   'Stamped best-effort when the host taps WhatsApp/Copy/Email in the form.';
 COMMENT ON COLUMN public.ota_reservations.covered_by_reservation_id IS
   'Set on an OTA-imported row (Airbnb block, Booking CLOSED, or Booking echo of our own iCal feed) when that row is only the host''s own closure for a direct booking. When set, the row is hidden from calendar bars, dashboard, reminders and ensureReservationBookingCodes — the direct row represents it.';
+COMMENT ON COLUMN public.ota_reservations.coverage_lost_at IS
+  'Stamped by the cancel-sweep when a covered OTA row disappears from its feed. Powers the "⚠️ Airbnb block gone" warning on the direct booking. Cleared when the host dismisses the warning or the block reappears.';
 
 -- ── 2. CHECK constraints (all NULL-tolerant) ────────────────────────
 -- channel: bounded enum
@@ -109,13 +112,14 @@ ALTER TABLE public.ota_reservations
   DROP COLUMN IF EXISTS notes,
   DROP COLUMN IF EXISTS created_by,
   DROP COLUMN IF EXISTS link_sent_at,
-  DROP COLUMN IF EXISTS covered_by_reservation_id;
+  DROP COLUMN IF EXISTS covered_by_reservation_id,
+  DROP COLUMN IF EXISTS coverage_lost_at;
 COMMIT;
 */
 
 -- ── Verification ────────────────────────────────────────────────────
 -- Run after applying. Expected shape:
---   - 8 new columns present
+--   - 9 new columns present
 --   - 3 new CHECK constraints present
 --   - 2 new indexes present
 --   - grants unchanged (authenticated + service_role keep full CRUD)
@@ -124,7 +128,8 @@ SELECT
   (SELECT COUNT(*) FROM information_schema.columns
     WHERE table_schema='public' AND table_name='ota_reservations'
       AND column_name IN ('channel','guest_count','contact_phone','contact_email',
-                          'notes','created_by','link_sent_at','covered_by_reservation_id')) AS new_columns,
+                          'notes','created_by','link_sent_at','covered_by_reservation_id',
+                          'coverage_lost_at')) AS new_columns,
   (SELECT string_agg(conname, ', ' ORDER BY conname)
      FROM pg_constraint
     WHERE conrelid='public.ota_reservations'::regclass

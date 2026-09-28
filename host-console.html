@@ -257,8 +257,14 @@ body { display: flex; overflow: hidden; }
 .cal-day-badge-wait { background: rgba(232,184,75,0.18); color: #9a6b00; }
 
 .cal-bar { position: absolute; height: 18px; line-height: 18px; padding: 0 6px; font-size: 0.7rem; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: inherit; text-decoration: none; box-sizing: border-box; z-index: 1; cursor: pointer; text-align: left; }
-.cal-bar-in   { background: rgba(109,191,130,0.28); color: #235a34; border: 1px solid rgba(47,122,68,0.4); }
-.cal-bar-wait { background: rgba(232,184,75,0.28); color: #7d5e10; border: 1px solid rgba(154,107,0,0.4); }
+.cal-bar-in     { background: rgba(109,191,130,0.28); color: #235a34; border: 1px solid rgba(47,122,68,0.4); }
+.cal-bar-wait   { background: rgba(232,184,75,0.28); color: #7d5e10; border: 1px solid rgba(154,107,0,0.4); }
+/* Round 45 · direct-booking bar (purple) + block bar (grey hatched). */
+.cal-bar-direct { background: rgba(139,92,246,0.20); color: #4c1d95; border: 1px solid rgba(109,40,217,0.45); }
+.cal-bar-block  { background: repeating-linear-gradient(45deg, rgba(107,122,144,0.16), rgba(107,122,144,0.16) 5px, rgba(107,122,144,0.06) 5px, rgba(107,122,144,0.06) 10px); color: #4a5468; border: 1px dashed rgba(107,122,144,0.55); cursor: pointer; }
+/* Coverage-candidate pill overlaid on top of a covered-echo bar. */
+.cal-cover-pill { position: absolute; z-index: 3; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.02em; padding: 2px 6px; border-radius: 999px; background: rgba(232,184,75,0.95); color: #5c3d00; border: 1px solid rgba(154,107,0,0.5); cursor: pointer; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+.cal-cover-pill:hover { filter: brightness(0.95); }
 .cal-bar:hover { filter: brightness(0.95); }
 
 .cal-empty { padding: 22px 16px; text-align: center; color: var(--ink-soft); font-size: 0.82rem; border-top: 1px solid rgba(107,122,144,0.08); }
@@ -5844,6 +5850,49 @@ function _closeReservationForm() {
   document.getElementById('reservationFormModal')?.remove();
 }
 
+// Round 45 Step 3 — coverage confirmation. Called from the calendar's
+// "🔗 Same booking?" pill on an OTA row that overlaps a direct
+// reservation. Confirms with the host, then:
+//   1. sets ota_reservations.covered_by_reservation_id on the OTA row
+//   2. wipes the OTA row's booking_code (the direct row owns the guest
+//      link — a single URL per stay, no fan-out)
+//   3. clears any coverage_lost_at flag on the OTA row
+//   4. re-renders the calendar + dashboard so the linked echo drops out
+//      immediately (its row is now filtered by the covered_by IS NULL
+//      predicate everywhere).
+async function _confirmCoverage(otaRowId, directRowId) {
+  if (!otaRowId || !directRowId) return;
+  const it = hostLang === 'it';
+  const q = it
+    ? 'Confermi che questa riga OTA è la stessa prenotazione diretta? Verrà nascosta dal calendario e dai promemoria — la prenotazione diretta la rappresenta. Puoi annullare il collegamento dai dettagli della prenotazione OTA.'
+    : 'Confirm that this OTA row is the same as the direct booking? It will disappear from the calendar and reminders — the direct booking represents it. You can unlink from the OTA row\'s detail popup.';
+  if (!confirm(q)) return;
+
+  try {
+    const { error } = await sb.from('ota_reservations')
+      .update({
+        covered_by_reservation_id: directRowId,
+        booking_code: null,
+        coverage_lost_at: null,
+      })
+      .eq('id', otaRowId)
+      .select('id')
+      .maybeSingle();
+    if (error) {
+      console.warn('[coverage] link failed:', error.message);
+      toast(it ? 'Collegamento fallito.' : 'Link failed.');
+      return;
+    }
+    toast(it ? '✓ Collegato.' : '✓ Linked.');
+    try { track('coverage_linked', {}); } catch(_) {}
+    try { if (typeof renderCalendarPanel === 'function') await renderCalendarPanel(); } catch(_) {}
+    try { if (typeof renderDashboard === 'function') await renderDashboard(); } catch(_) {}
+  } catch (e) {
+    console.warn('[coverage] link exception:', e);
+    toast(it ? 'Collegamento fallito.' : 'Link failed.');
+  }
+}
+
 // Live overlap indicator — reads dates from the form and hits the DB.
 // Debounced by the browser's own change semantics (change fires on
 // blur, not per-keystroke), so no explicit debounce needed.
@@ -5986,16 +6035,22 @@ async function _renderUpcomingCalendarBody(buildHeader) {
   const monthStartISO = _r39IsoDate(monthStart);
   const monthEndISO   = _r39IsoDate(monthEnd);
 
-  // Fetch overlapping reservations. Different from the list query on
-  // purpose — do not unify the two.
+  // Fetch overlapping reservations AND blocks. Different from the list
+  // query on purpose — do not unify the two.
+  // Round 45 Step 3 — includes entry_type='block' so host-set blocks
+  // and OTA-imported blocks (Airbnb "unavailable", Booking "CLOSED")
+  // both render as grey hatched bars. Excludes covered_by_reservation_id
+  // rows: those are OTA echoes of a direct booking already represented
+  // by the direct row, so painting them would double-book the day.
   let rows = [];
   try {
     const { data, error } = await sb.from('ota_reservations')
-      .select('id, platform, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code')
+      .select('id, platform, entry_type, channel, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code, covered_by_reservation_id')
       .eq('property_id', propertyId)
-      .eq('entry_type', 'reservation')
+      .in('entry_type', ['reservation', 'block'])
       .eq('status', 'active')
       .is('deleted_at', null)
+      .is('covered_by_reservation_id', null)
       .lte('checkin_date',  monthEndISO)
       .gte('checkout_date', monthStartISO)
       .order('checkin_date', { ascending: true });
@@ -6013,33 +6068,85 @@ async function _renderUpcomingCalendarBody(buildHeader) {
   _upcomingRowsById = {};
   for (const r of rows) _upcomingRowsById[r.id] = r;
 
-  // Enrich each row with { name, checkedIn }. Correlation logic
+  // Enrich each row with { name, checkedIn, tone }. Correlation logic
   // matches the list — booking_code first, then date overlap fallback.
+  // Round 45 Step 3 adds two new bar tones:
+  //   'direct' → purple for platform='direct' entry_type='reservation'
+  //   'block'  → grey hatched for entry_type='block' (any platform)
+  // The existing 'in' / 'wait' tones stay for OTA reservations.
   const dated = (allCheckins || []).filter(c => c.arrival_date);
   const isHeadType = t => t === 'single' || t === 'head' || t === 'group';
   const enriched = rows.map(r => {
-    let matched = r.booking_code ? dated.filter(c => c.booking_code === r.booking_code) : [];
-    if (matched.length === 0) {
-      matched = dated.filter(c =>
-        c.arrival_date < r.checkout_date &&
-        (!c.departure_date || c.departure_date > r.checkin_date)
-      );
-    }
+    const isBlock  = r.entry_type === 'block';
+    const isDirect = r.platform === 'direct';
     let name = null, checkedIn = false;
-    if (matched.length > 0) {
-      const head = matched.find(c => isHeadType(c.guest_type)) || matched[0];
-      const nm = `${head.surname || ''} ${head.name || ''}`.trim();
-      name = nm || null;
-      checkedIn = true;
+    if (isBlock) {
+      // Blocks never correlate to guests. Label reflects the reason
+      // (from channel for host-set blocks, or a generic OTA block
+      // label for imported ones).
+      const blockLabels = {
+        own_stay:    it ? 'Soggiorno personale' : 'Own stay',
+        maintenance: it ? 'Manutenzione'        : 'Maintenance',
+        other:       it ? 'Blocco'              : 'Blocked',
+      };
+      name = isDirect
+        ? (blockLabels[r.channel] || (it ? 'Blocco' : 'Blocked'))
+        : (it ? 'Non disponibile' : 'Unavailable');
     } else {
-      name = _cleanOtaGuestName(r.guest_name);
+      let matched = r.booking_code ? dated.filter(c => c.booking_code === r.booking_code) : [];
+      if (matched.length === 0) {
+        matched = dated.filter(c =>
+          c.arrival_date < r.checkout_date &&
+          (!c.departure_date || c.departure_date > r.checkin_date)
+        );
+      }
+      if (matched.length > 0) {
+        const head = matched.find(c => isHeadType(c.guest_type)) || matched[0];
+        const nm = `${head.surname || ''} ${head.name || ''}`.trim();
+        name = nm || null;
+        checkedIn = true;
+      } else {
+        name = _cleanOtaGuestName(r.guest_name);
+      }
     }
-    const label = name || r.booking_code || (it ? 'Prenotazione' : 'Reservation');
-    const link = r.booking_code
+    const fallback = isBlock
+      ? (it ? 'Blocco' : 'Blocked')
+      : (isDirect ? (it ? 'Diretta' : 'Direct') : (it ? 'Prenotazione' : 'Reservation'));
+    const label = name || r.booking_code || fallback;
+    // Bar tone selection.
+    let tone;
+    if (isBlock)         tone = 'block';
+    else if (isDirect)   tone = 'direct';
+    else                 tone = checkedIn ? 'in' : 'wait';
+    const link = (!isBlock && r.booking_code)
       ? `https://welcomebnb.vercel.app/?b=${encodeURIComponent(r.booking_code)}&p=${encodeURIComponent(propertyId)}`
       : '';
-    return { r, label, checkedIn, link };
+    return { r, label, checkedIn, link, tone, isBlock, isDirect };
   });
+
+  // Round 45 Step 3 — coverage-candidate detection. When an OTA row
+  // (Airbnb / Booking / Vrbo, either reservation or block) has NOT
+  // been linked yet and overlaps with a direct reservation on the
+  // same property + dates, tag the OTA row so the calendar paints a
+  // "Same booking?" pill on it. Host confirms → covered_by_reservation_id
+  // is set + the echo's booking_code is wiped (see _confirmCoverage).
+  const directRes = enriched.filter(e =>
+    e.isDirect && e.r.entry_type === 'reservation'
+  );
+  if (directRes.length > 0) {
+    for (const e of enriched) {
+      if (e.isDirect) continue;                       // only OTA rows.
+      if (e.r.covered_by_reservation_id) continue;    // already linked.
+      const overlap = directRes.find(d =>
+        d.r.checkin_date  <  e.r.checkout_date &&
+        d.r.checkout_date >  e.r.checkin_date
+      );
+      if (overlap) {
+        e.coverCandidateFor = overlap.r.id;
+        e.coverCandidateLabel = overlap.label;
+      }
+    }
+  }
 
   // Layout constants.
   const firstDayCol = _r39DowMon(monthStart);
@@ -6113,17 +6220,37 @@ async function _renderUpcomingCalendarBody(buildHeader) {
       const spanCols = Math.max(1, Math.round((segEndEx - segStart) / 86400000));
       const leftPct  = colStart * (100 / 7);
       const widthPct = spanCols * (100 / 7);
-      const tone     = b.checkedIn ? 'in' : 'wait';
+      // Round 45 Step 3 — b.tone was assigned during enrichment
+      // ('in' | 'wait' | 'direct' | 'block'). Blocks show a lock
+      // emoji so hosts see at a glance that these dates are unavailable
+      // (not a real booking).
+      const tone     = b.tone || (b.checkedIn ? 'in' : 'wait');
       const title    = safe(`${b.label} · ${b.r.checkin_date} → ${b.r.checkout_date}`);
+      const barLabel = b.isBlock ? `🚫 ${safe(b.label)}` : safe(b.label);
+      const topPx    = 28 + b.track * 20;
       // Round 39.1 — bar click opens the reservation-detail popup
-      // (same card the list view renders). The guest link is still
-      // one click away from that popup via its "Open" button.
+      // (same card the list view renders). Blocks open it too so the
+      // host can edit / cancel from there.
       bars.push(`
         <button type="button" class="cal-bar cal-bar-${tone}"
            data-guide="cal-bar"
            title="${title}"
            onclick="event.stopPropagation();_showReservationDetail('${safe(b.r.id)}');"
-           style="left:${leftPct.toFixed(4)}%;width:${widthPct.toFixed(4)}%;top:${28 + b.track * 20}px;">${safe(b.label)}</button>`);
+           style="left:${leftPct.toFixed(4)}%;width:${widthPct.toFixed(4)}%;top:${topPx}px;">${barLabel}</button>`);
+      // Round 45 Step 3 — coverage-candidate pill. Painted on top of
+      // the OTA row (not the direct one) at the right edge of its
+      // first weekly segment. Click → _confirmCoverage() opens a
+      // simple confirm dialog, links the two rows, wipes the echo's
+      // booking_code and re-renders the calendar.
+      if (b.coverCandidateFor && !b.isDirect) {
+        const pillLabel = it ? '🔗 Stessa prenotazione?' : '🔗 Same booking?';
+        const pillTitle = safe((it ? 'Collega a: ' : 'Link to: ') + b.coverCandidateLabel);
+        bars.push(`
+          <button type="button" class="cal-cover-pill"
+             title="${pillTitle}"
+             onclick="event.stopPropagation();_confirmCoverage('${safe(b.r.id)}','${safe(b.coverCandidateFor)}');"
+             style="left:${leftPct.toFixed(4)}%;top:${topPx - 12}px;">${pillLabel}</button>`);
+      }
     }
     weekRows.push(`
       <div class="cal-week" style="min-height:${Math.max(70, 28 + maxTracks * 20 + 6)}px;">

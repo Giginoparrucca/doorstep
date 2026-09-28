@@ -5744,14 +5744,133 @@ function _renderReservationCard(r, todayISO) {
 // view (and mobile row taps) open this modal instead of jumping
 // straight to the guest link. Same card as the list view; the guest
 // link is one click deeper via the "Open" button on the card.
-function _showReservationDetail(reservationId) {
+async function _showReservationDetail(reservationId) {
   const r = _upcomingRowsById && _upcomingRowsById[reservationId];
   if (!r) return;
   const closeExisting = document.getElementById('reservationDetailModal');
   if (closeExisting) closeExisting.remove();
-  const card = _renderReservationCard(r);
   const it = hostLang === 'it';
-  const title = it ? 'Dettagli prenotazione' : 'Reservation details';
+  const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+
+  // Round 45 Step 6 — when the popup opens on a direct row, fetch the
+  // full record so we can show the host-only extras (channel, guest
+  // count, contact info, notes) and any linked OTA echoes. The list
+  // and calendar queries don't pull those columns.
+  let full = r;
+  let coveredEchoes = [];
+  const isDirect = r.platform === 'direct';
+  const isBlock  = r.entry_type === 'block';
+  if (isDirect) {
+    try {
+      const { data } = await sb.from('ota_reservations')
+        .select('id, platform, entry_type, channel, guest_name, guest_count, contact_phone, contact_email, notes, checkin_date, checkout_date, booking_code, keybox_code, link_sent_at, created_by')
+        .eq('id', reservationId).maybeSingle();
+      if (data) full = { ...r, ...data };
+    } catch (_) {}
+    // Fetch OTA echoes that point at this direct row.
+    try {
+      const { data } = await sb.from('ota_reservations')
+        .select('id, platform, checkin_date, checkout_date, status')
+        .eq('covered_by_reservation_id', reservationId)
+        .is('deleted_at', null);
+      coveredEchoes = data || [];
+    } catch (_) {}
+  }
+
+  // Base card — the same one the list uses. Blocks bypass the card
+  // (no guest correlation, no guest link) and get a minimal panel
+  // instead so the popup doesn't try to render a reservation shape.
+  let bodyHtml;
+  if (isBlock) {
+    const blockLabels = {
+      own_stay:    it ? 'Soggiorno personale' : 'Own stay',
+      maintenance: it ? 'Manutenzione / pulizie' : 'Maintenance / cleaning',
+      other:       it ? 'Altro' : 'Other',
+    };
+    const reason = full.channel ? (blockLabels[full.channel] || full.channel) : (it ? 'Blocco' : 'Blocked');
+    const dateRange = `${safe(full.checkin_date)} → ${safe(full.checkout_date)}`;
+    const notesBlock = full.notes ? `
+      <div style="margin-top:10px;padding:8px 10px;background:var(--cream-2);border-radius:8px;font-size:0.82rem;color:var(--ink);white-space:pre-wrap;">${safe(full.notes)}</div>` : '';
+    bodyHtml = `
+      <div style="padding:14px 16px;background:var(--white);border:1px dashed rgba(107,122,144,0.5);border-radius:10px;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+          <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#4a5468;background:rgba(107,122,144,0.14);padding:2px 8px;border-radius:4px;">🚫 ${safe(it ? 'Bloccato' : 'Blocked')}</span>
+          <span style="font-weight:600;color:var(--ink);">${dateRange}</span>
+        </div>
+        <div style="font-size:0.82rem;color:var(--ink-soft);">${safe(it ? 'Motivo' : 'Reason')}: <strong style="color:var(--ink);">${safe(reason)}</strong></div>
+        ${notesBlock}
+      </div>`;
+  } else {
+    const card = _renderReservationCard(full);
+    bodyHtml = card.html;
+  }
+
+  // Round 45 Step 6 — extras block for direct reservations (host-only).
+  let directExtras = '';
+  if (isDirect && !isBlock) {
+    const chLabels = {
+      website: it ? 'Il nostro sito' : 'Our own website',
+      instagram: 'Instagram',
+      whatsapp_phone: it ? 'WhatsApp / Telefono' : 'WhatsApp / Phone',
+      word_of_mouth: it ? 'Passaparola' : 'Word of mouth',
+      returning_guest: it ? 'Ospite di ritorno' : 'Returning guest',
+      other_platform: it ? 'Altra piattaforma' : 'Other platform',
+      other: it ? 'Altro' : 'Other',
+    };
+    const rows = [];
+    if (full.channel)       rows.push([it ? 'Canale' : 'Channel', chLabels[full.channel] || full.channel]);
+    if (full.guest_count)   rows.push([it ? 'Ospiti' : 'Guests', String(full.guest_count)]);
+    if (full.contact_phone) rows.push([it ? 'Telefono' : 'Phone', full.contact_phone]);
+    if (full.contact_email) rows.push([it ? 'Email' : 'Email', full.contact_email]);
+    const notesHtml = full.notes ? `
+      <div style="margin-top:8px;padding:8px 10px;background:var(--cream-2);border-radius:8px;font-size:0.82rem;color:var(--ink);white-space:pre-wrap;">${safe(full.notes)}</div>` : '';
+    if (rows.length > 0 || full.notes) {
+      directExtras = `
+        <div style="margin-top:12px;padding:10px 14px;background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.18);border-radius:10px;">
+          <div style="font-size:0.68rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#5b21b6;margin-bottom:8px;">🔒 ${safe(it ? 'Dettagli privati (solo host)' : 'Private details (host-only)')}</div>
+          ${rows.map(([k, v]) => `<div style="display:flex;gap:10px;font-size:0.82rem;margin:3px 0;"><span style="min-width:80px;color:var(--ink-soft);">${safe(k)}:</span><span style="color:var(--ink);flex:1;min-width:0;word-break:break-word;">${safe(v)}</span></div>`).join('')}
+          ${notesHtml}
+        </div>`;
+    }
+  }
+
+  // Round 45 Step 6 — linked OTA echoes list. Only shown on direct
+  // reservations that have at least one covered echo. Each entry has
+  // an Unlink button that clears covered_by_reservation_id + revives
+  // the echo (status='active' if it was cancelled by the sweep) so
+  // it re-enters normal display.
+  let echoesBlock = '';
+  if (isDirect && !isBlock && coveredEchoes.length > 0) {
+    const platformLabel = p => (p === 'airbnb' ? 'Airbnb' : p === 'booking' ? 'Booking.com' : p === 'vrbo' ? 'Vrbo' : (p ? p[0].toUpperCase() + p.slice(1) : 'OTA'));
+    const rowsHtml = coveredEchoes.map(e => `
+      <div style="display:flex;gap:8px;align-items:center;padding:6px 0;font-size:0.82rem;">
+        <span style="flex:1;min-width:0;color:var(--ink);">🔗 ${safe(platformLabel(e.platform))} · ${safe(e.checkin_date)} → ${safe(e.checkout_date)} <span style="color:var(--ink-soft);font-size:0.72rem;">(${safe(e.status)})</span></span>
+        <button type="button" onclick="unlinkCoverage('${safe(e.id)}', this)"
+          style="padding:3px 8px;background:transparent;border:1px solid var(--border);border-radius:6px;font-size:0.7rem;cursor:pointer;color:var(--ink);font-family:inherit;">
+          ${safe(it ? 'Scollega' : 'Unlink')}
+        </button>
+      </div>`).join('');
+    echoesBlock = `
+      <div style="margin-top:12px;padding:10px 14px;background:var(--cream-2);border-radius:10px;">
+        <div style="font-size:0.68rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px;">${safe(it ? 'Blocchi OTA collegati' : 'Linked OTA blocks')}</div>
+        ${rowsHtml}
+      </div>`;
+  }
+
+  // Round 45 Step 6 — action buttons for direct rows: Edit + Cancel.
+  // OTA rows keep the existing "Open" / "Copy" from _renderReservationCard.
+  let actionsBlock = '';
+  if (isDirect) {
+    actionsBlock = `
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:12px;border-top:1px solid rgba(107,122,144,0.15);">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="editDirectReservation('${safe(reservationId)}')">✏️ ${safe(it ? 'Modifica' : 'Edit')}</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="cancelDirectReservation('${safe(reservationId)}')" style="color:var(--red);border-color:rgba(224,69,94,0.35);">${safe(it ? 'Annulla prenotazione' : 'Cancel booking')}</button>
+      </div>`;
+  }
+
+  const title = isBlock
+    ? (it ? 'Dettagli blocco' : 'Block details')
+    : (it ? 'Dettagli prenotazione' : 'Reservation details');
   const closeLbl = it ? 'Chiudi' : 'Close';
   const modal = document.createElement('div');
   modal.id = 'reservationDetailModal';
@@ -5763,12 +5882,118 @@ function _showReservationDetail(reservationId) {
         <h3 style="font-family:'Playfair Display',serif;font-weight:600;font-size:1.05rem;color:var(--ink);margin:0;">${title}</h3>
         <button type="button" onclick="_closeReservationDetail()" aria-label="${closeLbl}" style="background:none;border:none;font-size:1.4rem;color:var(--ink-soft);cursor:pointer;padding:2px 8px;line-height:1;">×</button>
       </div>
-      ${card.html}
+      ${bodyHtml}
+      ${directExtras}
+      ${echoesBlock}
+      ${actionsBlock}
     </div>`;
   document.body.appendChild(modal);
 }
 function _closeReservationDetail() {
   document.getElementById('reservationDetailModal')?.remove();
+}
+
+// Round 45 Step 6 — direct-reservation edit. Fetches the full row so
+// the form pre-fills every host-only field, then opens the shared
+// openReservationForm() from Step 1 in edit mode.
+async function editDirectReservation(id) {
+  if (!id) return;
+  const it = hostLang === 'it';
+  try {
+    const { data, error } = await sb.from('ota_reservations')
+      .select('id, entry_type, channel, guest_name, guest_count, contact_phone, contact_email, notes, checkin_date, checkout_date')
+      .eq('id', id).maybeSingle();
+    if (error || !data) {
+      toast(it ? 'Caricamento fallito.' : 'Load failed.');
+      return;
+    }
+    _closeReservationDetail();
+    openReservationForm({
+      mode: data.entry_type === 'block' ? 'block' : 'reservation',
+      reservationId: id,
+      prefill: {
+        channel:       data.channel,
+        guest_name:    data.guest_name,
+        guest_count:   data.guest_count,
+        contact_phone: data.contact_phone,
+        contact_email: data.contact_email,
+        notes:         data.notes,
+        checkin_date:  data.checkin_date,
+        checkout_date: data.checkout_date,
+      },
+    });
+  } catch (e) {
+    console.warn('[direct] edit fetch exception:', e);
+    toast(it ? 'Caricamento fallito.' : 'Load failed.');
+  }
+}
+
+// Round 45 Step 6 — cancel a direct reservation/block. Soft cancel
+// (status='cancelled', not a row delete) so it stops surfacing but
+// stays as an audit trail. If the row had covered echoes, they stay
+// linked but the direct target is now cancelled; the coverage-lost
+// banner will not fire for them (that only triggers when the ECHO
+// vanishes from the feed, not when the direct target changes).
+async function cancelDirectReservation(id) {
+  if (!id) return;
+  const it = hostLang === 'it';
+  const q = it
+    ? 'Annullare questa prenotazione? Verrà nascosta ovunque, ma resta nel database. L\'ospite non riceverà più promemoria.'
+    : 'Cancel this booking? It disappears everywhere but stays in the database. The guest will not receive further reminders.';
+  if (!confirm(q)) return;
+  try {
+    const { error } = await sb.from('ota_reservations')
+      .update({ status: 'cancelled' })
+      .eq('id', id);
+    if (error) {
+      console.warn('[direct] cancel failed:', error.message);
+      toast(it ? 'Annullamento fallito.' : 'Cancel failed.');
+      return;
+    }
+    _closeReservationDetail();
+    toast(it ? '✓ Prenotazione annullata.' : '✓ Booking cancelled.');
+    try { track('direct_reservation_cancelled', {}); } catch(_) {}
+    try { if (typeof renderCalendarPanel === 'function') await renderCalendarPanel(); } catch(_) {}
+    try { if (typeof renderDashboard === 'function') await renderDashboard(); } catch(_) {}
+  } catch (e) {
+    console.warn('[direct] cancel exception:', e);
+    toast(it ? 'Annullamento fallito.' : 'Cancel failed.');
+  }
+}
+
+// Round 45 Step 6 — unlink coverage. Reverses _confirmCoverage: clears
+// covered_by_reservation_id + coverage_lost_at on the OTA row. If the
+// row was cancelled by the sweep after coverage was lost, revive it
+// so the host sees it back on the calendar. Booking_code was wiped
+// when we linked; unlinking doesn't restore it (it was Airbnb's echo,
+// no guest link belongs to it anyway).
+async function unlinkCoverage(otaId, btn) {
+  if (!otaId) return;
+  const it = hostLang === 'it';
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+  try {
+    // Read status first so we know whether to also revive.
+    const { data: cur } = await sb.from('ota_reservations')
+      .select('status').eq('id', otaId).maybeSingle();
+    const patch = { covered_by_reservation_id: null, coverage_lost_at: null };
+    if (cur && cur.status === 'cancelled') patch.status = 'active';
+    const { error } = await sb.from('ota_reservations').update(patch).eq('id', otaId);
+    if (error) {
+      console.warn('[coverage] unlink failed:', error.message);
+      toast(it ? 'Scollegamento fallito.' : 'Unlink failed.');
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+      return;
+    }
+    _closeReservationDetail();
+    toast(it ? '✓ Scollegato.' : '✓ Unlinked.');
+    try { track('coverage_unlinked', {}); } catch(_) {}
+    try { if (typeof renderCalendarPanel === 'function') await renderCalendarPanel(); } catch(_) {}
+    try { if (typeof renderDashboard === 'function') await renderDashboard(); } catch(_) {}
+  } catch (e) {
+    console.warn('[coverage] unlink exception:', e);
+    toast(it ? 'Scollegamento fallito.' : 'Unlink failed.');
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════════

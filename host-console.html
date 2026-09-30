@@ -2045,8 +2045,9 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <p data-h="export_police_tourism_desc"></p>
           </div>
           <div class="tile-actions">
-            <button class="btn btn-primary" onclick="exportAlloggiati()" data-h="btn_gen_alloggiati" data-guide="export-alloggiati-btn">📥 Generate Guest File (.txt)</button>
+            <button class="btn btn-primary" onclick="sendToAlloggiati(this)" data-h="btn_send_alloggiati" data-guide="export-alloggiati-send">📤 File on Alloggiati</button>
             <button class="btn btn-secondary" onclick="validateAlloggiati(this)" data-h="btn_validate_alloggiati" data-guide="export-alloggiati-validate">🔍 Validate on Alloggiati</button>
+            <button class="btn btn-secondary" onclick="exportAlloggiati()" data-h="btn_gen_alloggiati" data-guide="export-alloggiati-btn">📥 Generate .txt (manual upload)</button>
             <a href="https://alloggiatiweb.poliziadistato.it" target="_blank" rel="noopener" class="export-portal-link" data-guide="export-alloggiati-link">
               🔗 <span data-h="link_alloggiati">Open Alloggiati Web</span> ↗
             </a>
@@ -4106,8 +4107,9 @@ const HT = {
     export_csv: '📋 Raw Data Export',
     export_csv_desc: 'Download all guest check-in data as a <strong>CSV spreadsheet</strong> — for your own accounting or backup.',
     date_range: 'Date Range', month: 'Month',
-    btn_gen_alloggiati: '📥 Generate Guest File (.txt)',
+    btn_gen_alloggiati: '📥 Generate .txt (manual upload)',
     btn_validate_alloggiati: '🔍 Validate on Alloggiati',
+    btn_send_alloggiati: '📤 File on Alloggiati',
     btn_dl_csv: '📥 Download CSV',
     btn_gen_istat: '📊 Generate C/59 Summary',
     link_alloggiati: 'Open Alloggiati Web',
@@ -4605,8 +4607,9 @@ const HT = {
     export_csv: '📋 Esportazione Dati',
     export_csv_desc: 'Scarica tutti i dati dei check-in come <strong>foglio di calcolo CSV</strong> — per la tua contabilità o backup.',
     date_range: 'Intervallo Date', month: 'Mese',
-    btn_gen_alloggiati: '📥 Genera File Ospiti (.txt)',
+    btn_gen_alloggiati: '📥 Genera .txt (upload manuale)',
     btn_validate_alloggiati: '🔍 Valida su Alloggiati',
+    btn_send_alloggiati: '📤 Invia ad Alloggiati',
     btn_dl_csv: '📥 Scarica CSV',
     btn_gen_istat: '📊 Genera Riepilogo C/59',
     link_alloggiati: 'Apri Alloggiati Web',
@@ -9715,7 +9718,11 @@ function fmtDateIT(isoDate) {
 //   null                                     — user was blocked or cancelled
 // (rowMeta[i] carries { idx, checkin_id, name, surname, booking_code }
 //  so the results modal can display which row a portal error refers to.)
-function _prepareAlloggiatiExport() {
+function _prepareAlloggiatiExport(opts = {}) {
+  // opts.excludeFiled — drop rows whose alloggiati_status is already
+  // 'filed'. Used by sendToAlloggiati() so we don't re-file the same
+  // guest twice (the portal rejects duplicates and would abort the
+  // whole batch during Test).
   if (allCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato check-in da esportare!' : 'No check-in data to export!'); return null; }
 
   // Round 42.1 — Alloggiati Web rejects any row whose arrival is in the
@@ -9733,7 +9740,13 @@ function _prepareAlloggiatiExport() {
     const arr = c.arrival_date || c.submitted_at?.split('T')[0] || '';
     return arr && arr <= today;
   };
-  const recentGuests = allCheckins.filter(c => {
+  // Round 44 Phase 3 — the Send flow drops already-filed rows so a
+  // second click doesn't try to re-file them (portal rejects
+  // duplicates, and the whole batch would abort during Test).
+  const isFiled = c => c.alloggiati_status === 'filed';
+  const baseSet = opts.excludeFiled ? allCheckins.filter(c => !isFiled(c)) : allCheckins;
+  const skippedFiledCount = opts.excludeFiled ? (allCheckins.length - baseSet.length) : 0;
+  const recentGuests = baseSet.filter(c => {
     if (!hasArrived(c)) return false;
     const arr = c.arrival_date || c.submitted_at?.split('T')[0] || '';
     return arr >= cutoff48h;
@@ -9743,8 +9756,8 @@ function _prepareAlloggiatiExport() {
   // future ones (Alloggiati would reject the whole batch).
   let toExport = recentGuests;
   if (recentGuests.length === 0) {
-    const arrivedAll = allCheckins.filter(hasArrived);
-    const futureCount = allCheckins.length - arrivedAll.length;
+    const arrivedAll = baseSet.filter(hasArrived);
+    const futureCount = baseSet.length - arrivedAll.length;
     if (arrivedAll.length === 0) {
       toast(hostLang === 'it'
         ? (futureCount > 0
@@ -9902,7 +9915,7 @@ function _prepareAlloggiatiExport() {
   });
 
   const groupCount = Object.keys(groups).length;
-  return { lines, warnings, groupCount, rowMeta };
+  return { lines, warnings, groupCount, rowMeta, skippedFiledCount };
 }
 
 function exportAlloggiati() {
@@ -9957,20 +9970,170 @@ async function validateAlloggiati(btn) {
   }
 }
 
+// Round 44 Phase 3 — actually FILE the batch with the State Police.
+// Server-side flow (in /api/alloggiati?action=send):
+//   decrypt creds → GenerateToken → Test → refuse if any rejection
+//   → Send → Ricevuta → upload PDF to storage → stamp check-ins.
+// The two guards up front (must be verified + must confirm) exist to
+// stop a mis-click from doing something legally consequential.
+async function sendToAlloggiati(btn) {
+  if (!propertyId) { toast(hostLang === 'it' ? 'Nessuna proprietà selezionata.' : 'No property selected.'); return; }
+  const it = hostLang === 'it';
+
+  // Require credentials to be verified — Send would fail anyway
+  // without a working token, and this makes the failure mode friendly.
+  const d = _alloggiatiState.data || {};
+  if (!d.configured || !d.verified_at) {
+    alert(it
+      ? 'Le credenziali Alloggiati non sono ancora verificate. Vai in Impostazioni → Alloggiati Web → Verifica ora.'
+      : 'Alloggiati credentials are not verified yet. Go to Impostazioni → Alloggiati Web → Verify now.');
+    return;
+  }
+
+  const prep = _prepareAlloggiatiExport({ excludeFiled: true });
+  if (!prep) return;
+  const { lines, rowMeta, warnings, skippedFiledCount } = prep;
+  if (lines.length === 0) {
+    alert(it ? 'Nessuna riga da inviare (tutti già inviati o esclusi).' : 'No rows to send (everything is already filed or excluded).');
+    return;
+  }
+
+  const skippedNote = skippedFiledCount > 0
+    ? (it ? `\n(${skippedFiledCount} check-in già inviati sono stati saltati.)` : `\n(${skippedFiledCount} already-filed check-in(s) skipped.)`)
+    : '';
+  const confirmMsg = it
+    ? `Stai per INVIARE ${lines.length} riga/e alla Polizia di Stato tramite Alloggiati Web. Questa operazione è vincolante e non annullabile dal portale.${skippedNote}\n\nProcedere?`
+    : `You are about to FILE ${lines.length} row(s) with the State Police via Alloggiati Web. This is legally binding and cannot be un-filed from the portal.${skippedNote}\n\nProceed?`;
+  if (!confirm(confirmMsg)) return;
+
+  // Assemble rows[] with checkin_ids so the server can stamp filed_at
+  // on the right rows.
+  const rowsPayload = lines.map((line, i) => ({
+    line,
+    checkin_ids: rowMeta[i]?.checkin_id ? [rowMeta[i].checkin_id] : [],
+  }));
+
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+  const origLabel = btn ? btn.innerHTML : '';
+  if (btn) btn.innerHTML = it ? '⏳ Invio in corso…' : '⏳ Filing…';
+
+  try {
+    const out = await _alloggiatiApi('send', { property_id: propertyId, rows: rowsPayload });
+    if (!out || out.ok === false) {
+      const msg = (out && out.error) ? out.error : (it ? 'Invio fallito.' : 'Send failed.');
+      // If the server returned per_row (validation_failed / send_partial),
+      // show them in the shared results modal so the host can see which
+      // guest was the problem.
+      if (Array.isArray(out?.per_row) && out.per_row.length > 0) {
+        _openAlloggiatiValidationModal(
+          { total: rowsPayload.length, valid_count: out.per_row.filter(r => r.ok).length, per_row: out.per_row },
+          rowMeta,
+          warnings,
+          { headerOverride: it ? `⚠ Invio bloccato — ${msg}` : `⚠ Send blocked — ${msg}`, headerTint: '#b03939' },
+        );
+        return;
+      }
+      alert((it ? 'Invio fallito:\n\n' : 'Send failed:\n\n') + msg);
+      try { track('alloggiati_send_failed', { error_code: out?.error_code || 'unknown' }); } catch(_) {}
+      return;
+    }
+
+    try { track('alloggiati_send_ok', { filed: out.filed_count, receipt: !!out.receipt_path }); } catch(_) {}
+    _openAlloggiatiSendSuccessModal(out, rowMeta);
+    // Reload the check-in list so freshly-stamped rows show as filed.
+    try { if (typeof loadAllData === 'function') await loadAllData(); } catch(_) {}
+  } catch (e) {
+    console.warn('[alloggiati] send failed:', e.message);
+    alert((it ? 'Invio fallito: ' : 'Send failed: ') + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = origLabel; }
+  }
+}
+
+// Success modal for a completed Send. Opens the receipt PDF (via a
+// short-lived signed URL from the private receipts bucket) so the
+// host has proof of filing at hand. If Ricevuta failed to arrive
+// (portal succeeded but the PDF fetch didn't), surface a clear
+// warning instead of pretending everything is fine.
+function _openAlloggiatiSendSuccessModal(out, rowMeta) {
+  document.getElementById('alloggiatiSendModal')?.remove();
+  const it = hostLang === 'it';
+  const safe = _alloggiatiSafe;
+  const filedCount = out.filed_count || 0;
+
+  const stampWarning = out.stamp_error
+    ? `<div style="margin-top:12px;padding:10px 12px;background:rgba(207,68,68,0.08);border:1px solid rgba(207,68,68,0.3);border-radius:8px;font-size:0.78rem;color:#b03939;">${safe(it
+        ? 'Attenzione: l\'invio al portale è riuscito, ma il nostro database non ha registrato lo stato "inviato" per queste righe. Prova a ricaricare la pagina; se il problema persiste, contatta il supporto.'
+        : 'Warning: filing at the portal succeeded but our database did not record the "filed" status for these rows. Try reloading; if the issue persists, contact support.')}</div>`
+    : '';
+
+  const receiptBlock = out.receipt_missing
+    ? `<div style="margin-top:12px;padding:10px 12px;background:rgba(232,184,75,0.14);border:1px solid rgba(232,184,75,0.4);border-radius:8px;font-size:0.78rem;color:#7d5e10;">
+        <div style="font-weight:700;margin-bottom:4px;">${safe(it ? 'Ricevuta non scaricabile automaticamente' : 'Receipt could not be downloaded automatically')}</div>
+        <div>${safe(out.receipt_missing)}</div>
+        <div style="margin-top:6px;"><a href="https://alloggiatiweb.poliziadistato.it" target="_blank" rel="noopener" style="color:#7d5e10;text-decoration:underline;">${safe(it ? 'Apri Alloggiati Web →' : 'Open Alloggiati Web →')}</a></div>
+       </div>`
+    : (out.receipt_path
+        ? `<div style="margin-top:12px;padding:10px 12px;background:rgba(109,191,130,0.14);border:1px solid rgba(109,191,130,0.4);border-radius:8px;font-size:0.82rem;color:#2f7a44;">
+             <div style="font-weight:700;margin-bottom:4px;">${safe(it ? 'Ricevuta pronta' : 'Receipt ready')}</div>
+             <div>${safe(it ? 'La ricevuta ufficiale è stata scaricata e conservata (5 anni).' : 'The official receipt has been downloaded and stored (5-year retention).')}</div>
+             <div style="margin-top:6px;">
+               <button type="button" class="btn btn-primary btn-sm" onclick="_openAlloggiatiReceipt('${safe(out.receipt_path)}')">📄 ${safe(it ? 'Apri ricevuta PDF' : 'Open receipt PDF')}</button>
+             </div>
+           </div>`
+        : '');
+
+  const modal = document.createElement('div');
+  modal.id = 'alloggiatiSendModal';
+  modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10000;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div style="background:var(--white);max-width:640px;width:100%;border-radius:14px;padding:18px 20px 16px;box-shadow:0 12px 48px rgba(0,0,0,0.25);max-height:calc(100vh - 60px);overflow-y:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:600;font-size:1.05rem;color:var(--ink);margin:0;">${safe(it ? 'Invio ad Alloggiati completato' : 'Filed on Alloggiati')}</h3>
+        <button type="button" onclick="document.getElementById('alloggiatiSendModal')?.remove()" aria-label="${safe(it ? 'Chiudi' : 'Close')}" style="background:none;border:none;font-size:1.4rem;color:var(--ink-soft);cursor:pointer;padding:2px 8px;line-height:1;">×</button>
+      </div>
+      <div style="font-size:0.95rem;color:#2f7a44;font-weight:600;margin-bottom:8px;">${safe(it ? `✓ ${filedCount} ospite/i inviato/i.` : `✓ ${filedCount} guest(s) filed.`)}</div>
+      <div style="font-size:0.75rem;color:var(--ink-soft);">${safe(it ? 'Data invio: ' : 'Filed at: ')}${safe(new Date(out.filed_at).toLocaleString(it ? 'it-IT' : 'en-GB'))}</div>
+      ${receiptBlock}
+      ${stampWarning}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
+        <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('alloggiatiSendModal')?.remove()">${safe(it ? 'Chiudi' : 'Close')}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+// Helper — mint a short-lived signed URL for a receipt PDF and open
+// it in a new tab. Reuses the same private-bucket signing pattern the
+// R36 P3 upload flow put in place.
+async function _openAlloggiatiReceipt(path) {
+  if (!path) return;
+  const it = hostLang === 'it';
+  try {
+    const { data, error } = await sb.storage.from('receipts').createSignedUrl(path, 300);
+    if (error || !data?.signedUrl) throw new Error(error?.message || 'no url');
+    window.open(data.signedUrl, '_blank', 'noopener');
+  } catch (e) {
+    console.warn('[alloggiati] open receipt failed:', e.message);
+    alert((it ? 'Apertura ricevuta fallita: ' : 'Opening receipt failed: ') + e.message);
+  }
+}
+
 // Results modal — one row per input, green for accepted, red for
 // rejected with the portal's own ErroreDes. Groups by booking code
 // so a stay with two rejected members reads as one incident.
-function _openAlloggiatiValidationModal(out, rowMeta, clientWarnings) {
+function _openAlloggiatiValidationModal(out, rowMeta, clientWarnings, opts = {}) {
   document.getElementById('alloggiatiValidateModal')?.remove();
   const it = hostLang === 'it';
   const safe = _alloggiatiSafe;
   const total = out.total || 0;
   const validCount = out.valid_count || 0;
   const rejectedCount = total - validCount;
-  const headerTint = rejectedCount === 0 ? '#2f7a44' : '#b03939';
-  const headerText = rejectedCount === 0
+  const headerTint = opts.headerTint || (rejectedCount === 0 ? '#2f7a44' : '#b03939');
+  const headerText = opts.headerOverride || (rejectedCount === 0
     ? (it ? `✓ Tutte le ${total} righe sono valide.` : `✓ All ${total} rows are valid.`)
-    : (it ? `⚠ ${rejectedCount} riga/e su ${total} rifiutata/e da Alloggiati.` : `⚠ ${rejectedCount} of ${total} row(s) rejected by Alloggiati.`);
+    : (it ? `⚠ ${rejectedCount} riga/e su ${total} rifiutata/e da Alloggiati.` : `⚠ ${rejectedCount} of ${total} row(s) rejected by Alloggiati.`));
   const perRowHtml = (out.per_row || []).map(r => {
     const meta = rowMeta[r.idx - 1] || {};
     const name = `${(meta.surname || '').trim()} ${(meta.name || '').trim()}`.trim() || (meta.booking_code || (it ? 'senza nome' : 'no name'));

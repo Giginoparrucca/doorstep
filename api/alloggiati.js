@@ -12,10 +12,9 @@
 //                                                  → { configured: true, saved_at }
 //   POST   ?action=verify    { property_id }       → { verified, verified_at?, token_expires_at?, error?, error_code? }
 //   POST   ?action=validate  { property_id, rows[] } → { ok, overall, per_row[] }
+//   POST   ?action=send      { property_id, rows[{line,checkin_ids[]}] }
+//                                                  → { ok, filed_count, receipt_path, receipt_missing?, per_row[] }
 //   POST   ?action=delete    { property_id }       → { configured: false }
-//
-// Future phase (Phase 3 = send) will add ?action=send here. Keeping
-// them in ONE file preserves the function budget.
 //
 // Security
 // --------
@@ -33,7 +32,13 @@
 
 import { applyCors } from './_cors.js';
 import { encryptCredentials, decryptCredentials } from './_alloggiati-crypto.js';
-import { generateToken, authenticationTest, test as soapTest } from './_alloggiati-soap.js';
+import {
+  generateToken,
+  authenticationTest,
+  test as soapTest,
+  send as soapSend,
+  ricevuta as soapRicevuta,
+} from './_alloggiati-soap.js';
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
@@ -434,6 +439,235 @@ export default async function handler(req, res) {
       total: rowsIn.length,
       valid_count: perRow.filter(p => p.ok).length,
       per_row: perRow,
+    });
+  }
+
+  if (action === 'send') {
+    // Round 44 Phase 3 — FILE the rows with the State Police via
+    // SOAP Send, fetch the Ricevuta PDF, store it in the receipts
+    // bucket, and stamp each affected check-in row.
+    //
+    // Safety pattern: Test first — refuse to Send if ANY row would
+    // be rejected. Alloggiati Send would happily file some and reject
+    // others, but a partial batch is confusing (some guests filed,
+    // some not, one receipt covers only the accepted ones). Better
+    // to fail cleanly and let the host fix the rejected rows before
+    // filing the whole batch fresh.
+    //
+    // Request shape: rows: [{ line: "168-char string", checkin_ids: ["uuid", ...] }]
+    // (one line per guest, but a single guest row can map to multiple
+    //  checkin_ids if the host somehow duplicated a check-in — rare,
+    //  but the client already collapses on booking_code + guest_type,
+    //  so we accept an array to keep the door open).
+    const rowsIn = Array.isArray(body.rows) ? body.rows : [];
+    if (rowsIn.length === 0) return res.status(400).json({ error: 'rows must be a non-empty array' });
+    if (rowsIn.length > 200) return res.status(400).json({ error: 'Too many rows (max 200 per Send batch)' });
+    const lines = [];
+    const checkinIdsFlat = [];
+    for (let i = 0; i < rowsIn.length; i++) {
+      const r = rowsIn[i];
+      if (!r || typeof r.line !== 'string') {
+        return res.status(400).json({ error: `Row ${i + 1} missing "line"` });
+      }
+      if (r.line.length > 400) return res.status(400).json({ error: `Row ${i + 1} too long` });
+      const ids = Array.isArray(r.checkin_ids) ? r.checkin_ids.filter(x => typeof x === 'string' && /^[0-9a-f-]{10,}$/i.test(x)) : [];
+      if (ids.length === 0) return res.status(400).json({ error: `Row ${i + 1} has no valid checkin_ids` });
+      lines.push(r.line);
+      checkinIdsFlat.push(...ids);
+    }
+
+    // ── Load and decrypt credentials ─────────────────────────────
+    let credRow;
+    try {
+      const rows = await sbGet(
+        `host_alloggiati_credentials?property_id=eq.${encodeURIComponent(propertyId)}` +
+        `&select=credentials_enc,credentials_nonce,enc_key_id&limit=1`
+      );
+      credRow = Array.isArray(rows) && rows[0];
+    } catch (e) {
+      console.warn('[alloggiati] send: cred lookup failed:', e.message);
+      return res.status(500).json({ error: 'Credential lookup failed' });
+    }
+    if (!credRow) return res.status(400).json({ error: 'No credentials saved for this property yet' });
+
+    let creds;
+    try {
+      creds = await decryptCredentials(credRow);
+    } catch (e) {
+      console.error('[alloggiati] send: decrypt failed:', e.message);
+      return res.status(200).json({
+        ok: false,
+        error: 'Stored credentials unreadable — please re-enter them.',
+        error_code: 'decrypt_failed',
+      });
+    }
+
+    // ── Ownership guard on the checkin_ids ───────────────────────
+    // Even though the client only sends what it built, defence in
+    // depth: confirm every checkin_id actually belongs to this
+    // property before we stamp them.
+    try {
+      const idList = Array.from(new Set(checkinIdsFlat));
+      // Cap the OR filter length to keep the URL sane; 200 rows *
+      // guests fits well within PostgREST's limits.
+      const inList = idList.map(x => `"${x}"`).join(',');
+      const ownRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/checkins?id=in.(${encodeURIComponent(inList)})&select=id,property_id`,
+        { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } },
+      );
+      if (!ownRes.ok) throw new Error(`checkins lookup ${ownRes.status}`);
+      const found = await ownRes.json();
+      if (!Array.isArray(found) || found.length !== idList.length) {
+        return res.status(400).json({ error: 'Some checkin_ids do not exist' });
+      }
+      const alien = found.find(c => c.property_id !== propertyId);
+      if (alien) return res.status(403).json({ error: 'A checkin does not belong to this property' });
+    } catch (e) {
+      console.warn('[alloggiati] send: ownership check failed:', e.message);
+      return res.status(500).json({ error: 'Ownership check failed' });
+    }
+
+    // ── Mint a fresh token ───────────────────────────────────────
+    let token;
+    try {
+      const t = await generateToken(creds);
+      token = t.token;
+    } catch (e) {
+      const portalMsg = e.message || 'Alloggiati portal rejected the credentials';
+      console.warn('[alloggiati] send: GenerateToken failed:', e.code, portalMsg);
+      return res.status(200).json({ ok: false, error: portalMsg, error_code: e.code || 'portal_error' });
+    }
+
+    // ── Test first — abort if any row would be rejected ──────────
+    let testOutcome;
+    try {
+      testOutcome = await soapTest({ utente: creds.utente, token, rows: lines });
+    } catch (e) {
+      const portalMsg = e.message || 'Alloggiati Test failed';
+      console.warn('[alloggiati] send: Test failed:', e.code, portalMsg);
+      return res.status(200).json({ ok: false, error: portalMsg, error_code: e.code || 'portal_error' });
+    }
+    const failedInTest = (testOutcome.perRow || [])
+      .map((r, i) => ({ idx: i + 1, r }))
+      .filter(x => !x.r.ok);
+    if (failedInTest.length > 0) {
+      return res.status(200).json({
+        ok: false,
+        error: 'One or more rows would be rejected by Alloggiati — nothing was filed.',
+        error_code: 'validation_failed',
+        per_row: (testOutcome.perRow || []).map((r, i) => r.ok
+          ? { idx: i + 1, ok: true }
+          : { idx: i + 1, ok: false, error_code: r.code, errore_cod: r.erroreCod, error_message: r.erroreDes || 'Row rejected' }),
+      });
+    }
+
+    // ── Send the batch (this is the legally-consequential call) ──
+    let sendOutcome;
+    try {
+      sendOutcome = await soapSend({ utente: creds.utente, token, rows: lines });
+    } catch (e) {
+      const portalMsg = e.message || 'Alloggiati Send failed';
+      console.warn('[alloggiati] send: Send failed:', e.code, portalMsg);
+      return res.status(200).json({ ok: false, error: portalMsg, error_code: e.code || 'portal_error' });
+    }
+    // If overall Send failed OR any row was rejected (shouldn't
+    // happen after Test passed, but portal state can change between
+    // calls), do NOT stamp any check-ins — the batch is in an
+    // ambiguous state and the host needs to check the portal.
+    if (!sendOutcome.overall.ok) {
+      return res.status(200).json({
+        ok: false,
+        error: sendOutcome.overall.erroreDes || 'Alloggiati Send rejected the batch',
+        error_code: sendOutcome.overall.code || 'portal_error',
+      });
+    }
+    const sendFailures = (sendOutcome.perRow || []).filter(r => !r.ok);
+    if (sendFailures.length > 0) {
+      console.error('[alloggiati] send: post-Test per-row failure — batch left un-stamped for manual review', sendFailures);
+      return res.status(200).json({
+        ok: false,
+        error: 'The portal accepted some rows but rejected others between Validate and Send. Check the Alloggiati portal directly before retrying.',
+        error_code: 'send_partial',
+        per_row: (sendOutcome.perRow || []).map((r, i) => r.ok
+          ? { idx: i + 1, ok: true }
+          : { idx: i + 1, ok: false, error_code: r.code, errore_cod: r.erroreCod, error_message: r.erroreDes || 'Row rejected' }),
+      });
+    }
+
+    // ── Send succeeded. Everything below is best-effort — even if
+    // Ricevuta or storage or the stamp fails, the filing IS DONE at
+    // the portal. Surface the situation to the host instead of
+    // silently succeeding OR silently losing state.
+    const filedAt = new Date();
+    const filedAtIso = filedAt.toISOString();
+    const filedDateRome = filedAtIso.slice(0, 10);
+
+    let receiptPath = null;
+    let receiptMissing = null;
+    try {
+      const rec = await soapRicevuta({ utente: creds.utente, token, date: filedDateRome });
+      // Storage path: <property_id>/ so the RLS policy (which keys off
+      // the first path segment) recognises it as this property's file.
+      const stamp = filedAtIso.slice(0, 19).replace(/[-:T]/g, '');
+      const path = `${propertyId}/alloggiati-batch-${stamp}.pdf`;
+      const upRes = await fetch(
+        `${SUPABASE_URL}/storage/v1/object/receipts/${path}`,
+        {
+          method: 'POST',
+          headers: {
+            apikey: SERVICE_KEY,
+            Authorization: `Bearer ${SERVICE_KEY}`,
+            'Content-Type': 'application/pdf',
+            'x-upsert': 'true',
+          },
+          body: rec.pdf,
+        },
+      );
+      if (!upRes.ok) {
+        const text = await upRes.text().catch(() => '');
+        throw new Error(`storage upload ${upRes.status}: ${text.slice(0, 200)}`);
+      }
+      receiptPath = path;
+    } catch (e) {
+      // Portal accepted the batch — losing the PDF here does not
+      // undo the filing. Log loud, warn the client, continue to
+      // stamp the check-ins so the "filed" state matches reality.
+      console.error('[alloggiati] send: receipt fetch/upload failed:', e.message);
+      receiptMissing = `Receipt PDF could not be retrieved (${e.message}). The filing itself succeeded — you can download the receipt manually from the Alloggiati portal.`;
+    }
+
+    // ── Stamp check-ins ──────────────────────────────────────────
+    // Uses PATCH so we don't hit the same ON CONFLICT trap the verify
+    // stamp did. Do this AFTER the storage upload so the receipt_path
+    // is either set or explicitly null (no half-state).
+    let stampError = null;
+    try {
+      const patch = {
+        alloggiati_status: 'filed',
+        filed_at: filedAtIso,
+      };
+      if (receiptPath) patch.receipt_path = receiptPath;
+      const idsList = Array.from(new Set(checkinIdsFlat)).map(x => `"${x}"`).join(',');
+      await sbPatch(
+        `checkins?id=in.(${encodeURIComponent(idsList)})&property_id=eq.${encodeURIComponent(propertyId)}`,
+        patch,
+      );
+    } catch (e) {
+      // The filing itself is safe; the row stamps aren't. Return a
+      // clear warning so the UI can show a "filed at portal but our
+      // database didn't update" banner.
+      console.error('[alloggiati] send: stamp failed:', e.message);
+      stampError = e.message;
+    }
+
+    return res.status(200).json({
+      ok: true,
+      filed_count: lines.length,
+      filed_at: filedAtIso,
+      receipt_path: receiptPath,
+      receipt_missing: receiptMissing,
+      stamp_error: stampError,
+      per_row: lines.map((_, i) => ({ idx: i + 1, ok: true })),
     });
   }
 

@@ -1805,6 +1805,22 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       </div>
       </fieldset>
 
+      <!-- Round 44 Phase 0.5 — Alloggiati Web credentials card.
+           Sits between Arrival Reminders (integrations) and the privacy
+           block (compliance surfaces). Renders in three states via
+           renderAlloggiatiCard(): not-configured (show entry form),
+           configured (show status pill + Update / Remove), error (show
+           red banner with the portal's exact message). All writes go
+           through /api/alloggiati (action-routed); the row itself is
+           service_role-only in the DB. -->
+      <div class="form-card" id="alloggiatiCard">
+        <div class="form-card-title" data-h="alloggiati_title">Alloggiati Web · automatic filing</div>
+        <div class="form-card-desc" data-h="alloggiati_desc">Connect your Alloggiati Web account to skip the manual .txt upload. WelcomeBnB will validate every guest row before filing and store the receipt automatically. Credentials are encrypted at rest and never shown again after you save them.</div>
+        <div id="alloggiatiCardBody">
+          <div style="font-size:0.82rem;color:var(--ink-soft);padding:6px 0;" data-h="alloggiati_loading">Loading…</div>
+        </div>
+      </div>
+
       <!-- Round 38 — Guest privacy notice preview + empty-field warning. -->
       <div class="form-card">
         <div class="form-card-title" data-h="prop_privacy_title">Guest privacy notice</div>
@@ -4115,6 +4131,10 @@ const HT = {
     ical_export_booking: 'Rates & Availability → Sync calendars → Import calendar → paste the URL.',
     ical_export_vrbo: 'Calendar → Import/Export → Import calendar → paste the URL.',
     ical_export_delay: 'OTAs poll external calendars every 2–4 hours, so a new direct booking may take that long to appear as blocked on Airbnb / Booking / Vrbo.',
+    // Round 44 Phase 0.5 — Alloggiati Web credentials card
+    alloggiati_title: 'Alloggiati Web · automatic filing',
+    alloggiati_desc: 'Connect your Alloggiati Web account to skip the manual .txt upload. WelcomeBnB will validate every guest row before filing and store the receipt automatically. Credentials are encrypted at rest and never shown again after you save them.',
+    alloggiati_loading: 'Loading…',
     ical_where: 'Airbnb: Calendar → Availability → Connect calendars → Export. Booking.com: Calendar → Sync calendars. Vrbo: Calendar → Import/Export → Export calendar.',
     ical_platform: 'Platform',
     ical_url: 'iCal URL',
@@ -4605,6 +4625,10 @@ const HT = {
     ical_export_booking: 'Tariffe e Disponibilità → Sincronizza calendari → Importa calendario → incolla l\'URL.',
     ical_export_vrbo: 'Calendario → Import/Export → Importa calendario → incolla l\'URL.',
     ical_export_delay: 'Gli OTA scaricano i calendari esterni ogni 2–4 ore, quindi una nuova prenotazione diretta potrebbe impiegare quel tempo per comparire come bloccata su Airbnb / Booking / Vrbo.',
+    // Round 44 Phase 0.5 — Credenziali Alloggiati Web
+    alloggiati_title: 'Alloggiati Web · Invio automatico',
+    alloggiati_desc: 'Collega il tuo account Alloggiati Web per saltare il caricamento manuale del file .txt. WelcomeBnB validerà ogni riga prima dell\'invio e conserverà automaticamente la ricevuta. Le credenziali sono crittografate a riposo e non vengono più mostrate dopo il salvataggio.',
+    alloggiati_loading: 'Caricamento…',
     ical_where: 'Airbnb: Calendario → Disponibilità → Collega calendari → Esporta. Booking.com: Calendario → Sincronizza calendari. Vrbo: Calendario → Importa/Esporta → Esporta calendario.',
     ical_platform: 'Piattaforma',
     ical_url: 'URL iCal',
@@ -8374,6 +8398,180 @@ async function saveArrivalReminders(btn) {
   }
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   Round 44 Phase 0.5 — Alloggiati Web credentials card.
+   All writes go through /api/alloggiati (action-routed). The endpoint
+   encrypts at rest with AES-GCM and the row itself is service_role-only
+   in the DB, so the client never sees ciphertext or plaintext.
+══════════════════════════════════════════════════════════════════════ */
+
+let _alloggiatiState = { status: 'loading', propertyId: null };
+const _alloggiatiSafe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+
+async function _alloggiatiApi(action, body) {
+  const { data } = await sb.auth.getSession();
+  const jwt = data?.session?.access_token;
+  if (!jwt) throw new Error('not-signed-in');
+  const res = await fetch(`/api/alloggiati?action=${encodeURIComponent(action)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
+    body: JSON.stringify(body || {}),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = (json && json.error) || `HTTP ${res.status}`;
+    const err = new Error(msg);
+    err.status = res.status;
+    throw err;
+  }
+  return json;
+}
+
+async function loadAlloggiatiCard() {
+  if (!propertyId) return;
+  _alloggiatiState = { status: 'loading', propertyId };
+  renderAlloggiatiCard();
+  try {
+    const out = await _alloggiatiApi('status', { property_id: propertyId });
+    // Guard against a stale response after a fast property switch.
+    if (_alloggiatiState.propertyId !== propertyId) return;
+    _alloggiatiState = { status: 'ready', propertyId, data: out };
+  } catch (e) {
+    console.warn('[alloggiati] status load failed:', e.message);
+    _alloggiatiState = { status: 'error', propertyId, error: e.message };
+  }
+  renderAlloggiatiCard();
+}
+
+function renderAlloggiatiCard() {
+  const body = document.getElementById('alloggiatiCardBody');
+  if (!body) return;
+  const it = hostLang === 'it';
+  const safe = _alloggiatiSafe;
+  if (_alloggiatiState.status === 'loading') {
+    body.innerHTML = `<div style="font-size:0.82rem;color:var(--ink-soft);padding:6px 0;">${safe(it ? 'Caricamento…' : 'Loading…')}</div>`;
+    return;
+  }
+  if (_alloggiatiState.status === 'error') {
+    body.innerHTML = `<div style="font-size:0.82rem;color:#b03939;padding:6px 0;">${safe(it ? 'Errore: ' : 'Error: ')}${safe(_alloggiatiState.error)}</div>`;
+    return;
+  }
+  const d = _alloggiatiState.data || {};
+  if (d.configured) {
+    const verifiedLine = d.verified_at
+      ? (it ? `✓ Verificato il ${new Date(d.verified_at).toLocaleString('it-IT')}` : `✓ Verified on ${new Date(d.verified_at).toLocaleString('en-GB')}`)
+      : (it ? '⚠️ Salvate ma non ancora verificate' : '⚠️ Saved but not verified yet');
+    const errorLine = d.last_error
+      ? `<div style="margin-top:6px;padding:8px 10px;background:rgba(207,68,68,0.08);border:1px solid rgba(207,68,68,0.3);border-radius:6px;font-size:0.78rem;color:#b03939;">${safe(d.last_error)}</div>`
+      : '';
+    body.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;">
+        <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#2f7a44;background:rgba(109,191,130,0.16);padding:3px 10px;border-radius:999px;">${safe(it ? 'Configurato' : 'Configured')}</span>
+        <span style="font-size:0.82rem;color:var(--ink-soft);">${safe(verifiedLine)}</span>
+      </div>
+      ${errorLine}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="openAlloggiatiForm(true)">✏️ ${safe(it ? 'Aggiorna credenziali' : 'Update credentials')}</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="removeAlloggiatiCredentials()" style="color:var(--red);border-color:rgba(224,69,94,0.3);">${safe(it ? '🗑 Rimuovi' : '🗑 Remove')}</button>
+      </div>`;
+    return;
+  }
+  // Not configured — show entry form.
+  body.innerHTML = `
+    <div style="padding:6px 0;">
+      <button type="button" class="btn btn-primary btn-sm" onclick="openAlloggiatiForm(false)">🔑 ${safe(it ? 'Configura Alloggiati Web' : 'Configure Alloggiati Web')}</button>
+    </div>`;
+}
+
+// Renders the credential-entry inputs inline in the card so a save
+// never opens a modal. `isUpdate` only changes the button label —
+// on the server side, save is always an upsert.
+function openAlloggiatiForm(isUpdate) {
+  const body = document.getElementById('alloggiatiCardBody');
+  if (!body) return;
+  const it = hostLang === 'it';
+  const safe = _alloggiatiSafe;
+  const saveLabel = isUpdate
+    ? (it ? '💾 Aggiorna' : '💾 Update')
+    : (it ? '💾 Salva credenziali' : '💾 Save credentials');
+  const cancelLabel = isUpdate
+    ? (it ? 'Annulla' : 'Cancel')
+    : (it ? '← Indietro' : '← Back');
+  const consentText = it
+    ? 'Autorizzo WelcomeBnB a utilizzare queste credenziali per validare e (in futuro) inviare per mio conto le comunicazioni ad Alloggiati Web. Le credenziali sono crittografate e usate solo per questa proprietà.'
+    : 'I authorise WelcomeBnB to use these credentials to validate and (in future) to file guest submissions on my behalf to Alloggiati Web. Credentials are encrypted and used only for this property.';
+  body.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:8px;padding:6px 0;">
+      <label style="display:flex;flex-direction:column;gap:4px;">
+        <span style="font-size:0.78rem;color:var(--ink-soft);">${safe(it ? 'Utente' : 'Username')}</span>
+        <input class="form-input" type="text" id="alloggiatiUtente" autocomplete="off" spellcheck="false" placeholder="es. TR12345">
+      </label>
+      <label style="display:flex;flex-direction:column;gap:4px;">
+        <span style="font-size:0.78rem;color:var(--ink-soft);">Password</span>
+        <input class="form-input" type="password" id="alloggiatiPassword" autocomplete="new-password">
+      </label>
+      <label style="display:flex;flex-direction:column;gap:4px;">
+        <span style="font-size:0.78rem;color:var(--ink-soft);">WsKey ${safe(it ? '(dal portale — sezione "Chiavi web service")' : '(from the portal — "Web service keys" section)')}</span>
+        <input class="form-input" type="text" id="alloggiatiWsKey" autocomplete="off" spellcheck="false">
+        <span style="font-size:0.7rem;color:var(--ink-soft);">${safe(it ? 'La WsKey scade ogni 24 ore. Il sistema la rinnoverà automaticamente in background.' : 'The WsKey expires every 24 hours. The system will renew it automatically in the background.')}</span>
+      </label>
+      <label style="display:flex;gap:8px;align-items:flex-start;margin-top:4px;font-size:0.78rem;color:var(--ink);line-height:1.4;">
+        <input type="checkbox" id="alloggiatiConsent" style="margin-top:3px;flex:0 0 auto;">
+        <span>${safe(consentText)}</span>
+      </label>
+      <div id="alloggiatiFormMsg" style="font-size:0.78rem;color:#b03939;min-height:1em;"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
+        <button type="button" class="btn btn-primary btn-sm" onclick="saveAlloggiatiCredentials(this)">${safe(saveLabel)}</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="renderAlloggiatiCard()">${safe(cancelLabel)}</button>
+      </div>
+    </div>`;
+  setTimeout(() => document.getElementById('alloggiatiUtente')?.focus(), 40);
+}
+
+async function saveAlloggiatiCredentials(btn) {
+  if (!propertyId) return;
+  const it = hostLang === 'it';
+  const msgEl = document.getElementById('alloggiatiFormMsg');
+  const utente   = document.getElementById('alloggiatiUtente')?.value || '';
+  const password = document.getElementById('alloggiatiPassword')?.value || '';
+  const wskey    = document.getElementById('alloggiatiWsKey')?.value || '';
+  const consent  = document.getElementById('alloggiatiConsent')?.checked;
+  const err = (m) => { if (msgEl) msgEl.textContent = m; };
+
+  if (!utente.trim() || !password || !wskey.trim()) return err(it ? 'Compila tutti e tre i campi.' : 'Fill in all three fields.');
+  if (!consent) return err(it ? 'Devi confermare l\'autorizzazione per procedere.' : 'You must confirm the authorisation to proceed.');
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+  err('');
+  try {
+    await _alloggiatiApi('save', { property_id: propertyId, utente, password, wskey, consent: true });
+    try { track('alloggiati_credentials_saved', {}); } catch(_) {}
+    try { toast(it ? '✓ Credenziali salvate. La verifica arriverà con la Fase 1.' : '✓ Credentials saved. Verification lands in Phase 1.'); } catch(_) {}
+    await loadAlloggiatiCard();
+  } catch (e) {
+    console.warn('[alloggiati] save failed:', e.message);
+    err((it ? 'Salvataggio fallito: ' : 'Save failed: ') + e.message);
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+  }
+}
+
+async function removeAlloggiatiCredentials() {
+  if (!propertyId) return;
+  const it = hostLang === 'it';
+  const q = it
+    ? 'Rimuovere le credenziali Alloggiati Web? Dovrai reinserirle per riattivare la validazione automatica.'
+    : 'Remove the Alloggiati Web credentials? You\'ll need to re-enter them to re-enable automatic validation.';
+  if (!confirm(q)) return;
+  try {
+    await _alloggiatiApi('delete', { property_id: propertyId });
+    try { track('alloggiati_credentials_removed', {}); } catch(_) {}
+    try { toast(it ? '✓ Credenziali rimosse.' : '✓ Credentials removed.'); } catch(_) {}
+    await loadAlloggiatiCard();
+  } catch (e) {
+    console.warn('[alloggiati] delete failed:', e.message);
+    try { toast((it ? 'Rimozione fallita: ' : 'Delete failed: ') + e.message); } catch(_) {}
+  }
+}
+
 // Round 32.4 — Rules & Recommendations default to a read-only list; the
 // host clicks Edit to reveal the form + preset chips + Add/Save. Save
 // flips back to view mode automatically.
@@ -11944,7 +12142,10 @@ async function notifSendTest(btn) {
     const { data: { session } } = await sb.auth.getSession();
     const jwt = session?.access_token;
     if (!jwt) throw new Error('no session');
-    const r = await fetch('/api/notify-test', {
+    // Round 44 consolidation — notify-test was folded into push-config
+    // (action-routed) to free a Vercel Hobby function slot for
+    // /api/alloggiati. Same behaviour, POST body + Bearer JWT unchanged.
+    const r = await fetch('/api/push-config?action=test', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
       body: '{}',
@@ -13972,6 +14173,7 @@ function fillPropertyForm(data) {
   if (el('propHostNames')) el('propHostNames').value = data.host_names || '';
   if (typeof renderIcalFeeds === 'function') renderIcalFeeds();
   if (typeof renderIcalExportCard === 'function') renderIcalExportCard();
+  if (typeof loadAlloggiatiCard === 'function') loadAlloggiatiCard();
   if (el('propReminderEmail')) el('propReminderEmail').value = data.reminder_email || '';
   if (el('propTimezone')) el('propTimezone').value = data.timezone || 'Europe/Rome';
   if (data.hero_image_url) {

@@ -1600,6 +1600,22 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       </div>
 
       </fieldset>
+
+      <!-- Round 38 → moved to Dettagli Proprietà 2026-09-30 —
+           the privacy-notice preview card lived in Impostazioni until
+           now, but its content is derived entirely from the fields
+           above (host names, contacts, address, region, CIN), so it
+           belongs alongside them. Sits OUTSIDE the property fieldset
+           so Preview + Download stay clickable in view mode too. -->
+      <div class="form-card">
+        <div class="form-card-title" data-h="prop_privacy_title">Privacy notice · Preview &amp; download</div>
+        <div class="form-card-desc" data-h="prop_privacy_desc">The notice guests see in the app, auto-generated from the property details above. Preview to check it renders correctly; download to keep a legal copy of what was shown.</div>
+        <div id="propPrivacyWarnings" style="display:none;background:rgba(232,184,75,0.14);border:1px solid rgba(232,184,75,0.4);color:#7d5e10;padding:10px 12px;border-radius:8px;font-size:0.82rem;margin-bottom:10px;"></div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          <button type="button" class="btn btn-secondary" onclick="openHostPrivacyPreview()"><span data-h="prop_privacy_preview_btn">🔍 Preview as guest</span></button>
+          <button type="button" class="btn btn-secondary" onclick="downloadHostPrivacyNotice()"><span data-h="prop_privacy_download_btn">⬇ Download HTML</span></button>
+        </div>
+      </div>
     </div>
 
     <!-- ════════════ SETTINGS ════════════
@@ -1818,17 +1834,6 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="form-card-desc" data-h="alloggiati_desc">Connect your Alloggiati Web account to skip the manual .txt upload. WelcomeBnB will validate every guest row before filing and store the receipt automatically. Credentials are encrypted at rest and never shown again after you save them.</div>
         <div id="alloggiatiCardBody">
           <div style="font-size:0.82rem;color:var(--ink-soft);padding:6px 0;" data-h="alloggiati_loading">Loading…</div>
-        </div>
-      </div>
-
-      <!-- Round 38 — Guest privacy notice preview + empty-field warning. -->
-      <div class="form-card">
-        <div class="form-card-title" data-h="prop_privacy_title">Guest privacy notice</div>
-        <div class="form-card-desc" data-h="prop_privacy_desc">Generated from your property details. Under GDPR you are the data controller (titolare del trattamento) — guests are shown this notice, and can download a copy.</div>
-        <div id="propPrivacyWarnings" style="display:none;background:rgba(232,184,75,0.14);border:1px solid rgba(232,184,75,0.4);color:#7d5e10;padding:10px 12px;border-radius:8px;font-size:0.82rem;margin-bottom:10px;"></div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;">
-          <button type="button" class="btn btn-secondary" onclick="openHostPrivacyPreview()"><span data-h="prop_privacy_preview_btn">🔍 Preview as guest</span></button>
-          <button type="button" class="btn btn-secondary" onclick="downloadHostPrivacyNotice()"><span data-h="prop_privacy_download_btn">⬇ Download HTML</span></button>
         </div>
       </div>
 
@@ -3979,8 +3984,8 @@ const HT = {
     prop_beds_available_hint: 'Total sleeping capacity (for statistical reporting).',
     prop_tax_title: 'Tourist Tax Configuration',
     prop_tax_desc: "Used by the tourist-tax declaration helper in Export. Enter the values from your comune's tourist-tax resolution (delibera). Leave empty if your comune doesn't levy a tourist tax.",
-    prop_privacy_title: 'Guest privacy notice',
-    prop_privacy_desc: 'Generated from your property details. Under GDPR you are the data controller (titolare del trattamento) — guests are shown this notice, and can download a copy.',
+    prop_privacy_title: 'Privacy notice · Preview & download',
+    prop_privacy_desc: 'The notice guests see in the app, auto-generated from the property details above. Preview to check it renders correctly; download to keep a legal copy of what was shown.',
     prop_privacy_preview_btn: '🔍 Preview as guest',
     prop_privacy_download_btn: '⬇ Download HTML',
     prop_privacy_data_title: 'Privacy & data',
@@ -4481,8 +4486,8 @@ const HT = {
     prop_beds_available_hint: 'Capacità ricettiva totale (per la rilevazione statistica).',
     prop_tax_title: 'Configurazione Imposta di Soggiorno',
     prop_tax_desc: 'Usata dall\'assistente dichiarazione in Export. Inserisci i valori dalla delibera del tuo comune sull\'imposta di soggiorno. Lascia vuoto se il tuo comune non applica l\'imposta.',
-    prop_privacy_title: 'Informativa privacy per gli ospiti',
-    prop_privacy_desc: 'Generata dai dettagli della tua proprietà. Ai sensi del GDPR sei il titolare del trattamento — gli ospiti visualizzano questa informativa e possono scaricarne copia.',
+    prop_privacy_title: 'Informativa privacy · Anteprima e scarica',
+    prop_privacy_desc: 'L\'informativa che gli ospiti vedono nell\'app, generata automaticamente dai campi della proprietà qui sopra. Anteprima per verificare che sia corretta; scarica per conservare una copia legale di quanto mostrato.',
     prop_privacy_preview_btn: '🔍 Anteprima come ospite',
     prop_privacy_download_btn: '⬇ Scarica HTML',
     prop_privacy_data_title: 'Privacy & dati',

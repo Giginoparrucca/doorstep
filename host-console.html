@@ -1832,21 +1832,16 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
       </div>
 
-      <!-- Round 40 Task 6 — Privacy & data card. "Delete all check-in
-           records" moved here from the check-in table toolbar; it's
-           destructive enough to belong on the property panel behind a
-           typed-name confirmation, not one clumsy click away on the
-           list header. -->
-      <div class="form-card">
-        <div class="form-card-title" data-h="prop_privacy_data_title">Privacy &amp; data</div>
-        <div class="form-card-desc" data-h="prop_privacy_data_desc">Bulk data actions for this property. Regular retention purges are automatic — see Data Retention in the admin console. Use this only when you need to wipe the current check-in history in one go.</div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-          <button type="button" class="btn btn-secondary" id="btnDeleteAllProp" onclick="deleteAllCheckinsGated()" style="color:var(--red);border-color:rgba(224,69,94,0.3);">
-            <span data-h="btn_delete_all_prop">Delete all check-in records</span>
-          </button>
-          <span style="font-size:0.72rem;color:var(--ink-soft);" data-h="prop_privacy_data_hint">Confirmation requires typing the property name.</span>
-        </div>
-      </div>
+      <!-- Round 40 Task 6 · Removed 2026-09-30 — the "Privacy & data /
+           Delete all check-in records" card was pulled out of the host
+           console. Retention purges are automatic (Round 36 auto-purges
+           photos + expired data), and TULPS art. 109 requires 5-year
+           retention of the check-in metadata regardless: a host bulk-
+           delete has no legitimate use case and is either a mistake or
+           a compliance breach. The admin Data Retention tile keeps the
+           equivalent surface for support-mediated cleanup requests.
+           deleteAllCheckinsGated() stays in the JS for now in case
+           admin re-uses it, but nothing in the UI can reach it. -->
 
       <!-- Round 40 Task 8 — the property panel's action row is now a
            sticky bar INSIDE the panel (top of the panel body, sticks

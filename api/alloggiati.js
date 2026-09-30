@@ -114,6 +114,24 @@ async function sbDelete(pathAndQuery) {
   if (!res.ok) throw new Error(`sbDelete ${res.status}: ${await res.text().catch(() => '')}`);
   return true;
 }
+// Round 44 Phase 1 hotfix — use PATCH for partial updates on rows
+// that already exist. Can't rely on sbUpsert here: Postgres checks
+// NOT NULL constraints on the pre-INSERT row BEFORE ON CONFLICT can
+// redirect to UPDATE, so an upsert body missing credentials_enc
+// always fails 23502 even when a row for property_id exists.
+async function sbPatch(pathAndQuery, body) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${pathAndQuery}`, {
+    method: 'PATCH',
+    headers: {
+      apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`sbPatch ${res.status}: ${await res.text().catch(() => '')}`);
+  return true;
+}
 
 // ── main handler ────────────────────────────────────────────────────
 export default async function handler(req, res) {
@@ -228,11 +246,10 @@ export default async function handler(req, res) {
       // are a rotated ALLOGGIATI_ENC_KEY without background re-encrypt.
       const stampErr = 'Stored credentials unreadable — please re-enter them.';
       try {
-        await sbUpsert('host_alloggiati_credentials', {
-          property_id: propertyId,
-          verified_at: null,
-          last_error:  stampErr,
-        }, 'property_id');
+        await sbPatch(
+          `host_alloggiati_credentials?property_id=eq.${encodeURIComponent(propertyId)}`,
+          { verified_at: null, last_error: stampErr },
+        );
       } catch (_) {}
       return res.status(200).json({
         verified: false,
@@ -253,11 +270,10 @@ export default async function handler(req, res) {
       const portalMsg = e.message || 'Alloggiati portal rejected the credentials';
       console.warn('[alloggiati] verify: GenerateToken failed:', e.code, portalMsg);
       try {
-        await sbUpsert('host_alloggiati_credentials', {
-          property_id: propertyId,
-          verified_at: null,
-          last_error:  portalMsg,
-        }, 'property_id');
+        await sbPatch(
+          `host_alloggiati_credentials?property_id=eq.${encodeURIComponent(propertyId)}`,
+          { verified_at: null, last_error: portalMsg },
+        );
       } catch (_) {}
       return res.status(200).json({
         verified: false,
@@ -272,11 +288,10 @@ export default async function handler(req, res) {
       const portalMsg = e.message || 'Alloggiati authentication test failed';
       console.warn('[alloggiati] verify: Authentication_Test failed:', e.code, portalMsg);
       try {
-        await sbUpsert('host_alloggiati_credentials', {
-          property_id: propertyId,
-          verified_at: null,
-          last_error:  portalMsg,
-        }, 'property_id');
+        await sbPatch(
+          `host_alloggiati_credentials?property_id=eq.${encodeURIComponent(propertyId)}`,
+          { verified_at: null, last_error: portalMsg },
+        );
       } catch (_) {}
       return res.status(200).json({
         verified: false,
@@ -293,11 +308,10 @@ export default async function handler(req, res) {
     // keep wskey_expires_at null; a future admin UI can let the host
     // record their portal-set expiry manually.
     try {
-      await sbUpsert('host_alloggiati_credentials', {
-        property_id: propertyId,
-        verified_at: verifiedAt,
-        last_error:  null,
-      }, 'property_id');
+      await sbPatch(
+        `host_alloggiati_credentials?property_id=eq.${encodeURIComponent(propertyId)}`,
+        { verified_at: verifiedAt, last_error: null },
+      );
     } catch (e) {
       console.error('[alloggiati] verify: stamp failed:', e.message);
       // Don't fail the whole call — the credentials DID verify; the

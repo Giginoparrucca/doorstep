@@ -8476,19 +8476,31 @@ function renderAlloggiatiCard() {
   }
   const d = _alloggiatiState.data || {};
   if (d.configured) {
-    const verifiedLine = d.verified_at
+    // Round 44 Phase 1 — a fresh save always clears verified_at, so
+    // "configured but not verified" means "click Verifica ora and let
+    // us hit Alloggiati's portal for you". Once verified, a smaller
+    // "Verify again" sits next to Update / Remove.
+    const isVerified = !!d.verified_at;
+    const verifiedLine = isVerified
       ? (it ? `✓ Verificato il ${new Date(d.verified_at).toLocaleString('it-IT')}` : `✓ Verified on ${new Date(d.verified_at).toLocaleString('en-GB')}`)
-      : (it ? '⚠️ Salvate ma non ancora verificate' : '⚠️ Saved but not verified yet');
+      : (it ? '⚠️ Salvate ma non ancora verificate — clicca Verifica ora.' : '⚠️ Saved but not verified yet — click Verify now.');
+    const verifiedColor = isVerified ? '#2f7a44' : '#8a6300';
     const errorLine = d.last_error
       ? `<div style="margin-top:6px;padding:8px 10px;background:rgba(207,68,68,0.08);border:1px solid rgba(207,68,68,0.3);border-radius:6px;font-size:0.78rem;color:#b03939;">${safe(d.last_error)}</div>`
       : '';
+    const verifyBtnClass = isVerified ? 'btn btn-secondary btn-sm' : 'btn btn-primary btn-sm';
+    const verifyBtnLabel = isVerified
+      ? (it ? '🔄 Verifica di nuovo' : '🔄 Verify again')
+      : (it ? '✓ Verifica ora' : '✓ Verify now');
     body.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;">
         <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#2f7a44;background:rgba(109,191,130,0.16);padding:3px 10px;border-radius:999px;">${safe(it ? 'Configurato' : 'Configured')}</span>
-        <span style="font-size:0.82rem;color:var(--ink-soft);">${safe(verifiedLine)}</span>
+        <span style="font-size:0.82rem;color:${verifiedColor};">${safe(verifiedLine)}</span>
       </div>
       ${errorLine}
+      <div id="alloggiatiVerifyMsg" style="font-size:0.78rem;color:var(--ink-soft);min-height:1em;margin-top:6px;"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+        <button type="button" class="${verifyBtnClass}" onclick="verifyAlloggiatiCredentials(this)">${safe(verifyBtnLabel)}</button>
         <button type="button" class="btn btn-secondary btn-sm" onclick="openAlloggiatiForm(true)">✏️ ${safe(it ? 'Aggiorna credenziali' : 'Update credentials')}</button>
         <button type="button" class="btn btn-secondary btn-sm" onclick="removeAlloggiatiCredentials()" style="color:var(--red);border-color:rgba(224,69,94,0.3);">${safe(it ? '🗑 Rimuovi' : '🗑 Remove')}</button>
       </div>`;
@@ -8531,7 +8543,7 @@ function openAlloggiatiForm(isUpdate) {
       <label style="display:flex;flex-direction:column;gap:4px;">
         <span style="font-size:0.78rem;color:var(--ink-soft);">WsKey ${safe(it ? '(dal portale — sezione "Chiavi web service")' : '(from the portal — "Web service keys" section)')}</span>
         <input class="form-input" type="text" id="alloggiatiWsKey" autocomplete="off" spellcheck="false">
-        <span style="font-size:0.7rem;color:var(--ink-soft);">${safe(it ? 'La WsKey scade ogni 24 ore. Il sistema la rinnoverà automaticamente in background.' : 'The WsKey expires every 24 hours. The system will renew it automatically in the background.')}</span>
+        <span style="font-size:0.7rem;color:var(--ink-soft);">${safe(it ? 'La WsKey viene generata dal portale Alloggiati e resta valida fino a 12 mesi. Il token di sessione (24 h) viene rinnovato automaticamente in background.' : 'The WsKey is issued by the Alloggiati portal and lasts up to 12 months. The 24-hour session token is renewed automatically in the background.')}</span>
       </label>
       <label style="display:flex;gap:8px;align-items:flex-start;margin-top:4px;font-size:0.78rem;color:var(--ink);line-height:1.4;">
         <input type="checkbox" id="alloggiatiConsent" style="margin-top:3px;flex:0 0 auto;">
@@ -8563,7 +8575,7 @@ async function saveAlloggiatiCredentials(btn) {
   try {
     await _alloggiatiApi('save', { property_id: propertyId, utente, password, wskey, consent: true });
     try { track('alloggiati_credentials_saved', {}); } catch(_) {}
-    try { toast(it ? '✓ Credenziali salvate. La verifica arriverà con la Fase 1.' : '✓ Credentials saved. Verification lands in Phase 1.'); } catch(_) {}
+    try { toast(it ? '✓ Credenziali salvate. Ora clicca Verifica ora per confermare l\'accesso al portale.' : '✓ Credentials saved. Now click Verify now to confirm portal access.'); } catch(_) {}
     await loadAlloggiatiCard();
   } catch (e) {
     console.warn('[alloggiati] save failed:', e.message);
@@ -8587,6 +8599,44 @@ async function removeAlloggiatiCredentials() {
   } catch (e) {
     console.warn('[alloggiati] delete failed:', e.message);
     try { toast((it ? 'Rimozione fallita: ' : 'Delete failed: ') + e.message); } catch(_) {}
+  }
+}
+
+// Round 44 Phase 1 — hit /api/alloggiati?action=verify and update the
+// card with the result. The endpoint always returns HTTP 200 for a
+// completed round-trip; verified=true|false is in the body. The
+// server has already stamped verified_at / last_error on the row, so
+// we reload the card afterwards to pick up the fresh state.
+async function verifyAlloggiatiCredentials(btn) {
+  if (!propertyId) return;
+  const it = hostLang === 'it';
+  const msgEl = document.getElementById('alloggiatiVerifyMsg');
+  const setMsg = (m, color) => {
+    if (!msgEl) return;
+    msgEl.textContent = m || '';
+    msgEl.style.color = color || 'var(--ink-soft)';
+  };
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+  setMsg(it ? 'Contatto il portale Alloggiati…' : 'Contacting the Alloggiati portal…', 'var(--ink-soft)');
+  try {
+    const out = await _alloggiatiApi('verify', { property_id: propertyId });
+    if (out && out.verified) {
+      try { track('alloggiati_verify_ok', {}); } catch(_) {}
+      try { toast(it ? '✓ Credenziali verificate con successo.' : '✓ Credentials verified successfully.'); } catch(_) {}
+      await loadAlloggiatiCard();
+    } else {
+      const portalMsg = (out && out.error) ? out.error : (it ? 'Verifica fallita.' : 'Verification failed.');
+      try { track('alloggiati_verify_failed', { code: out?.error_code || 'unknown' }); } catch(_) {}
+      // Server has already stamped last_error, so a full reload paints
+      // the red row + button state consistently.
+      await loadAlloggiatiCard();
+      try { toast((it ? 'Verifica fallita: ' : 'Verification failed: ') + portalMsg); } catch(_) {}
+    }
+  } catch (e) {
+    console.warn('[alloggiati] verify failed:', e.message);
+    setMsg('', 'var(--ink-soft)');
+    try { toast((it ? 'Verifica fallita: ' : 'Verification failed: ') + e.message); } catch(_) {}
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
   }
 }
 

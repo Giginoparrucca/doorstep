@@ -10,11 +10,12 @@
 //   POST   ?action=status  { property_id }       → { configured, verified_at, wskey_expires_at, last_error }
 //   POST   ?action=save    { property_id, utente, password, wskey, consent }
 //                                                → { configured: true, saved_at }
+//   POST   ?action=verify  { property_id }       → { verified, verified_at?, token_expires_at?, error?, error_code? }
 //   POST   ?action=delete  { property_id }       → { configured: false }
 //
-// Future phases (Phase 1 = auth verify, Phase 2 = validate, Phase 3 =
-// send) will add ?action=verify / ?action=validate / ?action=send
-// here. Keeping them in ONE file preserves the function budget.
+// Future phases (Phase 2 = validate, Phase 3 = send) will add
+// ?action=validate / ?action=send here. Keeping them in ONE file
+// preserves the function budget.
 //
 // Security
 // --------
@@ -31,7 +32,8 @@
 //   viewers cannot save credentials on behalf of a host.
 
 import { applyCors } from './_cors.js';
-import { encryptCredentials } from './_alloggiati-crypto.js';
+import { encryptCredentials, decryptCredentials } from './_alloggiati-crypto.js';
+import { generateToken, authenticationTest } from './_alloggiati-soap.js';
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
@@ -187,6 +189,132 @@ export default async function handler(req, res) {
       console.error('[alloggiati] save failed:', e.message);
       return res.status(500).json({ error: 'Save failed' });
     }
+  }
+
+  if (action === 'verify') {
+    // Round 44 Phase 1 — hit Alloggiati's SOAP endpoint with the
+    // stored credentials and stamp verified_at + last_error on the row.
+    //
+    // Return contract (always HTTP 200 for a completed attempt, even
+    // when the portal rejected the credentials — the client renders
+    // the result differently for `verified: true` vs `verified: false`):
+    //   { verified: true,  verified_at, token_expires_at }
+    //   { verified: false, error, error_code }
+    //
+    // We NEVER return the token to the client. It lives only in this
+    // function's memory during the two SOAP calls and is discarded.
+    let row;
+    try {
+      const rows = await sbGet(
+        `host_alloggiati_credentials?property_id=eq.${encodeURIComponent(propertyId)}` +
+        `&select=credentials_enc,credentials_nonce,enc_key_id&limit=1`
+      );
+      row = Array.isArray(rows) && rows[0];
+    } catch (e) {
+      console.warn('[alloggiati] verify: row lookup failed:', e.message);
+      return res.status(500).json({ error: 'Credential lookup failed' });
+    }
+    if (!row) {
+      return res.status(400).json({ error: 'No credentials saved for this property yet' });
+    }
+
+    let creds;
+    try {
+      creds = await decryptCredentials(row);
+    } catch (e) {
+      console.error('[alloggiati] verify: decrypt failed:', e.message);
+      // Stamp the row so the UI shows the honest state — "we can't
+      // read your stored credentials, please re-enter". Common causes
+      // are a rotated ALLOGGIATI_ENC_KEY without background re-encrypt.
+      const stampErr = 'Stored credentials unreadable — please re-enter them.';
+      try {
+        await sbUpsert('host_alloggiati_credentials', {
+          property_id: propertyId,
+          verified_at: null,
+          last_error:  stampErr,
+        }, 'property_id');
+      } catch (_) {}
+      return res.status(200).json({
+        verified: false,
+        error: stampErr,
+        error_code: 'decrypt_failed',
+      });
+    }
+
+    // Two SOAP calls: GenerateToken → Authentication_Test. Failure of
+    // either one is treated as a verification failure with the
+    // portal's own error message surfaced to the host.
+    let token, tokenExpires;
+    try {
+      const t = await generateToken(creds);
+      token = t.token;
+      tokenExpires = t.expires || null;
+    } catch (e) {
+      const portalMsg = e.message || 'Alloggiati portal rejected the credentials';
+      console.warn('[alloggiati] verify: GenerateToken failed:', e.code, portalMsg);
+      try {
+        await sbUpsert('host_alloggiati_credentials', {
+          property_id: propertyId,
+          verified_at: null,
+          last_error:  portalMsg,
+        }, 'property_id');
+      } catch (_) {}
+      return res.status(200).json({
+        verified: false,
+        error: portalMsg,
+        error_code: e.code || 'portal_error',
+      });
+    }
+
+    try {
+      await authenticationTest({ utente: creds.utente, token });
+    } catch (e) {
+      const portalMsg = e.message || 'Alloggiati authentication test failed';
+      console.warn('[alloggiati] verify: Authentication_Test failed:', e.code, portalMsg);
+      try {
+        await sbUpsert('host_alloggiati_credentials', {
+          property_id: propertyId,
+          verified_at: null,
+          last_error:  portalMsg,
+        }, 'property_id');
+      } catch (_) {}
+      return res.status(200).json({
+        verified: false,
+        error: portalMsg,
+        error_code: e.code || 'portal_error',
+      });
+    }
+
+    // Success — stamp the row and forget the token.
+    const verifiedAt = new Date().toISOString();
+    // Round 44 Phase 1 note — Alloggiati exposes the TOKEN expiry
+    // (24 h) through GenerateToken, but NOT the underlying WsKey
+    // expiry (set by the host at the portal, up to 12 months). We
+    // keep wskey_expires_at null; a future admin UI can let the host
+    // record their portal-set expiry manually.
+    try {
+      await sbUpsert('host_alloggiati_credentials', {
+        property_id: propertyId,
+        verified_at: verifiedAt,
+        last_error:  null,
+      }, 'property_id');
+    } catch (e) {
+      console.error('[alloggiati] verify: stamp failed:', e.message);
+      // Don't fail the whole call — the credentials DID verify; the
+      // client just won't see the timestamp until the next status
+      // load. Return `verified: true` with a soft warning.
+      return res.status(200).json({
+        verified: true,
+        verified_at: verifiedAt,
+        token_expires_at: tokenExpires,
+        warning: 'Verification succeeded but the timestamp could not be saved.',
+      });
+    }
+    return res.status(200).json({
+      verified: true,
+      verified_at: verifiedAt,
+      token_expires_at: tokenExpires,
+    });
   }
 
   if (action === 'delete') {

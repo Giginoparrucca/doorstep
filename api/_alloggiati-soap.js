@@ -106,24 +106,40 @@ const KNOWN_CODES = {
 };
 
 function interpretResult(xml, resultTag) {
+  // Alloggiati's response shape is inconsistent across operations:
+  //   • GenerateTokenResponse has TWO children — <GenerateTokenResult>
+  //     (TokenInfo: issued/expires/token) AND a SIBLING <result>
+  //     (EsitoOperazioneServizio: esito/ErroreCod/ErroreDes).
+  //   • Authentication_TestResponse has ONE child
+  //     <Authentication_TestResult> that IS itself the
+  //     EsitoOperazioneServizio (esito/ErroreCod/ErroreDes inline).
+  // Either way, esito/ErroreCod/ErroreDes appear exactly once in the
+  // whole document, so we scan the full XML for them. `scope` is
+  // still the resultTag body so callers can pull TokenInfo fields
+  // (token/issued/expires) out of it.
   const result = pickTag(xml, resultTag);
-  // Handle both flat and nested — some SOAP responses inline the
-  // <ResultTag> around the fields directly; pickTag returns the inner
-  // body either way, so read fields off the whole document if
-  // resultTag came back empty.
-  const scope = result || xml;
-  const esito     = pickTag(scope, 'esito').toLowerCase();
-  const erroreCod = parseInt(pickTag(scope, 'ErroreCod') || '0', 10) || 0;
-  const erroreDes = pickTag(scope, 'ErroreDes');
-  const erroreDet = pickTag(scope, 'ErroreDettaglio');
+  const scope  = result || xml;
+  const esito     = pickTag(xml, 'esito').toLowerCase();
+  const erroreCod = parseInt(pickTag(xml, 'ErroreCod') || '0', 10) || 0;
+  const erroreDes = pickTag(xml, 'ErroreDes');
+  const erroreDet = pickTag(xml, 'ErroreDettaglio');
   const ok = esito === 'true' && erroreCod === 0;
+  // If we couldn't even find <esito>, the response is not what we
+  // expect (portal returned an HTML error page, WAF captcha, changed
+  // shape, …). Surface a distinct code so the caller can tell "the
+  // portal said no" apart from "the portal said something we don't
+  // understand".
+  const shapeUnknown = !esito;
   return {
     ok,
-    code: KNOWN_CODES[erroreCod] || (ok ? 'ok' : 'portal_error'),
+    code: shapeUnknown
+      ? 'unrecognized_response'
+      : (KNOWN_CODES[erroreCod] || (ok ? 'ok' : 'portal_error')),
     erroreCod,
     erroreDes,
     erroreDet,
     scope,
+    shapeUnknown,
   };
 }
 

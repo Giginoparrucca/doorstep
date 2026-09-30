@@ -35,7 +35,13 @@
 // Phase 0.5.
 
 import { webcrypto } from 'node:crypto';
-const { subtle, getRandomValues } = webcrypto;
+// NB: `subtle` can be destructured safely (its methods live on the
+// subtle object itself), but `getRandomValues` is a method on the
+// Crypto instance — destructuring detaches it and Node throws
+// "Value of 'this' must be of type Crypto" at call time. Keep it on
+// the webcrypto object.
+const subtle = webcrypto.subtle;
+const getRandomValues = (arr) => webcrypto.getRandomValues(arr);
 
 const KEY_ID_DEFAULT = 'v1';
 const NONCE_BYTES    = 12;   // 96-bit GCM nonce (spec-recommended)

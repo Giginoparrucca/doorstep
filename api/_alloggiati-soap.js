@@ -274,9 +274,113 @@ export async function test({ utente, token, rows }, opts = {}) {
   };
 }
 
+// Public — Send.
+// Actually FILES the tracciato rows with the State Police (unlike
+// Test which is a dry run). Response shape is IDENTICAL to Test:
+// SendResult holds the overall EsitoOperazioneServizio, and a
+// sibling <result> block holds SchedineValide + Dettaglio (one
+// EsitoOperazioneServizio per input row, in order). Returns
+//   { overall: {...}, perRow: [...] }
+// same as test(). The caller decides how to act on partial success.
+export async function send({ utente, token, rows }, opts = {}) {
+  if (!utente || !token) throw new Error('send: missing utente/token');
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error('send: rows must be a non-empty array');
+  }
+  const rowsXml = rows.map(r => `<string>${xmlEscape(r)}</string>`).join('');
+  const body =
+    `<?xml version="1.0" encoding="utf-8"?>` +
+    `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">` +
+      `<soap:Body>` +
+        `<Send xmlns="${SOAP_NS}">` +
+          `<Utente>${xmlEscape(utente)}</Utente>` +
+          `<token>${xmlEscape(token)}</token>` +
+          `<ElencoSchedine>${rowsXml}</ElencoSchedine>` +
+        `</Send>` +
+      `</soap:Body>` +
+    `</soap:Envelope>`;
+  const xml = await postSoap({
+    soapAction: `${SOAP_NS}/Send`,
+    body,
+    // Send is comparable to Test in wall time but takes a bit longer
+    // because it commits — give it more headroom.
+    timeoutMs: opts.timeoutMs || 20000,
+  });
+  const overallResult = interpretResult(xml, 'SendResult');
+  if (overallResult.shapeUnknown) {
+    const err = new Error(overallResult.erroreDes || 'Unrecognized Alloggiati Send response');
+    err.code = 'unrecognized_response';
+    throw err;
+  }
+  const perRow = extractDettaglio(xml);
+  return {
+    overall: {
+      ok: overallResult.ok,
+      code: overallResult.code,
+      erroreCod: overallResult.erroreCod,
+      erroreDes: overallResult.erroreDes,
+    },
+    perRow,
+  };
+}
+
+// Public — Ricevuta.
+// Fetches the receipt PDF for a given filing date. Alloggiati
+// aggregates all rows filed on the same day into ONE receipt, so
+// this is called per calendar day, not per Send batch.
+// Returns { pdf: Buffer, erroreDes } on success. Throws on portal
+// failure. `date` is an ISO date string (YYYY-MM-DD); we format it
+// as a dateTime the SOAP endpoint accepts.
+export async function ricevuta({ utente, token, date }, opts = {}) {
+  if (!utente || !token) throw new Error('ricevuta: missing utente/token');
+  if (!date) throw new Error('ricevuta: missing date');
+  // dateTime with a T00:00:00 suffix is what Alloggiati expects; no
+  // timezone offset — the portal treats the date as Rome local.
+  const iso = /^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date}T00:00:00` : date;
+  const body =
+    `<?xml version="1.0" encoding="utf-8"?>` +
+    `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">` +
+      `<soap:Body>` +
+        `<Ricevuta xmlns="${SOAP_NS}">` +
+          `<Utente>${xmlEscape(utente)}</Utente>` +
+          `<token>${xmlEscape(token)}</token>` +
+          `<Data>${xmlEscape(iso)}</Data>` +
+        `</Ricevuta>` +
+      `</soap:Body>` +
+    `</soap:Envelope>`;
+  const xml = await postSoap({
+    soapAction: `${SOAP_NS}/Ricevuta`,
+    body,
+    timeoutMs: opts.timeoutMs || 15000,
+  });
+  const overallResult = interpretResult(xml, 'RicevutaResult');
+  if (!overallResult.ok) {
+    const err = new Error(overallResult.erroreDes || 'Alloggiati Ricevuta call failed');
+    err.code = overallResult.code || 'portal_error';
+    throw err;
+  }
+  // The PDF is inline in the SOAP body as base64. pickTag pulls it
+  // out; decode to a Buffer for the caller to hand to storage.
+  const b64Pdf = pickTag(xml, 'PDF');
+  if (!b64Pdf) {
+    const err = new Error('Alloggiati returned an empty receipt PDF');
+    err.code = 'empty_pdf';
+    throw err;
+  }
+  const pdf = Buffer.from(b64Pdf, 'base64');
+  if (pdf.length < 100) {
+    // A real Alloggiati receipt is tens of KB; anything under 100
+    // bytes is almost certainly a decode failure or empty payload.
+    const err = new Error('Ricevuta PDF is suspiciously small — refusing to store it');
+    err.code = 'empty_pdf';
+    throw err;
+  }
+  return { pdf, erroreDes: overallResult.erroreDes };
+}
+
 // Extract Dettaglio entries from the outer <result> block of a Test
-// response. Each <EsitoOperazioneServizio> is a self-contained trio
-// of esito/ErroreCod/ErroreDes.
+// or Send response. Each <EsitoOperazioneServizio> is a self-contained
+// trio of esito/ErroreCod/ErroreDes.
 function extractDettaglio(xml) {
   const out = [];
   if (!xml) return out;

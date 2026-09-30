@@ -219,5 +219,86 @@ export async function authenticationTest({ utente, token }, opts = {}) {
   return true;
 }
 
+// Public — Test.
+// Dry-runs a batch of tracciato-record rows through Alloggiati's
+// validator WITHOUT filing them. Returns
+//   { overall: { ok, code, erroreDes }, perRow: [{ ok, code, erroreCod, erroreDes }, ...] }
+// One perRow entry per input row, IN THE SAME ORDER. Alloggiati's
+// Test returns Dettaglio as an array of EsitoOperazioneServizio;
+// even when a row is valid it emits an entry with esito=true. If the
+// count doesn't match input we still return what came back — the
+// caller can flag the mismatch.
+export async function test({ utente, token, rows }, opts = {}) {
+  if (!utente || !token) throw new Error('test: missing utente/token');
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error('test: rows must be a non-empty array');
+  }
+  const rowsXml = rows.map(r => `<string>${xmlEscape(r)}</string>`).join('');
+  const body =
+    `<?xml version="1.0" encoding="utf-8"?>` +
+    `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">` +
+      `<soap:Body>` +
+        `<Test xmlns="${SOAP_NS}">` +
+          `<Utente>${xmlEscape(utente)}</Utente>` +
+          `<token>${xmlEscape(token)}</token>` +
+          `<ElencoSchedine>${rowsXml}</ElencoSchedine>` +
+        `</Test>` +
+      `</soap:Body>` +
+    `</soap:Envelope>`;
+  // Test can be slower than the auth calls (portal validates each row),
+  // so give it a bit more headroom before AbortController fires.
+  const xml = await postSoap({
+    soapAction: `${SOAP_NS}/Test`,
+    body,
+    timeoutMs: opts.timeoutMs || 15000,
+  });
+  const overallResult = interpretResult(xml, 'TestResult');
+  if (overallResult.shapeUnknown) {
+    const err = new Error(overallResult.erroreDes || 'Unrecognized Alloggiati Test response');
+    err.code = 'unrecognized_response';
+    throw err;
+  }
+  // Extract per-row Dettaglio. The <result> block on the outside
+  // carries ElencoSchedineEsito with SchedineValide + Dettaglio.
+  // Dettaglio is an array of <EsitoOperazioneServizio> — pull the
+  // fields out of each one.
+  const perRow = extractDettaglio(xml);
+  return {
+    overall: {
+      ok: overallResult.ok,
+      code: overallResult.code,
+      erroreCod: overallResult.erroreCod,
+      erroreDes: overallResult.erroreDes,
+    },
+    perRow,
+  };
+}
+
+// Extract Dettaglio entries from the outer <result> block of a Test
+// response. Each <EsitoOperazioneServizio> is a self-contained trio
+// of esito/ErroreCod/ErroreDes.
+function extractDettaglio(xml) {
+  const out = [];
+  if (!xml) return out;
+  // Grab every <EsitoOperazioneServizio>…</EsitoOperazioneServizio>
+  // block, namespace-agnostic. Non-greedy body match.
+  const re = /<(?:[a-zA-Z0-9]+:)?EsitoOperazioneServizio(?:\s[^>]*)?>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?EsitoOperazioneServizio>/gi;
+  let m;
+  while ((m = re.exec(xml)) !== null) {
+    const body = m[1] || '';
+    const esito = pickTag(body, 'esito').toLowerCase();
+    const erroreCod = parseInt(pickTag(body, 'ErroreCod') || '0', 10) || 0;
+    const erroreDes = pickTag(body, 'ErroreDes');
+    const ok = esito === 'true' && erroreCod === 0;
+    out.push({
+      ok,
+      code: KNOWN_CODES[erroreCod] || (ok ? 'ok' : 'row_rejected'),
+      erroreCod,
+      erroreDes,
+    });
+  }
+  return out;
+}
+
 // Exported for the unit-style local self-check.
-export const _internal = { xmlEscape, pickTag, interpretResult };
+export const _internal = { xmlEscape, pickTag, interpretResult, extractDettaglio };

@@ -2046,6 +2046,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           </div>
           <div class="tile-actions">
             <button class="btn btn-primary" onclick="exportAlloggiati()" data-h="btn_gen_alloggiati" data-guide="export-alloggiati-btn">📥 Generate Guest File (.txt)</button>
+            <button class="btn btn-secondary" onclick="validateAlloggiati(this)" data-h="btn_validate_alloggiati" data-guide="export-alloggiati-validate">🔍 Validate on Alloggiati</button>
             <a href="https://alloggiatiweb.poliziadistato.it" target="_blank" rel="noopener" class="export-portal-link" data-guide="export-alloggiati-link">
               🔗 <span data-h="link_alloggiati">Open Alloggiati Web</span> ↗
             </a>
@@ -4106,6 +4107,7 @@ const HT = {
     export_csv_desc: 'Download all guest check-in data as a <strong>CSV spreadsheet</strong> — for your own accounting or backup.',
     date_range: 'Date Range', month: 'Month',
     btn_gen_alloggiati: '📥 Generate Guest File (.txt)',
+    btn_validate_alloggiati: '🔍 Validate on Alloggiati',
     btn_dl_csv: '📥 Download CSV',
     btn_gen_istat: '📊 Generate C/59 Summary',
     link_alloggiati: 'Open Alloggiati Web',
@@ -4604,6 +4606,7 @@ const HT = {
     export_csv_desc: 'Scarica tutti i dati dei check-in come <strong>foglio di calcolo CSV</strong> — per la tua contabilità o backup.',
     date_range: 'Intervallo Date', month: 'Mese',
     btn_gen_alloggiati: '📥 Genera File Ospiti (.txt)',
+    btn_validate_alloggiati: '🔍 Valida su Alloggiati',
     btn_dl_csv: '📥 Scarica CSV',
     btn_gen_istat: '📊 Genera Riepilogo C/59',
     link_alloggiati: 'Apri Alloggiati Web',
@@ -9703,8 +9706,17 @@ function fmtDateIT(isoDate) {
   return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
 }
 
-function exportAlloggiati() {
-  if (allCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato check-in da esportare!' : 'No check-in data to export!'); return; }
+// Round 44 Phase 2 — the tracciato-record building loop was previously
+// inlined inside exportAlloggiati(). It's now shared with the new
+// validateAlloggiati() call so the .txt file we would export and the
+// batch we send to Alloggiati's Test operation are guaranteed to be
+// the same bytes. Returns:
+//   { lines, warnings, groupCount, rowMeta } — ready to download or validate
+//   null                                     — user was blocked or cancelled
+// (rowMeta[i] carries { idx, checkin_id, name, surname, booking_code }
+//  so the results modal can display which row a portal error refers to.)
+function _prepareAlloggiatiExport() {
+  if (allCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato check-in da esportare!' : 'No check-in data to export!'); return null; }
 
   // Round 42.1 — Alloggiati Web rejects any row whose arrival is in the
   // future. Guests can pre-check-in days ahead of time, so an unfiltered
@@ -9741,14 +9753,14 @@ function exportAlloggiati() {
         : (futureCount > 0
             ? `No guests have arrived yet. ${futureCount} future check-in(s) excluded.`
             : 'No arrived guests to export.'));
-      return;
+      return null;
     }
     const suffix = futureCount > 0
       ? (hostLang === 'it' ? ` (${futureCount} check-in futuri esclusi)` : ` (${futureCount} future check-in(s) excluded)`)
       : '';
     if (!confirm(hostLang === 'it'
       ? `Nessun ospite nelle ultime 48 ore. Esportare tutti i ${arrivedAll.length} ospiti già arrivati?${suffix}`
-      : `No guests in the last 48 hours. Export all ${arrivedAll.length} arrived guest(s)?${suffix}`)) return;
+      : `No guests in the last 48 hours. Export all ${arrivedAll.length} arrived guest(s)?${suffix}`)) return null;
     toExport = arrivedAll;
   }
 
@@ -9763,7 +9775,7 @@ function exportAlloggiati() {
       .slice(0, 20);
     const more = dobOffenders.length > 20 ? `\n… +${dobOffenders.length - 20}` : '';
     alert(h('dob_invalid_export_block') + '\n\n• ' + names.join('\n• ') + more);
-    return;
+    return null;
   }
 
   // ── GROUP BY STAY ──
@@ -9779,6 +9791,7 @@ function exportAlloggiati() {
   // ── SORT WITHIN EACH GROUP: head first, then members ──
   const warnings = [];
   const lines = [];
+  const rowMeta = [];
   const mainTypes = ['single', 'head', 'group'];
 
   Object.values(groups).forEach(group => {
@@ -9878,10 +9891,24 @@ function exportAlloggiati() {
         warnings.push(`⚠ Row ${globalIdx}: ${c.name} ${c.surname} — couldn't resolve citizenship "${citz}" to a 9-digit code. Check the country name spelling or add it to COUNTRY_ALIASES.`);
       }
       lines.push(line);
+      rowMeta.push({
+        idx: globalIdx,
+        checkin_id: c.id || null,
+        name: c.name || '',
+        surname: c.surname || '',
+        booking_code: c.booking_code || null,
+      });
     });
   });
 
   const groupCount = Object.keys(groups).length;
+  return { lines, warnings, groupCount, rowMeta };
+}
+
+function exportAlloggiati() {
+  const prep = _prepareAlloggiatiExport();
+  if (!prep) return;
+  const { lines, warnings, groupCount } = prep;
   const fileContent = lines.join('\r\n');
   // Filename kept as alloggiati_YYYY-MM-DD for familiarity — this IS the
   // Alloggiati tracciato record format, which SPOT Easy also accepts via
@@ -9895,6 +9922,101 @@ function exportAlloggiati() {
   } else {
     toast(`✅ ${lines.length} guest(s) · ${groupCount} stay(s) · works on Alloggiati + SPOT Easy`);
   }
+}
+
+// Round 44 Phase 2 — dry-run the same batch through Alloggiati's Test
+// operation via /api/alloggiati?action=validate. Nothing is filed;
+// this only surfaces which rows the portal would accept vs reject
+// and WHY. Result modal maps each rejection back to a specific guest
+// row so the host can go fix it.
+async function validateAlloggiati(btn) {
+  if (!propertyId) { toast(hostLang === 'it' ? 'Nessuna proprietà selezionata.' : 'No property selected.'); return; }
+  const prep = _prepareAlloggiatiExport();
+  if (!prep) return;
+  const it = hostLang === 'it';
+  const { lines, rowMeta, warnings } = prep;
+
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+  const origLabel = btn ? btn.innerHTML : '';
+  if (btn) btn.innerHTML = it ? '⏳ Validazione in corso…' : '⏳ Validating…';
+  try {
+    const out = await _alloggiatiApi('validate', { property_id: propertyId, rows: lines });
+    if (!out || out.ok === false) {
+      const msg = (out && out.error) ? out.error : (it ? 'Validazione fallita.' : 'Validation failed.');
+      alert((it ? 'Validazione fallita:\n\n' : 'Validation failed:\n\n') + msg);
+      try { track('alloggiati_validate_portal_failed', { error_code: out?.error_code || 'unknown' }); } catch(_) {}
+      return;
+    }
+    try { track('alloggiati_validate_ok', { total: out.total, valid: out.valid_count }); } catch(_) {}
+    _openAlloggiatiValidationModal(out, rowMeta, warnings);
+  } catch (e) {
+    console.warn('[alloggiati] validate failed:', e.message);
+    alert((it ? 'Validazione fallita: ' : 'Validation failed: ') + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.style.opacity = ''; btn.innerHTML = origLabel; }
+  }
+}
+
+// Results modal — one row per input, green for accepted, red for
+// rejected with the portal's own ErroreDes. Groups by booking code
+// so a stay with two rejected members reads as one incident.
+function _openAlloggiatiValidationModal(out, rowMeta, clientWarnings) {
+  document.getElementById('alloggiatiValidateModal')?.remove();
+  const it = hostLang === 'it';
+  const safe = _alloggiatiSafe;
+  const total = out.total || 0;
+  const validCount = out.valid_count || 0;
+  const rejectedCount = total - validCount;
+  const headerTint = rejectedCount === 0 ? '#2f7a44' : '#b03939';
+  const headerText = rejectedCount === 0
+    ? (it ? `✓ Tutte le ${total} righe sono valide.` : `✓ All ${total} rows are valid.`)
+    : (it ? `⚠ ${rejectedCount} riga/e su ${total} rifiutata/e da Alloggiati.` : `⚠ ${rejectedCount} of ${total} row(s) rejected by Alloggiati.`);
+  const perRowHtml = (out.per_row || []).map(r => {
+    const meta = rowMeta[r.idx - 1] || {};
+    const name = `${(meta.surname || '').trim()} ${(meta.name || '').trim()}`.trim() || (meta.booking_code || (it ? 'senza nome' : 'no name'));
+    if (r.ok) {
+      return `<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid rgba(0,0,0,0.06);">
+        <span style="color:#2f7a44;font-weight:700;flex:0 0 28px;">✓</span>
+        <div style="flex:1;">
+          <div style="font-weight:600;">${safe(name)}</div>
+          <div style="font-size:0.72rem;color:var(--ink-soft);">${safe(it ? 'Riga' : 'Row')} ${r.idx}${meta.booking_code ? ' · ' + safe(meta.booking_code) : ''}</div>
+        </div>
+      </div>`;
+    }
+    return `<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid rgba(0,0,0,0.06);">
+      <span style="color:#b03939;font-weight:700;flex:0 0 28px;">✗</span>
+      <div style="flex:1;">
+        <div style="font-weight:600;">${safe(name)}</div>
+        <div style="font-size:0.78rem;color:#b03939;margin-top:2px;">${safe(r.error_message || (it ? 'Riga rifiutata' : 'Row rejected'))}${r.errore_cod ? ` <span style="color:var(--ink-soft);">(cod. ${r.errore_cod})</span>` : ''}</div>
+        <div style="font-size:0.72rem;color:var(--ink-soft);">${safe(it ? 'Riga' : 'Row')} ${r.idx}${meta.booking_code ? ' · ' + safe(meta.booking_code) : ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+  const warnBlock = (Array.isArray(clientWarnings) && clientWarnings.length > 0)
+    ? `<div style="margin-top:12px;padding:10px 12px;background:rgba(232,184,75,0.12);border:1px solid rgba(232,184,75,0.4);border-radius:8px;font-size:0.78rem;color:#7d5e10;">
+        <div style="font-weight:700;margin-bottom:4px;">${safe(it ? 'Avvisi locali (prima di contattare Alloggiati):' : 'Local warnings (before contacting Alloggiati):')}</div>
+        ${clientWarnings.map(w => `<div style="margin-top:2px;">${safe(w)}</div>`).join('')}
+       </div>`
+    : '';
+  const modal = document.createElement('div');
+  modal.id = 'alloggiatiValidateModal';
+  modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10000;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;';
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.innerHTML = `
+    <div style="background:var(--white);max-width:640px;width:100%;border-radius:14px;padding:18px 20px 16px;box-shadow:0 12px 48px rgba(0,0,0,0.25);max-height:calc(100vh - 60px);overflow-y:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <h3 style="font-family:'Playfair Display',serif;font-weight:600;font-size:1.05rem;color:var(--ink);margin:0;">${safe(it ? 'Risultati validazione Alloggiati' : 'Alloggiati validation results')}</h3>
+        <button type="button" onclick="document.getElementById('alloggiatiValidateModal')?.remove()" aria-label="${safe(it ? 'Chiudi' : 'Close')}" style="background:none;border:none;font-size:1.4rem;color:var(--ink-soft);cursor:pointer;padding:2px 8px;line-height:1;">×</button>
+      </div>
+      <div style="font-size:0.9rem;color:${headerTint};font-weight:600;margin-bottom:10px;">${safe(headerText)}</div>
+      <div style="font-size:0.75rem;color:var(--ink-soft);margin-bottom:6px;">${safe(it ? 'Nessun dato è stato inviato al portale della polizia. Questo è un test in bianco.' : 'No data was submitted to the police portal. This is a dry-run check.')}</div>
+      <div>${perRowHtml || `<div style="color:var(--ink-soft);padding:6px 0;">${safe(it ? 'Nessun dettaglio per riga.' : 'No per-row detail returned.')}</div>`}</div>
+      ${warnBlock}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
+        <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('alloggiatiValidateModal')?.remove()">${safe(it ? 'Chiudi' : 'Close')}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
 }
 
 /* ══════════════════════════════════════

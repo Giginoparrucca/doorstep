@@ -7,15 +7,15 @@
 //
 // Actions
 // -------
-//   POST   ?action=status  { property_id }       → { configured, verified_at, wskey_expires_at, last_error }
-//   POST   ?action=save    { property_id, utente, password, wskey, consent }
-//                                                → { configured: true, saved_at }
-//   POST   ?action=verify  { property_id }       → { verified, verified_at?, token_expires_at?, error?, error_code? }
-//   POST   ?action=delete  { property_id }       → { configured: false }
+//   POST   ?action=status    { property_id }       → { configured, verified_at, wskey_expires_at, last_error }
+//   POST   ?action=save      { property_id, utente, password, wskey, consent }
+//                                                  → { configured: true, saved_at }
+//   POST   ?action=verify    { property_id }       → { verified, verified_at?, token_expires_at?, error?, error_code? }
+//   POST   ?action=validate  { property_id, rows[] } → { ok, overall, per_row[] }
+//   POST   ?action=delete    { property_id }       → { configured: false }
 //
-// Future phases (Phase 2 = validate, Phase 3 = send) will add
-// ?action=validate / ?action=send here. Keeping them in ONE file
-// preserves the function budget.
+// Future phase (Phase 3 = send) will add ?action=send here. Keeping
+// them in ONE file preserves the function budget.
 //
 // Security
 // --------
@@ -33,7 +33,7 @@
 
 import { applyCors } from './_cors.js';
 import { encryptCredentials, decryptCredentials } from './_alloggiati-crypto.js';
-import { generateToken, authenticationTest } from './_alloggiati-soap.js';
+import { generateToken, authenticationTest, test as soapTest } from './_alloggiati-soap.js';
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
@@ -328,6 +328,112 @@ export default async function handler(req, res) {
       verified: true,
       verified_at: verifiedAt,
       token_expires_at: tokenExpires,
+    });
+  }
+
+  if (action === 'validate') {
+    // Round 44 Phase 2 — dry-run a batch of tracciato-record rows
+    // through Alloggiati's Test operation. NOTHING is filed. Response
+    // shape (always HTTP 200 for a completed round-trip):
+    //   { ok: true, overall: {...}, per_row: [{ idx, ok, error_message?, error_code? }, ...] }
+    // or, for a portal-side failure:
+    //   { ok: false, error, error_code }
+    //
+    // Client sends the rows it BUILT locally (so what we validate is
+    // what would land in the .txt file). The endpoint enforces
+    // per-property ownership up-front and caps the batch size — a
+    // host can only run Test against their own account with rows
+    // they generated.
+    const rowsIn = Array.isArray(body.rows) ? body.rows : [];
+    if (rowsIn.length === 0) {
+      return res.status(400).json({ error: 'rows must be a non-empty array' });
+    }
+    if (rowsIn.length > 200) {
+      return res.status(400).json({ error: 'Too many rows (max 200 per validation batch)' });
+    }
+    // Each row is a 168-char string. Reject anything that isn't a
+    // string outright — we don't want unbounded objects going to the
+    // portal. Length is soft-checked (portal will complain about the
+    // wrong bytes; we still surface that per-row).
+    for (let i = 0; i < rowsIn.length; i++) {
+      if (typeof rowsIn[i] !== 'string') {
+        return res.status(400).json({ error: `Row ${i + 1} is not a string` });
+      }
+      if (rowsIn[i].length > 400) {
+        return res.status(400).json({ error: `Row ${i + 1} is too long` });
+      }
+    }
+
+    // Load stored credentials, decrypt, mint a fresh token.
+    let row;
+    try {
+      const rows = await sbGet(
+        `host_alloggiati_credentials?property_id=eq.${encodeURIComponent(propertyId)}` +
+        `&select=credentials_enc,credentials_nonce,enc_key_id&limit=1`
+      );
+      row = Array.isArray(rows) && rows[0];
+    } catch (e) {
+      console.warn('[alloggiati] validate: row lookup failed:', e.message);
+      return res.status(500).json({ error: 'Credential lookup failed' });
+    }
+    if (!row) return res.status(400).json({ error: 'No credentials saved for this property yet' });
+
+    let creds;
+    try {
+      creds = await decryptCredentials(row);
+    } catch (e) {
+      console.error('[alloggiati] validate: decrypt failed:', e.message);
+      return res.status(200).json({
+        ok: false,
+        error: 'Stored credentials unreadable — please re-enter them.',
+        error_code: 'decrypt_failed',
+      });
+    }
+
+    let token;
+    try {
+      const t = await generateToken(creds);
+      token = t.token;
+    } catch (e) {
+      const portalMsg = e.message || 'Alloggiati portal rejected the credentials';
+      console.warn('[alloggiati] validate: GenerateToken failed:', e.code, portalMsg);
+      return res.status(200).json({ ok: false, error: portalMsg, error_code: e.code || 'portal_error' });
+    }
+
+    let outcome;
+    try {
+      outcome = await soapTest({ utente: creds.utente, token, rows: rowsIn });
+    } catch (e) {
+      const portalMsg = e.message || 'Alloggiati Test call failed';
+      console.warn('[alloggiati] validate: Test failed:', e.code, portalMsg);
+      return res.status(200).json({ ok: false, error: portalMsg, error_code: e.code || 'portal_error' });
+    }
+
+    // Zip outcome.perRow with the input order. If the portal returned
+    // FEWER Dettaglio entries than we sent, treat the missing ones as
+    // "unknown" so the client can flag them explicitly rather than
+    // silently marking them ok.
+    const perRow = rowsIn.map((_, i) => {
+      const r = outcome.perRow[i];
+      if (!r) {
+        return { idx: i + 1, ok: false, error_code: 'no_response', error_message: 'Portal returned no result for this row' };
+      }
+      if (r.ok) return { idx: i + 1, ok: true };
+      return {
+        idx: i + 1,
+        ok: false,
+        error_code: r.code,
+        errore_cod: r.erroreCod,
+        error_message: r.erroreDes || 'Row rejected',
+      };
+    });
+
+    return res.status(200).json({
+      ok: true,
+      overall: outcome.overall,
+      total: rowsIn.length,
+      valid_count: perRow.filter(p => p.ok).length,
+      per_row: perRow,
     });
   }
 

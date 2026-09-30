@@ -1596,6 +1596,11 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <label class="form-label" data-h="prop_host">Host Name(s)</label>
             <input class="form-input" value="" id="propHostNames">
           </div>
+          <div class="form-group">
+            <label class="form-label" data-h="prop_host_email">Host email</label>
+            <input class="form-input" type="email" value="" id="propHostEmail" autocomplete="off">
+            <div class="form-hint" data-h="prop_host_email_hint">Shown in the privacy notice so guests can exercise their GDPR rights (Art. 15+).</div>
+          </div>
         </div>
       </div>
 
@@ -4042,6 +4047,8 @@ const HT = {
     dash_no_dismissed: 'No dismissed bookings.',
     prop_wifi: 'WiFi & Essentials', prop_wifi_name: 'WiFi Network', prop_wifi_pass: 'WiFi Password',
     prop_welcome: 'Host Welcome Message', prop_emergency: 'Emergency Phone', prop_host: 'Host Name(s)',
+    prop_host_email: 'Host email',
+    prop_host_email_hint: 'Shown in the privacy notice so guests can exercise their GDPR rights (Art. 15+).',
     btn_save_property: '💾 Save Property Details',
     // Property form
     prop_cover: 'Cover Photo', prop_cover_desc: 'This photo appears as the hero image on the guest welcome screen.',
@@ -4544,6 +4551,8 @@ const HT = {
     dash_no_dismissed: 'Nessuna prenotazione nascosta.',
     prop_wifi: 'WiFi & Essenziali', prop_wifi_name: 'Rete WiFi', prop_wifi_pass: 'Password WiFi',
     prop_welcome: 'Messaggio di Benvenuto', prop_emergency: 'Telefono Emergenza', prop_host: 'Nome Host',
+    prop_host_email: 'E-mail del titolare',
+    prop_host_email_hint: 'Mostrata nell\'informativa privacy così l\'ospite può esercitare i diritti GDPR (art. 15+).',
     btn_save_property: '💾 Salva Dettagli Proprietà',
     prop_cover: 'Foto Copertina', prop_cover_desc: 'Questa foto appare come immagine principale nella schermata di benvenuto.',
     prop_cover_click: 'Clicca per caricare la foto',
@@ -4771,6 +4780,11 @@ function setHostLang(l) {
   renderRecos();
   if (typeof renderCompliance === 'function') renderCompliance();
   if (typeof renderPropertySwitcher === 'function') renderPropertySwitcher(); // Round 21
+  // Round 44 hotfix — the privacy-notice warnings banner is generated
+  // in Italian OR English depending on hostLang; without this call the
+  // banner remained frozen in whichever language was active at panel
+  // render time.
+  if (typeof _updatePropPrivacyWarnings === 'function') _updatePropPrivacyWarnings();
   // Round 42.5 — the Avvisi card body is built from `it ? ... : ...`
   // ternaries at render time, so a language flip after the card is
   // open would leave the previous language stuck. Only repaint when
@@ -7544,6 +7558,10 @@ async function saveProperty() {
     })(),
     host_phone: document.getElementById('propPhone').value,
     host_names: document.getElementById('propHostNames').value,
+    // Round 44 hotfix — host_email now has a first-class input; the
+    // privacy notice references it (Art. 15 right-of-access) so it has
+    // to be reachable.
+    host_email: (document.getElementById('propHostEmail')?.value || '').trim() || null,
     ical_feeds: collectIcalFeeds(),
     reminder_email: (document.getElementById('propReminderEmail')?.value || '').trim() || null,
     timezone: document.getElementById('propTimezone')?.value || 'Europe/Rome',
@@ -10588,26 +10606,86 @@ function buildHostPrivacyDownloadHTML(prop) {
 }
 
 // Warning banner — the empty-field list. Runs whenever the Property
-// panel is rendered / the language switches.
+// panel is rendered AND whenever the language switches (setHostLang
+// calls back into here so the copy stays in sync).
+// Round 44 hotfix — each bullet is a clickable jump to the actual
+// input that fills it, so the host doesn't have to hunt for the field.
+// Clicking scrolls the input into view, focuses it, and pulses a
+// brief amber ring so it's obvious where to type.
 function _updatePropPrivacyWarnings() {
   const box = document.getElementById('propPrivacyWarnings');
   if (!box) return;
   const it = hostLang === 'it';
-  const missing = [];
   const p = propertyData || {};
-  if (!(p.host_email && String(p.host_email).trim())) missing.push(it ? 'e-mail del titolare (necessaria per esercitare l\'art. 15 GDPR)' : 'host email (guests need it to exercise Art. 15 rights)');
-  if (!(p.host_phone && String(p.host_phone).trim())) missing.push(it ? 'telefono del titolare' : 'host phone');
-  if (!(p.cir_code && String(p.cir_code).trim())) missing.push(it ? 'CIN' : 'CIN');
-  if (!(p.host_names && String(p.host_names).trim())) missing.push(it ? 'nome del titolare del trattamento' : 'host name');
+  const missing = [];
+  // { key, label (localised), targetId (input to jump to) }
+  if (!(p.host_email && String(p.host_email).trim())) missing.push({
+    key: 'host_email',
+    targetId: 'propHostEmail',
+    label: it ? 'e-mail del titolare (necessaria per esercitare l\'art. 15 GDPR)' : 'host email (guests need it to exercise Art. 15 rights)',
+  });
+  if (!(p.host_phone && String(p.host_phone).trim())) missing.push({
+    key: 'host_phone',
+    targetId: 'propPhone',
+    label: it ? 'telefono del titolare' : 'host phone',
+  });
+  if (!(p.cir_code && String(p.cir_code).trim())) missing.push({
+    key: 'cir_code',
+    targetId: 'cirCode',
+    label: 'CIN',
+  });
+  if (!(p.host_names && String(p.host_names).trim())) missing.push({
+    key: 'host_names',
+    targetId: 'propHostNames',
+    label: it ? 'nome del titolare del trattamento' : 'host name',
+  });
   if (missing.length === 0) {
     box.style.display = 'none';
     box.innerHTML = '';
     return;
   }
-  const items = missing.map(m => `<li style="margin:2px 0;">${_hostPrivacyEsc(m)}</li>`).join('');
-  const head = it ? '⚠ Alcuni campi usati dall\'informativa sono vuoti — le righe corrispondenti vengono omesse dall\'informativa mostrata all\'ospite:' : '⚠ Some fields used by the notice are empty — the corresponding lines are dropped from what the guest sees:';
-  box.innerHTML = `<div style="margin-bottom:4px;">${_hostPrivacyEsc(head)}</div><ul style="margin:0 0 0 20px;padding:0;">${items}</ul>`;
+  const head = it
+    ? '⚠ Alcuni campi usati dall\'informativa sono vuoti — le righe corrispondenti vengono omesse dall\'informativa mostrata all\'ospite:'
+    : '⚠ Some fields used by the notice are empty — the corresponding lines are dropped from what the guest sees:';
+  const jumpHint = it ? 'Fai clic su un campo per aprirlo qui sopra.' : 'Click a field to jump to it above.';
+  const items = missing.map(m => `
+    <li style="margin:4px 0;">
+      <a href="#${_hostPrivacyEsc(m.targetId)}"
+         onclick="event.preventDefault();_privacyWarningJump('${_hostPrivacyEsc(m.targetId)}');"
+         style="color:#7d5e10;text-decoration:underline;text-decoration-style:dotted;cursor:pointer;">${_hostPrivacyEsc(m.label)}</a>
+    </li>`).join('');
+  box.innerHTML = `
+    <div style="margin-bottom:4px;">${_hostPrivacyEsc(head)}</div>
+    <ul style="margin:0 0 6px 20px;padding:0;">${items}</ul>
+    <div style="font-size:0.72rem;color:#9a7a1e;">${_hostPrivacyEsc(jumpHint)}</div>`;
   box.style.display = '';
+}
+
+// Scroll to and briefly outline a missing-field input so the host can
+// see exactly where to type. Also switches Dettagli Proprietà into
+// edit mode if it's currently in view (otherwise the input is
+// read-only and a click would do nothing visible).
+function _privacyWarningJump(targetId) {
+  const el = document.getElementById(targetId);
+  if (!el) return;
+  try {
+    if (typeof propertyEditMode !== 'undefined' && !propertyEditMode && typeof startPropertyEdit === 'function') {
+      startPropertyEdit();
+    }
+  } catch (_) {}
+  try {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } catch (_) { el.scrollIntoView(); }
+  const prevShadow = el.style.boxShadow;
+  const prevOutline = el.style.outline;
+  el.style.transition = 'box-shadow 0.2s, outline 0.2s';
+  el.style.boxShadow = '0 0 0 4px rgba(232,184,75,0.35)';
+  el.style.outline = '2px solid rgba(232,184,75,0.85)';
+  setTimeout(() => { try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); } }, 350);
+  setTimeout(() => {
+    el.style.boxShadow = prevShadow;
+    el.style.outline = prevOutline;
+  }, 2200);
 }
 
 function openHostPrivacyPreview() {
@@ -14171,6 +14249,7 @@ function fillPropertyForm(data) {
   _i18nHydrateField('propWelcome', data, 'welcome_message');
   if (el('propPhone')) el('propPhone').value = data.host_phone || '';
   if (el('propHostNames')) el('propHostNames').value = data.host_names || '';
+  if (el('propHostEmail')) el('propHostEmail').value = data.host_email || '';
   if (typeof renderIcalFeeds === 'function') renderIcalFeeds();
   if (typeof renderIcalExportCard === 'function') renderIcalExportCard();
   if (typeof loadAlloggiatiCard === 'function') loadAlloggiatiCard();

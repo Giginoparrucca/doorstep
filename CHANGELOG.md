@@ -41,6 +41,16 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 - **Booking-level "do not capture" flag**
   Round 14.2 covers booking_code exclusion. If you ever need broader scope (per-property opt-out, per-host opt-out), that's a small extension.
 
+### Domain move: manual steps (Daniele) _(Round 46 ship list)_
+- [ ] Vercel → Domains → add `app.welcomebnb.it`; add the CNAME at the registrar
+- [ ] Resend → add and verify `welcomebnb.it` (SPF/DKIM records at the registrar)
+- [ ] Vercel env (Production): `APP_BASE_URL=https://app.welcomebnb.it`, `HOST_CONSOLE_URL=https://app.welcomebnb.it/host-console.html`, `REMINDER_FROM=WelcomeBnB <notifiche@welcomebnb.it>`; redeploy
+- [ ] Supabase → Auth → URL Configuration: Site URL `https://app.welcomebnb.it`; add `https://app.welcomebnb.it/**` to Redirect URLs (keep the vercel.app entry)
+- [ ] Supabase → Auth → SMTP: enable custom SMTP via Resend (built-in sender is limited to 2 emails/hour)
+- [ ] Upgrade Vercel to Pro (commercial use) and set a spend limit
+- [ ] Test on the new domain: host login, admin invite email, push notification on a phone, arrival-reminder email to a non-owner inbox
+- [ ] Message pilot hosts: new address, log in again, re-enable notifications, re-add to home screen
+
 ### Watch list — not building yet
 - **Supabase Pro plan ($25/mo) for backups + 7-day PITR**
   Defer until first paying host. Current data volume is low, soft-launch + audit log give a partial safety net.
@@ -64,7 +74,33 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
-### Round 45 — Direct bookings, blocked dates, outbound iCal + Impostazioni tab _(2026-09-28)_
+### Round 46 — Nightly purge fix + move to app.welcomebnb.it _(2026-10-01)_
+
+**What broke.** The `welcomebnb_daily_purge` cron (02:00 UTC) has been failing every single night since 2026-05-13, right when the soft-launch window ended and `purge_old_data_cron()` flipped from dry-run to live. Every run raised `storage.protect_delete()`: Supabase has disabled `DELETE FROM storage.objects` in SQL — file deletion must go through the Storage API. Because the function is one transaction, nothing purged at all: no ID photos past 48 h, no 90-day-resolved chats, no soft-deleted rows, no test rows. The last `data_purge_log` row before this round was 2026-05-12. Diagnosis took five minutes once we looked at `cron.job_run_details`; it had been invisible until now because `data_purge_log` was quiet and nobody was reading job history. **GDPR-wise this was a live retention breach of ~4½ months on 158 ID photos.**
+
+**The fix: queue + Storage API.** New `public.storage_purge_queue` table (bucket + path + reason + attempts + last_error, `UNIQUE(bucket,path)`, `CHECK(bucket='documents')` so a future edit cannot leak receipts in, RLS on + service-role-only grants). `purge_old_id_photos()` rewritten with the same signature and same eligibility rules but every `DELETE FROM storage.objects` is now `INSERT INTO storage_purge_queue … ON CONFLICT DO NOTHING`, followed by the usual `UPDATE checkins SET id_photo_path=NULL`. Same function now also covers `selfie_photo_path` (reason `'selfie_48h'`) under the same predicate — selfies have 0 non-null rows today but the column is wired in; getting the retention right now means it's covered when it starts being used. New `enqueue_orphan_documents(dry, days=7)` sweeps the bucket for files not referenced by any `checkins.id_photo_path`/`selfie_photo_path` and older than 7 d (floor protects in-flight uploads). `purge_old_data_cron()` calls it in both dry and live mode and writes the count onto the new nullable `data_purge_log.orphans_queued` column.
+
+**PASS C in `api/send-arrival-reminders.js`.** We're at 12/12 Vercel Hobby functions and 2/2 crons, so the file deletion lives inside the existing 05:00 UTC cron. New `runStoragePurgePass(dry)`: reads up to 1000 queue rows with `bucket='documents' AND attempts<5`, JS-level guard drops anything not literally `'documents'` (belt-and-braces atop the DB CHECK), one `DELETE /storage/v1/object/documents` call with `{prefixes: [...]}`, on 2xx deletes those queue rows, on failure bumps `attempts` and stamps `last_error` (500 char cap). Grouped PATCH by current attempts value (max 5 PATCHes regardless of batch size) because PostgREST can't `INCREMENT` server-side. The pass is structurally independent of A and B: moved the `RESEND_API_KEY` hard check out of the handler and down into the arrival + filing passes themselves (they self-skip when the key is missing), so a Resend outage never blocks file deletion. `?dry=1` reads + counts, deletes nothing. `?pass=storage` runs it alone. Response gets a `storagePurge: { queued, deleted, failed, dry }` block; `console.log` summary is counts only, never paths (guest document filenames).
+
+**A3 preview counts (dry run 2026-10-01, before migration):**
+- `chat_resolved_purged`: 139  (guest chat conversations resolved > 90 d, no activity since)
+- `chat_archived_purged`: 168  (soft-deleted chat messages > 30 d)
+- `analytics_purged`: 0
+- `analytics_aggregated`: 0
+- `test_rows_purged`: 553  (analytics_events 546 + recommendations 5 + properties 2 + checkins/chat_messages 0)
+- `soft_deleted_purged`: 0
+- `photos_purged`: 158  (checkins past 48 h-after-arrival with an id_photo_path)
+- `orphans_queued (preview)`: 59  (all 59 are over 7 d old)
+
+Documents bucket at the start of this round: 219 objects / 246 MB / oldest 2026-03-19. Receipts bucket (5-year retention) untouched and permanently fenced by the queue's bucket CHECK.
+
+**Domain move: app.welcomebnb.it.** Marketing site stays on `welcomebnb.it`; app moves to `app.welcomebnb.it`. The old `welcomebnb.vercel.app` host stays fully working with no redirect — printed QR codes, guest links already sent, and iCal export URLs pasted into Airbnb/Booking all point at it. One new constant `APP_ORIGIN = 'https://app.welcomebnb.it'` near the Supabase config in `host-console.html`; the seven hardcoded guest/booking/apartment/test-link literals now resolve through it (the `_icalExportUrl()` origin-based helper and the Safari "Impostazioni per <host>…" copy — rewritten to use `location.hostname` so each host sees the right domain — are the exceptions). `api/_cors.js`: `PROD_ORIGIN` single string became `PROD_ORIGINS` array with BOTH origins seeded explicitly (no regex, as always). Server defaults flipped to the new domain in `_notify-host.js` + `telegram-webhook.js` (`APP_BASE_URL`), `send-arrival-reminders.js` (`APP_BASE_URL` + `HOST_CONSOLE_URL`, and the hardcoded guest link at ~line 380 now resolves through `APP_BASE_URL`), and `REMINDER_FROM` moved to `'WelcomeBnB <notifiche@welcomebnb.it>'` so arrival + filing reminders stop silently landing only in the Resend account owner's inbox. iCal UIDs in `api/ical-sync.js` deliberately keep the `@welcomebnb.vercel.app` suffix — comment added above that line explaining why: UIDs are stable event identity for Airbnb/Booking/Vrbo, nothing dereferences the string, changing it would duplicate events at every OTA.
+
+**Gotchas surfaced.**
+- **Supabase blocks `DELETE FROM storage.objects` in SQL** via a trigger named `storage.protect_delete()`. Any file deletion must go through the Storage API. A storage delete inside a multi-branch SQL purge fails the whole transaction silently, from the cron's point of view, so **check `cron.job_run_details`, not just `data_purge_log`** — the log table only writes on successful completion, so a failing cron produces zero log rows and looks exactly like "nothing to purge yet."
+- When a stamp-only PATCH to a row with NOT NULL columns is tempting, remember Postgres evaluates NOT NULL on the pre-INSERT tuple before `ON CONFLICT` can redirect to UPDATE — so an `upsert({only_two_cols})` fails even when the row exists. Use PATCH, not upsert, for stamp-only updates. (Round 44 Phase 1 taught us this; the Round 46 PASS C queue cleanup uses PATCH + `attempts=eq.<n>` filter for the same reason.)
+
+
 
 Hosts can now record bookings taken outside Airbnb / Booking / Vrbo (WhatsApp, Instagram, their own website, word of mouth, returning guest) and block dates for own stays or maintenance. Direct bookings behave exactly like OTA-synced ones: they appear in Calendario + dashboard, get a booking code + guest link, trigger arrival reminders. Blocks appear only on the calendar, as grey hatched bars. Both live in the existing `ota_reservations` table under `platform = 'direct'` — one row shape for everything, no parallel table.
 

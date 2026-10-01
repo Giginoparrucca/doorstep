@@ -1,4 +1,4 @@
-// api/_cors.js — Round 34.2
+// api/_cors.js — Round 34.2, extended in Round 46 for the domain move.
 //
 // Single source of truth for the WelcomeBnB origin allowlist. Replaces
 // four byte-identical resolveOrigin() copies that lived in chat.js,
@@ -15,8 +15,18 @@
 // pattern-matching hostnames. NO regex matches `.vercel.app` anywhere
 // in this file; a receiving reviewer can grep the whole api/ tree and
 // verify that in one line.
+//
+// Round 46 — the app is moving to app.welcomebnb.it. The old
+// welcomebnb.vercel.app host stays fully working with NO redirect:
+// printed QR codes, guest links already sent, and iCal export URLs
+// pasted into Airbnb/Booking all point at it. Both origins are listed
+// explicitly here (no regex); add/remove hostnames by editing this
+// list only.
 
-const PROD_ORIGIN = 'https://welcomebnb.vercel.app';
+const PROD_ORIGINS = [
+  'https://app.welcomebnb.it',
+  'https://welcomebnb.vercel.app',
+];
 
 // Vercel env vars ship without the scheme. Normalise + validate.
 function _normalizeVercelHost(v) {
@@ -32,7 +42,7 @@ function _normalizeVercelHost(v) {
 let _cachedAllowlist = null;
 function _list() {
   if (_cachedAllowlist) return _cachedAllowlist;
-  const out = new Set([PROD_ORIGIN]);
+  const out = new Set(PROD_ORIGINS);
   const cands = [
     _normalizeVercelHost(process.env.VERCEL_PROJECT_PRODUCTION_URL),
     _normalizeVercelHost(process.env.VERCEL_BRANCH_URL),

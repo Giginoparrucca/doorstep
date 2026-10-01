@@ -1,6 +1,7 @@
-// api/send-arrival-reminders.js — Round 32 arrival reminder + Round 36 filing reminder.
+// api/send-arrival-reminders.js — Round 32 arrival reminder, Round 36
+// filing reminder, Round 46 storage purge.
 //
-// One Vercel cron slot serves two per-property reminder passes:
+// One Vercel cron slot serves THREE independent passes:
 //
 //   PASS A · arrival reminder (Round 32)
 //     Fires the morning before tomorrow's arrivals so hosts can send each
@@ -15,16 +16,24 @@
 //     unencrypted-PII-over-email practice the Garante's April 2026 note
 //     criticises), stamps checkins.filing_reminder_sent_at.
 //
-// Both passes share: the CRON_SECRET auth, the per-property local-hour
-// gate, Resend transport, and the "one email per property per day" dedup
-// pattern. The passes are structurally independent — one failing does not
-// block the other, and their per-property outcomes are reported side by
-// side in the response.
+//   PASS C · storage purge (Round 46)
+//     Drains public.storage_purge_queue by calling Supabase's Storage API
+//     DELETE endpoint. The queue is filled by the 02:00 UTC SQL purge
+//     (purge_old_data_cron → purge_old_id_photos + enqueue_orphan_documents).
+//     SQL cannot DELETE storage.objects (storage.protect_delete() rejects
+//     it); we moved file deletion out of SQL in Round 46.
+//
+// Structural independence: PASS C must run even when RESEND_API_KEY is
+// missing (A and B then self-skip), is NOT subject to the per-property
+// local-hour gate (storage cleanup is property-independent and runs once
+// per invocation), and a failure in any one pass does not block the
+// others. Pass outcomes are reported side-by-side in the response.
 //
 // Cron entry (see vercel.json): the job runs once a day at 05:00 UTC —
 // that lands 06:00-07:00 across most European timezones. Hobby's 2-cron
-// limit is the reason both passes share this endpoint instead of B living
-// in its own file with its own schedule.
+// limit is the reason all three passes share this endpoint instead of C
+// living in its own file with its own schedule. The ical-sync cron at
+// 04:00 UTC is the other half of the Hobby 2-cron allowance.
 //
 // Auth: Vercel cron adds `Authorization: Bearer <CRON_SECRET>` — we compare
 // against process.env.CRON_SECRET. Manual invocations by anyone else are
@@ -32,14 +41,18 @@
 //
 // Env vars required:
 //   CRON_SECRET                  — shared with Vercel cron
-//   RESEND_API_KEY               — https://resend.com/api-keys
 //   SUPABASE_URL                 — defaults to the project URL (public)
 //   SUPABASE_SERVICE_ROLE_KEY    — server-only key that bypasses RLS
 //                                  (writes need it to stamp *_sent_at
-//                                  regardless of caller)
+//                                  regardless of caller, and PASS C hits
+//                                  the Storage API with it)
 // Optional:
-//   REMINDER_FROM   default "WelcomeBnB Reminders <onboarding@resend.dev>"
-//   HOST_CONSOLE_URL default "https://welcomebnb.vercel.app/host-console.html"
+//   RESEND_API_KEY               — https://resend.com/api-keys (passes A+B
+//                                  self-skip when missing; PASS C runs)
+//   REMINDER_FROM   default "WelcomeBnB <notifiche@welcomebnb.it>"
+//   APP_BASE_URL    default "https://app.welcomebnb.it" (also used by
+//                                  PASS A to build the guest link)
+//   HOST_CONSOLE_URL default "https://app.welcomebnb.it/host-console.html"
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
@@ -48,9 +61,11 @@ const RESEND_KEY  = process.env.RESEND_API_KEY;
 const CRON_SECRET = process.env.CRON_SECRET;
 
 const REMINDER_FROM =
-  process.env.REMINDER_FROM || 'WelcomeBnB Reminders <onboarding@resend.dev>';
+  process.env.REMINDER_FROM || 'WelcomeBnB <notifiche@welcomebnb.it>';
+const APP_BASE_URL =
+  process.env.APP_BASE_URL || 'https://app.welcomebnb.it';
 const HOST_CONSOLE_URL =
-  process.env.HOST_CONSOLE_URL || 'https://welcomebnb.vercel.app/host-console.html';
+  process.env.HOST_CONSOLE_URL || 'https://app.welcomebnb.it/host-console.html';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -65,17 +80,21 @@ export default async function handler(req, res) {
   if (provided !== CRON_SECRET) return res.status(401).json({ error: 'Unauthorized' });
 
   if (!SERVICE_KEY) return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY not set' });
-  if (!RESEND_KEY)  return res.status(500).json({ error: 'RESEND_API_KEY not set' });
+  // Round 46 — RESEND_API_KEY is no longer a hard requirement at the
+  // handler level. PASS C (storage purge) does not use Resend; passes
+  // A + B self-skip when the key is missing. That way a Resend outage
+  // never blocks the GDPR-relevant file deletion pass.
 
-  // ?force=1 skips the local-hour gate. ?dry=1 sends no email and writes
-  // no marker. ?pass=arrival|filing runs only one of the two passes;
-  // omit for both. All three flags apply to both passes identically.
+  // ?force=1 skips the local-hour gate. ?dry=1 sends no email, writes
+  // no marker, and (PASS C) deletes nothing. ?pass=arrival|filing|storage
+  // runs only one of the three passes; omit for all three.
   const url = new URL(req.url, 'http://x');
   const force  = url.searchParams.get('force') === '1';
   const dry    = url.searchParams.get('dry')   === '1';
   const passOnly = url.searchParams.get('pass') || '';
   const runArrival = passOnly === '' || passOnly === 'arrival';
   const runFiling  = passOnly === '' || passOnly === 'filing';
+  const runStorage = passOnly === '' || passOnly === 'storage';
 
   const nowUTC = new Date();
   let props;
@@ -132,20 +151,40 @@ export default async function handler(req, res) {
     });
   }
 
+  // PASS C — storage purge. Independent of Resend, the per-property
+  // loop, and the local-hour gate. Runs once per invocation. A failure
+  // here must NOT change the status code of the whole call (passes A
+  // and B may have already succeeded) — runStoragePurgePass itself
+  // never throws out of its body.
+  const storagePurge = runStorage
+    ? await runStoragePurgePass(dry)
+    : { skipped: 'pass filter' };
+
+  // One-line summary for the Vercel log. Counts only — never paths
+  // (they are guest document filenames).
+  console.log(
+    `[reminders] props=${props.length} arrival_sent=${totalArrivalSent} filing_sent=${totalFilingSent} ` +
+    `storage_queued=${storagePurge.queued || 0} storage_deleted=${storagePurge.deleted || 0} ` +
+    `storage_failed=${storagePurge.failed || 0} dry=${!!dry}`
+  );
+
   return res.status(200).json({
     ok: true,
     total_properties: props.length,
     total_arrival_sent: totalArrivalSent,
     total_filing_sent:  totalFilingSent,
     per_property: perProperty,
+    storagePurge,
     dry_run: !!dry,
   });
 }
 
 // ══════════════════════════════════════════════════════════════════════
 // PASS A · arrival reminder — Round 32 logic, unchanged behaviour.
+// Round 46 — self-skip when Resend is missing so PASS C can still run.
 // ══════════════════════════════════════════════════════════════════════
 async function runArrivalPass(p, tomorrow, dry) {
+  if (!RESEND_KEY) return { skipped: 'RESEND_API_KEY not set' };
   let reservations;
   try {
     // Round 45 Step 4 — covered_by_reservation_id=is.null so a
@@ -218,6 +257,7 @@ async function runArrivalPass(p, tomorrow, dry) {
 // authenticated) to see who needs filing.
 // ══════════════════════════════════════════════════════════════════════
 async function runFilingPass(p, yesterday, dry) {
+  if (!RESEND_KEY) return { skipped: 'RESEND_API_KEY not set' };
   let checkins;
   try {
     checkins = await pgrestGET(
@@ -330,6 +370,134 @@ function pgrestPATCH(path, body) {
     return true;
   });
 }
+function pgrestDELETE(path) {
+  return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    method: 'DELETE',
+    headers: {
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      Prefer: 'return=minimal',
+    },
+  }).then(async r => {
+    if (!r.ok) throw new Error(`DELETE ${path} → ${r.status} ${await r.text()}`);
+    return true;
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// PASS C · storage purge (Round 46)
+//
+// Drain public.storage_purge_queue by calling Supabase's Storage API
+// DELETE endpoint. Independent of the per-property loop and of Resend
+// (so a Resend outage never blocks file deletion). Guarantees:
+//
+//   - Must NEVER throw out of its body. A thrown error here would
+//     short-circuit the handler's response to passes A/B that already
+//     succeeded. Every network call is wrapped.
+//   - The queue table enforces bucket='documents' via CHECK; we also
+//     filter in JS as belt-and-braces so a hypothetical schema regression
+//     cannot send 'receipts' paths to the Storage API.
+//   - On HTTP 2xx, the queue rows for those paths are deleted. A path
+//     that no longer exists in storage counts as done — the Storage API
+//     accepts missing prefixes without erroring.
+//   - On failure, attempts is incremented and last_error stamped (500
+//     char cap). After 5 attempts the row is left in place for manual
+//     inspection; it will no longer be picked up (attempts<5 filter).
+// ══════════════════════════════════════════════════════════════════════
+async function runStoragePurgePass(dry) {
+  const out = { queued: 0, deleted: 0, failed: 0, dry: !!dry };
+  let queueRows;
+  try {
+    queueRows = await pgrestGET(
+      'storage_purge_queue?bucket=eq.documents' +
+      '&attempts=lt.5' +
+      '&select=id,bucket,path,attempts' +
+      '&order=queued_at.asc&limit=1000'
+    );
+  } catch (e) {
+    out.error = 'queue read failed: ' + String(e).slice(0, 300);
+    return out;
+  }
+  // JS-level guard: drop any row whose bucket isn't exactly 'documents'.
+  // The DB CHECK already enforces this; the second filter here protects
+  // against a hypothetical future schema regression + makes the invariant
+  // visible in code to any reviewer.
+  const safeRows = (queueRows || []).filter(
+    r => r && r.bucket === 'documents' && typeof r.path === 'string' && r.path
+  );
+  out.queued = safeRows.length;
+  if (safeRows.length === 0) return out;
+  if (dry) return out;
+
+  const paths = safeRows.map(r => r.path);
+  // Supabase bulk-remove — DELETE /storage/v1/object/<bucket> with body
+  // { prefixes: [...] }. One request handles the whole batch.
+  let httpRes;
+  try {
+    httpRes = await fetch(`${SUPABASE_URL}/storage/v1/object/documents`, {
+      method: 'DELETE',
+      headers: {
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ prefixes: paths }),
+    });
+  } catch (e) {
+    out.failed = safeRows.length;
+    out.error = 'storage DELETE fetch failed: ' + String(e).slice(0, 300);
+    await _bumpQueueAttempts(safeRows, 'fetch failed: ' + String(e)).catch(() => {});
+    return out;
+  }
+
+  if (!httpRes.ok) {
+    const bodyText = await httpRes.text().catch(() => '');
+    out.failed = safeRows.length;
+    out.error = `storage DELETE http ${httpRes.status}: ${bodyText.slice(0, 200)}`;
+    await _bumpQueueAttempts(safeRows, `http ${httpRes.status}: ${bodyText}`).catch(() => {});
+    return out;
+  }
+
+  // 2xx: drop the queue rows. If this cleanup fails, the files are
+  // still gone from storage; the next pass will retry the same paths
+  // but the Storage API treats a missing-prefix delete as success,
+  // so it'll just drain again next cycle. Log but don't fail.
+  try {
+    const ids = safeRows.map(x => `"${x.id}"`).join(',');
+    await pgrestDELETE(`storage_purge_queue?id=in.(${ids})`);
+    out.deleted = safeRows.length;
+  } catch (e) {
+    console.warn('[storage-purge] queue cleanup failed (files were deleted):', String(e).slice(0, 300));
+    out.deleted = safeRows.length;
+    out.cleanup_warning = 'queue rows not removed';
+  }
+  return out;
+}
+
+// Group the batch by current attempts value and PATCH each group once.
+// PostgREST can't INCREMENT server-side, so we SET attempts to curr+1
+// based on what we read. There are at most 5 distinct values (0-4),
+// so this is at most 5 PATCH calls regardless of batch size.
+async function _bumpQueueAttempts(rows, errMsg) {
+  const errTrunc = String(errMsg || '').slice(0, 500);
+  const byAttempts = new Map();
+  for (const r of rows) {
+    const k = r.attempts || 0;
+    if (!byAttempts.has(k)) byAttempts.set(k, []);
+    byAttempts.get(k).push(r.id);
+  }
+  for (const [curr, grp] of byAttempts) {
+    const grpIds = grp.map(x => `"${x}"`).join(',');
+    try {
+      await pgrestPATCH(
+        `storage_purge_queue?id=in.(${grpIds})&attempts=eq.${curr}`,
+        { attempts: curr + 1, last_error: errTrunc },
+      );
+    } catch (e) {
+      console.warn('[storage-purge] attempts bump failed:', String(e).slice(0, 200));
+    }
+  }
+}
 
 // ── Email templates ──────────────────────────────────────────────────────
 function esc(s) {
@@ -377,7 +545,7 @@ function renderArrivalHTML(property, rows, lang) {
       || (r.platform || (isIT ? 'Prenotazione' : 'Reservation'));
     const guest = r.guest_name ? esc(r.guest_name) : T.guest;
     const link = r.booking_code
-      ? `https://welcomebnb.vercel.app/?b=${encodeURIComponent(r.booking_code)}&p=${encodeURIComponent(property.id)}`
+      ? `${APP_BASE_URL}/?b=${encodeURIComponent(r.booking_code)}&p=${encodeURIComponent(property.id)}`
       : null;
     const linkBlock = link
       ? `<p style="margin:8px 0 0;">

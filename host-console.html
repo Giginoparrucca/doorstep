@@ -2185,7 +2185,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
               <code style="background:var(--bg);padding:6px 12px;border-radius:6px;font-size:0.9rem;font-weight:600;color:var(--warm);letter-spacing:0.1em;" id="bookingCodeDisplay">—</code>
               <button class="btn btn-secondary btn-sm" onclick="copyLink()" style="white-space:nowrap;" data-h="btn_copy_link" data-guide="qr-copy-link">📋 Copy Link</button>
             </div>
-            <div class="qr-link" id="guestLink" style="font-size:0.65rem;word-break:break-all;">https://welcomebnb.vercel.app</div>
+            <div class="qr-link" id="guestLink" style="font-size:0.65rem;word-break:break-all;">https://app.welcomebnb.it</div>
           </div>
           <div style="margin-top:8px;font-size:0.6rem;color:var(--ink-soft);line-height:1.5;" id="qrReturningHint">
             💡 Returning guests who use the same link will see their check-in status and details automatically.
@@ -2392,6 +2392,13 @@ See you soon!</textarea>
 ══════════════════════════════════════ */
 const SUPABASE_URL = 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjandhcXFhYmd3cWhoemhmYnRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4OTM0MjMsImV4cCI6MjA4OTQ2OTQyM30.BCskfjawOLqayI7xXV8ebIBEcXf12WygH52w204NzWk';
+// Round 46 — centralised guest-app origin. All guest-facing links
+// (booking links, QR codes, apartment links, iCal UIDs are the
+// exception) resolve through this constant so a future domain move is
+// a one-line change. The old welcomebnb.vercel.app host stays fully
+// working (CORS allowlist in api/_cors.js) so already-sent guest
+// links and printed QR codes don't break.
+const APP_ORIGIN = 'https://app.welcomebnb.it';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let propertyId = null;
@@ -5367,7 +5374,7 @@ async function renderDashboard() {
           : `<div style="margin-top:6px;font-size:0.78rem;font-weight:500;padding:6px 9px;border-radius:5px;line-height:1.3;background:${_aBg};color:${_aFg};border-left:2px solid ${_aBd};">▸ ${safe(r.action.text)}</div>`)
       : '';
     if (r.awaitingCheckin && !r.action) {
-      const guestLink = `https://welcomebnb.vercel.app/?b=${encodeURIComponent(r.code)}&p=${encodeURIComponent(propertyId)}`;
+      const guestLink = `${APP_ORIGIN}/?b=${encodeURIComponent(r.code)}&p=${encodeURIComponent(propertyId)}`;
       const hint = safe(h('dash_awaiting_checkin_hint') || 'Send this guest their booking link so they can complete check-in.');
       actionBox = `<div style="margin-top:6px;font-size:0.78rem;font-weight:500;padding:6px 9px;border-radius:5px;line-height:1.35;background:rgba(232,184,75,0.14);color:#7d5e10;border-left:2px solid #E8B84B;">▸ ${hint} <a href="${safe(guestLink)}" target="_blank" rel="noopener" style="color:#7d5e10;text-decoration:underline;font-family:monospace;font-size:0.72rem;margin-left:4px;">${safe(hostLang === 'it' ? 'apri link' : 'open link')} ↗</a></div>`;
     }
@@ -5840,7 +5847,7 @@ function _renderReservationCard(r, todayISO) {
 
   const style = platformStyle(r.platform);
   const guestLink = r.booking_code
-    ? `https://welcomebnb.vercel.app/?b=${encodeURIComponent(r.booking_code)}&p=${propertyId}`
+    ? `${APP_ORIGIN}/?b=${encodeURIComponent(r.booking_code)}&p=${propertyId}`
     : '';
   const codeChip = r.booking_code
     ? `<span title="${safe(hostLang === 'it' ? 'Codice prenotazione' : 'Booking code')}" style="font-family:monospace;font-size:0.68rem;color:var(--warm);background:rgba(0,91,255,0.08);border-radius:3px;padding:1px 6px;">${safe(r.booking_code)}</span>`
@@ -6637,7 +6644,7 @@ async function _renderUpcomingCalendarBody(buildHeader) {
     else if (isDirect)   tone = 'direct';
     else                 tone = checkedIn ? 'in' : 'wait';
     const link = (!isBlock && r.booking_code)
-      ? `https://welcomebnb.vercel.app/?b=${encodeURIComponent(r.booking_code)}&p=${encodeURIComponent(propertyId)}`
+      ? `${APP_ORIGIN}/?b=${encodeURIComponent(r.booking_code)}&p=${encodeURIComponent(propertyId)}`
       : '';
     return { r, label, checkedIn, link, tone, isBlock, isDirect };
   });
@@ -12138,7 +12145,7 @@ function generateBookingCode() {
 
   // Update UI
   document.getElementById('bookingCodeDisplay').textContent = bookingCode;
-  const baseUrl = 'https://welcomebnb.vercel.app';
+  const baseUrl = APP_ORIGIN;
   const fullLink = `${baseUrl}/?b=${bookingCode}&p=${propertyId}`;
   document.getElementById('guestLink').textContent = fullLink;
   document.getElementById('bookingLinkSection').style.display = 'block';
@@ -12180,7 +12187,7 @@ function initQRPanel() {
   renderPastCodes();
   // Set apartment QR link and render QR
   if (propertyId) {
-    const aptLink = `https://welcomebnb.vercel.app/?p=${propertyId}`;
+    const aptLink = `${APP_ORIGIN}/?p=${propertyId}`;
     document.getElementById('apartmentLink').textContent = aptLink;
     renderQR(aptLink);
   }
@@ -12191,7 +12198,7 @@ function initQRPanel() {
 // banner on the guest side so the host knows tracking is off.
 function openPreviewAsGuest() {
   if (!propertyId) { toast(hostLang === 'it' ? 'Proprietà non ancora caricata' : 'No property loaded yet'); return; }
-  const url = `https://welcomebnb.vercel.app/?p=${propertyId}&test=1`;
+  const url = `${APP_ORIGIN}/?p=${propertyId}&test=1`;
   window.open(url, '_blank', 'noopener');
   track('preview_as_guest', {});
 }
@@ -12344,8 +12351,8 @@ function renderNotifCard() {
           ? 'clicca l\'icona 🔒 (lucchetto) a sinistra dell\'indirizzo → <em>Impostazioni sito</em> → <em>Notifiche</em> → <em>Consenti</em> → ricarica la pagina.'
           : 'click the 🔒 (padlock) icon at the left of the address bar → <em>Site settings</em> → <em>Notifications</em> → <em>Allow</em> → reload the page.'}</li>
         <li><strong>Safari:</strong> ${it
-          ? 'menu <em>Safari</em> → <em>Impostazioni per welcomebnb.vercel.app…</em> → <em>Notifiche</em> → <em>Consenti</em> → ricarica.'
-          : 'menu <em>Safari</em> → <em>Settings for welcomebnb.vercel.app…</em> → <em>Notifications</em> → <em>Allow</em> → reload.'}</li>
+          ? `menu <em>Safari</em> → <em>Impostazioni per ${location.hostname}…</em> → <em>Notifiche</em> → <em>Consenti</em> → ricarica.`
+          : `menu <em>Safari</em> → <em>Settings for ${location.hostname}…</em> → <em>Notifications</em> → <em>Allow</em> → reload.`}</li>
         <li><strong>Firefox:</strong> ${it
           ? 'clicca l\'icona 🔒 (lucchetto) a sinistra dell\'indirizzo → <em>Autorizzazioni</em> → togli il blocco su <em>Invio notifiche</em> → ricarica.'
           : 'click the 🔒 (padlock) icon at the left of the address bar → <em>Permissions</em> → clear the block on <em>Send notifications</em> → reload.'}</li>

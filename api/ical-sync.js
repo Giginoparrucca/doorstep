@@ -666,6 +666,13 @@ async function handleOutboundExport(req, res, token) {
     const start = _outboundISODate(r.checkin_date);
     const end   = _outboundISODate(r.checkout_date);
     if (!start || !end) continue;
+    // Round 46 — DO NOT change this UID domain. iCal consumers
+    // (Airbnb, Booking, Vrbo) use the UID as the event's stable
+    // identity. If this string changes, every event becomes "new" at
+    // the consumer, and OTAs can create duplicate blocks for stays
+    // we're already covering. The @welcomebnb.vercel.app suffix is a
+    // UID component, not a URL — nothing dereferences it — so the
+    // domain move does not require touching it.
     const uid = `${(r.uid || r.id).replace(/[<>\s]/g, '_')}@welcomebnb.vercel.app`;
     const summary = _outboundSummaryFor(r, hostLang);
     const lastMod = r.updated_at ? _outboundISOStamp(new Date(r.updated_at)) : dtstamp;

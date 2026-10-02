@@ -32,13 +32,13 @@ const SUPABASE_URL =
   process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const APP_BASE_URL       = process.env.APP_BASE_URL || 'https://app.welcomebnb.it';
+const APP_BASE_URL       = process.env.APP_BASE_URL || 'https://welcomebnb.vercel.app';
 const VAPID_PUBLIC       = process.env.VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE      = process.env.VAPID_PRIVATE_KEY;
 const VAPID_SUBJECT      = process.env.VAPID_SUBJECT || 'mailto:welcomebnbadmin@gmail.com';
 const TELEGRAM_TOKEN     = process.env.TELEGRAM_BOT_TOKEN;
 const RESEND_KEY         = process.env.RESEND_API_KEY;
-const REMINDER_FROM      = process.env.REMINDER_FROM || 'WelcomeBnB <notifiche@welcomebnb.it>';
+const REMINDER_FROM      = process.env.REMINDER_FROM || 'WelcomeBnB <onboarding@resend.dev>';
 
 const OVERALL_CAP_MS = 4000;
 

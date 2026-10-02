@@ -49,16 +49,10 @@
 // Optional:
 //   RESEND_API_KEY               — https://resend.com/api-keys (passes A+B
 //                                  self-skip when missing; PASS C runs)
-//   REMINDER_FROM   default "WelcomeBnB Reminders <onboarding@resend.dev>"
-//                   (⚠ 2026-10-02 — reverted until Resend verifies
-//                   welcomebnb.it; set env var to the welcomebnb.it
-//                   sender once the manual checklist step is done.)
-//   APP_BASE_URL    default "https://welcomebnb.vercel.app" (⚠ reverted
-//                                  2026-10-02 until app.welcomebnb.it
-//                                  DNS is live; also used by PASS A to
-//                                  build the guest link)
-//   HOST_CONSOLE_URL default "https://welcomebnb.vercel.app/host-console.html"
-//                   (⚠ reverted 2026-10-02 — same reason)
+//   REMINDER_FROM   default "WelcomeBnB <notifiche@welcomebnb.it>"
+//   APP_BASE_URL    default "https://app.welcomebnb.it" (also used by
+//                                  PASS A to build the guest link)
+//   HOST_CONSOLE_URL default "https://app.welcomebnb.it/host-console.html"
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
@@ -67,11 +61,11 @@ const RESEND_KEY  = process.env.RESEND_API_KEY;
 const CRON_SECRET = process.env.CRON_SECRET;
 
 const REMINDER_FROM =
-  process.env.REMINDER_FROM || 'WelcomeBnB Reminders <onboarding@resend.dev>';
+  process.env.REMINDER_FROM || 'WelcomeBnB <notifiche@welcomebnb.it>';
 const APP_BASE_URL =
-  process.env.APP_BASE_URL || 'https://welcomebnb.vercel.app';
+  process.env.APP_BASE_URL || 'https://app.welcomebnb.it';
 const HOST_CONSOLE_URL =
-  process.env.HOST_CONSOLE_URL || 'https://welcomebnb.vercel.app/host-console.html';
+  process.env.HOST_CONSOLE_URL || 'https://app.welcomebnb.it/host-console.html';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');

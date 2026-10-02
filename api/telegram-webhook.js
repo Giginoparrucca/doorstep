@@ -18,7 +18,7 @@ const SUPABASE_URL =
 const SERVICE_KEY       = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const TELEGRAM_TOKEN    = process.env.TELEGRAM_BOT_TOKEN;
 const WEBHOOK_SECRET    = process.env.TELEGRAM_WEBHOOK_SECRET || '';
-const APP_BASE_URL      = process.env.APP_BASE_URL || 'https://app.welcomebnb.it';
+const APP_BASE_URL      = process.env.APP_BASE_URL || 'https://welcomebnb.vercel.app';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();

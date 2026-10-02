@@ -103,9 +103,17 @@ export default async function handler(req, res) {
 
 // ── Actions ─────────────────────────────────────────────────────────────
 async function doInvite(email, actorId, notes) {
-  // Send Supabase's invitation email via the GoTrue admin API.
-  const invited = await gotruePost('/auth/v1/admin/invite', { email });
-  if (!invited.ok) return { ok: false, stage: 'invite', status: invited.status, detail: invited.text };
+  // Send Supabase's invitation email via the GoTrue invite endpoint.
+  // Round 46 — path was '/auth/v1/admin/invite' when R38 shipped;
+  // Supabase upgraded GoTrue and removed that alias, so the admin API
+  // now 404s. The live path is '/auth/v1/invite' (also what
+  // supabase.auth.admin.inviteUserByEmail() in supabase-js uses). The
+  // service-role bearer in the request headers is what authorises it.
+  const invited = await gotruePost('/auth/v1/invite', { email });
+  if (!invited.ok) {
+    console.warn('[admin-invite-host] GoTrue invite failed', email, invited.status, invited.text?.slice(0, 300));
+    return { ok: false, stage: 'invite', status: invited.status, detail: invited.text };
+  }
   // Upsert pilot_invites row. Reset a `revoked` row to `invited` so the
   // history stays legible.
   await pgrestPOST('/rest/v1/pilot_invites?on_conflict=email', {
@@ -125,8 +133,11 @@ async function doResend(email, actorId) {
   const row = await pgrestGET(`/rest/v1/pilot_invites?email=eq.${encodeURIComponent(email)}&select=status`);
   if (!row || row.length === 0) return { ok: false, error: 'no invite row for that email' };
   if (row[0].status === 'accepted') return { ok: false, error: 'already accepted; no resend' };
-  const invited = await gotruePost('/auth/v1/admin/invite', { email });
-  if (!invited.ok) return { ok: false, stage: 'resend', status: invited.status, detail: invited.text };
+  const invited = await gotruePost('/auth/v1/invite', { email });
+  if (!invited.ok) {
+    console.warn('[admin-invite-host] GoTrue resend failed', email, invited.status, invited.text?.slice(0, 300));
+    return { ok: false, stage: 'resend', status: invited.status, detail: invited.text };
+  }
   await pgrestPATCH(`/rest/v1/pilot_invites?email=eq.${encodeURIComponent(email)}`, {
     status: 'invited',
     invited_at: new Date().toISOString(),

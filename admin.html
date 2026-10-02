@@ -3155,7 +3155,14 @@ async function opsInviteAction(action, emailArg) {
     });
     const body = await resp.json().catch(() => ({}));
     if (!resp.ok || body?.ok === false) {
-      _opsInvToast('Failed: ' + (body?.error || `HTTP ${resp.status}`), 'error');
+      // Round 46 — the server sometimes returns {ok:false, stage, status, detail}
+      // (GoTrue upstream failure) with no top-level `error` string. Fall
+      // back through those so the toast shows the real cause instead of
+      // the useless "HTTP 200".
+      const msg = body?.error
+        || (body?.detail ? `${body.stage || 'upstream'} ${body.status || ''} ${body.detail}`.trim() : null)
+        || `HTTP ${resp.status}`;
+      _opsInvToast('Failed: ' + msg, 'error');
       return;
     }
     _opsInvToast(`✓ ${action} ok for ${email}${body.auth_user_deleted ? ' (auth user deleted)' : (body.reason ? ' — ' + body.reason : '')}`, 'ok');

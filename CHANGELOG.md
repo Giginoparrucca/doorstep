@@ -27,8 +27,11 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
   - Per-Guest Action Board: weight "checking out today" higher in sort
 
 ### Medium value, build when triggered
-- **Dynamic compliance (region/comune-aware)** _(Phase 1 of compliance, after Round 23 static guide)_
-  Round 23 shipped the static Compliance Guide. Next phases: (1) add `region` + `comune` fields to properties → filter the guide to show only what applies (region drives which statistical portal is named; comune drives the tourist-tax pointer). (2) Much later and only if clearly worth it: actual imposta-di-soggiorno calculation — dangerous, needs a per-comune config (rate, night cap, exemption ages/categories) maintained as deliberas change yearly. PayTourist already does this; duplicating may not be worth the maintenance. **Trigger**: hosts in multiple regions, or a host explicitly asking for region-specific guidance.
+- **Dynamic compliance (region/comune-aware)** _(Phase 1 shipped Round 47 — region half)_
+  Round 23 shipped the static Compliance Guide; Round 47 made the Export panel + Compliance Guide region-aware (dropdown + autodetect from city, single tile from `REGION_COMPLIANCE`, generated "All regions" list). Still open:
+  - **Comune half**: only the Venice CityTax++ gate is wired. A per-comune tourist-tax pointer (rate/night cap/exemptions by delibera) is still open. PayTourist already does this; duplicating is a risk/reward call.
+  - **`REGION_COMPLIANCE` link rot**: researched Oct 2026, only Veneto + Puglia are pilot-verified. Several regions (Lazio, Liguria, Molise, Toscana) migrated in 2025–26 — re-check portal URLs yearly. Open gaps: Toscana outside Firenze/Prato/Pistoia (provincial systems — MOTouristOffice/RiceStat vary by comune) and Alto Adige (no single host-facing ASTAT portal, flows go via comune/tourist association).
+  - **Extend the ROSS1000 XML export beyond Veneto**: most ROSS1000 regions share the GIES tracciato. Test one region (Lazio or Lombardia) with a pilot host first; expose the button when `cfg.export === 'ross1000'` and the region's tracciato quirks are verified.
 - **Adding languages beyond EN/IT to the UI strings** _(flagged Round 19; content-side handled by the JSONB work above)_
   The `T`/`h()` UI-string objects are still EN/IT only. Once the free-text content goes multilingual (JSONB, next round), the remaining piece is adding more UI-string locales (French, German, Spanish) to the static label dictionaries. Right call hinges on whether non-EN/IT guests become a real share of volume. **Trigger**: a host asks, or French/German/Spanish browser-language sessions exceed ~15% in admin analytics.
 - **Year-over-year analytics view** using `analytics_monthly`
@@ -73,6 +76,31 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 ---
 
 ## 📋 Done / Shipped
+
+### Round 47 — Region-aware compliance _(2026-10-02)_
+
+The Export panel's "Statistics · Regional" axis has shown the right tiles to the wrong hosts since Round 40 Task 7. The filter needed an exact string match on `properties.region`, but the column was free-text — live-data audit on 2026-10-02 found `region='Verona'` on the Marco Polo property and `region='BA'` on the Bari property, so **the ROSS1000 Veneto tile was hidden from the Verona host and the Puglia DMS tile was hidden from the Bari host**. Four properties also had blank region, which showed every regional tile to every host. The hard-coded CityTax++ (Venezia) tile sat on every host's Export panel the same way, and the Compliance Guide had an out-of-date hand-maintained ROSS1000 list that was missing Umbria, Sicilia, FVG and Valle d'Aosta.
+
+**Migration (`migration_round47_region_normalise.sql`)** normalises the two bad rows (`Verona`→Veneto, `BA`→Puglia) and adds a `CHECK` constraint locking `properties.region` to the 21 canonical Italian region names (NULL/'' still allowed for new properties where the host hasn't set one). The CHECK list and `IT_REGIONS` in host-console.html must stay in sync — a mismatch would let the UI write a value the DB rejects.
+
+**Region derivation from the comune code.** Every entry in `ALLOG_COMUNI_COMPACT` is a 9-digit Alloggiati code `4 RR PPP CCC`, where `RR` is the ISTAT region code (`04` is Trentino-Alto Adige, split by `PPP` — 021 Bolzano → Alto Adige, 022 Trento → Trentino) and `PPP` the province code. Three helpers (`regionFromComuneCode`, `regionFromCity`, `comuneCodeFromCity`) expose this, so the property form can autodetect the region as soon as the host types a known city.
+
+**Property form.** The region input is now a `<select>` populated from `IT_REGIONS` (plus a "— Select region —" first option). On load, if `data.region` isn't canonical, we fall back to `regionFromCity(data.city)` and show a muted "Detected from city — change it if wrong" hint. The hint also fires when the host types a new city; a manual region change dismisses it. Save path is unchanged (reads `.value` from the select).
+
+**Single regional tile.** `REGION_TILE_MAP`, `_applyExportRegionFilter`, `_scrollToRegionalTile` and the `exportOtherRegionsBlock` disclosure are gone. In their place: `REGION_COMPLIANCE` (one entry per region, with `byProvince` fallback for Toscana), `regionComplianceFor(region, city)` to resolve it, and `renderRegionalTile()` which paints exactly ONE tile matching the property's region. The Veneto ROSS1000-XML button and the Puglia DMS link keep working identically — a `cfg.export` flag drives their special-case rendering. For every other region, the tile shows "`{system} — {region}`" with a direct portal link and a muted "Link checked Oct 2026" note if the entry isn't pilot-verified. Toscana outside Firenze/Prato/Pistoia and Alto Adige get a `note` tile prompting the host to ask the Comune and save the link via the existing portal-editor (`✎`) slot.
+
+**CityTax++ (Venezia) is now city-gated.** The tile stays hidden unless `comuneCodeFromCity(propertyData.city) === '405027042'` (Venice). The tax checklist row picks `exportCityTax()` for Venice, `exportPayTourist()` when a PayTourist URL is saved, else a scroll-to-section.
+
+**Compliance Guide.** The stats section's hand-maintained paragraph list ("ROSS1000 used by: Abruzzo · Basilicata · … · Veneto") was out of date (missing Umbria, Sicilia, FVG, Valle d'Aosta; wrong about Toscana now being provincial for 7/10 provinces). `renderCompliance` now injects a **"Your region"** callout + a collapsed **"All regions"** `<details>` block generated from the same `REGION_COMPLIANCE` object that drives the Export tile. One source, no drift.
+
+**Language flip.** `setHostLang` now re-paints the Export checklist + regional tile when the Export panel is active. Previously a lang flip while on Export froze the generated tile in whichever language had been active at render time.
+
+**i18n (both EN and IT):** `prop_region_pick`, `prop_region_auto`, `export_region_generic_desc` (with `{system}` placeholder), `export_region_unverified`, `export_region_note_toscana_provincial`, `export_region_note_alto_adige`, `export_region_tile_title`, `export_region_unknown_tile_title`, `cmp_your_region`, `cmp_your_region_prompt`, `cmp_all_regions`, `cmp_region_todo`, `link_region_open`.
+
+**Gotchas surfaced.**
+- Alloggiati comune codes encode region + province: `4 RR PPP CCC` (ISTAT). `RR=04` MUST be split by `PPP` (`021` → Alto Adige / `022` → Trentino) — the two autonomous provinces run separate statistical systems.
+- **Never store region as free text.** The Round 40 Task 7 filter was an exact-string match on `properties.region`; a province name ("Verona") or province code ("BA") in that column silently hid every regional obligation. Any new filter-driving column should start life with a CHECK constraint and a canonical list, not a `TEXT` input.
+- Italian regional statistics portals are migrating constantly (Lazio, Liguria, Molise, Toscana all moved in 2025–26). The `REGION_COMPLIANCE` config carries a one-year freshness note; re-check portal URLs annually, prioritise verifying with pilot hosts.
 
 ### Round 46 — Nightly purge fix + move to app.welcomebnb.it _(2026-10-01)_
 

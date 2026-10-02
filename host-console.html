@@ -2395,12 +2395,10 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 // Round 46 — centralised guest-app origin. All guest-facing links
 // (booking links, QR codes, apartment links; iCal UIDs are the
 // exception) resolve through this constant so a future domain move is
-// a one-line change.
-// ⚠ 2026-10-02 — temporarily pointed back at welcomebnb.vercel.app
-// until the app.welcomebnb.it DNS + Vercel domain + Resend verification
-// are completed. Flip to 'https://app.welcomebnb.it' once step 1–4 of
-// the CHANGELOG "Domain move: manual steps" checklist are done.
-const APP_ORIGIN = 'https://welcomebnb.vercel.app';
+// a one-line change. The old welcomebnb.vercel.app host stays fully
+// working (CORS allowlist in api/_cors.js) so already-sent guest
+// links and printed QR codes don't break.
+const APP_ORIGIN = 'https://app.welcomebnb.it';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let propertyId = null;

@@ -180,6 +180,22 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
       const events = parseICS(text);
       let rows = events.map(e => vEventToRow(e, propertyId, platform));
 
+      // Round 47.1 — drop oversized Airbnb blocks before the upsert.
+      // The sweep below will cancel any already-stored row with that
+      // UID because the UID won't be in seenByPlatform for this run.
+      if (platform === 'airbnb' && rows.length > 0) {
+        const beforeN = rows.length;
+        rows = rows.filter(r => {
+          if (r.entry_type !== 'block') return true;
+          if (!r.checkin_date || !r.checkout_date) return true;
+          const days = Math.round((Date.parse(r.checkout_date) - Date.parse(r.checkin_date)) / 86400000);
+          return days <= AIRBNB_MAX_BLOCK_NIGHTS;
+        });
+        if (beforeN !== rows.length) {
+          console.log(`[ical-sync] airbnb oversize-block filter dropped ${beforeN - rows.length} row(s) for ${propertyId}`);
+        }
+      }
+
       // Round 38.3 — Booking.com quirks:
       //
       // (a) Long-safety block. Booking's iCal exports a ~6-month "closed
@@ -229,10 +245,21 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
   let cancelled = 0;
   for (const [platform, uids] of Object.entries(seenByPlatform)) {
     try {
+      // Round 47.1 — the sweep now covers:
+      //   • reservations with checkin_date >= today  (unchanged)
+      //   • blocks of ANY date                        (new)
+      // Previously the sweep ignored past-dated rows, which meant
+      // Airbnb's "Not available" blocks accumulated forever after
+      // their check-in day passed — cluttering the calendar with
+      // dozens of stale `Unavailable` bars (see Round 47.1
+      // post-ship incident). We never cancel past-dated reservations,
+      // because those represent real stays we may have filed with
+      // Alloggiati and need the audit trail.
       const listRes = await pgrestGET(
         `ota_reservations?property_id=eq.${encodeURIComponent(propertyId)}` +
         `&platform=eq.${encodeURIComponent(platform)}` +
-        `&status=eq.active&checkin_date=gte.${todayISO}` +
+        `&status=eq.active` +
+        `&or=(checkin_date.gte.${todayISO},entry_type.eq.block)` +
         `&select=id,uid,covered_by_reservation_id`,
         apikey, bearer,
       );
@@ -293,6 +320,15 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
 //      (never rolls forward) and preserves the booking_code so the
 //      guest link the host already shared keeps working.
 const BOOKING_MAX_RES_NIGHTS = 60;
+// Round 47.1 — Airbnb's iCal feed also carries a long-safety "closed
+// future dates" block (observed: a 96-night block Jun 29 2027 → Oct 3
+// 2027). Not a bug on their end — it's how Airbnb communicates far-
+// future availability to iCal consumers. For our calendar it just
+// paints a huge "Unavailable" bar over a season the host isn't
+// actually blocking. Filter blocks longer than this before upsert;
+// the sweep will then cancel any already-stored ones because their
+// UID won't be in seenByPlatform this run.
+const AIRBNB_MAX_BLOCK_NIGHTS = 60;
 
 async function mergeBookingRollingUIDs(propertyId, incoming, apikey, bearer, seenByPlatform) {
   const keptRows = [];

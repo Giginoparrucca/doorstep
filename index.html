@@ -1259,6 +1259,22 @@ function icon(name, cls) {
          rejects any value that doesn't resolve to a canonical country. -->
     <datalist id="wbnbCountryList"></datalist>
 
+    <!-- Round 47.2 — optional residence. Not required by Alloggiati Web
+         (168-char tracciato has no residence field), but used by ROSS1000
+         regional statistics and tourist-tax resident exemptions. If left
+         blank, the exports fall back to inferring residence from
+         citizenship/birth place. -->
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" data-i18n="residence_country_label">Country of Residence <span style="font-weight:400;color:var(--ink-soft);">(optional)</span></label>
+        <input class="form-input" type="text" id="residenceCountry" list="wbnbCountryList" autocomplete="off" data-i18n-placeholder="residence_country_hint" placeholder="e.g., Italy, Germany, France">
+      </div>
+      <div class="form-group">
+        <label class="form-label" data-i18n="residence_place_label">Comune / City of Residence <span style="font-weight:400;color:var(--ink-soft);">(optional)</span></label>
+        <input class="form-input" type="text" id="residencePlace" autocomplete="off" data-i18n-placeholder="residence_place_hint" placeholder="e.g., Milano, Berlin, Paris">
+      </div>
+    </div>
+
     <!-- Province — shows ONLY when born in Italy (not based on citizenship) -->
     <div class="form-group" id="provinceGroup" style="display:none;">
       <label class="form-label" data-i18n="province_label">Province of Birth <span class="req">*</span></label>
@@ -1855,6 +1871,10 @@ const T = {
     birthplace_label: 'Place of Birth', birthplace_hint: 'City or town',
     birth_country_label: 'Country of Birth', birth_country_hint: 'e.g., Italy, Switzerland, France',
     citizenship_label: 'Citizenship', citizenship_hint: 'e.g., Italian, French, German',
+    residence_country_label: 'Country of Residence',
+    residence_country_hint: 'e.g., Italy, Germany, France',
+    residence_place_label: 'Comune / City of Residence',
+    residence_place_hint: 'e.g., Milano, Berlin, Paris',
     doc_section: 'Identity Document',
     doctype_label: 'Document Type',
     passport: 'Passport', id_card: 'ID Card / Carta d\'Identità', driving: 'Driving License / Patente',
@@ -2000,6 +2020,10 @@ const T = {
     birthplace_label: 'Luogo di Nascita', birthplace_hint: 'Città o comune',
     birth_country_label: 'Stato di Nascita', birth_country_hint: 'es. Italia, Svizzera, Francia',
     citizenship_label: 'Cittadinanza', citizenship_hint: 'es. Italiana, Francese, Tedesca',
+    residence_country_label: 'Stato di Residenza',
+    residence_country_hint: 'es. Italia, Germania, Francia',
+    residence_place_label: 'Comune / Città di Residenza',
+    residence_place_hint: 'es. Milano, Berlino, Parigi',
     doc_section: 'Documento d\'Identità',
     doctype_label: 'Tipo Documento',
     passport: 'Passaporto', id_card: 'Carta d\'Identità', driving: 'Patente',
@@ -3417,6 +3441,10 @@ async function saveCurrentGuest() {
       birth_country: birthCountry || '',
       birth_province: bornInItaly ? province : 'EE',
       citizenship: citizenship || '',
+      // Round 47.2 — optional residence. Blank → ROSS1000 falls back
+      // to citizenship/birth-place inference. Alloggiati doesn't use it.
+      residence_country: document.getElementById('residenceCountry')?.value?.trim() || '',
+      residence_place:   document.getElementById('residencePlace')?.value?.trim() || '',
       document_type: isMainGuest() ? document.getElementById('doctype').value : '',
       document_number: isMainGuest() ? document.getElementById('docnum').value.trim() : '',
       doc_issue_place: isMainGuest() ? (docIssuePlaceEl?.value?.trim() || birthplace || '') : '',

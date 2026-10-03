@@ -1752,20 +1752,26 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       </div>
       </fieldset>
 
-      <fieldset class="settings-edit-fieldset" disabled style="border:0;padding:0;margin:0;min-width:0;">
       <div class="form-card">
         <div class="form-card-title" data-h="ical_title">Calendar sync (iCal)</div>
         <div class="form-card-desc" data-h="ical_desc">Paste your Airbnb / Booking.com / Vrbo iCal export URLs. WelcomeBnB pulls upcoming reservations into your dashboard. Only dates come from these feeds — guest names and counts arrive when guests complete check-in.</div>
         <div style="font-size:0.72rem;color:var(--ink-soft);line-height:1.5;margin-bottom:12px;" data-h="ical_where">Airbnb: Calendar → Availability → Connect calendars → Export. Booking.com: Calendar → Sync calendars. Vrbo: Calendar → Import/Export → Export calendar.</div>
-        <div id="icalFeedsList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
+        <!-- Round 47.1 — only the editable bits (feed URL inputs +
+             Add feed) sit inside the disabled fieldset. Sync now is a
+             pull-only, read-only action; the host should be able to
+             trigger it from view mode without clicking Edit first. -->
+        <fieldset class="settings-edit-fieldset" disabled style="border:0;padding:0;margin:0;min-width:0;">
+          <div id="icalFeedsList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+            <button type="button" class="btn btn-secondary" onclick="addIcalFeed()" data-h="ical_add">+ Add feed</button>
+          </div>
+        </fieldset>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-          <button type="button" class="btn btn-secondary" onclick="addIcalFeed()" data-h="ical_add">+ Add feed</button>
           <button type="button" class="btn btn-primary" onclick="syncIcalNow()" data-h="ical_sync_now" data-guide="ical-sync">🔄 Sync now</button>
           <span id="icalLastSynced" style="font-size:0.74rem;color:var(--ink-soft);"></span>
         </div>
         <div id="icalSyncResult" style="margin-top:10px;font-size:0.82rem;color:var(--ink-soft);"></div>
       </div>
-      </fieldset>
 
       <!-- Round 45 Step 4.5 — outbound iCal feed. Hosts paste this URL
            into Airbnb / Booking / Vrbo's "Import calendar" so their

@@ -3951,6 +3951,8 @@ const HT = {
     field_birth_province: 'Italian province (2 letters, if born in Italy)',
     field_birth_country: 'Country of birth',
     field_citizenship: 'Citizenship',
+    field_residence_country: 'Country of Residence (opt.)',
+    field_residence_place: 'Comune / City of Residence (opt.)',
     field_doc_type: 'Document type',
     field_doc_number: 'Document number',
     field_doc_issue_place: 'Place of issue',
@@ -4472,6 +4474,8 @@ const HT = {
     field_birth_province: 'Provincia italiana (2 lettere, se nato in Italia)',
     field_birth_country: 'Paese di nascita',
     field_citizenship: 'Cittadinanza',
+    field_residence_country: 'Stato di Residenza (opz.)',
+    field_residence_place: 'Comune / Città di Residenza (opz.)',
     field_doc_type: 'Tipo documento',
     field_doc_number: 'Numero documento',
     field_doc_issue_place: 'Luogo di rilascio',
@@ -10459,12 +10463,21 @@ function _ross1000Arrivo(c, idswhByGuest) {
                       isItalianCitizenshipCode(birthCode);
   const statoNascita = bornInItaly ? '100000100' : birthCode;
   const comuneNascita = bornInItaly ? _codeComune(c.place_of_birth, c.birth_province) : '';
-  // Residence: we don't capture a separate residence field; default residence
-  // = citizenship country, and for Italians use birth comune as a best-effort
-  // luogoresidenza (ROSS1000 requires SOMETHING when statoresidenza=Italia).
-  const statoRes = citt || statoNascita || '';
+  // Residence — Round 47.2 captures this as an optional pair on the
+  // check-in form. If the guest provided residence_country, use it;
+  // otherwise fall back to citizenship (reasonable default — a German
+  // citizen's residence is usually Germany). For Italians, residence
+  // place uses the guest-provided comune if any, else the birth comune.
+  const residenceCountryRaw = c.residence_country || '';
+  const statoRes = residenceCountryRaw
+    ? (_codeStato(residenceCountryRaw) || citt || statoNascita || '')
+    : (citt || statoNascita || '');
   const isItalRes = isItalianCitizenshipCode(statoRes);
-  const luogoRes = isItalRes ? (comuneNascita || '') : '';
+  const residencePlaceRaw = c.residence_place || '';
+  const residencePlaceCode = isItalRes && residencePlaceRaw
+    ? _codeComune(residencePlaceRaw, '')
+    : '';
+  const luogoRes = residencePlaceCode || (isItalRes ? (comuneNascita || '') : '');
   const fields = [
     ['idswh', idswh],
     ['tipoalloggiato', tipo],
@@ -13945,6 +13958,10 @@ function editGuest(id) {
       `<input id="edit_birth_country" type="text" list="wbnbCountryList" autocomplete="off" value="${safeAttr(c.birth_country || '')}" style="${inputStyle}">`)}
     ${field('field_citizenship',
       `<input id="edit_citizenship" type="text" list="wbnbCountryList" autocomplete="off" value="${safeAttr(c.citizenship || '')}" style="${inputStyle}">`)}
+    ${field('field_residence_country',
+      `<input id="edit_residence_country" type="text" list="wbnbCountryList" autocomplete="off" value="${safeAttr(c.residence_country || '')}" style="${inputStyle}" placeholder="— optional —">`)}
+    ${field('field_residence_place',
+      `<input id="edit_residence_place" type="text" value="${safeAttr(c.residence_place || '')}" style="${inputStyle}" placeholder="— optional —">`)}
   `;
 
   // Shared datalist so both birth_country and citizenship inputs get
@@ -14080,6 +14097,10 @@ async function saveGuestEdits(id) {
     birth_province: birthProv || null,
     birth_country: birth_country || null,
     citizenship,
+    // Round 47.2 — optional residence. '' coerces to null so the DB
+    // row doesn't carry an empty string; blank → ROSS1000 fallback.
+    residence_country: v('edit_residence_country') || null,
+    residence_place:   v('edit_residence_place')   || null,
     document_type: document_type_raw || '',
     document_number: document_number || '',
     doc_issue_place: v('edit_doc_issue_place') || null,

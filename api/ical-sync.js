@@ -184,25 +184,30 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
       // The sweep below will cancel any already-stored row with that
       // UID because the UID won't be in seenByPlatform for this run.
       //
-      // Also drop 1-night Airbnb blocks: Airbnb's iCal echoes every
-      // night that happens to be unbooked as a 1-night block (including
-      // "today" the moment Airbnb's lead-time cutoff passes). They're
-      // noise — not actionable info — and cluttered the calendar with
-      // a trail of 1-night bars across any gap between bookings. A
-      // genuine 1-night block the host wants to represent in WelcomeBnB
-      // can be added via "+ Block dates" (Round 45).
+      // Also drop PAST/TODAY 1-night Airbnb blocks: Airbnb's iCal
+      // echoes every unbooked night as a 1-night block, including
+      // "today" the moment Airbnb's lead-time cutoff passes. Those
+      // day-of blocks aren't actionable — just noise — and
+      // accumulate into long trails across gaps between bookings.
+      // We DO keep FUTURE 1-night blocks because those are much more
+      // likely a host-intentional single-night block set in Airbnb's
+      // own calendar (e.g. "my parents visit next Friday"). The
+      // host can still override by adding a 1-night direct block
+      // via "+ Block dates" (Round 45) if they want it on the
+      // WelcomeBnB calendar regardless.
       if (platform === 'airbnb' && rows.length > 0) {
+        const todayISO = new Date().toISOString().slice(0, 10);
         let dropLong = 0, drop1night = 0;
         rows = rows.filter(r => {
           if (r.entry_type !== 'block') return true;
           if (!r.checkin_date || !r.checkout_date) return true;
           const days = Math.round((Date.parse(r.checkout_date) - Date.parse(r.checkin_date)) / 86400000);
           if (days > AIRBNB_MAX_BLOCK_NIGHTS) { dropLong++; return false; }
-          if (days <= 1) { drop1night++; return false; }
+          if (days <= 1 && r.checkin_date <= todayISO) { drop1night++; return false; }
           return true;
         });
         if (dropLong || drop1night) {
-          console.log(`[ical-sync] airbnb block filter dropped ${dropLong} oversize + ${drop1night} 1-night for ${propertyId}`);
+          console.log(`[ical-sync] airbnb block filter dropped ${dropLong} oversize + ${drop1night} day-of-1-night for ${propertyId}`);
         }
       }
 

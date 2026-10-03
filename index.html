@@ -819,8 +819,11 @@ body.tab-chat .powered-by {
 .powered-by a:hover { opacity: 0.8; }
 .powered-by .wbnb-mark {
   width: 14px; height: 14px;
-  object-fit: contain;
-  display: block;
+  background: var(--warm);
+  border-radius: 3px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.5rem; color: #fff; font-weight: 700;
+  line-height: 1;
 }
 
 @media (min-width: 600px) {
@@ -1472,7 +1475,7 @@ function icon(name, cls) {
      the second reco on Explore, and the No-Parties rule on Rules. -->
 <div class="powered-by">
   <a href="https://getwelcomebnb.com" target="_blank">
-    <img class="wbnb-mark" src="logo-glyph-light.png" alt="">
+    <div class="wbnb-mark">W</div>
     Powered by <strong style="font-weight:600;color:var(--ink-2);">Welcome</strong><strong style="font-weight:600;color:var(--warm);">BnB</strong>
   </a>
   <button type="button" id="privacyLink" class="privacy-inline"

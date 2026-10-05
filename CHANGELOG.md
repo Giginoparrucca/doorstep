@@ -77,6 +77,47 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 48 Phase 2 — Guest gateway + edit-until-filed _(2026-10-05)_
+
+Phase 2 of the Round 48 security lockdown. Phase 1 closed six of the ten holes from the Oct 5 `pg_policies` audit via DB-only policy changes (zero client impact). Phase 2 moves every guest-side SQL call behind a bearer-token gateway and adds a self-service edit flow for the guest's own check-in rows (until they're filed with Alloggiati).
+
+**Function rename, not a new one.** `api/guest-chat.js` → `api/guest.js` (`git mv`) keeps every existing chat action (`history`, `send`, `poll`) byte-for-byte. A `vercel.json` rewrite (`/api/guest-chat` → `/api/guest`) lets cached clients keep working. Total still 12 functions (Hobby cap).
+
+**New gateway actions**, all scoped by the token's `property_id` + `booking_code` + `is_test` so a token for property A can't touch anything on property B:
+- `property` → whitelisted property fields. `wifi_name`, `wifi_password`, `access_method`, `keybox_code` + rotating keybox code are gated behind `bookingHasCheckin()` — matches today's "revealed only after check-in" UI.
+- `checkin_list` → the booking's guests, with a server-computed `editable` boolean (`alloggiati_status NOT IN ('filed','correction')`). Never returns `id_photo_path`. Also returns `ota_reservations.checkin_reopened_at` so the client doesn't need a second roundtrip.
+- `checkin_insert` → mints `WB-xxxxxxxx` (Crockford base32) when the token has no `booking_code`. Moves the Round 36.2.3 reopen-flag clear and the rotating keybox stamp (`get_reservation_keybox` RPC) into side effects on the service-role side; the client's anon writes used to silently no-op because no anon UPDATE policy existed.
+- `checkin_update` → field-whitelisted conditional PATCH with `alloggiati_status=neq.filed` + `Prefer: return=representation`; 0 rows → `409 { error: 'already_filed' }`. Stamps `guest_edited_at=now()`. If the main guest changes `arrival_date`/`departure_date`/`nights`, the dates fan out to every non-filed row in the booking.
+- `checkin_lookup` → rate-limited surname + arrival_date search (10/hour/session via `api_usage`). Exact case-insensitive surname match, scoped to the token's property. Returns `{ found, property_id, booking_code, guests: n }` — never PII. Replaces the cross-property anon `ilike` sweep at `index.html` ~2405.
+- `consent_withdraw` → scoped by the token's `property_id`. Replaces the anon column-scoped UPDATE on `marketing_consents`.
+
+**`api_usage.endpoint` CHECK widened** (`migration_round48b_apiusage_check.sql`) to include `checkin_lookup` and `checkin_write`. Round 34.1's gotcha was that a narrowed CHECK silently disables the rate limit — `recordUsage` catches the CHECK violation, logs, and `select count(*)` returns 0 forever. The old auto-generated constraint `api_usage_endpoint_chk` is dropped and replaced with a predictably named `api_usage_endpoint_check`.
+
+**Client refactor (`index.html`).** Every `sb.from('checkins')`, `sb.from('properties')`, `sb.from('ota_reservations')` and the `marketing_consents` UPDATE now go through `_guestCall(action, args)` (wraps `_authedAIFetch('/api/guest', …)` and returns `{ ok, status, data, error }`). Grep is clean: the only `sb.from(` left is `rules`/`recommendations` SELECT (public by design), the `analytics_events` INSERT, the `marketing_consents` INSERT, and the `documents` upload — exactly the four exceptions the spec called out.
+
+**Edit-until-filed.** Each guest card in the welcome-back panel (`showWelcomeBackState`) now renders an **Edit** button when `editable` is true, reusing the review-step edit form (`_editFormHTML` extracted to a shared helper so review + welcome-back render the same inputs with the same `ed_*` ids). `saveGuestEdit` routes through `checkin_update` when `_dbId` is set (welcome-back) and stays local-only when it isn't (pre-submit review). On a 409 we show the lock message and re-fetch the list so the row flips to the lock state. Filed rows show `🔒 Details already sent to the police — ask your host to correct them.` instead of the Edit button.
+
+**i18n (both EN and IT).** New single-line strings `wb_edit_btn`, `wb_filed_lock`, `edit_filed_409`, `lookup_err_rate`. `wb_hint` updated to invite the edit flow when the row isn't filed yet.
+
+**Unsubscribe flow.** `handleUnsubscribeIfPresent` now resolves `propertyId` from `?p=` or localStorage before calling `consent_withdraw` through the gateway. Links that lack a `?p=` get the same "invalid or already used" message as before; hosts should include `?p=` in their marketing emails (same host-console guidance about including an unsubscribe link already covers this).
+
+**Phase 3 pending** (`migration_round48b_anon_revoke.sql`, ships after Phase 2 verified): drop `anon_select_checkins`, `anon_insert_checkins`, `"Guests read any property by ID"`, `marketing_consents_anon_withdraw`; `REVOKE` anon grants on `checkins` / `properties` / `ota_reservations`; `REVOKE EXECUTE` on `get_reservation_keybox` from `anon, public`.
+
+**Phase 4 pending** (`migration_round48c_filed_lock.sql`): BEFORE UPDATE trigger on `checkins` that raises `'checkin_locked_filed'` when any personal/document/stay column changes on a `filed` row; `alloggiati_status='correction'` + host-side "Unlock to correct" UI; "Edited by guest · <time>" note on rows with `guest_edited_at`.
+
+**Key learnings & gotchas.**
+- Policies created in the SQL editor bypass review. `*_admin_update` policies had `qual=true` instead of `is_admin()`. Run `scripts/audit_policies.sql` at the end of every round that touches the DB.
+- Storage policies with role `public` include anon. Never use them for private buckets.
+- Supabase's `DROP POLICY` has been hanging indefinitely behind an event trigger (`pgrst_drop_watch`). `ALTER POLICY … USING (false) WITH CHECK (false)` is semantically identical to drop + recreate for the policies in question and sidesteps the hang.
+
+### Round 48 Phase 1 — DB-only policy lockdown _(2026-10-05)_
+
+Policies from an Oct 5 live audit of `pg_policies` and storage policies, all neutered without touching the client. The round shipped as `migration_round48a_policy_lockdown.sql` + `scripts/audit_policies.sql`.
+
+Holes #4 (five `*_admin_update` policies with `qual=true` that let any authenticated host edit any row — `checkins`, `properties`, `recommendations`, `chat_messages`, `analytics_events`), #5 (`auth_insert_checkins` and `"Auth insert chat"` with `with_check=true` → owner-scoped), #6 (`"Anon read analytics"` dropped, `"Auth read analytics"` → owner-scoped; INSERT policies stay for event capture), #2 (storage bucket `documents`: anon SELECT dropped, anon INSERT narrowed to `name LIKE 'id-photos/%'`, added `documents_owner_read` for hosts), #8 (storage bucket `property-images`: public INSERT and DELETE dropped, owner-scoped `property_images_owner_{insert,update,delete}` added — public SELECT stays so guests see covers), #9 (`admin_users_select_authenticated`: `qual=true` → `lower(email) = lower(auth.email()) OR is_admin()`), #10 (legacy `"Hosts claim unowned properties"` was already dead code after Round 33 removed the claim branch — neutered).
+
+Holes #1, #3 and #7 (wide-open anon SELECT on `checkins`, wide-open anon read on `properties`, wide-open UPDATE on `marketing_consents`) stay until Phase 3 revokes anon access — the gateway built in Phase 2 is a prerequisite.
+
 ### Round 47 — Region-aware compliance _(2026-10-02)_
 
 The Export panel's "Statistics · Regional" axis has shown the right tiles to the wrong hosts since Round 40 Task 7. The filter needed an exact string match on `properties.region`, but the column was free-text — live-data audit on 2026-10-02 found `region='Verona'` on the Marco Polo property and `region='BA'` on the Bari property, so **the ROSS1000 Veneto tile was hidden from the Verona host and the Puglia DMS tile was hidden from the Bari host**. Four properties also had blank region, which showed every regional tile to every host. The hard-coded CityTax++ (Venezia) tile sat on every host's Export panel the same way, and the Compliance Guide had an out-of-date hand-maintained ROSS1000 list that was missing Umbria, Sicilia, FVG and Valle d'Aosta.

@@ -13,5 +13,11 @@
       "path": "/api/send-arrival-reminders",
       "schedule": "0 5 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "api/alloggiati.js": {
+      "includeFiles": "lib/**",
+      "maxDuration": 60
+    }
+  }
 }

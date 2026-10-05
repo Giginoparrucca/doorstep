@@ -1,0 +1,17 @@
+# Round 49 Phase 1 — golden-check fixtures contain real guest PII.
+# The script writes new-lib.txt here; neither file commits. Only the
+# sha256 goes in the PR body.
+scripts/golden/*
+!scripts/golden/.gitkeep
+
+# Build helpers used only to assemble lib/alloggiati-records.js — the
+# shipped artifact is the lib file itself.
+lib/_prefix.js
+lib/_suffix.js
+lib/_build-lib.sh
+
+# Node tooling (not currently used but reserve the names).
+node_modules/
+.env
+.env.local
+.vercel

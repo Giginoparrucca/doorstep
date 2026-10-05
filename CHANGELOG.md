@@ -77,6 +77,37 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 48 Phase 4 — Host-side filing lock _(2026-10-05)_
+
+The last piece of Round 48. The guest side already enforces "filed = not editable" via the Phase 2 gateway's `checkin_update` conditional PATCH, but the host-console does a direct `sb.from('checkins').update()` as the host and had been able to edit filed rows freely. Phase 4 moves the enforcement from "a filter on the client's PATCH" to a BEFORE UPDATE trigger on the table itself — the lock now applies to every writer, service role included.
+
+**Migration (`migration_round48d_filed_lock.sql`)**
+- Four new `checkins` columns: `guest_edited_at`, `unlocked_at`, `unlocked_by`, `unlock_reason`. `guest_edited_at` was already referenced by the Phase 2 gateway's `checkin_update` action — it was a silent no-op until this round because the column didn't exist. Fixed in-flight.
+- Trigger function `checkins_prevent_filed_edit()` + BEFORE UPDATE trigger `checkins_filed_edit_guard`. Raises `checkin_locked_filed` when `OLD.alloggiati_status = 'filed'`, `NEW.alloggiati_status = 'filed'` and any of the 15 identity/document/stay columns changed (surname, name, sex, date_of_birth, place_of_birth, birth_province, birth_country, citizenship, document_type, document_number, doc_issue_place, arrival_date, departure_date, nights, guest_type). Metadata columns (`filed_at`, `receipt_path`, `deleted_at`, `filing_reminder_sent_at`, `checkin_reopened_at`, `keybox_code`, `tax_declared_flags`, `docs_status`, `puglia_dms_status`) stay writable so hosts can still attach a late receipt or soft-delete.
+- Status-flip exemption: when `NEW.alloggiati_status != 'filed'` the trigger returns NEW unconditionally, so the "Unlock to correct" path (filed → correction) is allowed. Resending a correction row flips correction → filed, which also passes (OLD != 'filed').
+- Verified live: metadata-only write on a filed row succeeded, sensitive write raised `checkin_locked_filed`, pending-row write succeeded.
+
+**Host console (`host-console.html`)**
+- `editGuest`: filed rows open the modal in **read-only** state — every input + select carries `disabled`, the amber `edit_filed_lock_banner` appears above the form, and the footer **replaces** Save with **"Unlock to correct"**. Correction rows (already unlocked) are editable as normal.
+- New `unlockFiledForCorrection(id)`: confirm dialog → required reason via `prompt()` → PATCH `alloggiati_status='correction', unlocked_at=now(), unlocked_by=auth.uid(), unlock_reason` using the Round 20.2 `.select()` pattern so a 0-row result is loud. Mirrors into `allCheckins`, re-renders, re-opens the modal in editable mode. Also records a `track('unlock_filed_checkin', { id })` analytics event.
+- `saveGuestEdits` catches the trigger error (`/checkin_locked_filed/i`) and surfaces `edit_save_filed_locked` with a nudge toward the unlock button — defensive, since the modal is already disabled for filed rows.
+- Status pills recognise `correction`: group header gets an amber `✎ Correzione — da reinviare` / `✎ Correction — needs re-filing` pill, row pill gets an inline amber `✎`, the detail modal filing badge picks the correction label too.
+- Each row with a non-null `guest_edited_at` shows a blue `✎ ospite · <date>` / `✎ guest · <date>` chip next to the name so a host who's already downloaded a .txt knows which rows need regenerating.
+
+**i18n (both EN and IT, host-console only)**: new single-line strings `edit_filed_lock_banner`, `edit_unlock_btn`, `edit_unlock_confirm`, `edit_unlock_reason_prompt`, `edit_save_filed_locked`.
+
+**Scope checks (`alloggiati_status !== 'filed'`)**: every `!= 'filed'` filter the codebase already runs — host-console lines 7080-7081 (strict all-filed badge), 9811/9835 (export excludeFiled), 12002, 14740, 14778 (overdue counts), `api/send-arrival-reminders.js` PASS B — treats correction rows as not-filed exactly the way the spec called for, so none of them needed to change.
+
+**Full Round 48 — complete.**
+- Phase 1 (#108) — DB-only policy lockdown (6 of 10 holes)
+- Phase 2 (#109) — guest gateway + edit-until-filed
+- Phase 3 (#110) — revoke anon access
+- Phase 4 (this round) — host-side filing lock + "Unlock to correct"
+
+**Key learnings & gotchas (this round)**
+- The `pgrst_drop_watch` quirk from Phase 1 and Phase 3 is live for triggers too: `DROP TRIGGER IF EXISTS` on a trigger that doesn't exist still times out at 60s. On first apply there's nothing to drop; on re-apply, run `DROP TRIGGER` by hand in the SQL editor and wait it out, or rename the trigger. The migration file skips the DROP so a first apply is unaffected.
+- Postgres' FK triggers on `marketing_consents.property_id → properties.id` run with the inserting role, so when Phase 3 revoked anon's privileges on `properties` entirely the opt-in form broke mid-run. Column-level `GRANT REFERENCES (id), SELECT (id) ON properties TO anon` is the minimum that unblocks the FK check without reopening the hole (noted in the Phase 3 CHANGELOG entry).
+
 ### Round 48 Phase 3 — Revoke anon access _(2026-10-05)_
 
 The lockdown Phase 1 and Phase 2 were building up to. Shipped as `migration_round48c_anon_revoke.sql` after Phase 2 (#109) was deployed to production and the gateway was verified live. Closes holes #1, #3 and #7 from the Oct 5 `pg_policies` audit — the last three wide-open anon doors.

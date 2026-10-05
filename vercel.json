@@ -1,6 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["dub1"],
+  "rewrites": [
+    { "source": "/api/guest-chat", "destination": "/api/guest" }
+  ],
   "crons": [
     {
       "path": "/api/ical-sync",

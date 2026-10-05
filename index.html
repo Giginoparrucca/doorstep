@@ -1669,26 +1669,32 @@ async function mintGuestToken(force = false) {
   return _mintInFlight;
 }
 
-// Round 34 helper — wraps /api/guest-chat. Every guest chat read + write
-// goes through this after Round 34's migration revoked anon access to
-// chat_messages. Silent noop when there's no token yet (page loads
-// before propertyId resolves).
-async function _guestChatCall(action, args) {
+// Round 34 helper, renamed in Round 48 Phase 2 — wraps /api/guest.
+// Every guest DB read + write goes through this after Round 48
+// Phase 3's migration revokes anon access to checkins, properties,
+// ota_reservations and marketing_consents. The old /api/guest-chat
+// URL still works via a Vercel rewrite for cached clients.
+// Silent noop when there's no token yet (page loads before
+// propertyId resolves).
+async function _guestCall(action, args) {
   if (!propertyId) return null;
   try {
-    const r = await _authedAIFetch('/api/guest-chat', {
+    const r = await _authedAIFetch('/api/guest', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, ...(args || {}) }),
     });
     if (!r.ok) {
-      console.warn('[guest-chat]', action, 'failed:', r.status);
-      return null;
+      let body = null;
+      try { body = await r.json(); } catch (_) {}
+      console.warn('[guest]', action, 'failed:', r.status, body?.error || '');
+      return { ok: false, status: r.status, error: body?.error || null, data: body };
     }
-    return await r.json();
+    const data = await r.json();
+    return { ok: true, status: r.status, data };
   } catch (e) {
-    console.warn('[guest-chat]', action, 'exception:', e);
-    return null;
+    console.warn('[guest]', action, 'exception:', e);
+    return { ok: false, status: 0, error: 'network', data: null };
   }
 }
 
@@ -1961,9 +1967,14 @@ const T = {
     // Welcome back
     wb_title: 'Welcome back,',
     wb_sub: 'Your check-in is complete. Here\'s your booking summary.',
-    wb_hint: 'Need to update your details? Contact your host.',
+    wb_hint: 'Need to update your details? Edit the row below (until it\'s been filed with the police).',
     wb_main_guest: 'Main guest',
     wb_companion: 'Companion',
+    // Round 48 Phase 2 — guest-side edit after submission.
+    wb_edit_btn: 'Edit',
+    wb_filed_lock: 'Details already sent to the police — ask your host to correct them.',
+    edit_filed_409: 'Details already sent to the police — ask your host to correct them.',
+    lookup_err_rate: 'Too many lookups. Please wait a moment and try again.',
   },
   it: {
     welcome_title: 'Benvenuti a<br><em>Il Vostro Soggiorno</em>',
@@ -2106,9 +2117,14 @@ const T = {
     // Welcome back
     wb_title: 'Bentornato/a,',
     wb_sub: 'Il tuo check-in è completo. Ecco il riepilogo della prenotazione.',
-    wb_hint: 'Hai bisogno di aggiornare i tuoi dati? Contatta il tuo host.',
+    wb_hint: 'Devi aggiornare i tuoi dati? Modifica la riga qui sotto (finché non è stata inviata alla Questura).',
     wb_main_guest: 'Ospite principale',
     wb_companion: 'Accompagnatore',
+    // Round 48 Fase 2 — modifiche dell\'ospite dopo l\'invio.
+    wb_edit_btn: 'Modifica',
+    wb_filed_lock: 'Dati già inviati alla Questura — chiedi all\'host di correggerli.',
+    edit_filed_409: 'Dati già inviati alla Questura — chiedi all\'host di correggerli.',
+    lookup_err_rate: 'Troppe ricerche. Attendi un momento e riprova.',
   }
 };
 
@@ -2309,13 +2325,26 @@ function showWelcomeBackState(checkins) {
   wbHint.textContent = T[lang].wb_hint;
 
   // 4. Render guest summary cards
+  // Round 48 Phase 2 — the gateway's checkin_list returns an `editable`
+  // boolean per row. True → show an Edit button that reuses the review
+  // form (saveGuestEdit routes through the gateway when _dbId is set).
+  // False (filed on Alloggiati) → show a lock line instead. savedGuests
+  // is populated here so editGuest(i)/saveGuestEdit(i) read the right
+  // record; _dbId carries the checkins.id so saveGuestEdit knows this
+  // is a welcome-back edit, not a pre-submit review-step edit.
+  savedGuests = checkins.map((g) => ({ ...g, _dbId: g.id }));
   const cardsEl = document.getElementById('welcomeBackCards');
   cardsEl.innerHTML = checkins.map((g, i) => {
     const isMain = ['single','head','group'].includes(g.guest_type);
     const roleLabel = isMain ? T[lang].wb_main_guest : T[lang].wb_companion;
     const provInfo = g.birth_province && g.birth_province !== 'EE' ? ` (${g.birth_province})` : '';
+    const editControls = g.editable === true
+      ? `<div style="margin-top:8px;"><button onclick="editGuest(${i})" class="btn" style="padding:5px 10px;font-size:0.68rem;background:var(--white);border:1px solid var(--cream-3);color:var(--ink);">${T[lang].wb_edit_btn}</button></div>`
+      : (g.editable === false
+        ? `<div style="margin-top:8px;font-size:0.62rem;color:var(--ink-soft);font-style:italic;">🔒 ${T[lang].wb_filed_lock}</div>`
+        : '');
     return `
-      <div style="background:var(--white);border:1px solid var(--cream-3);border-radius:10px;padding:12px 14px;margin-bottom:8px;${isMain ? 'border-left:3px solid var(--warm);' : ''}">
+      <div id="wbCard${i}" style="background:var(--white);border:1px solid var(--cream-3);border-radius:10px;padding:12px 14px;margin-bottom:8px;${isMain ? 'border-left:3px solid var(--warm);' : ''}">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
           <div style="font-weight:600;font-size:0.82rem;color:var(--ink);">${g.surname} ${g.name}</div>
           <div style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--warm);font-weight:500;">${roleLabel}</div>
@@ -2325,8 +2354,12 @@ function showWelcomeBackState(checkins) {
           ${g.citizenship ? ` · ${g.citizenship}` : ''}
           ${isMain && g.document_type ? `<br>${g.document_type} · ${g.document_number || ''}` : ''}
         </div>
+        ${editControls}
+        ${g.editable === true ? _editFormHTML(g, i, isMain) : ''}
       </div>`;
   }).join('');
+  // Attach comune autocomplete to the edit forms we just rendered.
+  _wireEditFormAutocomplete();
 
   // 5. Update check-in badge to show "done"
   const badge = document.getElementById('checkinBadge');
@@ -2400,87 +2433,78 @@ async function lookupCheckin() {
   document.getElementById('lookupBtn').disabled = true;
 
   try {
-    // Search across ALL properties by surname + arrival_date.
-    // Filter out test/deleted rows so admin clean-ups don't surface stale guests.
-    const { data, error } = await sb.from('checkins')
-      .select('*')
-      .eq('arrival_date', date)
-      .eq('is_test', false)
-      .is('deleted_at', null)
-      .ilike('surname', surname.toUpperCase());
+    // Round 48: lookup goes through the guest gateway, scoped by the
+    // token's property_id. If the guest's booking is at a different
+    // property than the URL they opened, we return "not found" — the
+    // right link gets them there. No cross-property surname sweep is
+    // possible from the client anymore (was a Round 48 Phase 1 audit
+    // finding), and the server rate-limits to 10 lookups/hour/session.
+    const look = await _guestCall('checkin_lookup', {
+      surname: surname.toUpperCase(),
+      arrival_date: date,
+    });
 
     loadEl.style.display = 'none';
     document.getElementById('lookupBtn').disabled = false;
 
-    if (error) throw error;
+    if (look && look.status === 429) {
+      errEl.textContent = (T[lang].lookup_err_rate || T[lang].lookup_err_date || 'Too many tries, please wait.');
+      errEl.style.display = 'block';
+      return;
+    }
+    if (!look || !look.ok) throw new Error(look?.error || 'lookup failed');
 
-    if (!data || data.length === 0) {
+    if (!look.data || !look.data.found) {
       errEl.textContent = T[lang].lookup_not_found;
       errEl.style.display = 'block';
-      // Analytics: failed lookup (privacy-safe — no surname logged)
       trackGuest('guest_lookup_used', { result: 'not_found' });
       return;
     }
 
-    // Analytics: successful lookup + whether it triggered a cross-device switch
-    const crossDevice = data[0].property_id && data[0].property_id !== propertyId;
+    const foundCode = look.data.booking_code;
     trackGuest('guest_lookup_used', {
       result: 'found',
-      matches: data.length,
-      cross_device: !!crossDevice,
+      matches: look.data.guests || 0,
+      cross_device: false,
     });
 
-    // Found! Switch to the correct property if different
-    const foundPropId = data[0].property_id;
-    if (foundPropId && foundPropId !== propertyId) {
-      console.log('🔄 Switching to property:', foundPropId);
-      localStorage.setItem('wbnb_property', foundPropId);
-      propertyId = foundPropId;
-      // Reload property data for welcome page
-      const { data: propData } = await sb.from('properties').select('*').eq('id', foundPropId).is('deleted_at', null).single();
-      if (propData) {
-        propertyData = propData;
-        const el = (id) => document.getElementById(id);
-        if (el('topBarTitle')) el('topBarTitle').textContent = propData.name || 'Property';
-        if (el('heroTitle')) el('heroTitle').innerHTML = `Welcome to<br><em>${propData.name || 'Your Stay'}</em>`;
-        if (el('heroBadge')) el('heroBadge').textContent = `${propData.city || ''}, ${propData.region || ''}`;
-        if (el('heroImg') && propData.hero_image_url) el('heroImg').src = propData.hero_image_url;
-      }
+    // Found! Pin the booking code locally and re-mint the token so the
+    // gateway's token-scoped queries pick it up for the rest of the
+    // session.
+    if (foundCode) {
+      bookingCode = foundCode;
+      localStorage.setItem('wbnb_booking', foundCode);
+      // Round 48: the token payload carries booking_code; re-mint so
+      // every subsequent gateway call scopes to this booking.
+      await mintGuestToken(true).catch(() => {});
     }
 
-    // Get the booking_code from the first match
-    const foundCode = data[0].booking_code;
+    // Pull fresh property data (keybox / wifi are gated by whether this
+    // booking has a check-in; the gateway handles that server-side).
+    const propR = await _guestCall('property', {});
+    const propData = propR?.data?.property || null;
+    if (propData) {
+      propertyData = propData;
+      const el = (id) => document.getElementById(id);
+      if (el('topBarTitle')) el('topBarTitle').textContent = propData.name || 'Property';
+      if (el('heroTitle')) el('heroTitle').innerHTML = `Welcome to<br><em>${propData.name || 'Your Stay'}</em>`;
+      if (el('heroBadge')) el('heroBadge').textContent = `${propData.city || ''}, ${propData.region || ''}`;
+      if (el('heroImg') && propData.hero_image_url) el('heroImg').src = propData.hero_image_url;
+    }
 
-    // If they have a booking code, find ALL guests in that booking
-    let allGuests = data.filter(g => g.property_id === propertyId);
-    if (foundCode) {
-      const { data: fullGroup } = await sb.from('checkins')
-        .select('*')
-        .eq('booking_code', foundCode)
-        .eq('is_test', false)
-        .is('deleted_at', null)
-        .order('submitted_at');
-      if (fullGroup && fullGroup.length > 0) allGuests = fullGroup;
-      localStorage.setItem('wbnb_booking', foundCode);
+    // Load the full guest list for this booking via the gateway.
+    const listR = await _guestCall('checkin_list', {});
+    const allGuests = listR?.data?.guests || [];
 
-      // Retroactively stamp booking_code on session events that fired before the lookup
-      // resolved the code (link_opened, early page views). This lets host-console
-      // correctly attribute pre-lookup events to the right guest.
-      if (foundCode !== bookingCode) {
-        bookingCode = foundCode;
-        // Round 33 — the token payload carries booking_code; re-mint so
-        // R34's guest-chat scoping picks up the right thread.
-        mintGuestToken(true).catch(() => {});
-        sb.from('analytics_events')
-          .update({ booking_code: foundCode })
-          .eq('session_id', _guestSessionId)
-          .is('booking_code', null)
-          .then(({ error }) => {
-            if (error) console.warn('📊 retroactive booking_code backfill failed:', error.message);
-            else console.log('📊 retroactive booking_code backfill OK →', foundCode);
-          });
-      }
-    } else {
+    // Round 48 — the client-side retroactive analytics_events UPDATE
+    // that used to live here (back-stamping booking_code onto early
+    // session events) silently no-ops today under anon RLS. Leaving
+    // it off for now; a follow-up round can move it into the gateway
+    // if the analytics gap turns out to matter.
+
+    if (!foundCode) {
+      // No booking code case — remember the lookup for the next page
+      // load so a resume still works.
       localStorage.setItem('wbnb_lookup', JSON.stringify({ surname: surname.toUpperCase(), date }));
     }
 
@@ -3502,13 +3526,44 @@ async function saveCurrentGuest() {
     }
 
     console.log(`💾 Saving guest ${currentGuestIdx+1}/${totalGuests}:`, JSON.stringify(record));
-    const { data, error } = await sb.from('checkins').insert(record);
-    if (error) {
-      console.error('❌ DB insert error:', error.code, error.message, error.details, error.hint);
-      alert(`DB Error: ${error.message}\n${error.details || ''}\n${error.hint || ''}`);
-      throw error;
+    // Round 48 Phase 2 — insert via the guest gateway. The server
+    // sets property_id, booking_code and is_test from the token
+    // payload, so we strip them from the record first. Also:
+    // - Walk-in sessions (no token.b) get a WB-xxxxxxxx code minted
+    //   server-side and returned here; we persist it to the token.
+    // - Rotating keybox stamp + checkin_reopened_at clearing used to
+    //   happen client-side on separate `sb.from()` calls that silently
+    //   no-op'd under anon RLS. The gateway now does both as side
+    //   effects of the insert.
+    const outboundRecord = { ...record };
+    delete outboundRecord.property_id;
+    delete outboundRecord.booking_code;
+    delete outboundRecord.is_test;
+    const insertR = await _guestCall('checkin_insert', { record: outboundRecord });
+    if (!insertR || !insertR.ok) {
+      const errMsg = insertR?.data?.error || insertR?.error || 'insert failed';
+      const errFields = insertR?.data?.fields;
+      console.error('❌ Gateway insert error:', insertR?.status, errMsg, errFields);
+      alert(`DB Error: ${errMsg}${errFields ? '\n' + errFields.join(', ') : ''}`);
+      throw new Error(errMsg);
     }
-    console.log('✅ Guest saved OK');
+    const insertedId = insertR.data?.id;
+    const mintedCode = insertR.data?.booking_code;
+    // Walk-in — the token had no booking code; adopt the minted one
+    // and re-mint the guest token so subsequent gateway calls scope
+    // to it. Keep the URL readable too (history.replaceState).
+    if (mintedCode && !bookingCode) {
+      bookingCode = mintedCode;
+      canonicalBooking = canonicalBooking || mintedCode;
+      try { localStorage.setItem('wbnb_booking', mintedCode); } catch (_) {}
+      try {
+        const u = new URL(window.location.href);
+        u.searchParams.set('b', mintedCode);
+        history.replaceState(null, '', u.toString());
+      } catch (_) {}
+      try { await mintGuestToken(true); } catch (_) {}
+    }
+    console.log('✅ Guest saved OK via gateway, id=', insertedId);
     savedGuests.push(record);
 
     if (currentGuestIdx < totalGuests - 1) {
@@ -3518,10 +3573,10 @@ async function saveCurrentGuest() {
       updateSteps();
       document.getElementById('page-checkin').scrollTop = 0;
     } else {
-      // All done — Round 34: routed via /api/guest-chat (service-role
+      // All done — Round 48: routed via /api/guest (service-role
       // backed), not the anon sb client. property_id + booking_code
       // come from the token payload on the server side.
-      await _guestChatCall('send', {
+      await _guestCall('send', {
         sender: 'system',
         message: `Check-in complete: ${savedGuests.length} guest(s) registered. Arrival: ${arrivalDate}, Departure: ${departureDate}.`
       });
@@ -3547,32 +3602,13 @@ async function saveCurrentGuest() {
         nights: nights,
       });
 
-      // Round 36.2.3 — clear the reopen flag on ota_reservations and on
+      // Round 36.2.3 — clear the reopen flag on ota_reservations + on
       // every checkin row of this booking so the next visit locks back
-      // into the welcome-back state. Best-effort; a failure here just
-      // means the host sees "🔓 Reopened" for another day and can retry.
-      if (isReopenedCheckin && canonicalPropId && canonicalBooking) {
-        try {
-          await sb.from('ota_reservations')
-            .update({ checkin_reopened_at: null })
-            .eq('property_id', canonicalPropId)
-            .eq('booking_code', canonicalBooking);
-          await sb.from('checkins')
-            .update({ checkin_reopened_at: null })
-            .eq('property_id', canonicalPropId)
-            .eq('booking_code', canonicalBooking);
-        } catch (e) { console.warn('reopen flag clear failed:', e); }
-      } else if (isReopenedCheckin && canonicalPropId && !canonicalBooking) {
-        // Walk-in / solo case — clear on the specific existing checkin ids
-        try {
-          const ids = (existingCheckins || []).map(c => c.id).filter(Boolean);
-          if (ids.length) {
-            await sb.from('checkins')
-              .update({ checkin_reopened_at: null })
-              .in('id', ids);
-          }
-        } catch (e) { console.warn('reopen flag clear (solo) failed:', e); }
-      }
+      // into the welcome-back state.
+      // Round 48 Phase 2 — moved into the gateway's checkin_insert
+      // side effects (it runs under the service role so the updates
+      // actually land, unlike the client's silent no-op under anon
+      // RLS). Deliberate no-op here now.
     }
   } catch (err) {
     console.error('Save error:', err);
@@ -3585,6 +3621,61 @@ async function saveCurrentGuest() {
 /* ══════════════════════════════════════
    POST-SUBMISSION REVIEW & EDIT
 ══════════════════════════════════════ */
+// Round 48 Phase 2 — shared edit-form HTML so the welcome-back cards
+// and the review-step cards both show the same inputs (and so
+// editGuest(i)/saveGuestEdit(i) can find the same ed_* ids on both
+// screens). isMain here means "this record owns the document fields";
+// the review-step passes `i === 0`, welcome-back checks guest_type.
+function _editFormHTML(g, i, isMain) {
+  return `
+        <div id="editForm${i}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].surname_label}</label><input class="form-input" id="ed_surname${i}" value="${g.surname||''}" style="font-size:0.78rem;padding:8px;"></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].name_label}</label><input class="form-input" id="ed_name${i}" value="${g.name||''}" style="font-size:0.78rem;padding:8px;"></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].sex_label}</label><select class="form-select" id="ed_sex${i}" style="font-size:0.78rem;padding:8px;"><option value="M" ${g.sex==='M'?'selected':''}>${T[lang].male}</option><option value="F" ${g.sex==='F'?'selected':''}>${T[lang].female}</option></select></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].dob_label}</label><input class="form-input" type="date" id="ed_dob${i}" value="${g.date_of_birth||''}" style="font-size:0.78rem;padding:8px;"></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].birthplace_label}</label><input class="form-input" id="ed_birth${i}" value="${g.place_of_birth||''}" style="font-size:0.78rem;padding:8px;"></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].birth_country_label}</label><input class="form-input" id="ed_bcountry${i}" value="${g.birth_country||''}" style="font-size:0.78rem;padding:8px;"></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].citizenship_label}</label><input class="form-input" id="ed_cit${i}" value="${g.citizenship||''}" style="font-size:0.78rem;padding:8px;"></div>
+            ${isItalianCountry(g.birth_country) ? `<div style="grid-column:1/-1"><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].province_label}</label><input class="form-input" id="ed_prov${i}" value="${g.birth_province||''}" style="font-size:0.78rem;padding:8px;" placeholder="e.g. BA, MI, RM"></div>` : ''}
+            ${isMain ? `
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].docnum_label}</label><input class="form-input" id="ed_docnum${i}" value="${g.document_number||''}" style="font-size:0.78rem;padding:8px;"></div>
+            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].docissue_label}</label><input class="form-input" id="ed_docissue${i}" value="${g.doc_issue_place||''}" style="font-size:0.78rem;padding:8px;"></div>
+            ` : ''}
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;">
+            <button onclick="saveGuestEdit(${i})" class="btn btn-primary" style="flex:1;padding:8px;font-size:0.72rem;">${T[lang].review_save}</button>
+            <button onclick="cancelGuestEdit(${i})" class="btn btn-secondary" style="padding:8px;font-size:0.72rem;">${T[lang].review_cancel}</button>
+          </div>
+        </div>`;
+}
+
+// Round 48 Phase 2 — wire comune autocomplete onto whichever cards
+// currently exist (review-step or welcome-back). Both flows share the
+// same ed_* ids via _editFormHTML.
+function _wireEditFormAutocomplete() {
+  savedGuests.forEach((g, i) => {
+    const _eb = document.getElementById('ed_birth' + i);
+    if (_eb) {
+      attachComuneAutocomplete(_eb, (entry) => {
+        const _ep = document.getElementById('ed_prov' + i);
+        if (_ep && entry.prov) _ep.value = entry.prov;
+      });
+      if (_eb.value && _eb.value.trim()) {
+        refreshComuneValidation(_eb, (entry) => {
+          const _ep = document.getElementById('ed_prov' + i);
+          if (_ep && entry.prov) _ep.value = entry.prov;
+        });
+      }
+    }
+    const _edi = document.getElementById('ed_docissue' + i);
+    if (_edi) {
+      attachComuneAutocomplete(_edi, null);
+      if (_edi.value && _edi.value.trim()) refreshComuneValidation(_edi, null);
+    }
+  });
+}
+
 function renderReviewCards() {
   const container = document.getElementById('reviewCards');
   container.innerHTML = savedGuests.map((g, i) => {
@@ -3610,26 +3701,7 @@ function renderReviewCards() {
             ${T[lang].review_edit}
           </button>
         </div>
-        <div id="editForm${i}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].surname_label}</label><input class="form-input" id="ed_surname${i}" value="${g.surname}" style="font-size:0.78rem;padding:8px;"></div>
-            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].name_label}</label><input class="form-input" id="ed_name${i}" value="${g.name}" style="font-size:0.78rem;padding:8px;"></div>
-            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].sex_label}</label><select class="form-select" id="ed_sex${i}" style="font-size:0.78rem;padding:8px;"><option value="M" ${g.sex==='M'?'selected':''}>${T[lang].male}</option><option value="F" ${g.sex==='F'?'selected':''}>${T[lang].female}</option></select></div>
-            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].dob_label}</label><input class="form-input" type="date" id="ed_dob${i}" value="${g.date_of_birth}" style="font-size:0.78rem;padding:8px;"></div>
-            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].birthplace_label}</label><input class="form-input" id="ed_birth${i}" value="${g.place_of_birth}" style="font-size:0.78rem;padding:8px;"></div>
-            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].birth_country_label}</label><input class="form-input" id="ed_bcountry${i}" value="${g.birth_country||''}" style="font-size:0.78rem;padding:8px;"></div>
-            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].citizenship_label}</label><input class="form-input" id="ed_cit${i}" value="${g.citizenship}" style="font-size:0.78rem;padding:8px;"></div>
-            ${isItalianCountry(g.birth_country) ? `<div style="grid-column:1/-1"><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].province_label}</label><input class="form-input" id="ed_prov${i}" value="${g.birth_province||''}" style="font-size:0.78rem;padding:8px;" placeholder="e.g. BA, MI, RM"></div>` : ''}
-            ${isMain ? `
-            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].docnum_label}</label><input class="form-input" id="ed_docnum${i}" value="${g.document_number}" style="font-size:0.78rem;padding:8px;"></div>
-            <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].docissue_label}</label><input class="form-input" id="ed_docissue${i}" value="${g.doc_issue_place||''}" style="font-size:0.78rem;padding:8px;"></div>
-            ` : ''}
-          </div>
-          <div style="display:flex;gap:8px;margin-top:10px;">
-            <button onclick="saveGuestEdit(${i})" class="btn btn-primary" style="flex:1;padding:8px;font-size:0.72rem;">${T[lang].review_save}</button>
-            <button onclick="cancelGuestEdit(${i})" class="btn btn-secondary" style="padding:8px;font-size:0.72rem;">${T[lang].review_cancel}</button>
-          </div>
-        </div>
+        ${_editFormHTML(g, i, isMain)}
       </div>
     `;
   }).join('');
@@ -3639,28 +3711,7 @@ function renderReviewCards() {
   // Pre-seed validation state for values already saved to the DB (so we
   // don't punish a guest who simply opens an edit form without changing
   // the birthplace).
-  savedGuests.forEach((g, i) => {
-    const _eb = document.getElementById('ed_birth' + i);
-    if (_eb) {
-      attachComuneAutocomplete(_eb, (entry) => {
-        // If a province field is showing for this guest, fill it.
-        const _ep = document.getElementById('ed_prov' + i);
-        if (_ep && entry.prov) _ep.value = entry.prov;
-      });
-      // Pre-seed validation so prefilled values aren't flagged as invalid
-      if (_eb.value && _eb.value.trim()) {
-        refreshComuneValidation(_eb, (entry) => {
-          const _ep = document.getElementById('ed_prov' + i);
-          if (_ep && entry.prov) _ep.value = entry.prov;
-        });
-      }
-    }
-    const _edi = document.getElementById('ed_docissue' + i);
-    if (_edi) {
-      attachComuneAutocomplete(_edi, null);
-      if (_edi.value && _edi.value.trim()) refreshComuneValidation(_edi, null);
-    }
-  });
+  _wireEditFormAutocomplete();
 }
 
 /* ══════════════════════════════════════
@@ -3783,17 +3834,41 @@ async function saveGuestEdit(idx) {
     updates.doc_issue_place = document.getElementById('ed_docissue' + idx).value.trim();
   }
 
-  // Update in Supabase
-  if (g._dbId) {
-    const { error } = await sb.from('checkins').update(updates).eq('id', g._dbId);
-    if (error) { console.error('Update error:', error); alert('Save failed. Try again.'); return; }
+  // Round 48 Phase 2 — gateway-routed update. The review-step edit
+  // (idx is in the pre-submit list, _dbId unset) stays local-only;
+  // the welcome-back Edit flow sets _dbId on each card so the save
+  // routes through the gateway and lands in the DB. The gateway's
+  // conditional PATCH filters on alloggiati_status!=filed, so a row
+  // whose details have already been sent to the police comes back
+  // as a 409 and we show the lock message + refresh the list.
+  const isWelcomeBack = !!g._dbId;
+  if (isWelcomeBack) {
+    const r = await _guestCall('checkin_update', { id: g._dbId, fields: updates });
+    if (r && r.status === 409) {
+      alert(T[lang].edit_filed_409 || T[lang].wb_filed_lock || 'Details already sent to the police — ask your host to correct them.');
+      // Re-fetch the list so the Edit button on this row flips to
+      // the lock state (editable will now be false for this row).
+      try {
+        const listR = await _guestCall('checkin_list', {});
+        if (listR && listR.ok && Array.isArray(listR.data?.guests)) {
+          showWelcomeBackState(listR.data.guests);
+        }
+      } catch (_) {}
+      return;
+    }
+    if (!r || !r.ok) { console.error('Update error:', r); alert('Save failed. Try again.'); return; }
   }
 
   // Update local
   Object.assign(savedGuests[idx], updates);
 
-  // Re-render
-  renderReviewCards();
+  // Re-render — in welcome-back we rebuild the WB cards, otherwise
+  // the pre-submit review cards.
+  if (isWelcomeBack) {
+    showWelcomeBackState(savedGuests);
+  } else {
+    renderReviewCards();
+  }
   console.log(`✅ Guest ${idx + 1} updated`);
 }
 
@@ -4212,14 +4287,13 @@ function addBubble(text, type) {
 
 async function saveChatMsg(sender, message) {
   if (!propertyId) { console.warn('💬 No propertyId, skipping save'); return; }
-  // Round 34: chat writes are gated behind /api/guest-chat now (anon
-  // no longer has INSERT on chat_messages). property_id + booking_code
-  // are derived server-side from the guest token, so we only pass
-  // sender + message.
+  // Round 48: chat writes stay on /api/guest (Round 48 rename of
+  // /api/guest-chat). property_id + booking_code are derived server-
+  // side from the guest token, so we only pass sender + message.
   console.log('💬 Saving chat:', sender, message.substring(0, 50));
-  const r = await _guestChatCall('send', { sender, message });
+  const r = await _guestCall('send', { sender, message });
   if (!r || !r.ok) console.error('💬 Chat save FAILED', r);
-  else console.log('💬 Chat saved OK', r.id);
+  else console.log('💬 Chat saved OK', r.data?.id);
 }
 
 // Round 16 — pending image attachment + stay context helpers
@@ -4598,12 +4672,12 @@ function startHostChatListener() {
   // Clear stale cursor
   localStorage.removeItem('wbnb_chat_seen');
 
-  // Round 34: cursor + poll routed via /api/guest-chat. The server
+  // Round 48: cursor + poll routed via /api/guest. The server
   // scopes by the token payload — booking_code is respected too, so a
   // guest with a booking code only sees messages tagged with it.
   const setCursor = async () => {
-    const h = await _guestChatCall('history', {});
-    const msgs = (h && h.messages) || [];
+    const h = await _guestCall('history', {});
+    const msgs = (h && h.data && h.data.messages) || [];
     if (msgs.length > 0) {
       localStorage.setItem('wbnb_chat_seen', msgs[msgs.length - 1].created_at);
     } else {
@@ -4616,8 +4690,8 @@ function startHostChatListener() {
     if (!propertyId) return;
     try {
       const cursor = localStorage.getItem('wbnb_chat_seen') || new Date(0).toISOString();
-      const r = await _guestChatCall('poll', { since: cursor });
-      const newMsgs = (r && r.messages) || [];
+      const r = await _guestCall('poll', { since: cursor });
+      const newMsgs = (r && r.data && r.data.messages) || [];
       if (newMsgs.length === 0) return;
 
       console.log('🔄 New messages:', newMsgs.length);
@@ -4664,11 +4738,11 @@ function startHostChatListener() {
 async function checkExistingChat() {
   if (!propertyId) return;
   try {
-    // Round 34: reads go through /api/guest-chat which server-side
+    // Round 48: reads go through /api/guest which server-side
     // scopes by property_id + booking_code from the token payload.
     // Filters is_test=false + deleted_at IS NULL for us.
-    const r = await _guestChatCall('history', {});
-    const data = (r && r.messages) || [];
+    const r = await _guestCall('history', {});
+    const data = (r && r.data && r.data.messages) || [];
     if (data && data.length > 0) {
       const msgEl = document.getElementById('chatMessages');
       msgEl.innerHTML = '';
@@ -4707,17 +4781,25 @@ async function handleUnsubscribeIfPresent() {
   screen.style.display = 'flex';
 
   try {
-    // Only the anon column-scoped GRANT UPDATE (withdrawn_at) permits this —
-    // see migration_round27_marketing_consent.sql. Scoping to
-    // withdrawn_at IS NULL avoids clobbering an already-set timestamp and
-    // lets us tell "already unsubscribed" apart from "bad id" below.
-    const { data, error } = await sb.from('marketing_consents')
-      .update({ withdrawn_at: new Date().toISOString() })
-      .eq('id', unsubId)
-      .is('withdrawn_at', null)
-      .select();
-    if (error) throw error;
-    if (!data || data.length === 0) {
+    // Round 48 Phase 2 — route through the gateway so the anon UPDATE
+    // policy on marketing_consents can be dropped in Phase 3. The
+    // gateway scopes the withdraw to the token's property_id, so the
+    // link must carry ?p=<property> (or the browser has it cached in
+    // localStorage from a prior visit to that host's check-in page).
+    // Hosts write their own marketing emails and the "always include
+    // an unsubscribe link" guidance already lives in host-console
+    // (see panel-contacts); keep the ?p= requirement a soft one here
+    // by resolving it the same way the main init does.
+    propertyId = getStoredPropertyId();
+    if (!propertyId) {
+      document.getElementById('unsubIcon').textContent = 'ℹ️';
+      document.getElementById('unsubTitle').textContent = '';
+      document.getElementById('unsubText').textContent = T[lang].unsub_err;
+      return true;
+    }
+    bookingCode = getBookingCode();
+    const r = await _guestCall('consent_withdraw', { id: unsubId });
+    if (!r || !r.ok || !r.data || r.data.ok !== true) {
       document.getElementById('unsubIcon').textContent = 'ℹ️';
       document.getElementById('unsubTitle').textContent = '';
       document.getElementById('unsubText').textContent = T[lang].unsub_err;
@@ -4757,11 +4839,16 @@ async function init() {
     return;
   }
   try {
-    let data;
-    const res = await sb.from('properties').select('*').eq('id', storedPropId).is('deleted_at', null).single();
-    data = res.data;
+    // Round 48 — property load goes through the gateway. The server
+    // whitelists the fields it returns and gates wifi/keybox/access
+    // behind a successful check-in (bookingHasCheckin()).
+    // Note: we need propertyId resolved before _guestCall works, so
+    // we set it here from the URL/localStorage source first.
+    propertyId = storedPropId;
+    const r = await _guestCall('property', {});
+    let data = r?.data?.property || null;
     if (!data) {
-      console.error('❌ Property not found:', storedPropId, res.error);
+      console.error('❌ Property not found:', storedPropId, r);
       showLinkErrorAndHalt(lang === 'it'
         ? 'Proprietà non trovata. Contatta il tuo host per un nuovo link.'
         : 'Property not found. Please ask your host for a fresh check-in link.');
@@ -4770,7 +4857,7 @@ async function init() {
     if (data) {
       propertyId = data.id;
       propertyData = data;
-      console.log('✅ Property loaded from Supabase:', data.name, 'ID:', data.id);
+      console.log('✅ Property loaded via gateway:', data.name, 'ID:', data.id);
       // Round 41 Task 2 — helper for per-language property free-text
       // fields. Reads d.<field>_<lang>, falls back to the other
       // language (so a host who wrote only one still renders), then
@@ -4931,154 +5018,105 @@ async function init() {
   if (document.getElementById('arrivalDate')) document.getElementById('arrivalDate').value = today;
   if (document.getElementById('departureDate')) document.getElementById('departureDate').value = tomorrow;
 
-  // Scenario: host deletes a guest's check-in (e.g., wrong guest type,
-  // need to reset). The DB row is gone, but the guest's browser still
-  // has cached identity in localStorage (wbnb_lookup, plus the booking-
-  // code-based welcome-back flow re-uses URL params). Without this
-  // validation, the guest re-opens the app and still sees themselves as
-  // the head guest — confusing and broken.
+  // Round 48 Phase 2 — cache validation + existing-checkin load, now
+  // routed through the guest gateway (anon SELECT on checkins is
+  // getting revoked in Phase 3). The gateway's checkin_list is
+  // scoped by the token's property_id + booking_code + is_test, and
+  // also returns ota_reservations.checkin_reopened_at via `reopened_at`
+  // so we don't need a separate ota_reservations read.
   //
-  // We do a tiny indexed query: "for this booking_code (or surname+date
-  // from the cache), are there any non-deleted, non-test head-guest
-  // rows?". If zero, we know the host has reset this guest, so we clear
-  // the local cache, show a friendly toast, and let init proceed as if
-  // it were a fresh visit.
+  // Path A (bookingCode in URL/localStorage): one checkin_list call
+  //   serves BOTH the "did the host reset me" check (empty list → clear
+  //   cache) AND the welcome-back load.
+  // Path B (no bookingCode, cached surname+date): fire checkin_lookup
+  //   first; on hit re-mint the token with the found booking code and
+  //   then call checkin_list. The gateway rate-limits lookup server-side.
   //
-  // Costs one extra DB roundtrip per app open (~30-80ms). Acceptable
-  // at our scale; eliminates a real bug class.
-  if (propertyId) {
-    try {
-      let validationCount = null;
-
-      if (bookingCode) {
-        // Path A: validate via booking_code (most reliable signal)
-        const { count } = await sb.from('checkins')
-          .select('id', { count: 'exact', head: true })
-          .eq('booking_code', bookingCode)
-          .eq('property_id', propertyId)
-          .eq('is_test', false)
-          .is('deleted_at', null);
-        validationCount = count;
-      } else {
-        // Path B: validate via cached surname + arrival_date (no URL ?b=)
-        const lookupStr = localStorage.getItem('wbnb_lookup');
-        if (lookupStr) {
-          try {
-            const { surname, date } = JSON.parse(lookupStr);
-            if (surname && date) {
-              const { count } = await sb.from('checkins')
-                .select('id', { count: 'exact', head: true })
-                .eq('property_id', propertyId)
-                .eq('arrival_date', date)
-                .eq('is_test', false)
-                .is('deleted_at', null)
-                .ilike('surname', surname);
-              validationCount = count;
-            }
-          } catch (_) { /* malformed cache — treat as zero */ validationCount = 0; }
-        }
-      }
-
-      // If we ran a validation query AND it came back empty, clear cache.
-      // We only clear when validationCount === 0 (explicitly zero).
-      // null means we had nothing to validate against — leave cache alone.
-      if (validationCount === 0) {
-        const hadCache =
-          localStorage.getItem('wbnb_lookup') ||
-          localStorage.getItem('wbnb_booking');
-        if (hadCache) {
-          console.log('🔄 Cache validation: no matching DB rows, clearing local cache');
-          localStorage.removeItem('wbnb_lookup');
-          localStorage.removeItem('wbnb_booking');
-          // Show a friendly toast once init finishes
-          window._wbnb_show_reset_toast = true;
-        }
-      }
-    } catch (e) {
-      // Validation is best-effort; don't block app init on network errors
-      console.warn('Cache validation skipped:', e);
-    }
-  }
-
-  // 5. Check booking code & load existing check-ins.
-  //
-  // Round 34.3: test mode (?test=1) must always render a clean slate — never
-  // load real guest data. Two ways real data leaked into a preview session
-  // before this: (1) the booking-code query below matched a live booking
-  // whose code was carried in the URL; (2) the surname-lookup fallback
-  // read a prior real guest's cached lookup from localStorage. Both are
-  // now bypassed when IS_TEST_SESSION is true. The host still gets a full
-  // check-in walkthrough for previewing the guest UX — they just start
-  // from the same blank slate a first-time guest would see.
+  // Round 34.3: test mode must always render a clean slate.
   let foundExisting = false;
+  let existingReset = false;
 
-  if (!IS_TEST_SESSION && bookingCode && propertyId) {
+  if (!IS_TEST_SESSION && propertyId && bookingCode) {
     try {
-      const { data } = await sb.from('checkins')
-        .select('*')
-        .eq('booking_code', bookingCode)
-        .eq('property_id', propertyId)
-        .eq('is_test', false)
-        .is('deleted_at', null)
-        .order('submitted_at');
-      if (data && data.length > 0) {
-        existingCheckins = data;
+      const listR = await _guestCall('checkin_list', {});
+      const guests = listR?.data?.guests || [];
+      if (guests.length > 0) {
+        existingCheckins = guests;
         foundExisting = true;
-        console.log(`✅ Found ${data.length} existing check-ins for booking ${bookingCode}`);
-        // Round 36.2.3 — if the host has reopened the check-in, don't lock
-        // the guest into the "already checked in" state. Any reopened row
-        // on the booking (or a reopened matching ota_reservations row)
-        // qualifies.
-        let reopened = data.some(c => c.checkin_reopened_at);
-        if (!reopened) {
-          try {
-            const { data: resData } = await sb.from('ota_reservations')
-              .select('checkin_reopened_at')
-              .eq('property_id', propertyId).eq('booking_code', bookingCode)
-              .maybeSingle();
-            if (resData && resData.checkin_reopened_at) reopened = true;
-          } catch (_) { /* non-fatal */ }
-        }
+        console.log(`✅ Found ${guests.length} existing check-ins for booking ${bookingCode}`);
+        // Reopen signal: any row's checkin_reopened_at, or ota_reservations.
+        const reopened = guests.some(c => c.checkin_reopened_at) || !!listR?.data?.reopened_at;
         if (reopened) {
           console.log('🔓 Booking check-in has been reopened by the host — allowing more guests');
           isReopenedCheckin = true;
-          showReopenedBanner(data.length);
+          showReopenedBanner(guests.length);
           refreshLockboxDisplay();
         } else {
-          showWelcomeBackState(data);
+          showWelcomeBackState(guests);
           refreshLockboxDisplay();
         }
+      } else if (listR && listR.ok) {
+        // Empty list for a specific booking_code = host reset the guest.
+        // Clear the local cache so the UI goes back to a blank slate.
+        existingReset = true;
       }
     } catch (e) { console.log('No existing check-ins found'); }
   }
 
-  // Fallback: check surname lookup from previous session
+  // Fallback: surname+arrival_date from a previous visit (localStorage).
+  // Uses the gateway's rate-limited checkin_lookup, which never returns
+  // PII — just enough to re-pin the booking code and re-fetch the list.
   if (!IS_TEST_SESSION && !foundExisting && propertyId) {
     const lookupStr = localStorage.getItem('wbnb_lookup');
     if (lookupStr) {
       try {
         const { surname, date } = JSON.parse(lookupStr);
-        const { data } = await sb.from('checkins')
-          .select('*')
-          .eq('property_id', propertyId)
-          .eq('arrival_date', date)
-          .eq('is_test', false)
-          .is('deleted_at', null)
-          .ilike('surname', surname);
-        if (data && data.length > 0) {
-          existingCheckins = data;
-          foundExisting = true;
-          const reopened = data.some(c => c.checkin_reopened_at);
-          if (reopened) {
-            isReopenedCheckin = true;
-            showReopenedBanner(data.length);
-            refreshLockboxDisplay();
-          } else {
-            showWelcomeBackState(data);
-            refreshLockboxDisplay();
+        if (surname && date) {
+          const look = await _guestCall('checkin_lookup', {
+            surname: String(surname).toUpperCase(),
+            arrival_date: date,
+          });
+          if (look && look.ok && look.data?.found && look.data?.booking_code) {
+            // Re-pin the booking code and re-mint the token so the
+            // follow-up checkin_list is scoped to it.
+            bookingCode = look.data.booking_code;
+            localStorage.setItem('wbnb_booking', bookingCode);
+            await mintGuestToken(true).catch(() => {});
+            const listR = await _guestCall('checkin_list', {});
+            const guests = listR?.data?.guests || [];
+            if (guests.length > 0) {
+              existingCheckins = guests;
+              foundExisting = true;
+              const reopened = guests.some(c => c.checkin_reopened_at) || !!listR?.data?.reopened_at;
+              if (reopened) {
+                isReopenedCheckin = true;
+                showReopenedBanner(guests.length);
+                refreshLockboxDisplay();
+              } else {
+                showWelcomeBackState(guests);
+                refreshLockboxDisplay();
+              }
+            }
+          } else if (look && look.ok && look.data && look.data.found === false) {
+            // No match today — treat it the same as "host reset me".
+            existingReset = true;
           }
         }
       } catch (e) {}
+    }
+  }
+
+  // Cache clear + reset toast when we had cached identity but the server
+  // says there's nothing on it.
+  if (existingReset && !foundExisting) {
+    const hadCache =
+      localStorage.getItem('wbnb_lookup') ||
+      localStorage.getItem('wbnb_booking');
+    if (hadCache) {
+      console.log('🔄 Cache validation: no matching DB rows, clearing local cache');
+      localStorage.removeItem('wbnb_lookup');
+      localStorage.removeItem('wbnb_booking');
+      window._wbnb_show_reset_toast = true;
     }
   }
 

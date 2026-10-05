@@ -77,6 +77,27 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 48 Phase 3 — Revoke anon access _(2026-10-05)_
+
+The lockdown Phase 1 and Phase 2 were building up to. Shipped as `migration_round48c_anon_revoke.sql` after Phase 2 (#109) was deployed to production and the gateway was verified live. Closes holes #1, #3 and #7 from the Oct 5 `pg_policies` audit — the last three wide-open anon doors.
+
+**What was closed**
+- `checkins.anon_select_checkins` + `anon_insert_checkins` → policies neutered (`USING(false)` / `WITH CHECK(false)`), and `REVOKE SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON checkins FROM anon`. Guest inserts and reads now flow through `/api/guest` (service role).
+- `properties."Guests read any property by ID"` → policy neutered, `REVOKE ALL ... FROM anon`. The gateway's `property` action is the only path to a property row.
+- `ota_reservations` → `REVOKE ALL ... FROM anon`. The gateway reads this via the service role (checkin_list surfaces `reopened_at`, checkin_insert clears it).
+- `marketing_consents.marketing_consents_anon_withdraw` → policy neutered, `REVOKE UPDATE (withdrawn_at) ... FROM anon`. The gateway's `consent_withdraw` action owns this now.
+- `get_reservation_keybox(uuid, text)` → `REVOKE EXECUTE ... FROM anon, public`. The RPC is called server-side as a side effect of `checkin_insert`.
+
+**Live anon probes after the migration** (all previously 200): `GET /rest/v1/checkins`, `GET /rest/v1/properties`, `GET /rest/v1/ota_reservations`, `PATCH /rest/v1/marketing_consents`, `POST /rest/v1/rpc/get_reservation_keybox` — all now `401 permission denied`. The still-allowed exceptions (`POST /rest/v1/analytics_events`, `POST /rest/v1/marketing_consents`, `/storage/.../id-photos/*` upload) still return 201. The `/api/guest` gateway continues to return 200 for `property`, `checkin_list`, `checkin_lookup`, `history`, `send`, `poll` — verified with a headless Chrome smoke run against the Marco Polo test property.
+
+**Two tweaks the live run surfaced**
+- Postgres' FK trigger for `marketing_consents.property_id → properties.id` runs with the inserting role, which (after the Phase 3 revoke) had no privilege on `properties` at all → the opt-in form broke with "permission denied for table properties". Column-level `GRANT REFERENCES (id), SELECT (id) ON properties TO anon` is the minimum that unblocks the FK check: a bare `SELECT *` on properties still returns 401, and `SELECT id` is filtered by the (`qual=false`) policy above → empty array. Pulled into the migration file.
+- The `marketing_consents_anon_insert` policy's `WITH CHECK` was `EXISTS(SELECT 1 FROM properties ...)` — defence-in-depth that no longer passed once anon lost RLS access to properties. Swapped it for `property_id IS NOT NULL`; the FK already enforces exactly the same guarantee.
+
+**Known deferral**: the DROP POLICY hang from Phase 1 is still live on this project (observed again on `DROP POLICY "anon_select_checkins"` — timed out at 60s). The migration ALTERs each policy to `USING(false) WITH CHECK(false)` first — semantically identical to drop — and then issues the DROP; if that hangs, the ALTER has already made the policy harmless. The audit queries confirm no row matches any of the four neutered policies. A future cleanup pass (once Supabase support identifies the root cause) can remove the empty policy rows.
+
+**Full Round 48 — all four holes marked critical closed.** Phase 1 (#108) fixed six policies via DB-only changes; Phase 2 (#109) put every guest-side SQL call behind a bearer-token gateway and added guest edit-until-filed; Phase 3 (this round) revoked the remaining anon access. Phase 4 (host-side filing lock + "Unlock to correct" UI) is still open; it's a safer-time project, not a security blocker.
+
 ### Round 48 Phase 2 — Guest gateway + edit-until-filed _(2026-10-05)_
 
 Phase 2 of the Round 48 security lockdown. Phase 1 closed six of the ten holes from the Oct 5 `pg_policies` audit via DB-only policy changes (zero client impact). Phase 2 moves every guest-side SQL call behind a bearer-token gateway and adds a self-service edit flow for the guest's own check-in rows (until they're filed with Alloggiati).

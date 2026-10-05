@@ -31,6 +31,7 @@
 //   viewers cannot save credentials on behalf of a host.
 
 import { applyCors } from './_cors.js';
+import { createRequire } from 'node:module';
 import { encryptCredentials, decryptCredentials } from './_alloggiati-crypto.js';
 import {
   generateToken,
@@ -39,6 +40,16 @@ import {
   send as soapSend,
   ricevuta as soapRicevuta,
 } from './_alloggiati-soap.js';
+
+// Round 49 Phase 1 — the Alloggiati reference tables, line builder,
+// autofileDueAt timing function and every lookup helper live in a
+// shared lib so the auto-filer tick (Round 49 Part 4) runs the exact
+// same bytes the browser Export panel runs. CommonJS lib loaded via
+// createRequire because the package is "type":"module" and the lib
+// uses an IIFE + module.exports dual to also run under <script src>
+// in host-console.html. Byte-identity enforced by
+// scripts/golden-cross-check.mjs. The function budget is unchanged.
+const AllogRecords = createRequire(import.meta.url)('../lib/alloggiati-records.js');
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';

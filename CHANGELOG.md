@@ -77,6 +77,16 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 48 Phase 5 — service_role grants hotfix _(2026-10-05)_
+
+Post-ship audit, right after Phase 4 landed. A probe matrix against the live gateway found that `consent_withdraw` was returning `500 permission denied for table marketing_consents`. Root cause: `service_role` only had `REFERENCES, TRIGGER, TRUNCATE` on `marketing_consents` — never any CRUD — a latent bug from the Round 27 migration that the direct-anon UPDATE policy had been hiding until Phase 3 dropped it.
+
+A sweep across every `public` table surfaced ten more with the same gap: `admin_impersonation_log`, `admin_users`, `analytics_events`, `analytics_monthly`, `chat_qa_pairs`, `data_purge_log`, `excluded_booking_codes`, `host_dismissed_bookings`, `purge_settings`, `recommendations`, `rules`. None had surfaced yet because nothing currently reaches them via the service role, but any future gateway or cron that tries would 500 the same way.
+
+`migration_round48e_service_role_crud.sql` grants `SELECT, INSERT, UPDATE, DELETE` on all twelve tables to `service_role`, restoring Supabase's invariant that `service_role` has ALL on every public table. Not an escalation — `service_role` is already a `BYPASSRLS` superuser; every RLS policy against `anon` and `authenticated` still applies.
+
+Re-ran the probe after the grant landed: `consent_withdraw` with a non-existent id now returns `200 {ok:false}` as designed.
+
 ### Round 48 Phase 4 — Host-side filing lock _(2026-10-05)_
 
 The last piece of Round 48. The guest side already enforces "filed = not editable" via the Phase 2 gateway's `checkin_update` conditional PATCH, but the host-console does a direct `sb.from('checkins').update()` as the host and had been able to edit filed rows freely. Phase 4 moves the enforcement from "a filter on the client's PATCH" to a BEFORE UPDATE trigger on the table itself — the lock now applies to every writer, service role included.

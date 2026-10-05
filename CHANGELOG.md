@@ -77,6 +77,31 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 49 Phase 2 — Autofile data model _(2026-10-05)_
+
+Pure schema change for the automatic Alloggiati filer. Lands FIRST — the `autofile_tick` action (Phase 3) depends on `claim_autofile_rows`, and the Round 48 lock trigger needs to understand the new `'filing'` state before any row flips into it.
+
+**`migration_round49_autofile.sql`** applied in seven batches to sidestep the pgrst_drop_watch quirk:
+
+1. `properties.alloggiati_autofile_mode text not null default 'off'` + `_consent_at timestamptz` + `_consent_by uuid`. CHECK constraint `properties_alloggiati_autofile_mode_check` pins mode to `('off','dry_run','live')`.
+2. `checkins`: `autofile_attempts int default 0`, `autofile_last_attempt_at timestamptz`, `autofile_last_error text`, `autofile_claimed_at timestamptz`, `autofile_excluded boolean default false`.
+3. `checkins_prevent_filed_edit()` widened to treat `'filing'` like `'filed'` for sensitive-column writes. CREATE OR REPLACE keeps the function oid so the existing `checkins_filed_edit_guard` trigger picks up the new body without any DROP TRIGGER (the Round 48 DROP hang is well-known at this point).
+4. `alloggiati_filing_log` table — immutable audit of every filing attempt (manual, autofile, autofile_dry_run). Columns `id, property_id, run_at, trigger, checkin_ids[], outcome, error_code, error_detail, receipt_path, actor`. Index `(property_id, run_at desc)`.
+5. RLS: SELECT policy `alloggiati_filing_log_host_read` gates on `is_admin() OR properties.owner_id=auth.uid()`. **No UPDATE/DELETE/TRUNCATE grant for anyone, service_role included.** service_role has SELECT + INSERT only; authenticated has SELECT only (gated by the policy).
+6. `log_alloggiati_filing(...)` SECURITY DEFINER — the only writer. Validates inputs (property_id, trigger, non-empty checkin_ids, outcome) and inserts. EXECUTE revoked from public/anon/authenticated, granted to service_role.
+7. `claim_autofile_rows(p_property, p_ids)` SECURITY DEFINER — atomic (a) stale-claim reset: `'filing'` rows older than 20 minutes flip back to `'pending'` with `autofile_last_error='stale_claim_reset'`; (b) claim: rows passing the gate (status not in filed/filing, not excluded, not deleted, right property) flip to `'filing'` and are returned. EXECUTE service_role only.
+
+**Guest gateway** (`api/guest.js`) tightened in the same PR so the brief overlap window (tick landed, guest client still filters `neq.filed` alone) can't let a guest edit a `'filing'` row:
+- `checkin_update` conditional PATCH filter → `alloggiati_status=not.in.(filed,filing)`
+- Both `checkin_list` and `checkin_update` response `editable` → `!['filed','filing','correction'].includes(status)`
+
+**Live-verified post-migration**
+- Claim on a pending test row → row flips to `'filing'` and returns the id.
+- Metadata-only write on a `'filing'` row → ✓ succeeds (unchanged behaviour from the pending state).
+- `surname` write on a `'filing'` row → ✗ `P0001 checkin_locked_filed`.
+- `log_alloggiati_filing` with a well-formed payload → returns new row id.
+- UPDATE on `alloggiati_filing_log` under `set local role service_role` → `42501 permission denied` — the audit row survived the probe unchanged.
+
 ### Round 48 Phase 5 — service_role grants hotfix _(2026-10-05)_
 
 Post-ship audit, right after Phase 4 landed. A probe matrix against the live gateway found that `consent_withdraw` was returning `500 permission denied for table marketing_consents`. Root cause: `service_role` only had `REFERENCES, TRIGGER, TRUNCATE` on `marketing_consents` — never any CRUD — a latent bug from the Round 27 migration that the direct-anon UPDATE policy had been hiding until Phase 3 dropped it.

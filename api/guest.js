@@ -449,7 +449,11 @@ async function doCheckinList(res, propertyId, bookingCode, isTest) {
   // Server-computed editable flag so the client can't lie about state.
   const guests = rows.map(row => ({
     ...row,
-    editable: row.alloggiati_status !== 'filed' && row.alloggiati_status !== 'correction',
+    // Round 49 Phase 2 — 'filing' = the autofile tick has claimed the
+    // row for an in-flight SOAP Send. The DB trigger raises on edits
+    // in that state too; mirror it here so the client doesn't offer
+    // an Edit button that would 409.
+    editable: !['filed', 'filing', 'correction'].includes(row.alloggiati_status),
   }));
   // Also expose the reopen flag from ota_reservations if the booking has one.
   let reopened_at = null;
@@ -579,9 +583,10 @@ async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, is
   patch.guest_edited_at = new Date().toISOString();
 
   // Conditional PATCH. The filters pin us to the token's property +
-  // booking, and alloggiati_status=neq.filed enforces "editable until
-  // filed". Prefer: return=representation lets us tell "no row updated"
-  // (filed → 409) apart from "row updated".
+  // booking, and alloggiati_status=not.in.(filed,filing) enforces
+  // "editable until filed OR claimed by the autofile tick" (Round 49
+  // Phase 2). Prefer: return=representation lets us tell "no row
+  // updated" (filed/filing → 409) apart from "row updated".
   const scope = bookingCode
     ? `&booking_code=eq.${encodeURIComponent(bookingCode)}`
     : '';
@@ -589,7 +594,7 @@ async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, is
     `${SUPABASE_URL}/rest/v1/checkins?id=eq.${encodeURIComponent(id)}` +
     `&property_id=eq.${encodeURIComponent(propertyId)}` +
     scope +
-    `&alloggiati_status=neq.filed`,
+    `&alloggiati_status=not.in.(filed,filing)`,
     {
       method: 'PATCH',
       headers: {
@@ -626,7 +631,7 @@ async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, is
         `${SUPABASE_URL}/rest/v1/checkins` +
         `?property_id=eq.${encodeURIComponent(propertyId)}` +
         `&booking_code=eq.${encodeURIComponent(bookingCode)}` +
-        `&alloggiati_status=neq.filed` +
+        `&alloggiati_status=not.in.(filed,filing)` +
         `&id=neq.${encodeURIComponent(id)}`,
         {
           method: 'PATCH',
@@ -652,7 +657,7 @@ async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, is
   // it can't have been written, but belt-and-braces.
   const out = {};
   for (const k of CHECKIN_READ_FIELDS) if (updated[k] !== undefined) out[k] = updated[k];
-  out.editable = updated.alloggiati_status !== 'filed' && updated.alloggiati_status !== 'correction';
+  out.editable = !['filed', 'filing', 'correction'].includes(updated.alloggiati_status);
   return res.status(200).json({ updated: out });
 }
 

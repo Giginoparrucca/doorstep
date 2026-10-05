@@ -3933,6 +3933,12 @@ const HT = {
     edit_no_change: 'No changes to save',
     edit_save_blocked: '⚠ No row updated — permission denied. Run migration_round30_checkins_host_update.sql.',
     edit_save_failed: '⚠ Save failed',
+    // Round 48 Phase 4 — filed-lock copy.
+    edit_filed_lock_banner: 'This guest was already sent to Alloggiati Web. The modal is read-only. Press “Unlock to correct” to flip this row to the correction state — after saving the correction you must contact your Questura or re-file as instructed by them.',
+    edit_unlock_btn: 'Unlock to correct',
+    edit_unlock_confirm: 'This guest was already sent to Alloggiati Web. Filed records can’t be changed online — after saving the correction you must contact your Questura or re-file as instructed by them. Continue?',
+    edit_unlock_reason_prompt: 'Short reason for the correction (kept as an audit trail):',
+    edit_save_filed_locked: '⚠ This row is filed on Alloggiati — the database rejected the edit. Press “Unlock to correct” first.',
     edit_field_missing: 'Missing required field: {name}',
     edit_country_unresolved: '⚠ {name}: not a recognized country. Pick one from the dropdown so the Alloggiati export doesn\'t ship blank.',
     edit_stay: 'Stay',
@@ -4456,6 +4462,12 @@ const HT = {
     edit_no_change: 'Nessuna modifica da salvare',
     edit_save_blocked: '⚠ Nessuna riga aggiornata — permessi mancanti. Esegui migration_round30_checkins_host_update.sql.',
     edit_save_failed: '⚠ Salvataggio fallito',
+    // Round 48 Fase 4 — copy del blocco "filed".
+    edit_filed_lock_banner: 'Questo ospite è già stato inviato ad Alloggiati Web. La modale è in sola lettura. Premi “Sblocca per correggere” per portare la riga in stato correzione — dopo aver salvato la correzione dovrai contattare la Questura o reinviare come indicato.',
+    edit_unlock_btn: 'Sblocca per correggere',
+    edit_unlock_confirm: 'Questo ospite è già stato inviato ad Alloggiati Web. I record inviati non si possono modificare online — dopo aver salvato la correzione dovrai contattare la Questura o reinviare come indicato. Continuare?',
+    edit_unlock_reason_prompt: 'Motivo breve della correzione (resta come traccia di audit):',
+    edit_save_filed_locked: '⚠ Questa riga è già stata inviata ad Alloggiati — il database ha rifiutato la modifica. Premi prima “Sblocca per correggere”.',
     edit_field_missing: 'Campo obbligatorio mancante: {name}',
     edit_country_unresolved: '⚠ {name}: paese non riconosciuto. Scegline uno dall\'elenco così l\'export Alloggiati non parte vuoto.',
     edit_stay: 'Soggiorno',
@@ -7079,14 +7091,19 @@ function renderCheckins() {
     const arrival     = rows[0].arrival_date;
     const allFiled    = rows.every(r => r.alloggiati_status === 'filed');
     const anyFiled    = rows.some(r => r.alloggiati_status === 'filed');
+    const anyCorrection = rows.some(r => r.alloggiati_status === 'correction');
     const anyReceipt  = rows.some(r => r.receipt_path);
     const groupStamp  = arrival ? String(arrival).replace(/-/g, '') : new Date().toISOString().slice(0,10).replace(/-/g,'');
     // A unique DOM id for the group's file input so multiple groups can
     // coexist on the page without stealing each other's clicks.
     const groupToken = isSolo ? `solo_${rows[0].id}` : `bk_${bookingCode.replace(/[^A-Za-z0-9]/g, '_')}`;
 
-    // Status pill for the group header
-    const groupPill = allFiled
+    // Status pill for the group header. Round 48 Phase 4 — a group that
+    // contains at least one 'correction' row shows an amber "Correction"
+    // pill: filed once, needs re-filing after a host or guest edit.
+    const groupPill = anyCorrection
+      ? `<span data-guide="checkin-row-status" style="display:inline-block;font-size:0.66rem;padding:3px 10px;background:rgba(232,184,75,0.18);color:#9a6b00;border-radius:12px;font-weight:600;letter-spacing:0.04em;">${it ? '✎ Correzione — da reinviare' : '✎ Correction — needs re-filing'}</span>`
+      : allFiled
       ? `<span data-guide="checkin-row-status" style="display:inline-block;font-size:0.66rem;padding:3px 10px;background:rgba(47,122,68,0.14);color:#2f7a44;border-radius:12px;font-weight:600;letter-spacing:0.04em;">${it ? '✓ Inviato Alloggiati' : '✓ Filed on Alloggiati'}</span>`
       : anyFiled
         ? `<span data-guide="checkin-row-status" style="display:inline-block;font-size:0.66rem;padding:3px 10px;background:rgba(232,184,75,0.16);color:#9a6b00;border-radius:12px;font-weight:600;letter-spacing:0.04em;">${it ? '⚠ Parziale' : '⚠ Partial'}</span>`
@@ -7210,10 +7227,23 @@ function renderCheckins() {
     const hideAttr = collapsed ? ' style="display:none;"' : '';
     for (const c of rows) {
       // Small filing pill inline with the guest name so the row-level
-      // status is visible even without expanding the group.
+      // status is visible even without expanding the group. Round 48 Phase 4
+      // — 'correction' gets its own amber ✎ pill so a host who already
+      // downloaded a .txt knows this one needs a fresh export.
       const rowPill = c.alloggiati_status === 'filed'
-        ? `<span style="display:inline-block;font-size:0.6rem;padding:1px 6px;background:rgba(47,122,68,0.14);color:#2f7a44;border-radius:8px;font-weight:600;letter-spacing:0.04em;margin-left:6px;vertical-align:middle;">${it ? '✓' : '✓'}</span>`
-        : `<span style="display:inline-block;font-size:0.6rem;padding:1px 6px;background:rgba(176,57,57,0.12);color:#b03939;border-radius:8px;font-weight:600;letter-spacing:0.04em;margin-left:6px;vertical-align:middle;" title="${it ? 'Da inviare ad Alloggiati' : 'Not filed on Alloggiati'}">${it ? '⚠' : '⚠'}</span>`;
+        ? `<span style="display:inline-block;font-size:0.6rem;padding:1px 6px;background:rgba(47,122,68,0.14);color:#2f7a44;border-radius:8px;font-weight:600;letter-spacing:0.04em;margin-left:6px;vertical-align:middle;" title="${it ? 'Inviato ad Alloggiati' : 'Filed on Alloggiati'}">${it ? '✓' : '✓'}</span>`
+        : c.alloggiati_status === 'correction'
+          ? `<span style="display:inline-block;font-size:0.6rem;padding:1px 6px;background:rgba(232,184,75,0.18);color:#9a6b00;border-radius:8px;font-weight:600;letter-spacing:0.04em;margin-left:6px;vertical-align:middle;" title="${it ? 'Correzione — da reinviare' : 'Correction — needs re-filing'}">${it ? '✎' : '✎'}</span>`
+          : `<span style="display:inline-block;font-size:0.6rem;padding:1px 6px;background:rgba(176,57,57,0.12);color:#b03939;border-radius:8px;font-weight:600;letter-spacing:0.04em;margin-left:6px;vertical-align:middle;" title="${it ? 'Da inviare ad Alloggiati' : 'Not filed on Alloggiati'}">${it ? '⚠' : '⚠'}</span>`;
+      // Round 48 Phase 4 — "Edited by guest · <date>" chip. Set by the
+      // guest gateway's checkin_update action; surfacing it on the host
+      // row lets a host who's already generated an export see which rows
+      // need regenerating. Date only (no time) is enough for the host
+      // signal; the detail modal can show the full timestamp.
+      const _gEdDate = c.guest_edited_at ? fmtDate(c.guest_edited_at) : '';
+      const guestEditChip = c.guest_edited_at
+        ? ` <span style="display:inline-block;font-size:0.56rem;padding:1px 6px;background:rgba(0,91,255,0.07);color:#005BFF;border-radius:8px;font-weight:500;letter-spacing:0.04em;margin-left:6px;vertical-align:middle;" title="${it ? 'Modificato dall&apos;ospite' : 'Edited by guest'}">${it ? '✎ ospite · ' : '✎ guest · '}${_gEdDate}</span>`
+        : '';
       // Round 40 T1 — citizenship / document / submitted / docs
       // moved to the detail view (viewGuest opens the modal that already
       // shows them). Keeping them in the table caused the sticky-right
@@ -7227,7 +7257,7 @@ function renderCheckins() {
       html += `
         <tr data-checkin-group="${groupToken}"${hideAttr}
             onclick="viewGuest('${c.id}')" style="cursor:pointer;">
-          <td data-label=""><strong>${c.surname} ${c.name}</strong>${rowPill}</td>
+          <td data-label=""><strong>${c.surname} ${c.name}</strong>${rowPill}${guestEditChip}</td>
           <td data-label="${h('th_type')}">${typeLabel}</td>
           <td data-label="${h('th_arrival')}">${fmtDate(c.arrival_date)}</td>
           <td data-label="${h('th_departure')}">${fmtDate(c.departure_date)}</td>
@@ -13573,10 +13603,15 @@ function viewGuest(id) {
   // Uploading a file marks the guest as filed and stamps filed_at, so the
   // day-after filing reminder stops for this row. Receipt lives in the
   // 'receipts' storage bucket (owner-scoped RLS), 5-year retention.
-  const isFiled = c.alloggiati_status === 'filed';
-  const filedBadge = isFiled
-    ? `<span style="display:inline-block;font-size:0.66rem;padding:2px 8px;background:rgba(47,122,68,0.14);color:#2f7a44;border-radius:10px;font-weight:600;letter-spacing:0.04em;">${it ? '✓ Inviato Alloggiati' : '✓ Filed on Alloggiati'}</span>`
-    : `<span style="display:inline-block;font-size:0.66rem;padding:2px 8px;background:rgba(176,57,57,0.12);color:#b03939;border-radius:10px;font-weight:600;letter-spacing:0.04em;">${it ? '⚠ Da inviare' : '⚠ Not filed yet'}</span>`;
+  const isFiled      = c.alloggiati_status === 'filed';
+  const isCorrection = c.alloggiati_status === 'correction';
+  // Round 48 Phase 4 — 'correction' is "filed once, needs re-filing after a
+  // host or guest edit". Not green ✓, not red ⚠ — amber ✎.
+  const filedBadge = isCorrection
+    ? `<span style="display:inline-block;font-size:0.66rem;padding:2px 8px;background:rgba(232,184,75,0.18);color:#9a6b00;border-radius:10px;font-weight:600;letter-spacing:0.04em;">${it ? '✎ Correzione — da reinviare' : '✎ Correction — needs re-filing'}</span>`
+    : isFiled
+      ? `<span style="display:inline-block;font-size:0.66rem;padding:2px 8px;background:rgba(47,122,68,0.14);color:#2f7a44;border-radius:10px;font-weight:600;letter-spacing:0.04em;">${it ? '✓ Inviato Alloggiati' : '✓ Filed on Alloggiati'}</span>`
+      : `<span style="display:inline-block;font-size:0.66rem;padding:2px 8px;background:rgba(176,57,57,0.12);color:#b03939;border-radius:10px;font-weight:600;letter-spacing:0.04em;">${it ? '⚠ Da inviare' : '⚠ Not filed yet'}</span>`;
   const filedAtLine = c.filed_at
     ? `<div style="font-size:0.72rem;color:var(--ink-soft);margin-top:4px;">${it ? 'Inviato il' : 'Filed at'}: ${safe(fmtDT(c.filed_at))}</div>`
     : '';
@@ -13902,6 +13937,13 @@ function editGuest(id) {
     // Supabase dates come back as either 'YYYY-MM-DD' or ISO string.
     return String(d).slice(0, 10);
   };
+  // Round 48 Phase 4 — filed rows open read-only with an Unlock-to-correct
+  // button. 'correction' rows (already unlocked) stay editable. The DB
+  // trigger `checkins_filed_edit_guard` is the real enforcer — this flag
+  // just keeps the UI from offering a Save button that would then fail.
+  const isFiled   = c.alloggiati_status === 'filed';
+  const roAttr    = isFiled ? ' disabled aria-readonly="true"' : '';
+  const roSelAttr = isFiled ? ' disabled' : '';
 
   const sectionTitle = (txt) => `
     <div style="font-family:'Playfair Display',serif;font-size:0.95rem;font-weight:600;color:var(--ink);margin:18px 0 8px;padding-bottom:6px;border-bottom:1.5px solid rgba(107,122,144,0.12);">${safeAttr(txt)}</div>`;
@@ -13920,9 +13962,9 @@ function editGuest(id) {
   const stay = `
     ${sectionTitle(h('edit_stay'))}
     ${field('field_booking_code',
-      `<input id="edit_booking_code" type="text" value="${safeAttr(c.booking_code || '')}" style="${inputStyle}font-family:monospace;">`)}
+      `<input id="edit_booking_code" type="text" value="${safeAttr(c.booking_code || '')}" style="${inputStyle}font-family:monospace;"${roAttr}>`)}
     ${field('field_guest_type',
-      `<select id="edit_guest_type" style="${inputStyle}">
+      `<select id="edit_guest_type" style="${inputStyle}"${roSelAttr}>
         ${selOpt('single', 'gtype_single', c.guest_type)}
         ${selOpt('head', 'gtype_head', c.guest_type)}
         ${selOpt('group', 'gtype_group', c.guest_type)}
@@ -13930,38 +13972,38 @@ function editGuest(id) {
         ${selOpt('group_member', 'gtype_group_member', c.guest_type)}
       </select>`)}
     ${field('field_arrival',
-      `<input id="edit_arrival_date" type="date" value="${safeAttr(isoDate(c.arrival_date))}" style="${inputStyle}">`)}
+      `<input id="edit_arrival_date" type="date" value="${safeAttr(isoDate(c.arrival_date))}" style="${inputStyle}"${roAttr}>`)}
     ${field('field_departure',
-      `<input id="edit_departure_date" type="date" value="${safeAttr(isoDate(c.departure_date))}" style="${inputStyle}">`)}
+      `<input id="edit_departure_date" type="date" value="${safeAttr(isoDate(c.departure_date))}" style="${inputStyle}"${roAttr}>`)}
     ${field('field_nights',
-      `<input id="edit_nights" type="number" min="0" max="365" value="${safeAttr(c.nights == null ? '' : c.nights)}" style="${inputStyle}"> <span style="font-size:0.72rem;color:var(--ink-soft);">${it ? '(0 = calcolo automatico)' : '(0 = auto-compute)'}</span>`)}
+      `<input id="edit_nights" type="number" min="0" max="365" value="${safeAttr(c.nights == null ? '' : c.nights)}" style="${inputStyle}"${roAttr}> <span style="font-size:0.72rem;color:var(--ink-soft);">${it ? '(0 = calcolo automatico)' : '(0 = auto-compute)'}</span>`)}
   `;
 
   const personal = `
     ${sectionTitle(h('edit_personal'))}
     ${field('field_surname',
-      `<input id="edit_surname" type="text" value="${safeAttr(c.surname || '')}" style="${inputStyle}text-transform:uppercase;">`)}
+      `<input id="edit_surname" type="text" value="${safeAttr(c.surname || '')}" style="${inputStyle}text-transform:uppercase;"${roAttr}>`)}
     ${field('field_name',
-      `<input id="edit_name" type="text" value="${safeAttr(c.name || '')}" style="${inputStyle}text-transform:uppercase;">`)}
+      `<input id="edit_name" type="text" value="${safeAttr(c.name || '')}" style="${inputStyle}text-transform:uppercase;"${roAttr}>`)}
     ${field('field_sex',
-      `<select id="edit_sex" style="${inputStyle}">
+      `<select id="edit_sex" style="${inputStyle}"${roSelAttr}>
         <option value="M"${c.sex === 'M' ? ' selected' : ''}>${safeAttr(h('sex_m'))}</option>
         <option value="F"${c.sex === 'F' ? ' selected' : ''}>${safeAttr(h('sex_f'))}</option>
       </select>`)}
     ${field('field_dob',
-      `<input id="edit_dob" type="date" value="${safeAttr(isoDate(c.date_of_birth))}" style="${inputStyle}">`)}
+      `<input id="edit_dob" type="date" value="${safeAttr(isoDate(c.date_of_birth))}" style="${inputStyle}"${roAttr}>`)}
     ${field('field_place_of_birth',
-      `<input id="edit_place_of_birth" type="text" value="${safeAttr(c.place_of_birth || '')}" style="${inputStyle}">`)}
+      `<input id="edit_place_of_birth" type="text" value="${safeAttr(c.place_of_birth || '')}" style="${inputStyle}"${roAttr}>`)}
     ${field('field_birth_province',
-      `<input id="edit_birth_province" type="text" maxlength="2" value="${safeAttr((c.birth_province || '').toUpperCase())}" style="${inputStyle}text-transform:uppercase;max-width:120px;">`)}
+      `<input id="edit_birth_province" type="text" maxlength="2" value="${safeAttr((c.birth_province || '').toUpperCase())}" style="${inputStyle}text-transform:uppercase;max-width:120px;"${roAttr}>`)}
     ${field('field_birth_country',
-      `<input id="edit_birth_country" type="text" list="wbnbCountryList" autocomplete="off" value="${safeAttr(c.birth_country || '')}" style="${inputStyle}">`)}
+      `<input id="edit_birth_country" type="text" list="wbnbCountryList" autocomplete="off" value="${safeAttr(c.birth_country || '')}" style="${inputStyle}"${roAttr}>`)}
     ${field('field_citizenship',
-      `<input id="edit_citizenship" type="text" list="wbnbCountryList" autocomplete="off" value="${safeAttr(c.citizenship || '')}" style="${inputStyle}">`)}
+      `<input id="edit_citizenship" type="text" list="wbnbCountryList" autocomplete="off" value="${safeAttr(c.citizenship || '')}" style="${inputStyle}"${roAttr}>`)}
     ${field('field_residence_country',
-      `<input id="edit_residence_country" type="text" list="wbnbCountryList" autocomplete="off" value="${safeAttr(c.residence_country || '')}" style="${inputStyle}" placeholder="— optional —">`)}
+      `<input id="edit_residence_country" type="text" list="wbnbCountryList" autocomplete="off" value="${safeAttr(c.residence_country || '')}" style="${inputStyle}" placeholder="— optional —"${roAttr}>`)}
     ${field('field_residence_place',
-      `<input id="edit_residence_place" type="text" value="${safeAttr(c.residence_place || '')}" style="${inputStyle}" placeholder="— optional —">`)}
+      `<input id="edit_residence_place" type="text" value="${safeAttr(c.residence_place || '')}" style="${inputStyle}" placeholder="— optional —"${roAttr}>`)}
   `;
 
   // Shared datalist so both birth_country and citizenship inputs get
@@ -13974,16 +14016,16 @@ function editGuest(id) {
   const docSection = `
     ${sectionTitle(h('edit_document'))}
     ${field('field_doc_type',
-      `<select id="edit_document_type" style="${inputStyle}">
+      `<select id="edit_document_type" style="${inputStyle}"${roSelAttr}>
         <option value=""${!c.document_type ? ' selected' : ''}>${safeAttr(h('doc_type_none'))}</option>
         <option value="passport"${c.document_type === 'passport' ? ' selected' : ''}>${safeAttr(h('doc_type_passport'))}</option>
         <option value="id_card"${c.document_type === 'id_card' ? ' selected' : ''}>${safeAttr(h('doc_type_id_card'))}</option>
         <option value="driving"${c.document_type === 'driving' ? ' selected' : ''}>${safeAttr(h('doc_type_driving'))}</option>
       </select>`)}
     ${field('field_doc_number',
-      `<input id="edit_document_number" type="text" value="${safeAttr(c.document_number || '')}" style="${inputStyle}font-family:monospace;">`)}
+      `<input id="edit_document_number" type="text" value="${safeAttr(c.document_number || '')}" style="${inputStyle}font-family:monospace;"${roAttr}>`)}
     ${field('field_doc_issue_place',
-      `<input id="edit_doc_issue_place" type="text" value="${safeAttr(c.doc_issue_place || '')}" style="${inputStyle}">`)}
+      `<input id="edit_doc_issue_place" type="text" value="${safeAttr(c.doc_issue_place || '')}" style="${inputStyle}"${roAttr}>`)}
   `;
 
   const existing = document.getElementById('guestEditModal');
@@ -13999,6 +14041,10 @@ function editGuest(id) {
           <button type="button" onclick="closeGuestEditModal()" style="background:none;border:none;font-size:1.5rem;color:var(--ink-soft);cursor:pointer;padding:4px 10px;line-height:1;">×</button>
         </div>
         <div style="font-size:0.78rem;color:var(--ink-soft);margin-top:6px;background:rgba(0,91,255,0.05);border-left:3px solid var(--warm);padding:8px 12px;border-radius:4px;">${safeAttr(h('edit_intro'))}</div>
+        ${isFiled ? `
+          <div style="margin-top:10px;background:rgba(232,184,75,0.14);border-left:3px solid #c89632;padding:10px 14px;border-radius:4px;font-size:0.82rem;color:#5a3f00;line-height:1.5;">
+            🔒 ${safeAttr(h('edit_filed_lock_banner'))}
+          </div>` : ''}
         ${countryListHTML}
         ${stay}
         ${personal}
@@ -14006,7 +14052,9 @@ function editGuest(id) {
         <div id="editGuestStatus" style="min-height:20px;margin-top:12px;font-size:0.82rem;"></div>
         <div style="margin-top:6px;display:flex;justify-content:flex-end;gap:10px;">
           <button type="button" onclick="closeGuestEditModal()" class="btn btn-secondary" data-h="edit_cancel">${safeAttr(h('edit_cancel'))}</button>
-          <button type="button" onclick="saveGuestEdits('${c.id}')" class="btn btn-primary" data-h="edit_save">${safeAttr(h('edit_save'))}</button>
+          ${isFiled
+            ? `<button type="button" onclick="unlockFiledForCorrection('${c.id}')" class="btn" style="background:#c89632;color:#fff;border:none;">${safeAttr(h('edit_unlock_btn'))}</button>`
+            : `<button type="button" onclick="saveGuestEdits('${c.id}')" class="btn btn-primary" data-h="edit_save">${safeAttr(h('edit_save'))}</button>`}
         </div>
       </div>
     </div>`;
@@ -14018,6 +14066,64 @@ function closeGuestEditModal() {
   const m = document.getElementById('guestEditModal');
   if (m) m.remove();
   document.body.style.overflow = '';
+}
+
+// Round 48 Phase 4 — "Unlock to correct". Filed rows are locked by a
+// BEFORE UPDATE trigger (migration_round48d) that raises
+// checkin_locked_filed on any identity/document/stay write. To correct
+// a filed row the host must first flip alloggiati_status to 'correction'
+// (with a captured reason + stamp of who/when). Round 20.2 pattern:
+// request the rows back so a 0-row result is loud, not silent-success.
+async function unlockFiledForCorrection(id) {
+  const it = hostLang === 'it';
+  const c = allCheckins.find(g => g.id === id);
+  if (!c) { toast(it ? 'Ospite non trovato' : 'Guest not found'); return; }
+  if (c.alloggiati_status !== 'filed') {
+    toast(it ? 'Questa riga non è bloccata.' : 'This row isn’t locked.');
+    return;
+  }
+  if (!confirm(h('edit_unlock_confirm'))) return;
+  const reason = (prompt(h('edit_unlock_reason_prompt')) || '').trim();
+  if (!reason) {
+    toast(it ? 'Motivo richiesto — sblocco annullato.' : 'Reason required — unlock cancelled.');
+    return;
+  }
+  const statusEl = document.getElementById('editGuestStatus');
+  const setStatus = (html, tone) => {
+    if (!statusEl) return;
+    const color = tone === 'error' ? '#b03939' : tone === 'ok' ? '#2f7a44' : 'var(--ink-soft)';
+    statusEl.innerHTML = `<span style="color:${color};">${html}</span>`;
+  };
+  setStatus(it ? 'Sblocco in corso…' : 'Unlocking…');
+  const uid = (await sb.auth.getUser()).data?.user?.id || null;
+  const { data, error } = await sb.from('checkins')
+    .update({
+      alloggiati_status: 'correction',
+      unlocked_at:       new Date().toISOString(),
+      unlocked_by:       uid,
+      unlock_reason:     reason,
+    })
+    .eq('id', id)
+    .select();
+  if (error) {
+    console.error('unlock error:', error);
+    setStatus((it ? 'Sblocco fallito: ' : 'Unlock failed: ') + error.message, 'error');
+    return;
+  }
+  if (!data || data.length === 0) {
+    setStatus(it ? 'Aggiornamento bloccato (RLS).' : 'Update blocked (RLS).', 'error');
+    return;
+  }
+  // Mirror into local cache and re-render.
+  const idx = allCheckins.findIndex(x => x.id === id);
+  if (idx > -1) allCheckins[idx] = { ...allCheckins[idx], ...data[0] };
+  renderCheckins();
+  track('unlock_filed_checkin', { id });
+  // Re-open the modal in editable mode so the host can make the correction
+  // immediately. closeGuestEditModal first so the old one is cleaned up.
+  closeGuestEditModal();
+  editGuest(id);
+  toast(it ? '🔓 Sbloccato — ricorda di reinviare dopo la correzione.' : '🔓 Unlocked — remember to re-file after correcting.');
 }
 
 async function saveGuestEdits(id) {
@@ -14118,6 +14224,15 @@ async function saveGuestEdits(id) {
     .select();
   if (error) {
     console.error('Edit save error:', error);
+    // Round 48 Phase 4 — the DB trigger raises `checkin_locked_filed`
+    // when a sensitive write hits a filed row. The modal is already
+    // disabled for filed rows, so this path is defensive — e.g. a stale
+    // local cache that still thinks a row is pending. Nudge the host
+    // toward the unlock flow.
+    if (/checkin_locked_filed/i.test(error.message || '')) {
+      setStatus(h('edit_save_filed_locked'), 'error');
+      return;
+    }
     setStatus(h('edit_save_failed') + ': ' + error.message, 'error');
     return;
   }

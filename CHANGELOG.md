@@ -77,6 +77,38 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 49 Phase 3 — Autofile tick + manual-send audit mirror _(2026-10-06)_
+
+The server-to-server `autofile_tick` endpoint and its pg_cron schedule. **Operationally gated** — the schedule and the Vault secret are provisioned by Daniele by hand (`migration_round49_autofile_tick_cron.sql` is a reference file, not auto-applied); until that lands no fire reaches the endpoint. The endpoint itself refuses every call that isn't accompanied by the matching `x-cron-secret`.
+
+**`api/alloggiati.js`: `action=autofile_tick`**
+
+- Short-circuits BEFORE `applyCors()` and `resolveHostAndProperty()`. No Origin check, no host JWT.
+- Auth is a constant-time compare of the `x-cron-secret` header against `process.env.AUTOFILE_CRON_SECRET` (Node's `crypto.timingSafeEqual`, with a length-mismatch fallback that still runs the compare on padded buffers so the response time doesn't leak the length).
+- Walks every property where `alloggiati_autofile_mode in ('dry_run','live')` AND a `host_alloggiati_credentials` row has `verified_at`. Caps at 25 properties and 45 s of wall-clock per tick (Vercel Hobby caps the function at 60 s; the remainder goes to the next tick).
+
+**`processPropertyAutofile(prop)`**
+
+- Candidate rows: `is_test=false`, `deleted_at is null`, `autofile_excluded=false`, `alloggiati_status not in (filed,filing,correction)`, `arrival_date in (today, yesterday)` in Europe/Rome.
+- `AllogRecords.autofileDueAt(row, prop)` from Phase 1 filters past-portal-window rows (stamped `autofile_last_error='past_portal_window'`) and not-yet-due rows (left alone).
+- **Group integrity:** for each booking_code with due rows, look up every row of that booking and skip the group if any row is already `filed`. Blocked rows get `autofile_last_error='group_already_filed'` and are deferred to a manual host send.
+- Lines built via `AllogRecords.buildBatch`. Any builder warning (unresolved state code, missing comune, etc.) → row's `autofile_last_error='builder_warning'`, line excluded from the batch.
+- **Dry-run mode:** SOAP Test only, no claim, no stamp, no receipt. Logs `trigger='autofile_dry_run'` with `outcome='test_all_ok'` or `test_rejected_N`.
+- **Live mode:** `claim_autofile_rows` (Phase 2 SECURITY DEFINER) flips qualifying rows to `'filing'`. SOAP Test → Send → Ricevuta → stamp `filed`/`filed_at`/`receipt_path`. Failure path releases the claim (`'filing' → 'pending'`), stamps `autofile_last_error`, logs the outcome. All transitions respect the Phase 4+2 lock trigger.
+
+**Audit log**
+
+- Every autofile attempt (dry-run or live, success or failure) calls `log_alloggiati_filing(...)` via the Phase 2 SECURITY DEFINER RPC. The host manual `send` action now mirrors there too (`trigger='host'`, `actor=hostId`).
+- Outcomes: `filed`, `filed_stamp_desync`, `test_all_ok`, `test_rejected_N`, `test_error`, `test_rejected`, `test_transport_error`, `send_rejected`, `send_transport_error`, `stamp_desync`, `cred_error`, `claim_failed`.
+
+**`migration_round49_autofile_tick_cron.sql`** — reference-only, applied by Daniele:
+1. In Vercel, set `AUTOFILE_CRON_SECRET` (48+ random chars) on Production, redeploy.
+2. In Supabase SQL editor, `vault.create_secret('<same value>', 'autofile_cron_secret')`.
+3. Uncomment the `cron.schedule('alloggiati-autofile-tick', '*/10 * * * *', ...)` block and run it.
+4. Verify via `select * from cron.job where jobname='alloggiati-autofile-tick'`.
+
+Deferred to Phase 5: 18:00 heads-up alert for arrivals without a check-in; 09:00 overdue alert for anything still unfiled; "alert after 3 consecutive failures" via `_notify-host.js`; the daily dry-run digest. The pieces are stubbed as `logFiling(...)` entries so Phase 5 just needs to tail the audit log and route alerts; nothing in the current tick code needs restructuring.
+
 ### Round 49 Phase 2 — Autofile data model _(2026-10-05)_
 
 Pure schema change for the automatic Alloggiati filer. Lands FIRST — the `autofile_tick` action (Phase 3) depends on `claim_autofile_rows`, and the Round 48 lock trigger needs to understand the new `'filing'` state before any row flips into it.

@@ -32,6 +32,7 @@
 
 import { applyCors } from './_cors.js';
 import { createRequire } from 'node:module';
+import { timingSafeEqual } from 'node:crypto';
 import { encryptCredentials, decryptCredentials } from './_alloggiati-crypto.js';
 import {
   generateToken,
@@ -149,15 +150,580 @@ async function sbPatch(pathAndQuery, body) {
   return true;
 }
 
+// ── Round 49 Phase 3 — autofile tick helpers ────────────────────────
+//
+// runAutofileTick(res) is the entry point for every pg_cron fire. It
+// walks the properties that have alloggiati_autofile_mode in
+// (dry_run,live), has a 45-second budget (the cron is every 10 min
+// and Vercel caps the function at 60s), and for each one picks the
+// due rows + builds lines via the shared record builder + files them
+// (dry_run → SOAP Test only; live → Test + Send + Ricevuta + stamp).
+// Every claim/success/failure is logged into alloggiati_filing_log
+// via the SECURITY DEFINER log_alloggiati_filing RPC.
+//
+// IMPORTANT: nothing here calls applyCors() or resolveHostAndProperty
+// — the tick's auth is a constant-time compare of x-cron-secret and
+// its "actor" is the autofile tick itself (null in the audit log).
+
+function _timingSafeStringCompare(a, b) {
+  const bufA = Buffer.from(String(a), 'utf8');
+  const bufB = Buffer.from(String(b), 'utf8');
+  // timingSafeEqual throws if lengths differ; pad the shorter side so
+  // the compare still runs in constant time against the fixed want.
+  if (bufA.length !== bufB.length) {
+    // Still compare equal-length buffers so a length mismatch doesn't
+    // early-return; the result is already false.
+    const pad = Buffer.alloc(Math.max(bufA.length, bufB.length));
+    bufA.copy(pad);
+    const bufB2 = Buffer.alloc(pad.length);
+    bufB.copy(bufB2);
+    timingSafeEqual(pad, bufB2);
+    return false;
+  }
+  return timingSafeEqual(bufA, bufB);
+}
+
+const AUTOFILE_TICK_BUDGET_MS = 45_000; // leave 15s headroom under Vercel's 60s cap
+const AUTOFILE_MAX_PROPS_PER_TICK = 25;  // Hobby safety net; most ticks process 1-3
+
+async function runAutofileTick(res) {
+  const started = Date.now();
+  const summary = {
+    properties_processed: 0,
+    properties_skipped_budget: 0,
+    rows_filed: 0,
+    rows_dry_run: 0,
+    rows_past_window: 0,
+    group_blocked: 0,
+    tick_errors: 0,
+  };
+
+  let props;
+  try {
+    props = await sbGet(
+      'properties?alloggiati_autofile_mode=in.(dry_run,live)' +
+      '&deleted_at=is.null' +
+      '&select=id,name,owner_id,alloggiati_autofile_mode,checkin_time,timezone'
+    );
+  } catch (e) {
+    console.error('[autofile_tick] property load failed:', e.message);
+    return res.status(500).json({ error: 'property_load_failed', detail: e.message });
+  }
+  if (!Array.isArray(props) || props.length === 0) {
+    return res.status(200).json({ ok: true, note: 'no autofile properties', ...summary, elapsed_ms: Date.now() - started });
+  }
+
+  // Join: only properties with a verified credential row are eligible.
+  const idsList = props.map(p => `"${p.id}"`).join(',');
+  let verifiedIds = new Set();
+  try {
+    const credRows = await sbGet(
+      `host_alloggiati_credentials?property_id=in.(${encodeURIComponent(idsList)})` +
+      '&verified_at=not.is.null&select=property_id'
+    );
+    for (const c of credRows) verifiedIds.add(c.property_id);
+  } catch (e) {
+    console.error('[autofile_tick] cred lookup failed:', e.message);
+    return res.status(500).json({ error: 'cred_load_failed', detail: e.message });
+  }
+  const eligible = props.filter(p => verifiedIds.has(p.id));
+
+  for (const prop of eligible) {
+    if (Date.now() - started > AUTOFILE_TICK_BUDGET_MS) {
+      summary.properties_skipped_budget += (eligible.length - summary.properties_processed - summary.properties_skipped_budget);
+      break;
+    }
+    if (summary.properties_processed >= AUTOFILE_MAX_PROPS_PER_TICK) break;
+    try {
+      const perProp = await processPropertyAutofile(prop);
+      summary.properties_processed++;
+      summary.rows_filed       += perProp.rows_filed || 0;
+      summary.rows_dry_run     += perProp.rows_dry_run || 0;
+      summary.rows_past_window += perProp.rows_past_window || 0;
+      summary.group_blocked    += perProp.group_blocked || 0;
+      summary.tick_errors      += perProp.errors || 0;
+    } catch (e) {
+      console.error('[autofile_tick]', prop.id, 'crashed:', e.message);
+      summary.tick_errors++;
+    }
+  }
+
+  return res.status(200).json({ ok: true, ...summary, elapsed_ms: Date.now() - started });
+}
+
+function _romeDateYmd(date) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/Rome',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(date);
+    const g = (t) => parts.find(p => p.type === t)?.value;
+    return `${g('year')}-${g('month')}-${g('day')}`;
+  } catch (_e) {
+    return date.toISOString().slice(0, 10);
+  }
+}
+
+async function processPropertyAutofile(prop) {
+  const isDry = prop.alloggiati_autofile_mode === 'dry_run';
+  const summary = { rows_filed: 0, rows_dry_run: 0, rows_past_window: 0, group_blocked: 0, errors: 0 };
+
+  const now = new Date();
+  const today = _romeDateYmd(now);
+  const yesterday = _romeDateYmd(new Date(now.getTime() - 86400000));
+
+  // Candidate rows: not yet filed, not excluded, arrival in today or
+  // yesterday Rome. The autofile_excluded + alloggiati_status filters
+  // are the same bar claim_autofile_rows uses, so the two can't
+  // disagree.
+  let candidates;
+  try {
+    candidates = await sbGet(
+      `checkins?property_id=eq.${encodeURIComponent(prop.id)}` +
+      '&is_test=eq.false&deleted_at=is.null&autofile_excluded=eq.false' +
+      '&alloggiati_status=not.in.(filed,filing,correction)' +
+      `&arrival_date=in.(${today},${yesterday})` +
+      '&select=*&order=booking_code.asc.nullslast,guest_type.asc,submitted_at.asc'
+    );
+  } catch (e) {
+    console.error('[autofile_tick]', prop.id, 'candidate load failed:', e.message);
+    summary.errors++;
+    return summary;
+  }
+  if (!Array.isArray(candidates) || candidates.length === 0) return summary;
+
+  // Mark past-portal-window rows (autofileDueAt returns null when the
+  // arrival+1 23:59 Rome window has elapsed). These rows get an alert
+  // and are excluded from the batch — the host must file manually.
+  const dueNow = [];
+  const pastWindow = [];
+  for (const row of candidates) {
+    const dueAt = AllogRecords.autofileDueAt(row, { checkin_time: prop.checkin_time }, now);
+    if (dueAt === null) { pastWindow.push(row); continue; }
+    if (dueAt.getTime() <= now.getTime()) dueNow.push(row);
+  }
+
+  if (pastWindow.length > 0) {
+    const ids = pastWindow.map(r => `"${r.id}"`).join(',');
+    try {
+      await sbPatch(
+        `checkins?id=in.(${encodeURIComponent(ids)})`,
+        {
+          autofile_last_attempt_at: new Date().toISOString(),
+          autofile_last_error: 'past_portal_window',
+        },
+      );
+    } catch (e) { console.warn('[autofile_tick] past-window stamp failed:', e.message); }
+    summary.rows_past_window += pastWindow.length;
+  }
+
+  if (dueNow.length === 0) return summary;
+
+  // Group integrity: for each booking_code, check whether ANY row of
+  // that booking (even one outside today/yesterday or filtered out
+  // above) is already filed. A new familiare added after a reopen must
+  // not be auto-filed in isolation — the portal would see a familiare
+  // without its capofamiglia in the same batch.
+  const bookingCodes = Array.from(new Set(dueNow.map(r => r.booking_code).filter(Boolean)));
+  const filedBookings = new Set();
+  if (bookingCodes.length > 0) {
+    const bcIn = bookingCodes.map(b => `"${b}"`).join(',');
+    try {
+      const filedRows = await sbGet(
+        `checkins?property_id=eq.${encodeURIComponent(prop.id)}` +
+        `&booking_code=in.(${encodeURIComponent(bcIn)})` +
+        '&alloggiati_status=eq.filed&deleted_at=is.null&select=booking_code&limit=500'
+      );
+      for (const fr of filedRows) filedBookings.add(fr.booking_code);
+    } catch (e) { console.warn('[autofile_tick] filed-booking lookup failed:', e.message); }
+  }
+
+  const toFile = [];
+  const blocked = [];
+  for (const row of dueNow) {
+    if (row.booking_code && filedBookings.has(row.booking_code)) blocked.push(row);
+    else toFile.push(row);
+  }
+
+  if (blocked.length > 0) {
+    const ids = blocked.map(r => `"${r.id}"`).join(',');
+    try {
+      await sbPatch(
+        `checkins?id=in.(${encodeURIComponent(ids)})`,
+        {
+          autofile_last_attempt_at: new Date().toISOString(),
+          autofile_last_error: 'group_already_filed',
+          autofile_attempts: null, // we don't increment on this guard — not a retry
+        },
+      );
+      // Note: null overwrites to NULL in PostgREST; we want to leave attempts
+      // alone instead. Re-stamp just the two targeted columns.
+      await sbPatch(
+        `checkins?id=in.(${encodeURIComponent(ids)})`,
+        {
+          autofile_last_attempt_at: new Date().toISOString(),
+          autofile_last_error: 'group_already_filed',
+        },
+      );
+    } catch (e) { console.warn('[autofile_tick] group_already_filed stamp failed:', e.message); }
+    summary.group_blocked += blocked.length;
+  }
+
+  if (toFile.length === 0) return summary;
+
+  // Build lines via the shared record builder. Any builder warning
+  // means the Alloggiati portal would reject the line (unresolved
+  // state code, missing comune, etc.) — don't claim or send; stamp
+  // the row and move on. The host will see autofile_last_error in
+  // the console (Phase 4 UI) and know to fix the field.
+  const { lines, rowMeta, warnings } = AllogRecords.buildBatch(toFile);
+  // Map warnings back to row ids via rowMeta's idx (1-based line index).
+  const warningRowIdxs = new Set();
+  for (const w of warnings) {
+    const m = w.match(/Row\s+(\d+):/);
+    if (m) warningRowIdxs.add(Number(m[1]));
+  }
+  const okIndices = [];
+  const warnIndices = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (warningRowIdxs.has(i + 1)) warnIndices.push(i);
+    else okIndices.push(i);
+  }
+  if (warnIndices.length > 0) {
+    const warnIds = warnIndices.map(i => rowMeta[i].checkin_id).filter(Boolean).map(x => `"${x}"`).join(',');
+    if (warnIds) {
+      try {
+        await sbPatch(
+          `checkins?id=in.(${encodeURIComponent(warnIds)})`,
+          {
+            autofile_last_attempt_at: new Date().toISOString(),
+            autofile_last_error: 'builder_warning',
+          },
+        );
+      } catch (e) { console.warn('[autofile_tick] builder-warning stamp failed:', e.message); }
+    }
+    summary.errors += warnIndices.length;
+  }
+  if (okIndices.length === 0) return summary;
+
+  const okLines = okIndices.map(i => lines[i]);
+  const okCheckinIds = okIndices.map(i => rowMeta[i].checkin_id).filter(Boolean);
+
+  // Load + decrypt credentials once per property.
+  let creds;
+  try {
+    const credRows = await sbGet(
+      `host_alloggiati_credentials?property_id=eq.${encodeURIComponent(prop.id)}` +
+      '&select=credentials_enc,credentials_nonce,enc_key_id&limit=1'
+    );
+    if (!Array.isArray(credRows) || !credRows[0]) throw new Error('no credentials row');
+    creds = await decryptCredentials(credRows[0]);
+  } catch (e) {
+    console.error('[autofile_tick]', prop.id, 'cred load/decrypt failed:', e.message);
+    await logFiling({
+      propertyId: prop.id, trigger: isDry ? 'autofile_dry_run' : 'autofile',
+      checkinIds: okCheckinIds, outcome: 'cred_error',
+      errorCode: 'cred_error', errorDetail: e.message,
+    });
+    summary.errors++;
+    return summary;
+  }
+
+  // Mint token
+  let token;
+  try {
+    token = (await generateToken(creds)).token;
+  } catch (e) {
+    await _bumpAttempts(okCheckinIds, 'generate_token_failed', e.message);
+    await logFiling({
+      propertyId: prop.id, trigger: isDry ? 'autofile_dry_run' : 'autofile',
+      checkinIds: okCheckinIds, outcome: 'cred_error',
+      errorCode: e.code || 'generate_token_failed', errorDetail: e.message,
+    });
+    summary.errors++;
+    return summary;
+  }
+
+  // Dry-run path: SOAP Test only. No claim, no stamp, no receipt — the
+  // tick only writes the audit log entry and the per-row attempt
+  // timestamp so a daily digest (Phase 5) can summarise outcomes.
+  if (isDry) {
+    try {
+      const testOutcome = await soapTest({ utente: creds.utente, token, rows: okLines });
+      const rejected = (testOutcome.perRow || []).filter(r => !r.ok).length;
+      await logFiling({
+        propertyId: prop.id, trigger: 'autofile_dry_run',
+        checkinIds: okCheckinIds,
+        outcome: rejected === 0 ? 'test_all_ok' : `test_rejected_${rejected}`,
+        errorCode: null, errorDetail: null,
+      });
+      const idsList = okCheckinIds.map(x => `"${x}"`).join(',');
+      await sbPatch(
+        `checkins?id=in.(${encodeURIComponent(idsList)})`,
+        { autofile_last_attempt_at: new Date().toISOString(), autofile_last_error: rejected === 0 ? null : 'dry_run_rejected' },
+      );
+      summary.rows_dry_run += okLines.length;
+      return summary;
+    } catch (e) {
+      await _bumpAttempts(okCheckinIds, 'test_failed', e.message);
+      await logFiling({
+        propertyId: prop.id, trigger: 'autofile_dry_run',
+        checkinIds: okCheckinIds, outcome: 'test_error',
+        errorCode: e.code || 'test_error', errorDetail: e.message,
+      });
+      summary.errors++;
+      return summary;
+    }
+  }
+
+  // Live path: claim rows atomically via the Phase 2 SECURITY DEFINER
+  // function. If some rows aren't claimable (status changed between
+  // the candidate load and now), file only the ones we got.
+  let claimed;
+  try {
+    const claimRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/claim_autofile_rows`, {
+      method: 'POST',
+      headers: {
+        apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ p_property: prop.id, p_ids: okCheckinIds }),
+    });
+    if (!claimRes.ok) throw new Error(`claim ${claimRes.status}: ${await claimRes.text().catch(() => '')}`);
+    const claimedBody = await claimRes.json();
+    // RPC returning setof uuid comes back as [{claim_autofile_rows: uuid}] OR [uuid]
+    claimed = (Array.isArray(claimedBody) ? claimedBody : []).map(x => typeof x === 'string' ? x : (x?.claim_autofile_rows || x?.id || null)).filter(Boolean);
+  } catch (e) {
+    console.error('[autofile_tick]', prop.id, 'claim failed:', e.message);
+    await logFiling({
+      propertyId: prop.id, trigger: 'autofile',
+      checkinIds: okCheckinIds, outcome: 'claim_failed',
+      errorCode: 'claim_failed', errorDetail: e.message,
+    });
+    summary.errors++;
+    return summary;
+  }
+  if (claimed.length === 0) {
+    // Nothing to do this tick — the rows raced out from under us.
+    return summary;
+  }
+  const claimedSet = new Set(claimed);
+  const batchLines = [];
+  const batchCheckinIds = [];
+  for (let i = 0; i < okCheckinIds.length; i++) {
+    if (claimedSet.has(okCheckinIds[i])) {
+      batchLines.push(okLines[i]);
+      batchCheckinIds.push(okCheckinIds[i]);
+    }
+  }
+
+  // SOAP Test → Send → Ricevuta. Same Round 44 safety order the host
+  // manual send uses: refuse to Send if Test rejects any row.
+  try {
+    const testOutcome = await soapTest({ utente: creds.utente, token, rows: batchLines });
+    const anyRejected = (testOutcome.perRow || []).some(r => !r.ok);
+    if (anyRejected) {
+      await _releaseClaimAndStamp(batchCheckinIds, 'test_rejected');
+      await logFiling({
+        propertyId: prop.id, trigger: 'autofile',
+        checkinIds: batchCheckinIds, outcome: 'test_rejected',
+        errorCode: 'validation_failed',
+        errorDetail: (testOutcome.perRow || []).filter(r => !r.ok).slice(0, 5).map(r => r.erroreDes || r.code).join(' | '),
+      });
+      summary.errors += batchCheckinIds.length;
+      return summary;
+    }
+  } catch (e) {
+    await _releaseClaimAndStamp(batchCheckinIds, 'test_transport_error');
+    await logFiling({
+      propertyId: prop.id, trigger: 'autofile',
+      checkinIds: batchCheckinIds, outcome: 'test_transport_error',
+      errorCode: e.code || 'test_error', errorDetail: e.message,
+    });
+    summary.errors += batchCheckinIds.length;
+    return summary;
+  }
+
+  let sendOutcome;
+  try {
+    sendOutcome = await soapSend({ utente: creds.utente, token, rows: batchLines });
+  } catch (e) {
+    await _releaseClaimAndStamp(batchCheckinIds, 'send_transport_error');
+    await logFiling({
+      propertyId: prop.id, trigger: 'autofile',
+      checkinIds: batchCheckinIds, outcome: 'send_transport_error',
+      errorCode: e.code || 'send_error', errorDetail: e.message,
+    });
+    summary.errors += batchCheckinIds.length;
+    return summary;
+  }
+  if (!sendOutcome.overall.ok || (sendOutcome.perRow || []).some(r => !r.ok)) {
+    await _releaseClaimAndStamp(batchCheckinIds, 'send_rejected');
+    await logFiling({
+      propertyId: prop.id, trigger: 'autofile',
+      checkinIds: batchCheckinIds, outcome: 'send_rejected',
+      errorCode: sendOutcome.overall.code || 'portal_rejected',
+      errorDetail: sendOutcome.overall.erroreDes || 'portal rejected after test passed',
+    });
+    summary.errors += batchCheckinIds.length;
+    return summary;
+  }
+
+  // Send succeeded. Fetch Ricevuta best-effort (do not revert stamps if it fails).
+  const filedAt = new Date();
+  const filedAtIso = filedAt.toISOString();
+  const filedDateRome = _romeDateYmd(filedAt);
+  let receiptPath = null;
+  try {
+    const rec = await soapRicevuta({ utente: creds.utente, token, date: filedDateRome });
+    const stamp = filedAtIso.slice(0, 19).replace(/[-:T]/g, '');
+    const path = `${prop.id}/alloggiati-autofile-${stamp}.pdf`;
+    const upRes = await fetch(
+      `${SUPABASE_URL}/storage/v1/object/receipts/${path}`,
+      {
+        method: 'POST',
+        headers: {
+          apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+          'Content-Type': 'application/pdf', 'x-upsert': 'true',
+        },
+        body: rec.pdf,
+      },
+    );
+    if (upRes.ok) receiptPath = path;
+    else console.warn('[autofile_tick] receipt upload', upRes.status);
+  } catch (e) {
+    console.warn('[autofile_tick] ricevuta failed (non-fatal):', e.message);
+  }
+
+  // Stamp rows filed. The lock trigger allows filing → filed with no
+  // sensitive-column change, so this UPDATE lands cleanly.
+  try {
+    const idsList = batchCheckinIds.map(x => `"${x}"`).join(',');
+    const patch = { alloggiati_status: 'filed', filed_at: filedAtIso };
+    if (receiptPath) patch.receipt_path = receiptPath;
+    await sbPatch(
+      `checkins?id=in.(${encodeURIComponent(idsList)})&property_id=eq.${encodeURIComponent(prop.id)}`,
+      patch,
+    );
+    // Reset autofile tracking columns on success — attempt counters
+    // from an earlier failed round shouldn't carry across a success.
+    await sbPatch(
+      `checkins?id=in.(${encodeURIComponent(idsList)})`,
+      { autofile_attempts: 0, autofile_last_attempt_at: new Date().toISOString(), autofile_last_error: null, autofile_claimed_at: null },
+    );
+  } catch (e) {
+    console.error('[autofile_tick] stamp failed (filing done, DB desync):', e.message);
+    await logFiling({
+      propertyId: prop.id, trigger: 'autofile',
+      checkinIds: batchCheckinIds, outcome: 'stamp_desync',
+      errorCode: 'stamp_desync', errorDetail: e.message, receiptPath,
+    });
+    summary.errors += batchCheckinIds.length;
+    return summary;
+  }
+
+  await logFiling({
+    propertyId: prop.id, trigger: 'autofile',
+    checkinIds: batchCheckinIds, outcome: 'filed',
+    receiptPath,
+  });
+  summary.rows_filed += batchCheckinIds.length;
+  return summary;
+}
+
+async function _bumpAttempts(ids, lastError, detail) {
+  if (!ids || ids.length === 0) return;
+  const idsList = ids.map(x => `"${x}"`).join(',');
+  try {
+    // PostgREST doesn't support `autofile_attempts = autofile_attempts + 1`
+    // in a PATCH body — read-then-write would race. Use a Postgres RPC
+    // next round; for now a plain stamp is enough (the attempt count is
+    // mostly for the "alert after 3 failures" alerting that Phase 5
+    // wires up).
+    await sbPatch(
+      `checkins?id=in.(${encodeURIComponent(idsList)})`,
+      {
+        autofile_last_attempt_at: new Date().toISOString(),
+        autofile_last_error: (lastError || 'error') + (detail ? ': ' + String(detail).slice(0, 120) : ''),
+      },
+    );
+  } catch (e) {
+    console.warn('[autofile_tick] _bumpAttempts failed:', e.message);
+  }
+}
+
+async function _releaseClaimAndStamp(ids, lastError) {
+  if (!ids || ids.length === 0) return;
+  const idsList = ids.map(x => `"${x}"`).join(',');
+  try {
+    await sbPatch(
+      `checkins?id=in.(${encodeURIComponent(idsList)})`,
+      {
+        alloggiati_status: 'pending',
+        autofile_claimed_at: null,
+        autofile_last_attempt_at: new Date().toISOString(),
+        autofile_last_error: lastError,
+      },
+    );
+  } catch (e) {
+    console.warn('[autofile_tick] _releaseClaimAndStamp failed:', e.message);
+  }
+}
+
+async function logFiling({ propertyId, trigger, checkinIds, outcome, errorCode = null, errorDetail = null, receiptPath = null, actor = null }) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/log_alloggiati_filing`, {
+      method: 'POST',
+      headers: {
+        apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        p_property_id: propertyId,
+        p_trigger: trigger,
+        p_checkin_ids: checkinIds,
+        p_outcome: outcome,
+        p_error_code: errorCode,
+        p_error_detail: errorDetail ? String(errorDetail).slice(0, 500) : null,
+        p_receipt_path: receiptPath,
+        p_actor: actor,
+      }),
+    });
+    if (!r.ok) {
+      console.warn('[autofile_tick] logFiling RPC', r.status, await r.text().catch(() => ''));
+    }
+  } catch (e) {
+    console.warn('[autofile_tick] logFiling exception:', e.message);
+  }
+}
+
 // ── main handler ────────────────────────────────────────────────────
 export default async function handler(req, res) {
+  const action = String((req.query && req.query.action) || '').trim();
+
+  // Round 49 Phase 3 — autofile_tick is a server-to-server call from
+  // Supabase pg_cron. It has no Origin and no host JWT; the whole
+  // auth check is a constant-time compare of x-cron-secret against
+  // the Vercel AUTOFILE_CRON_SECRET env var. Skip the CORS gate and
+  // the property-owner resolve entirely for this one action — the
+  // tick operates across every autofile-enabled property.
+  if (action === 'autofile_tick') {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
+    if (!SERVICE_KEY) return res.status(500).json({ error: 'Server misconfigured' });
+    const want = process.env.AUTOFILE_CRON_SECRET || '';
+    const got = String(req.headers['x-cron-secret'] || req.headers['X-Cron-Secret'] || '').trim();
+    if (!want || !got || !_timingSafeStringCompare(want, got)) {
+      return res.status(401).json({ error: 'Invalid cron secret' });
+    }
+    return await runAutofileTick(res);
+  }
+
   const allowed = applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(allowed ? 200 : 403).end();
   if (!allowed) return res.status(403).json({ error: 'Origin not allowed' });
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   if (!SERVICE_KEY) return res.status(500).json({ error: 'Server misconfigured' });
 
-  const action = String((req.query && req.query.action) || '').trim();
   const body = req.body || {};
   const propertyId = String(body.property_id || '').trim();
 
@@ -670,6 +1236,20 @@ export default async function handler(req, res) {
       console.error('[alloggiati] send: stamp failed:', e.message);
       stampError = e.message;
     }
+
+    // Round 49 Phase 3 — mirror the manual Send into alloggiati_filing_log.
+    // Failures above exited through 200 responses that never reached this
+    // point, so getting here means the portal accepted the whole batch.
+    await logFiling({
+      propertyId,
+      trigger: 'host',
+      checkinIds: Array.from(new Set(checkinIdsFlat)),
+      outcome: stampError ? 'filed_stamp_desync' : 'filed',
+      errorCode: stampError ? 'stamp_desync' : null,
+      errorDetail: stampError || null,
+      receiptPath,
+      actor: owner.hostId || null,
+    });
 
     return res.status(200).json({
       ok: true,

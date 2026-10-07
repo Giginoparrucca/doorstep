@@ -499,6 +499,15 @@ async function doCheckinInsert(res, propertyId, incomingBookingCode, sessionId, 
   });
   if (!insRes.ok) {
     const t = await insRes.text().catch(() => '');
+    // Log the database code/constraint, but never the raw detail: Postgres
+    // constraint details can include the guest's entire failing row.
+    let dbError;
+    try { dbError = JSON.parse(t); } catch (_) {}
+    console.error('[guest] checkin_insert failed', {
+      status: insRes.status,
+      code: dbError?.code || null,
+      message: dbError?.message || 'Database insert rejected',
+    });
     return res.status(500).json({ error: 'checkin_insert failed', detail: t });
   }
   const [inserted] = await insRes.json();
@@ -770,7 +779,12 @@ async function doConsentWithdraw(res, propertyId, body) {
 function pickFields(obj, allow) {
   const out = {};
   for (const k of allow) {
-    if (obj[k] !== undefined && obj[k] !== null && obj[k] !== '') out[k] = obj[k];
+    // These NOT NULL text columns intentionally use '' for members,
+    // who do not supply a document. Omitting '' lets the INSERT default
+    // document_number to NULL and rejects every additional guest.
+    const requiredDocumentText = k === 'document_type' || k === 'document_number';
+    if (obj[k] !== undefined && obj[k] !== null
+        && (obj[k] !== '' || requiredDocumentText)) out[k] = obj[k];
     else if (obj[k] === null) out[k] = null;
   }
   return out;

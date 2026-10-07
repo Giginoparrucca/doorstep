@@ -3486,7 +3486,7 @@ async function saveCurrentGuest() {
     // If either the in-memory or canonical source is missing the property, abort
     // rather than silently saving the check-in to the wrong property.
     const canonicalPropId   = getStoredPropertyId() || propertyId;
-    const canonicalBooking  = getBookingCode()     || bookingCode;
+    let canonicalBooking  = getBookingCode()     || bookingCode;
     if (!canonicalPropId) {
       alert(lang === 'it'
         ? 'Impossibile completare il check-in: link proprietà mancante. Riapri il link del tuo host.'
@@ -3543,9 +3543,10 @@ async function saveCurrentGuest() {
     if (!insertR || !insertR.ok) {
       const errMsg = insertR?.data?.error || insertR?.error || 'insert failed';
       const errFields = insertR?.data?.fields;
-      console.error('❌ Gateway insert error:', insertR?.status, errMsg, errFields);
-      alert(`DB Error: ${errMsg}${errFields ? '\n' + errFields.join(', ') : ''}`);
-      throw new Error(errMsg);
+      console.error('❌ Gateway insert error:', insertR?.status, insertR?.data || insertR?.error);
+      const saveError = new Error(errMsg);
+      saveError.fields = errFields;
+      throw saveError;
     }
     const insertedId = insertR.data?.id;
     const mintedCode = insertR.data?.booking_code;
@@ -3614,7 +3615,10 @@ async function saveCurrentGuest() {
     console.error('Save error:', err);
     btn.innerHTML = originalText;
     btn.disabled = false;
-    if (!err?.code) alert(T[lang].error_text);
+    if (!err?.code) {
+      const fields = Array.isArray(err?.fields) ? err.fields : [];
+      alert(T[lang].error_text + (fields.length ? '\n' + fields.join(', ') : ''));
+    }
   }
 }
 

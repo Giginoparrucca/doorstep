@@ -11549,13 +11549,23 @@ function renderExportChecklist() {
   const automationInfo = document.getElementById('alloggiatiAutomationInfo');
   if (automationInfo) {
     const mode = propertyData?.alloggiati_autofile_mode;
-    const modeLabel = mode === 'live' ? (it ? 'Invio automatico configurato' : 'Automatic filing configured')
-      : mode === 'dry_run' ? (it ? 'Solo verifica automatica: nessun invio' : 'Automatic validation only: no filing')
-      : mode === 'off' ? (it ? 'Invio automatico disattivato: invia manualmente' : 'Automatic filing off: file manually')
-      : (it ? 'Stato invio automatico non disponibile' : 'Automatic filing status unavailable');
-    automationInfo.textContent = modeLabel + '. ' + (it
-      ? 'Orario previsto (Italia, Europe/Rome): soggiorni di più notti alle 03:00 del giorno dopo l’arrivo; check-in completati dopo le 03:00 al controllo successivo. Soggiorni di una notte: al controllo successivo se il check-in è completato il giorno dell’arrivo; se completato prima, dall’orario di check-in della struttura il giorno dell’arrivo. Il controllo è previsto ogni 10 minuti, solo se lo scheduler è attivato. Lo stato configurato non conferma che lo scheduler sia in esecuzione. Ricevuta PDF disponibile dal giorno successivo all’invio nel portale Alloggiati, per 30 giorni; scaricala e caricala nella scheda check-in. Non inviare di nuovo per ottenere la ricevuta.'
-      : 'Planned schedule (Italy, Europe/Rome): multi-night stays at 03:00 the day after arrival; check-ins completed after 03:00 at the next check. One-night stays: at the next check when completed on arrival day; when completed earlier, from the property check-in time on arrival day. Checks are scheduled every 10 minutes only when the scheduler is enabled. Configured mode does not confirm the scheduler is running. Receipt PDFs are available from the day after filing in the Alloggiati portal for 30 days; download and upload to the check-in record. Do not file again to obtain a receipt.');
+    let message;
+    if (mode === 'live') {
+      const now = new Date();
+      const due = (Array.isArray(allCheckins) ? allCheckins : [])
+        .filter(c => c.submitted_at && c.alloggiati_status !== 'filed' && !c.is_test && !c.deleted_at && !c.autofile_excluded)
+        .map(c => autofileDueAt(c, propertyData, now))
+        .filter(d => d && Number.isFinite(new Date(d).getTime()));
+      const next = due.length ? new Date(Math.ceil(Math.max(now.getTime(), Math.min(...due.map(d => new Date(d).getTime()))) / 600000) * 600000) : null;
+      message = next
+        ? (it ? 'Prossimo invio automatico previsto: ' : 'Next automatic send scheduled: ') + next.toLocaleString(it ? 'it-IT' : 'en-GB', { timeZone: 'Europe/Rome', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + (it ? ' (ora italiana).' : ' (Italy time).')
+        : (it ? 'Prossimo invio automatico: nessun ospite in attesa.' : 'Next automatic send: no guests waiting.');
+    } else {
+      message = mode === 'off' ? (it ? 'Invio automatico disattivato.' : 'Automatic filing is off.')
+        : mode === 'dry_run' ? (it ? 'Solo verifica automatica: nessun invio programmato.' : 'Validation mode: no automatic send scheduled.')
+        : (it ? 'Stato invio automatico non disponibile.' : 'Automatic filing status unavailable.');
+    }
+    automationInfo.textContent = message;
   }
   const region = (propertyData?.region || '').trim();
   const rows = Array.isArray(allCheckins) ? allCheckins : [];

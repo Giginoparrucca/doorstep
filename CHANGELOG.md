@@ -7,6 +7,19 @@ Newest entries at the top of each section.
 
 ---
 
+## Hotfix — additional guest check-in (2026-10-07)
+
+- Fixed the guest gateway dropping explicitly empty `document_type` and
+  `document_number` fields. Members intentionally send empty strings; dropping
+  `document_number` caused PostgreSQL 23502 (NOT NULL violation). Preserve those
+  two fields on inserts and updates without changing the database schema.
+- Failed saves show one guest-facing alert and restore the Save button. The
+  browser console retains the gateway response for diagnosis; server logs record
+  the database code/message without logging the failing guest row.
+- Fixed assignment to a constant when adopting a minted walk-in booking code.
+- Validation: `node scripts/guest-checkin.test.mjs` and API/inline JS syntax checks.
+- Published to main; deployment status checked separately.
+
 ## 🚧 Open / Pending
 
 Things we've discussed but haven't built. Roughly ordered by leverage.

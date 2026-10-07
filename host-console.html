@@ -587,7 +587,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
    Used in the Tourist flow reporting axis so three regional options fit
    the panel without stacking into tall cards. */
 .export-tile-h {
-  display: flex; align-items: center; gap: 14px;
+  display: flex; flex-direction: column; align-items: stretch; gap: 14px;
   background: var(--white); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 12px 16px;
   box-shadow: var(--shadow-s); margin-bottom: 8px;
@@ -603,7 +603,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 }
 .export-tile-h .tile-actions {
   display: flex; align-items: center; gap: 8px;
-  flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end;
+  flex-shrink: 0; flex-wrap: wrap; justify-content: flex-start;
 }
 .export-tile-h .tile-actions .export-portal-link {
   margin-top: 0; width: auto; padding: 6px 12px; font-size: 0.78rem;
@@ -2054,6 +2054,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           <div class="tile-body">
             <h3 data-h="export_police_tourism">🏛 Alloggiati Web — Guest File</h3>
             <p data-h="export_police_tourism_desc"></p>
+            <div id="alloggiatiAutomationInfo" style="margin-top:12px;font-size:0.78rem;line-height:1.6;color:var(--ink-soft);"></div>
           </div>
           <div class="tile-actions">
             <button class="btn btn-primary" onclick="sendToAlloggiati(this)" data-h="btn_send_alloggiati" data-guide="export-alloggiati-send">📤 File on Alloggiati</button>
@@ -9717,8 +9718,8 @@ function _openAlloggiatiSendSuccessModal(out, rowMeta) {
 
   const receiptBlock = out.receipt_missing
     ? `<div style="margin-top:12px;padding:10px 12px;background:rgba(232,184,75,0.14);border:1px solid rgba(232,184,75,0.4);border-radius:8px;font-size:0.78rem;color:#7d5e10;">
-        <div style="font-weight:700;margin-bottom:4px;">${safe(it ? 'Ricevuta non scaricabile automaticamente' : 'Receipt could not be downloaded automatically')}</div>
-        <div>${safe(out.receipt_missing)}</div>
+        <div style="font-weight:700;margin-bottom:4px;">${safe(it ? 'Ricevuta disponibile dal giorno successivo' : 'Receipt available from the next day')}</div>
+        <div>${safe(it ? 'L’invio è riuscito. Alloggiati non rilascia la ricevuta del giorno corrente: scaricala dal portale dal giorno successivo (ora italiana) e caricala nella scheda check-in. Non ripetere l’invio.' : 'Filing succeeded. Alloggiati does not provide receipts for the current day: download it from the portal from the next day (Italy time), then upload it to the check-in record. Do not submit the guests again.')}</div>
         <div style="margin-top:6px;"><a href="https://alloggiatiweb.poliziadistato.it" target="_blank" rel="noopener" style="color:#7d5e10;text-decoration:underline;">${safe(it ? 'Apri Alloggiati Web →' : 'Open Alloggiati Web →')}</a></div>
        </div>`
     : (out.receipt_path
@@ -11545,6 +11546,17 @@ function renderExportChecklist() {
   const host = document.getElementById('exportChecklist');
   if (!host) return;
   const it = hostLang === 'it';
+  const automationInfo = document.getElementById('alloggiatiAutomationInfo');
+  if (automationInfo) {
+    const mode = propertyData?.alloggiati_autofile_mode;
+    const modeLabel = mode === 'live' ? (it ? 'Invio automatico configurato' : 'Automatic filing configured')
+      : mode === 'dry_run' ? (it ? 'Solo verifica automatica: nessun invio' : 'Automatic validation only: no filing')
+      : mode === 'off' ? (it ? 'Invio automatico disattivato: invia manualmente' : 'Automatic filing off: file manually')
+      : (it ? 'Stato invio automatico non disponibile' : 'Automatic filing status unavailable');
+    automationInfo.textContent = modeLabel + '. ' + (it
+      ? 'Orario previsto (Italia, Europe/Rome): soggiorni di più notti alle 03:00 del giorno dopo l’arrivo; check-in completati dopo le 03:00 al controllo successivo. Soggiorni di una notte: al controllo successivo se il check-in è completato il giorno dell’arrivo; se completato prima, dall’orario di check-in della struttura il giorno dell’arrivo. Il controllo è previsto ogni 10 minuti, solo se lo scheduler è attivato. Lo stato configurato non conferma che lo scheduler sia in esecuzione. Ricevuta PDF disponibile dal giorno successivo all’invio nel portale Alloggiati, per 30 giorni; scaricala e caricala nella scheda check-in. Non inviare di nuovo per ottenere la ricevuta.'
+      : 'Planned schedule (Italy, Europe/Rome): multi-night stays at 03:00 the day after arrival; check-ins completed after 03:00 at the next check. One-night stays: at the next check when completed on arrival day; when completed earlier, from the property check-in time on arrival day. Checks are scheduled every 10 minutes only when the scheduler is enabled. Configured mode does not confirm the scheduler is running. Receipt PDFs are available from the day after filing in the Alloggiati portal for 30 days; download and upload to the check-in record. Do not file again to obtain a receipt.');
+  }
   const region = (propertyData?.region || '').trim();
   const rows = Array.isArray(allCheckins) ? allCheckins : [];
   const today = new Date().toISOString().slice(0, 10);

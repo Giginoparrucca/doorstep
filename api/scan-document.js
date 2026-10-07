@@ -15,7 +15,7 @@ const SUPABASE_URL =
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const MAX_BASE64_LEN            = 14_000_000;   // ~10 MB decoded
-const SCAN_SESSION_HOURLY_LIMIT = 5;
+const SCAN_SESSION_HOURLY_LIMIT = 15;  // Supports nine guests plus scan retries.
 const SCAN_PROPERTY_DAILY_LIMIT = 60;
 
 export default async function handler(req, res) {

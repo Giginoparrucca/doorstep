@@ -3234,10 +3234,10 @@ function _gpgActionPrompt(status, eng, topCats, isPreCheckin, hasDocs) {
   return null;
 }
 
-function renderGaGuestBreakdown(events, summaryMap) {
+async function renderGaGuestBreakdown(events, summaryMap) {
   const el = document.getElementById('gaGuestBreakdown');
   if (!el) return;
-  summaryMap = summaryMap || {};
+  summaryMap = summaryMap || {}; const cutoff = new Date(); cutoff.setHours(0, 0, 0, 0); cutoff.setDate(cutoff.getDate() - 7); const cutoffYmd = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`; const expiredCodes = new Set(); const { data: expiredReservations, error: expiryError } = await sb.from('ota_reservations').select('booking_code').eq('property_id', propertyId).eq('is_test', false).is('deleted_at', null).lte('checkout_date', cutoffYmd); if (expiryError) console.warn('Action board reservation expiry lookup failed:', expiryError); for (const reservation of expiredReservations || []) expiredCodes.add(reservation.booking_code);
   const today = new Date();
 
   // Group events by booking_code (or session_id for anonymous).
@@ -3259,7 +3259,7 @@ function renderGaGuestBreakdown(events, summaryMap) {
       anonEvents += g.events.length;
       continue;
     }
-    if (dismissedBookingCodes.has(g.code)) continue;  // Round 19.4: skip dismissed
+    if (dismissedBookingCodes.has(g.code) || expiredCodes.has(g.code)) continue;  // Round 19.4: skip dismissed
     const summary = summaryMap[g.code] || null;
     const isPreCheckin = !summary; // code known but no checkin row yet
     const status = summary ? _gpgComputeStayStatus(summary, today) : null; if (status?.tone === 'past' && status.daysOut >= 7) continue;

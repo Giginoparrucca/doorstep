@@ -4284,7 +4284,7 @@ function scrollChatToBottom(force) {
 function addBubble(text, type) {
   const div = document.createElement('div');
   div.className = 'chat-bubble ' + type;
-  div.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  div.innerHTML = renderChatText(text);
   document.getElementById('chatMessages').appendChild(div);
   scrollChatToBottom(true);
 }
@@ -4467,6 +4467,12 @@ function renderFollowups(followups) {
   sugContainer.style.display = 'flex';
 }
 
+function renderChatText(text) {
+  const escaped = String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  return escaped.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="text-decoration:underline">$1</a>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+}
+
 async function sendChat() {
   const input = document.getElementById('chatInput');
   const msg = input.value.trim();
@@ -4484,7 +4490,7 @@ async function sendChat() {
   }
   if (msg) {
     const txt = document.createElement('div');
-    txt.innerHTML = msg.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    txt.innerHTML = renderChatText(msg);
     userBubble.appendChild(txt);
   }
   document.getElementById('chatMessages').appendChild(userBubble);
@@ -4573,7 +4579,7 @@ async function sendChat() {
             // body. The server strips it from the recorded value; this
             // is defense in depth for what the guest sees on the screen.
             const displayText = fullReply.replace(/\[ESCALATE\]/g, '').trim();
-            botBubble.innerHTML = displayText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            botBubble.innerHTML = renderChatText(displayText);
             scrollChatToBottom(false);
           } else if (payload.type === 'done') {
             escalated = !!payload.escalated;
@@ -4590,7 +4596,7 @@ async function sendChat() {
     // Round 34.1: strip [ESCALATE] regardless of the escalated flag.
     // Sofia sometimes leaks it into the body; the guest must never see it.
     fullReply = fullReply.replace(/\[ESCALATE\]/g, '').trim();
-    botBubble.innerHTML = fullReply.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    botBubble.innerHTML = renderChatText(fullReply);
 
     // Round 34.1: client-side belt-and-braces — if the server didn't flag
     // this as escalation but the reply body clearly says "connecting you

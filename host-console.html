@@ -3262,7 +3262,7 @@ function renderGaGuestBreakdown(events, summaryMap) {
     if (dismissedBookingCodes.has(g.code)) continue;  // Round 19.4: skip dismissed
     const summary = summaryMap[g.code] || null;
     const isPreCheckin = !summary; // code known but no checkin row yet
-    const status = summary ? _gpgComputeStayStatus(summary, today) : null;
+    const status = summary ? _gpgComputeStayStatus(summary, today) : null; if (status?.tone === 'past' && status.daysOut >= 7) continue;
     const eng = _gpgComputeEngagement(g.events);
     const topCats = _gpgTopRecoCategories(g.events);
     const action = _gpgActionPrompt(status, eng, topCats, isPreCheckin, summary && summary.hasDocs);
@@ -5248,7 +5248,7 @@ async function renderDashboard() {
     const summary = summaryMap[code] || null;
     if (!summary) continue;  // skip anonymous / unknown bookings
     const isPreCheckin = false;  // dashboard treats anyone with a checkin row as checked-in
-    const status = _gpgComputeStayStatus(summary, today);
+    const status = _gpgComputeStayStatus(summary, today); if (status?.tone === 'past' && status.daysOut >= 7) continue;
     const eng = _gpgComputeEngagement(g.events);
     const topCats = _gpgTopRecoCategories(g.events);
     const action = _gpgActionPrompt(status, eng, topCats, isPreCheckin, summary.hasDocs);

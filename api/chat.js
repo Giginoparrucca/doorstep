@@ -117,16 +117,21 @@ export default async function handler(req, res) {
 
   // Load current recommendations using authenticated property identity.
   // Do not rely on stale browser context or earlier bot claims for routes.
+  let serverLocationCtx = '';
   let hostRecommendationsCtx = '\n\nCURRENT SERVER HOST RECOMMENDATIONS:\nUnavailable. Do not treat client recommendations or chat history as confirmed route information.';
   if (SERVICE_KEY) {
     try {
+      const location = await pgrestGET('properties?id=eq.' + encodeURIComponent(propertyId) + '&select=name,address,city,zip,region,country&limit=1');
+      const property = location.data?.[0] || {};
+      serverLocationCtx = '\n\nAUTHENTICATED PROPERTY LOCATION (overrides client location):\n' + JSON.stringify(property);
+      const locality = [property.city, property.region, property.country].filter(Boolean).join(', ');
       const current = await pgrestGET(
         'recommendations?property_id=eq.' + encodeURIComponent(propertyId)
         + '&deleted_at=is.null&is_test=eq.' + (v.payload.t === true ? 'true' : 'false')
         + '&select=name,address,category,desc_en,desc_it,tags&order=sort_order.asc'
       );
       hostRecommendationsCtx = '\n\nCURRENT SERVER HOST RECOMMENDATIONS (host-provided facts, not live route verification):\n'
-        + JSON.stringify(current.data || []);
+        + JSON.stringify((current.data || []).map(place => ({ ...place, maps_url: 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent([place.name, place.address, locality].filter(Boolean).join(', ')) })));
     } catch (e) {
       console.warn('[chat] current recommendations unavailable');
     }
@@ -203,7 +208,7 @@ Never put any text outside these two tags. The structure is parsed by the app.`;
 GUEST'S CHOSEN LANGUAGE: ${langLabel}
 
 PROPERTY INFORMATION
-${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}${hostRecommendationsCtx}`;
+${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}${serverLocationCtx}${hostRecommendationsCtx}`;
 
   // ── Build the messages array, possibly adding image to the last user msg ──
   let apiMessages = messages.slice(-10).map(m => ({ role: m.role, content: m.content }));

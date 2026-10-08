@@ -149,9 +149,13 @@ FACTUAL ACCURACY — applies to replies AND follow-up suggestions
 - Only quote a travel time or distance if it is explicitly supplied for that exact destination and starting point. Preserve the value, approximation and transport mode together. A driving time must NEVER become a walking time.
 - If a time has no transport mode, do not assume one. If only a distance is supplied, do not calculate a duration from it.
 - "Nearby", "close", a category/tag, an address or a Maps link does NOT establish walking distance, walking time, route safety or suitability. Never infer "walkable", "a short stroll" or similar.
-- This endpoint has no route lookup or live opening-hours tool. Do not claim to have checked Maps, calculated a route or verified that a venue is open.
+- You have a live web_search tool. For EVERY place recommendation, location, opening-hours, reviews or directions question, search before answering, including host-listed places and follow-up questions. Identify the exact venue using its address and the property's locality; if ambiguous, ask which venue. Never search for guest names, booking dates, access codes, WiFi credentials or other private property information.
+- Prefer the venue's official website for hours and current notices. Search listings/reviews when relevant; state the source and avoid presenting a few comments as consensus. Distinguish published regular hours from confirmed opening on a specific date; check holiday exceptions and use Italy's local date/time.
+- Web search is NOT a routing engine. Never infer route duration from search snippets, straight-line distances, reviews or generic routes. Only quote host-provided estimates explicitly as host estimates; otherwise say the route time is unconfirmed. No Google routing API is configured.
+- Always include a clickable Markdown Google Maps link for EACH place you recommend or locate, especially host recommendations. Use https://www.google.com/maps/search/?api=1&query= followed by the URL-encoded venue name AND full address/locality. For directions use https://www.google.com/maps/dir/?api=1&origin=ENCODED_PROPERTY_ADDRESS&destination=ENCODED_PLACE_ADDRESS&travelmode=walking or driving matching the guest's request. Do not invent place IDs, coordinates, shortened URLs or route results.
+- Cite live claims with source links. If search fails, has no exact match, or gives conflicting/stale results, say what couldn't be verified, provide the Maps link and continue with attributed host facts. Never claim you checked Google Maps itself unless a returned source actually establishes the fact.
 - When route information is missing, say briefly that the walking/driving time is not confirmed and direct the guest to Explore → Open in Maps, where they can choose the transport mode. Continue helping with supported details; do not invent an estimate.
-- For recommendations, opening hours, prices, facilities and availability, use only supplied facts. If missing, say you don't have confirmation and suggest checking with the venue or host.
+- For recommendations, opening hours, prices, facilities and availability, use only supplied facts or relevant results from this turn's live search. If missing, say you don't have confirmation and suggest checking with the venue or host.
 - Before responding, check each practical claim against the supplied facts, especially numbers and walking versus driving.
 
 LANGUAGE
@@ -195,7 +199,8 @@ Three short follow-up questions the guest is likely to ask next, in the guest's 
 
 Never put any text outside these two tags. The structure is parsed by the app.`;
 
-  const variableSystemBlock = `GUEST'S CHOSEN LANGUAGE: ${langLabel}
+  const variableSystemBlock = `CURRENT ITALY TIME: ${new Date().toLocaleString('en-GB', { timeZone: 'Europe/Rome' })}
+GUEST'S CHOSEN LANGUAGE: ${langLabel}
 
 PROPERTY INFORMATION
 ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}${hostRecommendationsCtx}`;
@@ -225,7 +230,8 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}${host
 
   const requestBody = {
     model: 'claude-sonnet-4-5',
-    max_tokens: 1024,
+    max_tokens: 2048,
+    tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }],
     system: [
       { type: 'text', text: stableSystemBlock, cache_control: { type: 'ephemeral' } },
       { type: 'text', text: variableSystemBlock },
@@ -235,7 +241,7 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}${host
   };
 
   try {
-    const upstream = await fetch('https://api.anthropic.com/v1/messages', {
+    let upstream = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -244,6 +250,21 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}${host
       },
       body: JSON.stringify(requestBody),
     });
+
+    // If the provider account disables search, preserve basic guest assistance
+    // while explicitly withdrawing live verification in the model context.
+    if (upstream.status === 400) {
+      const detail = await upstream.clone().text();
+      if (/web.?search/i.test(detail)) {
+        delete requestBody.tools;
+        requestBody.system[1].text += '\nLIVE SEARCH UNAVAILABLE: Do not claim verification. For place questions say live checks are unavailable, use attributed host facts and include Google Maps links.';
+        upstream = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+          body: JSON.stringify(requestBody),
+        });
+      }
+    }
 
     if (!upstream.ok) {
       const errText = await upstream.text();
@@ -262,6 +283,7 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}${host
       const decoder = new TextDecoder();
       let buffer = '';
       let fullText = '';
+      const sourceLinks = new Map();
       let inReply = false;
       let replyBuffer = '';
       let inputTokens  = 0;
@@ -331,6 +353,10 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}${host
               if (payload.type === 'message_delta' && payload.usage) {
                 outputTokens = payload.usage.output_tokens || outputTokens;
               }
+              if (payload.type === 'content_block_delta' && payload.delta?.type === 'citations_delta') {
+                const citation = payload.delta.citation;
+                if (citation?.url && /^https?:\/\//.test(citation.url)) sourceLinks.set(citation.url, citation.title || 'Source');
+              }
               if (payload.type === 'content_block_delta' && payload.delta?.type === 'text_delta') {
                 flushText(payload.delta.text || '');
               }
@@ -341,6 +367,8 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}${host
         console.error('Stream read error:', e);
       }
 
+      const sources = formatSourceLinks(sourceLinks);
+      if (sources) res.write(`data: ${JSON.stringify({ type: 'text', text: sources })}\n\n`);
       const replyMatch = fullText.match(/<reply>([\s\S]*?)<\/reply>/);
       const replyText = replyMatch ? replyMatch[1].trim() : fullText.trim();
       // Round 34.1: Sofia sometimes forgets the [ESCALATE] marker even
@@ -381,7 +409,12 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}${host
     const data = await upstream.json();
     if (data.error) return res.status(500).json({ error: data.error.message });
 
-    const rawText = data.content?.[0]?.text || '';
+    const textBlocks = (data.content || []).filter(b => b.type === 'text');
+    const rawText = textBlocks.map(b => b.text || '').join('');
+    const sourceLinks = new Map();
+    for (const b of textBlocks) for (const citation of b.citations || []) {
+      if (citation.url && /^https?:\/\//.test(citation.url)) sourceLinks.set(citation.url, citation.title || 'Source');
+    }
     const replyMatch = rawText.match(/<reply>([\s\S]*?)<\/reply>/);
     let replyText = replyMatch ? replyMatch[1].trim() : rawText.trim();
     const cleanReply = replyText.replace('[ESCALATE]', '').trim();
@@ -412,7 +445,7 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}${host
     } catch (e) { console.warn('[chat] usage insert failed:', e); }
 
     return res.status(200).json({
-      reply: cleanReply || (isIT ? 'Scusa, riprova.' : 'Sorry, please try again.'),
+      reply: (cleanReply + formatSourceLinks(sourceLinks)) || (isIT ? 'Scusa, riprova.' : 'Sorry, please try again.'),
       escalated,
       followups,
     });
@@ -719,4 +752,14 @@ function describeWeatherCode(code) {
     99: t('severe thunderstorm', 'temporale violento'),
   };
   return map[code] || t('unsettled', 'variabile');
+}
+
+// Preserve provider citations as accessible links in both response modes.
+function formatSourceLinks(links) {
+  if (!links.size) return '';
+  return '\n\n' + [...links].slice(0, 6).map(([url, title]) => {
+    const label = String(title).split('[').join('').split(']').join('').split('<').join('').split('>').join('').slice(0, 100);
+    const href = encodeURI(url).split('(').join('%28').split(')').join('%29');
+    return '[' + label + '](' + href + ')';
+  }).join(' · ');
 }

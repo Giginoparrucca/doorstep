@@ -1,8 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["dub1"],
+  "regions": [
+    "dub1"
+  ],
   "rewrites": [
-    { "source": "/api/guest-chat", "destination": "/api/guest" }
+    {
+      "source": "/api/guest-chat",
+      "destination": "/api/guest"
+    }
   ],
   "crons": [
     {
@@ -17,6 +22,9 @@
   "functions": {
     "api/alloggiati.js": {
       "includeFiles": "lib/**",
+      "maxDuration": 60
+    },
+    "api/chat.js": {
       "maxDuration": 60
     }
   }

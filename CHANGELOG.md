@@ -3,11 +3,28 @@
 Living document tracking what's been built, what's pending, and what to revisit.
 Newest entries at the top of each section.
 
-> **Maintenance contract:** Claude updates this file automatically at the end of every working session — Daniele does not need to ask. New "Done / Shipped" entry per round, items moved between Pending and Done as work progresses, gotchas appended whenever a recurring pattern surfaces. Daniele's only job is to push the updated file to the repo alongside the code.
+> **Contratto di manutenzione (Claude e GPT):** leggere questo CHANGELOG dall'inizio alla fine prima di iniziare qualsiasi Round. Aggiornarlo durante il lavoro e alla fine di ogni sessione, insieme alla modifica pertinente: stato delle fasi, PR, verifiche, blocchi e prossimi passi. Daniele non deve chiedere un aggiornamento separato. Le istruzioni permanenti sono in `AGENTS.md`.
 
-> **Multi-model hand-off (Claude ↔ GPT):** before you touch Round 49, read the "Current round — in-flight" block below. Mark your phase `in-progress — <model>` when you start, flip to `shipped — PR #N — <model>` when you merge. Every Round 49 commit subject must start with `Round 49 Phase N · ` so `git log --oneline | grep "Round 49"` lists the full timeline. If you only shipped part of a phase, say so (`Phase 4a (radio + consent)`); don't mark a phase shipped if its spec isn't fully covered.
+> **Passaggio multi-modello (Claude ↔ GPT):** prima di iniziare una fase, passare da `pending` a `in-progress — <modello>` e creare un commit. Dopo il merge, indicare `shipped — PR #N — <modello>` soltanto se la specifica della fase è completamente coperta. Prefisso dei commit: `Round R Phase N · `. Le consegne parziali devono essere esplicite (es. `Phase 5a`); documentazione pronta non significa ambiente operativo.
 
 ### Current round — in-flight
+
+**Round 50 — Ambiente demo e onboarding host**
+
+Specifica: `PLAN_round50_demo_onboarding.md`. Scaletta: `docs/DEMO_ONBOARDING_IT.md`.
+La fase 0 riguarda solo la documentazione; l'ambiente demo non è ancora realizzato.
+
+| Phase | Status | Where |
+|---|---|---|
+| 0 — Specifica, scaletta e regole di aggiornamento | in-progress — GPT | Piano Round 50, script italiano, `AGENTS.md` |
+| 1 — Configurazione separata e protezioni demo | pending | Configurazione frontend/API, blocchi server delle integrazioni |
+| 2 — Provisioning demo e schema riproducibile | pending | Progetto Vercel demo, progetto Supabase demo, dominio e account |
+| 3 — Dati fittizi e scenari di onboarding | pending | Seed versionato, proprietà demo, prenotazioni e conversazioni |
+| 4 — Ripristino e gestione delle sessioni | pending | Reset autenticato, date relative, isolamento tra presentazioni |
+| 5 — Esperienza demo e simulazioni | pending | Banner demo, link/QR, Alloggiati simulato, casella notifiche demo |
+| 6 — Verifica completa e consegna operativa | pending | Collaudo, prova della scaletta, gestione aggiornamenti e rollback |
+
+### Round precedente — stato conservato
 
 **Round 49 — Automatic Alloggiati filing** (spec: Daniele's prompt pinned 2026-10-05)
 
@@ -39,6 +56,7 @@ Newest entries at the top of each section.
 Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ### High value, ready to build
+- **Round 50 — Ambiente demo e onboarding host** _(pianificato 2026-10-09)_: istanza separata con dati esclusivamente fittizi, integrazioni esterne simulate/bloccate, reset ripetibile e scaletta italiana. Specifica: `PLAN_round50_demo_onboarding.md`; onboarding: `docs/DEMO_ONBOARDING_IT.md`. Le fasi operative restano pending fino all'implementazione e alla verifica.
 - **Multi-language for host free-text content** _(scoped Round 23, building next)_
   **Decision made**: JSONB-per-field architecture (`{"en": "...", "it": "...", "de": "..."}` in one column per translatable field — welcome message, check-in/checkout instructions, transport info, reco descriptions), so adding a language never needs a schema migration. Guest app reads `field[guestLang] || field[hostDefaultLang]`. Plus an optional **"suggest translation"** button per field that pre-fills a language via the Anthropic API for the host to review/edit — **never auto-published**, especially for safety-critical check-in instructions. Migration: convert existing TEXT columns to JSONB, back-filling current content under the host's default language key. Guest + host render/save paths updated to read/write the active language key. **This is the agreed next round.**
 

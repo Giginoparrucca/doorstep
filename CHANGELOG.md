@@ -18,7 +18,7 @@ Phases 0/0a cover documentation only; the demo environment has not been provisio
 | Phase | Status | Where / test gate |
 |---|---|---|
 | 0 — Specification, script and maintenance rules | shipped — PR #118 — GPT | Original planning delivery |
-| 0a — English plan, autonomy and Italian PDF | in-progress — GPT | English docs, mandatory phase gates, Italian script/PDF; content/link/render checks |
+| 0a — English plan, autonomy and Italian PDF | shipped — PR #119 — GPT | English docs, mandatory phase gates, Italian script/PDF; content/link/render checks |
 | 1 — Environment configuration and demo guards | pending | Config/guard tests, failed-config denial, production regressions |
 | 2 — Provisioning and reproducible schema | pending | Deployed auth/API/storage tests, RLS and environment isolation |
 | 3 — Fictional fixtures and scenarios | pending | Seed repeatability, relationships, dashboard/date boundaries |
@@ -124,13 +124,23 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
+### Round 50 Phase 0a — English plan, phase gates and Italian PDF _(2026-10-09)_
+
+- Rewrote the technical plan, permanent agent instructions and Round 50 CHANGELOG content in English. The onboarding script remains Italian and includes agent-owned preparation and cleanup.
+- Added explicit mandatory tests for every implementation phase. GPT or Claude implements, tests, fixes and records each phase before automatically progressing; Daniele performs only a strictly necessary action unavailable to the agent.
+- Generated `Onboarding_WelcomeBnB_IT.pdf`, five A4 pages, from `docs/DEMO_ONBOARDING_IT.md`. PDF source corresponds to script blob `9b2be19e5e55ff69c81301b734a9c539cb6d88cc`; keep PDF and script aligned on future edits.
+- **Publication:** PR #119 — GPT. Documentation revision only; no demo infrastructure or data provisioned. Phases 1–6 remain pending.
+- **Checks:** all six implementation phases have mandatory test lists; document links and whitespace checks pass. PDF contains every source word, stays within page margins, and all five rendered pages were visually inspected.
+- **Next step:** Phase 1, environment configuration and server guards, followed by its mandatory test gate before provisioning. No further user action is required for this documentation delivery.
+
+
 ### Round 50 Phase 0 — Demo plan and onboarding script _(2026-10-09)_
 
 - Delivered the original planning specification and Italian 15-minute presenter script with preparation, sample dialogue, fallback options and post-meeting checks.
 - Added permanent CHANGELOG and multi-model handoff instructions in `AGENTS.md`.
 - **Publication:** PR #118 — GPT. Documentation phase only; no demo project, domain or dataset created. Implementation phases 1–6 remain pending.
 - **Checks:** UTF-8 content, local links, complete phase table and whitespace validation.
-- **Follow-up:** Phase 0a revises technical documentation into English, adds agent ownership and mandatory per-phase tests, and generates the Italian script PDF. Operational work starts with Phase 1 after planning delivery.
+- **Follow-up:** Phase 0a completed the English technical documentation, agent ownership, mandatory per-phase tests and Italian script PDF in PR #119. Operational work starts with Phase 1 after planning delivery.
 
 ### Round 49 Phase 5 — Alerts + dry-run digest _(2026-10-09)_
 

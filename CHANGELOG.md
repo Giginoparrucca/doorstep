@@ -124,9 +124,6 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## Round 50 — active implementation notes
 
-- The host-provided Vercel screenshot identifies the preview failure: the custom build completed but Vercel expected a missing `public` output directory. Commit `d3bd923` sets `outputDirectory` to `.` for the existing root-level static application. Environment/zero-outbound-call regression tests pass again; a fresh preview check is pending. Vercel team API access remains unavailable, independently of this build fix.
-
-
 - Phase 1 is published in PR #120 at commit `71ff32b`. Local tests pass; it is not merged or shipped.
 - The preview deployment `C53xVJRtwpuA8DNtFZZwjXsVCiYT` reports failure. The cause cannot yet be read: Vercel MCP returns 403 for the existing team, the CLI has no credentials, and the browser redirects to sign-in. Owner sign-in/access is the next necessary action; no production deployment or demo provisioning has occurred.
 - Phase 2 remains pending until Phase 1 deployment verification passes. Resume by inspecting build logs, fixing the observed failure, rerunning the gate and merging PR #120.

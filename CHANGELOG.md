@@ -19,8 +19,8 @@ Phases 0/0a cover documentation only; the demo environment has not been provisio
 |---|---|---|
 | 0 — Specification, script and maintenance rules | shipped — PR #118 — GPT | Original planning delivery |
 | 0a — English plan, autonomy and Italian PDF | shipped — PR #119 — GPT | English docs, mandatory phase gates, Italian script/PDF; content/link/render checks |
-| 1 — Environment configuration and demo guards | in-progress — GPT | PR #120; local config/guard and production regression tests pass; deployment gate blocked by Vercel access |
-| 2 — Provisioning and reproducible schema | pending | Deployed auth/API/storage tests, RLS and environment isolation |
+| 1 — Environment configuration and demo guards | shipped — PR #120 — GPT | Local config/guard/production regressions and served preview/production checks pass |
+| 2 — Provisioning and reproducible schema | in-progress — GPT | Deployed auth/API/storage tests, RLS and environment isolation |
 | 3 — Fictional fixtures and scenarios | pending | Seed repeatability, relationships, dashboard/date boundaries |
 | 4 — Reset and session management | pending | Two resets, authorization, concurrency and recovery |
 | 5 — Demo UX and simulations | pending | Real chat flow, fake external calls, demo links and AI/place checks |
@@ -123,6 +123,11 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 ---
 
 ## Round 50 — active implementation notes
+
+- Phase 1 merged as `4640618`; deployment `2rmYJzpvjZZcwcrd8j8bqZaQZmHk` is READY on production, matching main. Read-only HTTP checks return 200 for the guest page, generated configuration and bootstrap; config refs stay production. Preview checks use an expiring share cookie and verify pages, cache headers and guest gateway origin rejection. No filing tick was executed: automatic review rejected that probe, and verification uses read-only requests instead.
+- Vercel access recovery: the verified project/deployment can be read and share access issued when optional team selectors are omitted. Explicit team selectors and the combined protected-fetch wrapper still return 403. Reconnection is not treated as a routine workaround; retain known target IDs and verify ownership on every creation/deployment.
+- Phase 2 ownership taken by GPT. Supabase project cost tool is advertised but unavailable upstream; inspect the actual provisioning options before creating a billable resource.
+
 
 - PR #120 build repair: commit `d3bd923` explicitly sets static `outputDirectory` to `.` after the host screenshot exposed a missing `public` directory error. Environment tests pass again. Vercel reports success for `d3bd923` and `0057437`.
 - The remaining served-page/API verification gate is blocked by access: preview redirects to Vercel Authentication; protected deployment fetch returns 403 for project/team. The current connection must authorize `giginoparruccas-projects` / `welcomebnb`. No merge or Phase 2 provisioning has occurred.

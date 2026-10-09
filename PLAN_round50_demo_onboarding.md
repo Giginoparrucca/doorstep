@@ -1,246 +1,306 @@
-# Round 50 — Ambiente demo e onboarding host
+# Round 50 - Demo environment and host onboarding
 
-Data: 9 ottobre 2026. Stato: pianificato; nessuna istanza demo ancora attivata.
-Responsabile della specifica: GPT. Lingua della documentazione e della presentazione: italiano.
+Date: 9 October 2026. Implementation status: planned, not yet provisioned.
+Planning owner: GPT. Implementation owner: GPT or Claude, as recorded in CHANGELOG.md.
+Technical documentation is in English. The presenter script and its PDF remain in Italian.
 
-## Obiettivo e risultato atteso
+## Outcome
 
-Un ambiente permanente su `demo.welcomebnb.it`, con lo stesso codice dell'app,
-una banca dati separata e dati esclusivamente fittizi. Serve a mostrare il percorso
-ospite e il lavoro dell'host, provare le funzionalità e ripetere l'onboarding senza
-alterare proprietà, prenotazioni, credenziali o statistiche reali.
+A permanent demo at `demo.welcomebnb.it`, running the same application code as
+production with a separate database and entirely fictional guest data. Presenters
+can demonstrate the guest journey and host console, then restore the initial state.
 
-La consegna comprende ambiente funzionante, dati ripristinabili, account per i
-presentatori, link ospite e QR, simulazioni esplicite e la scaletta
-[`docs/DEMO_ONBOARDING_IT.md`](docs/DEMO_ONBOARDING_IT.md).
-La documentazione della fase 0 è una consegna distinta dalla realizzazione.
+Deliver the working environment, presenter accounts, guest links/QR codes,
+repeatable fixtures, clearly labelled simulations and the Italian
+[onboarding script](docs/DEMO_ONBOARDING_IT.md). The PDF is generated from that
+script; both must match whenever the script changes.
+Documentation delivery does not mean the environment is operational.
 
-## Decisioni di architettura
+## Execution ownership and autonomy
 
-- Un progetto Vercel dedicato e un progetto Supabase dedicato, entrambi demo.
-  Lo stesso repository resta la fonte del codice; niente copia dell'app che diverga.
-- Pubblicare nella demo soltanto revisioni approvate e registrare il commit distribuito.
-  Ogni modifica allo schema ha una migrazione versionata valida per entrambi gli ambienti.
-- Ricostruire lo schema corrente senza dati di produzione: tabelle, funzioni,
-  trigger, RLS, grant, bucket e policy. Le vecchie migrazioni contengono anche
-  operazioni manuali; non eseguirle tutte alla cieca. Preparare e verificare una
-  baseline riproducibile priva di dati, segreti e scheduler di produzione.
-- Mantenere autentici login, autorizzazioni, check-in, dashboard e messaggistica
-  host/ospite. Simulare soltanto le azioni verso servizi esterni quando richiesto.
-- `?test=1` non è l'ambiente demo: oggi esclude attività dai pannelli host e
-  altera alcuni percorsi ospite. Nella banca dati demo gli scenari devono passare
-  attraverso i normali filtri dell'app; distinguere le fixture con identificatori
-  demo e un registro dedicato, senza cambiare la semantica di `is_test` in produzione.
-- Nessun invio alla Questura, nessuna credenziale Alloggiati reale, nessun feed OTA
-  reale e nessuna notifica a host o ospiti reali. Blocchi applicati sul server.
-- AI e ricerca dei luoghi possono essere reali, con chiavi e limiti dedicati.
-  La scheda usa luoghi reali verificabili, una posizione demo dichiarata e link
-  Google Maps; nessun tempo a piedi inventato per rendere la presentazione più bella.
+GPT or Claude owns every technical activity: discovery, implementation, project
+creation through available access, environment configuration, secrets generation,
+schema setup, seed data, deployments, test execution, fixes, PRs, merges,
+verification, PDF updates and CHANGELOG maintenance.
 
-## Protocollo di lavoro e aggiornamento del CHANGELOG
+Proceed through the phases in order without asking Daniele to approve routine
+choices, run SQL, generate secrets, deploy, test, reset data or maintain documents.
+After each test gate passes, record the evidence and continue to the next phase.
+If tests fail, fix the phase and rerun the relevant checks before advancing.
+Do not add a manual handoff when the agent has sufficient authorized access.
 
-Prima di ogni fase leggere `CHANGELOG.md` integralmente e verificare la tabella
-`Current round — in-flight`. Cambiare `pending` in `in-progress — GPT` oppure
-`in-progress — Claude` e creare un commit prima del lavoro della fase.
+Daniele is involved only when strictly necessary: an account-owner-only login or
+MFA action, permissions the agent cannot obtain, an actual billing approval, a DNS
+change without accessible registrar controls, or a legal consent/signature that
+must be performed by the responsible person. First complete all independent work,
+try the authorized tools, and prepare the exact smallest remaining action. Record
+why it is blocked and what access or action resolves it; do not delegate a whole
+phase. Do not treat elapsed time or an unanswered question as approval.
 
-Prefisso di ogni commit: `Round 50 Phase N · `. Ogni PR riporta fase, comportamento,
-verifiche e limiti. Aggiornare il CHANGELOG anche se il lavoro si interrompe:
-indicare quanto è fatto, quanto manca e il prossimo passo concreto. Dopo il merge,
-registrare `shipped — PR #N — <modello>` solo per una fase completamente verificata.
-Una consegna parziale si chiama, per esempio, `Phase 4a`, e non chiude la fase 4.
+Presenting the demo and agreeing a real host's onboarding details remain human
+activities. Technical preparation, smoke checks and cleanup are agent-owned.
+This protocol directs active work; it does not imply background execution when
+no agent session or explicit automation is running.
 
-Le regole permanenti in `AGENTS.md` si applicano anche ai Round successivi.
-La tabella di Round 49 e i suoi PR restano conservati nel CHANGELOG.
+## Architecture and operating constraints
 
-## Fase 0 — Specifica e scaletta
+- Separate Vercel and Supabase projects, with independent keys, accounts and
+  storage. One source repository; no permanently divergent copy of the app.
+- Deploy approved revisions and record the source commit. Apply versioned schema
+  changes to the appropriate environments without copying production data.
+- Build a verified schema-only baseline: tables, functions, triggers, grants,
+  RLS, buckets and storage policies. Old migrations contain manual operations;
+  do not replay them blindly or import production schedules or secrets.
+- Real login, authorization, guest check-in, host dashboard and host/guest chat.
+  Label external-service simulations at the point where they occur.
+- Existing `?test=1` is not the showcase environment: it hides activity from host
+  views and changes guest behavior. In the isolated demo database, fixtures must
+  appear through the normal application filters. Track fixture identity separately;
+  preserve the production meaning of `is_test`.
+- No real Questura SOAP calls, Alloggiati credentials, OTA feeds or notifications
+  to real hosts/guests. Enforce restrictions on the server, not just in the UI.
+- AI and place search may be live with dedicated credentials, measured usage and
+  limits. Use a declared demo location and verifiable real places with Maps links.
+  Never invent walking times, opening hours or reviews for presentation purposes.
+- First release supports one onboarding session at a time. Parallel presentations
+  require independent datasets or session isolation before they are enabled.
 
-- [ ] Registrare Round 50 e tutte le fasi nel CHANGELOG.
-- [ ] Pubblicare questa specifica e la scaletta italiana per i presentatori.
-- [ ] Aggiungere istruzioni permanenti di manutenzione in `AGENTS.md`.
-- [ ] Verificare i link interni, il numero del Round e la distinzione tra piano e rilascio.
+## Delivery protocol and test gates
 
-Accettazione: documenti nel repository e PR registrato; tutte le fasi operative
-restano `pending`. Non creare infrastruttura nel solo lavoro di pianificazione.
+Read CHANGELOG.md top-to-bottom before every phase. Change its row from `pending`
+to `in-progress - <model>` and commit before starting. Use the prefix
+`Round 50 Phase N · ` for commits; use the actual subphase number for partial work.
 
-## Fase 1 — Configurazione separata e protezioni demo
+Every implementation phase follows this sequence:
 
-- [ ] Inventariare URL, chiavi pubbliche, fallback e integrazioni in tutte le pagine
-  e API, compresi `index.html`, `host-console.html`, `admin.html`, guide, manifest,
-  service worker, notifiche, inviti, email, QR e link calendario.
-- [ ] Sostituire Supabase e origine app hardcoded con configurazione specifica
-  dell'ambiente. Nel frontend esporre solo URL e chiave pubblica; segreti server
-  esclusivamente nelle variabili Vercel. Per la stack HTML usare un file pubblico
-  generato durante il deployment oppure una configurazione equivalente verificata.
-- [ ] Definire `APP_ENV=demo`, origine demo, ref Supabase demo e lista di origini
-  ammesse. Configurazione mancante o incoerente deve bloccare il servizio, senza
-  fallback verso il progetto Supabase di produzione.
-- [ ] Applicare sul server i blocchi Alloggiati, inviti, notifiche, sincronizzazione
-  OTA e webhook esterni. Un parametro URL o una modifica al browser non deve
-  poterli aggirare. In demo il valore predefinito dell'autofile è `off`.
-- [ ] Separare chiavi AI, token ospite e altri segreti. Non copiare il Vault,
-  `AUTOFILE_CRON_SECRET`, credenziali Alloggiati o destinatari della produzione.
-- [ ] Mantenere CORS con origini esplicite: niente wildcard `*.vercel.app`.
-- [ ] Separare cache, token e configurazione client per origine e ambiente.
+1. Implement that phase's scope and prepare rollback/recovery where applicable.
+2. Run its mandatory tests against the actual result, not just the code draft.
+3. Fix failures and rerun the affected tests. Run broader checks only when needed.
+4. Record revision, environment, test commands/probes, results, limits and PR in
+   CHANGELOG.md. A deployment alone is not a passing test.
+5. Merge the complete phase and verify its deployment if that phase has one.
+   Mark `shipped - PR #N - <model>` only when all acceptance criteria are covered.
+6. Automatically take ownership of the next phase. If blocked, record the blocker
+   and continue independent authorized work; do not mark an incomplete phase shipped.
 
-Accettazione: browser e API puntano entrambi alla demo; nessun percorso demo
-può leggere/scrivere in produzione o richiamare un'integrazione reale bloccata.
+Required test evidence is a compact reproducible record. Never store secrets or
+personal data in logs, PR descriptions or CHANGELOG.md. Documentation-only edits
+need content/link/render checks, not unnecessary runtime tests.
 
-## Fase 2 — Provisioning e schema riproducibile
-
-- [ ] Verificare disponibilità, piano, costi e limiti dei due progetti prima della
-  creazione; registrare nomi, ID, regione, proprietario e procedura di gestione.
-- [ ] Creare Supabase demo e applicare la baseline/migrazioni verificate, inclusi
-  grant espliciti, RLS, funzioni e bucket privati. Nessun dump di dati reali.
-- [ ] Non attivare i cron di produzione: autofile, invii email, cattura QA e purge.
-  Documentare separatamente eventuali lavori di manutenzione propri della demo.
-- [ ] Creare Vercel demo collegato allo stesso repository; configurare variabili,
-  dominio `demo.welcomebnb.it` e DNS, poi verificare HTTPS e deployment.
-- [ ] Configurare Supabase Auth con Site URL/redirect demo e accesso host tramite
-  invito. Account nominali per i presentatori; credenziali fuori dal repository.
-- [ ] Proteggere console e funzioni gestionali con login. L'accesso ospite deve
-  restare utilizzabile da telefono tramite QR; verificare che eventuale protezione
-  Vercel non blocchi questo percorso. Nessuna password condivisa pubblicamente.
-- [ ] Preparare rollback della configurazione e delle migrazioni della demo.
-
-Accettazione: login, gateway ospite e storage funzionano sulla nuova istanza;
-un account di un'altra proprietà non vede i dati altrui; la produzione è invariata.
-
-## Fase 3 — Dati fittizi e scenari
-
-- [ ] Creare un seed versionato e ripetibile, con identificatori stabili e manifest
-  dei dati gestiti. Email su domini riservati agli esempi, telefoni non operativi,
-  nominativi e documenti inventati; nessun documento reale o fotografia di un ospite.
-- [ ] Preparare la proprietà principale **Casa Demo WelcomeBnB**: foto autorizzate,
-  descrizione, regole, Wi-Fi e codice di accesso dimostrativi, istruzioni IT/EN,
-  impostazioni tassa di soggiorno dichiarate come esempio.
-- [ ] Aggiungere una seconda proprietà fittizia per mostrare il cambio proprietà
-  e verificare l'isolamento. Limitare i dati a quelli utili alla presentazione.
-- [ ] Collegare 5–6 consigli a luoghi reali con Maps e fonti verificate, usando una
-  posizione demo dichiarata. Non attribuire recensioni, orari o distanze senza fonte.
-- [ ] Preparare circa 10 prenotazioni con date relative al giorno di reset.
-  Allineare date OTA/check-in, notti, codici e tutti gli eventi collegati.
-
-| Scenario stabile | Date relative | Cosa mostra |
+| Phase | Scope | Mandatory gate before the next phase |
 |---|---|---|
-| DEMO-ARRIVO | Arrivo domani | Prenotazione, link da condividere, istruzioni |
-| DEMO-NUOVO | Arrivo oggi, nessun check-in | Percorso completo da telefono |
-| DEMO-SOGGIORNO | Arrivo ieri, partenza tra 3 giorni | Dashboard e dettagli ospite |
-| DEMO-AIUTO | Soggiorno in corso | Richiesta all'host e risposta in chat |
-| DEMO-GRUPPO | Arrivo oggi, 3 ospiti | Capogruppo e membri, dati/documenti fittizi |
-| DEMO-CONFORMITA | Arrivo ieri | Invio simulato e ricevuta dimostrativa |
-| DEMO-PARTENZA | Partenza oggi | Azioni di fine soggiorno |
-| DEMO-RECENTE | Partenza 3 giorni fa | Periodo recente nel pannello azioni |
-| DEMO-SCADUTO | Partenza 8 giorni fa | Assenza dalla bacheca azioni |
-| DEMO-NOSHOW | Partenza 8 giorni fa, nessun check-in | Assenza di richieste di check-in obsolete |
+| 0 / 0a | Plan, ownership rules, Italian script/PDF | Content, links, status consistency, PDF text and visual inspection |
+| 1 | Environment configuration and server guards | Missing/mismatched config fails closed; blocked integrations cannot execute; production configuration regression checks |
+| 2 | Projects, schema, auth, storage and deployment | Demo login/guest API/storage work; owner isolation holds; no production data/secrets/schedules imported |
+| 3 | Fictional fixtures and showcase scenarios | Seed repeatability, relationship integrity, correct dashboard visibility and boundary dates |
+| 4 | Reset and session management | Two complete resets, authorization/project guards, concurrency and failure recovery |
+| 5 | Demo UX and labelled simulations | Real host/guest messaging, fake external calls, demo-only links and AI/place checks |
+| 6 | End-to-end verification and release | Entire Italian script executed, mobile/desktop checks, production isolation and rollback verified |
 
-- [ ] Popolare conversazioni IT/EN, eventi analytics credibili e una richiesta di
-  assistenza. Ogni storico precompilato è presentato come esempio dimostrativo.
-- [ ] Creare un'immagine/documento di esempio con marcatura **FACSIMILE — DEMO**
-  per il percorso scansione simulato. Non usare un'identità ufficiale valida.
-- [ ] Verificare FK, vincoli, gruppi e conteggi dopo il seed; nessuna duplicazione
-  dopo una seconda esecuzione.
+## Phase 0 / 0a - Planning and presenter materials
 
-Accettazione: tutti gli scenari sono visibili nei pannelli corretti; le prenotazioni
-scadute e i no-show vecchi non compaiono nella bacheca; i dati sono solo fittizi.
+- Maintain the current-round table, preserve Round 49's history, and link the plan.
+- Keep the plan and permanent AGENTS.md instructions in English.
+- Keep the presenter script in Italian and generate a legible PDF from it.
+- Define agent ownership and mandatory tests between implementation phases.
 
-## Fase 4 — Ripristino e sessioni
+Gate: resolve internal links; verify every phase has scope/tests/evidence; compare
+PDF text with the script and visually inspect every rendered page. Record the
+planning PR separately. Operational phases remain pending until implemented.
 
-- [ ] Implementare **Ripristina demo**, riservato al presentatore e protetto sul
-  server da autenticazione, autorizzazione e controllo del progetto demo.
-  Mostrare una conferma chiara e rifiutare qualsiasi richiesta verso produzione.
-- [ ] Scegliere un'implementazione compatibile con i vincoli esistenti: l'audit
-  Alloggiati è immutabile e non può essere cancellato con un normale `DELETE`.
-  Non indebolire grant o audit di produzione per rendere possibile il reset.
-  Gestire dataset/sessioni demo nuovi oppure un ripristino amministrativo isolato,
-  documentando il trattamento dei log dimostrativi.
-- [ ] Ripristinare prenotazioni, check-in, chat, escalation, analytics, esclusioni,
-  preferenze, cooldown notifiche, ricevute simulate e file creati durante la demo.
-  Mantenere gli account nominali e le loro autorizzazioni.
-- [ ] Calcolare le date relative in `Europe/Rome`; conservare durate e relazioni.
-  Riportare un riepilogo di successo con data, conteggi e link aggiornati.
-- [ ] Invalidare sessioni e link precedenti dove necessario; fornire un nuovo link
-  ospite. Il vecchio localStorage non deve ripristinare un check-in già azzerato.
-- [ ] Rendere il reset atomico o recuperabile e impedire due reset concorrenti.
-- [ ] Per la prima versione usare una sola presentazione alla volta, con indicazione
-  della sessione in corso. Le demo parallele richiedono dataset/host separati;
-  un reset globale non deve cancellare il lavoro di un altro presentatore.
+## Phase 1 - Configuration and server-side demo guards
 
-Accettazione: due onboarding consecutivi iniziano nello stesso stato funzionale;
-il reset è rifiutato a un ospite e in produzione, e recupera da un errore parziale.
+- Inventory hardcoded database URLs, public keys, production fallbacks and links
+  across guest/host/admin pages, APIs, guides, manifests, workers and notifications.
+- Replace hardcoded frontend configuration with an environment-specific public
+  configuration generated at deployment, or an equivalent verified mechanism.
+  Expose only the Supabase URL/public key; keep service keys and secrets server-side.
+- Define `APP_ENV=demo`, expected demo project ref, application origin and explicit
+  CORS origins. Missing or inconsistent demo configuration must fail closed;
+  never fall back to the production database or application URL.
+- Guard Alloggiati, notifications, invitations, OTA sync/export and incoming
+  integration webhooks on the server. Browser parameters cannot enable live calls.
+  Set demo autofile default to `off`; even a crafted `live` request cannot call SOAP.
+- Generate independent guest-token and AI credentials where authorized. Never
+  copy the production Vault, cron secret, encrypted credentials or recipients.
+- Scope browser cache/tokens by environment; preserve production behavior.
+- Check the Vercel plan's function cap before adding endpoints; reuse a suitable
+  dispatcher where necessary. Do not introduce a wildcard Vercel CORS rule.
 
-## Fase 5 — Esperienza demo e simulazioni
+Mandatory tests:
+- Unit/probe cases for valid demo config, missing values and mismatched project ref.
+- Direct API attempts to bypass demo guards for each external integration, with
+  mocked outbound transports asserting zero real calls.
+- Generated frontend config contains only public values; all demo links use demo origin.
+- Relevant production config, guest-token and check-in regression checks still pass.
 
-- [ ] Banner persistente **Ambiente demo — dati fittizi**, anche su telefono,
-  e pagina di avvio con Apri console, Apri ospite, QR e Ripristina demo.
-- [ ] QR e link generati puntano sempre alla demo, anche dopo cambio proprietà,
-  reset e invio di una notifica simulata.
-- [ ] Simulare scansione del facsimile con dati predefiniti, chiaramente dichiarati.
-  Non invitare il nuovo host a caricare un documento personale durante l'onboarding.
-- [ ] Alloggiati: simulare validazione, errore da correggere, invio e ricevuta
-  **FACSIMILE — nessuna trasmissione alla Questura**. Ogni simulazione è etichettata;
-  il backend non chiama SOAP, neppure se il browser prova un'azione manuale o live.
-- [ ] Notifiche: registrare gli avvisi in una casella demo accessibile al presentatore.
-  Eventuali email effettive devono avere destinatari autorizzati espliciti e fissi.
-  Telegram e push a dispositivi reali disabilitati nella prima versione.
-- [ ] Calendario OTA: mostrare prenotazioni precompilate e un feed fixture locale;
-  nessuna pubblicazione o sincronizzazione con account OTA veri.
-- [ ] AI: mantenere la conversazione reale e i limiti di consumo demo; fornire
-  uno storico di riserva chiaramente etichettato per indisponibilità del servizio.
-  Link Maps quando si consiglia un luogo; dichiarare ciò che non è verificabile.
-- [ ] Aggiornare le guide interessate e la loro versione secondo il contratto
-  esistente; distinguere le istruzioni demo da quelle operative reali.
+Exit: guarded build works locally/through an isolated test harness. Actual hosted
+project setup is Phase 2; do not claim deployed isolation before it is tested.
 
-Accettazione: il pubblico distingue funzioni reali e simulate senza spiegazioni
-tecniche; i percorsi interattivi della scaletta funzionano e non inviano dati fuori.
+## Phase 2 - Provisioning and reproducible schema
 
-## Fase 6 — Collaudo, rilascio e gestione
+- Inspect accessible projects/plans, limits and costs. Create dedicated demo
+  Supabase/Vercel projects using agent tools; record IDs, region and ownership.
+- Build/apply the schema-only baseline and migrations, including explicit grants,
+  owner-scoped RLS and private storage policies. No production row dump.
+- Exclude production cron jobs: autofile, email dispatch, QA capture and purge.
+  Document any demo-only maintenance job independently.
+- Configure Vercel variables and repository connection, deploy, connect
+  `demo.welcomebnb.it`, and complete DNS through available authorized controls.
+  If registrar access is unavailable, prepare the exact DNS record for Daniele
+  and continue testing on the assigned demo deployment URL.
+- Configure demo-only Supabase Auth site/redirect URLs, invite-only access and
+  named presenter accounts. Keep credentials out of the repository.
+- Host/admin access requires authentication. Guest links/QR must work on a phone
+  without an unrelated deployment-protection sign-in wall.
+- Document and verify recovery/rollback without affecting production.
 
-- [ ] Verificare URL/ref demo nei browser, API, storage e link generati; provare
-  richieste manipolate e token di produzione contro la demo e viceversa.
-- [ ] Provare il percorso da telefono e desktop: QR → check-in → chat AI →
-  richiesta host → risposta host → polling ospite → conformità simulata → reset.
-- [ ] Verificare l'assenza di chiamate SOAP, feed OTA reali, email non autorizzate,
-  cron importati e scritture di produzione, osservando richieste e log.
-- [ ] Verificare AI con richiesta di ristorante a piedi: Maps, posizione corretta,
-  fonti per informazioni attuali e nessun tempo inventato.
-- [ ] Controllare RLS/grant, chiavi pubbliche, assenza di segreti nei file distribuiti,
-  limiti AI e accessibilità del percorso ospite da telefono.
-- [ ] Provare il reset due volte e l'esecuzione a cavallo di giorno/mese, con date
-  valide, scadenze della bacheca e stato ospite ripristinato.
-- [ ] Eseguire la scaletta italiana completa in circa 15 minuti; aggiornare nomi
-  dei pulsanti e link ai valori realmente rilasciati.
-- [ ] Consegnare al presentatore link, accesso sicuro, procedura pre-demo,
-  ripristino, soluzione alternativa e istruzioni per aggiornare la demo.
-- [ ] Registrare PR, commit distribuito, verifiche, costi osservati, proprietario
-  della manutenzione e rollback nel CHANGELOG. Non dichiarare pronto il Round
-  se dominio, accesso o simulazioni sono ancora incompleti.
+Mandatory tests:
+- Login, token mint, guest gateway and private upload/read using fictional probes.
+- Owner can access their rows; a second owner cannot read/change them. Guest tokens
+  are scoped; cross-environment tokens are rejected.
+- Inspect schema/grants/buckets and scheduled jobs; verify no production data,
+  credentials or schedules were imported and backend/frontend refs match.
+- HTTPS, Auth redirects and guest QR URL work on the deployed demo origin.
+- Clean rebuild of the baseline in an isolated disposable environment succeeds;
+  verify recovery without executing a destructive production probe.
 
-## File e configurazioni da consegnare
+Exit: functioning isolated demo foundation. Custom-domain completion remains a
+blocker to final release if DNS is unfinished, even if the temporary URL works.
 
-| Elemento | Scopo |
-|---|---|
-| `PLAN_round50_demo_onboarding.md` | Specifica e criteri di completamento |
-| `docs/DEMO_ONBOARDING_IT.md` | Scaletta per presentatore e nuovo host |
-| `AGENTS.md` + `CHANGELOG.md` | Stato, responsabilità e aggiornamento continuo |
-| Baseline schema e migrazioni versionate | Ricostruzione demo senza dati reali |
-| Seed/fixture e manifest demo | Ripristino di scenari e dati fittizi |
-| Configurazione pubblica per ambiente | URL/chiave pubblica/frontend, senza segreti |
-| Controlli server e simulazioni | Blocco integrazioni reali nella demo |
-| Gestione reset e pagina di avvio | Presentazioni ripetibili |
-| Verifiche di isolamento e percorso completo | Evidenze prima del rilascio |
+## Phase 3 - Fictional seed data and scenarios
 
-I nomi dei nuovi file di implementazione vengono fissati nelle rispettive fasi,
-dopo l'inventario della stack e dei limiti Vercel. Non aggiungere endpoint oltre
-il limite del piano senza verificarlo; riusare un dispatcher quando appropriato.
+- Version a repeatable seed/fixture manifest with stable IDs, reserved example
+  emails, non-operational phone numbers and invented guest/document details.
+- Create **Casa Demo WelcomeBnB** with authorized imagery, IT/EN content, example
+  Wi-Fi/access details, rules and explicitly illustrative tourist-tax settings.
+- Add a second fictional property for switching and ownership checks.
+- Add 5-6 verifiable real recommendations around a declared demo location, with
+  Maps links and sources. Do not invent current hours, reviews or route duration.
+- Populate ten booking scenarios with dates relative to the reset day in Rome.
+  Keep OTA/check-in dates, nights, booking codes and linked events consistent.
 
-## Operatività dopo il rilascio
+| Stable scenario | Relative date | Demonstration |
+|---|---|---|
+| DEMO-ARRIVO | Arrival tomorrow | Reservation and shareable guest link |
+| DEMO-NUOVO | Arrival today; no check-in | Complete interactive guest journey |
+| DEMO-SOGGIORNO | Arrived yesterday; leaves in 3 days | Active stay and guest details |
+| DEMO-AIUTO | Current stay | Host help request and reply |
+| DEMO-GRUPPO | Arrival today; 3 guests | Group lead and members |
+| DEMO-CONFORMITA | Arrival yesterday | Simulated filing and sample receipt |
+| DEMO-PARTENZA | Departure today | Departure actions |
+| DEMO-RECENTE | Departed 3 days ago | Recent activity |
+| DEMO-SCADUTO | Departed 8 days ago | Excluded from action board |
+| DEMO-NOSHOW | Departed 8 days ago; no check-in | No stale check-in prompt |
 
-Prima di ogni onboarding: reset, controllo rapido, nuovi link ospite e verifica
-dei servizi AI. Dopo l'incontro: chiudere la sessione e ripristinare i dati.
-Quando cambia una funzionalità presentata: aggiornare seed, scaletta, guide e
-CHANGELOG nella stessa consegna. Prima di promuovere una nuova revisione demo,
-provare migrazioni e percorso completo; conservare una versione stabile per gli incontri.
+- Seed IT/EN conversations, engagement events and an assistance request; label
+  prerecorded conversation examples. Prepare a **FACSIMILE - DEMO** document
+  image for simulated scanning, without a valid real identity.
 
-La demo non include attivazione della proprietà reale del nuovo host. Quella è un
-passaggio separato, con contenuti corretti, credenziali del titolare e configurazione
-operativa delle integrazioni. Le simulazioni non provano una trasmissione reale.
+Mandatory tests:
+- Seed twice: same scenario counts and IDs, no duplicate relations or bookings.
+- Validate FK/check constraints, nights, group lead/member relationships and dates.
+- Assert scenarios appear in intended views; expired stays/no-shows do not appear
+  on the action board. Test the existing seven-day cutoff at its exact boundary.
+- Verify fixture content contains no copied production PII or operational credentials.
+
+Exit: complete useful showcase data through normal app filters.
+
+## Phase 4 - Reset and presentation sessions
+
+- Implement presenter-only **Ripristina demo**, authorized on the server with a
+  positive demo-project check. Confirmation describes affected demo data.
+- Respect immutable Alloggiati audit logs. Use new demo datasets/sessions or a
+  documented isolated administrative restore; do not weaken production grants
+  or attempt a normal DELETE against the protected audit table.
+- Reset bookings, check-ins, chat/escalations, events, dismissals, cooldowns,
+  preferences, simulated receipts and session-created files. Preserve accounts.
+- Rebase dates in `Europe/Rome`, preserving durations and relations; return a
+  completion summary and refreshed guest links.
+- Prevent stale client storage from resurrecting old check-ins; invalidate old
+  session links/tokens as appropriate. Make reset atomic or recoverable.
+- Lock concurrent resets and show which presentation session is active. First
+  release is single-session; never reset another presenter's active session.
+- Provide an agent-operated prepare/reset/smoke-check command or authenticated
+  action so Daniele is not asked to run scripts or reseed the database.
+
+Mandatory tests:
+- Modify a full guest journey, reset, then repeat it and reset again; fixture
+  state is restored and presenter access remains valid.
+- Guest/non-presenter reset is denied; production/mismatched project reset is denied
+  in a safe harness, without a destructive request against real production.
+- Concurrent resets cannot corrupt state; injected mid-reset failure recovers.
+- Test local-storage reuse, old guest links, day/month/year boundaries and Rome DST.
+
+Exit: repeatable onboarding with verified recovery and session handling.
+
+## Phase 5 - Demo UX and simulations
+
+- Persistent Italian demo banner on guest and host pages; launch page with host,
+  guest, QR and reset actions. Match actual interface labels in the script.
+- Keep all generated links and QR codes on the demo origin after switching/reset.
+- Simulated facsimile scanning returns declared fixture data; do not request
+  personal documents during onboarding.
+- Simulate Alloggiati validation, a correctable rejection, submission and a
+  **FACSIMILE** receipt. Server guarantees zero SOAP calls even for live/manual modes.
+- Capture notifications in a presenter-visible demo inbox. First release sends
+  no external email, Telegram or push; no live invitation dispatch to real users.
+- OTA demonstration uses local fixtures; real feeds and outbound sync stay blocked.
+- Live AI/place search has dedicated usage limits. Provide clearly labelled
+  prerecorded examples for outages; Maps links and uncertainty remain explicit.
+- Update affected in-app guides and version strings under the existing guide contract.
+
+Mandatory tests:
+- Desktop/mobile guest-to-host escalation and host reply appear through the real
+  message flow and polling; the demo inbox captures the expected alert.
+- Validation/rejection/success/receipt simulations run with outbound transports
+  proving zero SOAP/OTA/email/push/Telegram calls.
+- Check link origin after property switching, notifications and reset.
+- Walking-distance restaurant query uses the declared location and Maps; current
+  facts have sources, and unverified route times are not asserted.
+- Test AI failure/budget fallback and confirm examples are visibly prerecorded.
+
+Exit: every live and simulated action in the script works and is clearly labelled.
+
+## Phase 6 - End-to-end release and maintenance
+
+- Agent performs the entire Italian script on desktop and mobile-size browser,
+  then repeats the demo after reset. Record the actual deployed revision.
+- Verify database, API, storage and all generated links remain isolated; inspect
+  requests/logs for unwanted real integrations or production writes.
+- Run relevant existing regression checks for affected production code and review
+  RLS/grants, public configuration and secrets exposure.
+- Verify deploy rollback and data recovery in demo; ensure a stable revision is
+  available before future meetings.
+- Deliver working URLs, secure presenter access, automatic preparation/cleanup,
+  recovery instructions and the refreshed Italian script/PDF.
+- Record deployment, PRs, test evidence, observed operating cost, maintenance owner
+  and any unavoidable external action in CHANGELOG.md.
+
+Mandatory tests:
+- Full QR -> check-in -> AI -> escalation -> host reply -> simulated filing ->
+  receipt -> reset journey, twice, plus desktop/mobile navigation and readability.
+- Cross-environment token/config checks, no unauthorized outbound calls, no secrets
+  in public files; complete all unresolved gates from previous phases.
+- Italian PDF matches script, renders cleanly and uses actual released labels/URLs.
+- Rollback restores the previous demo revision and its compatible schema/data state.
+
+Exit: mark the Round operational only after every gate passes and custom domain,
+access, simulations and reset are complete. Report limitations honestly.
+
+## Deliverables and ongoing ownership
+
+Plan, CHANGELOG.md and AGENTS.md are English; `docs/DEMO_ONBOARDING_IT.md` and its
+PDF are Italian. Other deliverables include schema/migrations, fixture manifest,
+environment configuration, guarded APIs, reset/prepare operation, launch page,
+simulated inbox/receipts and reproducible test evidence.
+
+Before meetings, the agent prepares fixtures, dates, fresh links and smoke checks
+when invoked or through an explicitly configured maintenance automation. After
+meetings, cleanup follows the session lock rules. Never promise an unattended
+reset schedule unless it has actually been configured and verified.
+
+When a demonstrated feature changes, update its fixtures, guide, script/PDF and
+CHANGELOG in the same delivery. Promote only verified demo revisions. Activating
+a new host's real property is a separate workflow with their correct content,
+credentials and required consent; demo receipts never prove real filing.

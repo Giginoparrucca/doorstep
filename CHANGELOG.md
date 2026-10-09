@@ -124,6 +124,10 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## Round 50 — active implementation notes
 
+- PR #120 build repair: commit `d3bd923` explicitly sets static `outputDirectory` to `.` after the host screenshot exposed a missing `public` directory error. Environment tests pass again. Vercel reports success for `d3bd923` and `0057437`.
+- The remaining served-page/API verification gate is blocked by access: preview redirects to Vercel Authentication; protected deployment fetch returns 403 for project/team. The current connection must authorize `giginoparruccas-projects` / `welcomebnb`. No merge or Phase 2 provisioning has occurred.
+
+
 - Phase 1 is published in PR #120 at commit `71ff32b`. Local tests pass; it is not merged or shipped.
 - The preview deployment `C53xVJRtwpuA8DNtFZZwjXsVCiYT` reports failure. The cause cannot yet be read: Vercel MCP returns 403 for the existing team, the CLI has no credentials, and the browser redirects to sign-in. Owner sign-in/access is the next necessary action; no production deployment or demo provisioning has occurred.
 - Phase 2 remains pending until Phase 1 deployment verification passes. Resume by inspecting build logs, fixing the observed failure, rerunning the gate and merging PR #120.

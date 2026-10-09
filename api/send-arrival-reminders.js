@@ -1,3 +1,4 @@
+import { rejectInvalidEnvironment, SUPABASE_URL, APP_BASE_URL, HOST_CONSOLE_URL, rejectDemoIntegration } from './_environment.js';
 // api/send-arrival-reminders.js — Round 32 arrival reminder, Round 36
 // filing reminder, Round 46 storage purge.
 //
@@ -54,20 +55,16 @@
 //                                  PASS A to build the guest link)
 //   HOST_CONSOLE_URL default "https://app.welcomebnb.it/host-console.html"
 
-const SUPABASE_URL =
-  process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const RESEND_KEY  = process.env.RESEND_API_KEY;
 const CRON_SECRET = process.env.CRON_SECRET;
 
 const REMINDER_FROM =
   process.env.REMINDER_FROM || 'WelcomeBnB <notifiche@welcomebnb.it>';
-const APP_BASE_URL =
-  process.env.APP_BASE_URL || 'https://app.welcomebnb.it';
-const HOST_CONSOLE_URL =
-  process.env.HOST_CONSOLE_URL || 'https://app.welcomebnb.it/host-console.html';
 
 export default async function handler(req, res) {
+  if (rejectInvalidEnvironment(res)) return;
+  if (rejectDemoIntegration(res, 'scheduled_notifications')) return;
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST' && req.method !== 'GET') {

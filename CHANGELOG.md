@@ -19,7 +19,7 @@ Phases 0/0a cover documentation only; the demo environment has not been provisio
 |---|---|---|
 | 0 — Specification, script and maintenance rules | shipped — PR #118 — GPT | Original planning delivery |
 | 0a — English plan, autonomy and Italian PDF | shipped — PR #119 — GPT | English docs, mandatory phase gates, Italian script/PDF; content/link/render checks |
-| 1 — Environment configuration and demo guards | pending | Config/guard tests, failed-config denial, production regressions |
+| 1 — Environment configuration and demo guards | in-progress — GPT | PR #120; local config/guard and production regression tests pass; deployment gate blocked by Vercel access |
 | 2 — Provisioning and reproducible schema | pending | Deployed auth/API/storage tests, RLS and environment isolation |
 | 3 — Fictional fixtures and scenarios | pending | Seed repeatability, relationships, dashboard/date boundaries |
 | 4 — Reset and session management | pending | Two resets, authorization, concurrency and recovery |
@@ -121,6 +121,25 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 - **Whenever a guest writes objecting**: admin → GDPR Objections card → record booking code
 
 ---
+
+## Round 50 — active implementation notes
+
+- PR #120 build repair: commit `d3bd923` explicitly sets static `outputDirectory` to `.` after the host screenshot exposed a missing `public` directory error. Environment tests pass again. Vercel reports success for `d3bd923` and `0057437`.
+- The remaining served-page/API verification gate is blocked by access: preview redirects to Vercel Authentication; protected deployment fetch returns 403 for project/team. The current connection must authorize `giginoparruccas-projects` / `welcomebnb`. No merge or Phase 2 provisioning has occurred.
+
+
+- Phase 1 is published in PR #120 at commit `71ff32b`. Local tests pass; it is not merged or shipped.
+- The preview deployment `C53xVJRtwpuA8DNtFZZwjXsVCiYT` reports failure. The cause cannot yet be read: Vercel MCP returns 403 for the existing team, the CLI has no credentials, and the browser redirects to sign-in. Owner sign-in/access is the next necessary action; no production deployment or demo provisioning has occurred.
+- Phase 2 remains pending until Phase 1 deployment verification passes. Resume by inspecting build logs, fixing the observed failure, rerunning the gate and merging PR #120.
+
+
+### Phase 1 — environment isolation and server guards (GPT, in progress)
+
+- Centralized public/build/server configuration; removed per-page/API production fallbacks from demo paths. Generated browser configuration contains an explicit public-field allowlist.
+- Added failed-config rejection to every handler and demo guards for Alloggiati (including SOAP transport), OTA, invitations, Telegram, push, scheduled dispatch and notification helpers. Facsimile scanning remains blocked until Phase 5 simulation.
+- Browser bootstrap validates deployment origin, separates demo auth/cache, and uses the configured origin for guest links/QR. Inventory, variables and rollback are in `docs/ROUND50_ENVIRONMENT.md`.
+- **Local gates passed:** environment config/actual-handler fetch-spy tests (zero demo outbound calls), cross-fixture guest-token rejection, existing guest-checkin regression, all eight filing due-time cases, API/inline-JS syntax and whitespace checks.
+- **Remaining gate:** publish PR and verify its Vercel preview build, generated config and HTTP behavior before merge. No demo infrastructure or data has been created; Phase 2 remains pending.
 
 ## 📋 Done / Shipped
 

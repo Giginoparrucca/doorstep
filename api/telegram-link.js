@@ -1,3 +1,4 @@
+import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, rejectDemoIntegration } from './_environment.js';
 // api/telegram-link.js — Round 42.
 // Creates a short-lived link token and returns the t.me URL the host
 // clicks to bind their Telegram chat. Rate-limited to 5 tokens per host
@@ -6,11 +7,7 @@
 import { applyCors } from './_cors.js';
 import crypto from 'crypto';
 
-const SUPABASE_URL =
-  process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
-const SUPABASE_ANON_KEY =
-  process.env.SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjandhcXFhYmd3cWhoemhmYnRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4OTM0MjMsImV4cCI6MjA4OTQ2OTQyM30.BCskfjawOLqayI7xXV8ebIBEcXf12WygH52w204NzWk';
+
 const SERVICE_KEY        = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const TELEGRAM_USERNAME  = process.env.TELEGRAM_BOT_USERNAME || '';
 
@@ -19,6 +16,8 @@ const RATE_MAX = 5;
 const RATE_WINDOW_MS = 60 * 60 * 1000;
 
 export default async function handler(req, res) {
+  if (rejectInvalidEnvironment(res)) return;
+  if (rejectDemoIntegration(res, 'telegram')) return;
   const allowed = applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(allowed ? 200 : 403).end();
   if (!allowed) return res.status(403).json({ error: 'Origin not allowed' });

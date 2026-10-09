@@ -1,3 +1,4 @@
+import { rejectInvalidEnvironment, SUPABASE_URL } from './_environment.js';
 // api/guest-token.js — guest session token mint endpoint.
 //
 // Round 33: introduced; POST /api/guest-token with { property_id,
@@ -27,8 +28,6 @@
 import { signGuestToken } from './_guest-token.js';
 import { applyCors } from './_cors.js';
 
-const SUPABASE_URL =
-  process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Round 34.2 — mint limit per rolling hour per session_id. Deliberately
@@ -38,6 +37,7 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const MINT_HOURLY_LIMIT_PER_SESSION = 20;
 
 export default async function handler(req, res) {
+  if (rejectInvalidEnvironment(res)) return;
   const allowed = applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(allowed ? 200 : 403).end();
   if (!allowed) return res.status(403).json({ error: 'Origin not allowed' });

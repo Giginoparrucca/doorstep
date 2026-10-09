@@ -16,7 +16,7 @@ La fase 0 riguarda solo la documentazione; l'ambiente demo non è ancora realizz
 
 | Phase | Status | Where |
 |---|---|---|
-| 0 — Specifica, scaletta e regole di aggiornamento | in-progress — GPT | Piano Round 50, script italiano, `AGENTS.md` |
+| 0 — Specifica, scaletta e regole di aggiornamento | shipped — PR #118 — GPT | Piano Round 50, script italiano, `AGENTS.md` |
 | 1 — Configurazione separata e protezioni demo | pending | Configurazione frontend/API, blocchi server delle integrazioni |
 | 2 — Provisioning demo e schema riproducibile | pending | Progetto Vercel demo, progetto Supabase demo, dominio e account |
 | 3 — Dati fittizi e scenari di onboarding | pending | Seed versionato, proprietà demo, prenotazioni e conversazioni |
@@ -121,6 +121,16 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 ---
 
 ## 📋 Done / Shipped
+
+### Round 50 Phase 0 — Piano demo e scaletta onboarding _(2026-10-09)_
+
+- Specifica italiana in `PLAN_round50_demo_onboarding.md`: sei fasi operative con attività, dipendenze e criteri di accettazione per configurazione separata, provisioning, dati fittizi, reset, simulazioni e collaudo.
+- Scaletta italiana in `docs/DEMO_ONBOARDING_IT.md`: preparazione, presentazione di circa 15 minuti, frasi suggerite, domande al nuovo host, alternative in caso di problemi e controlli dopo l'incontro.
+- `AGENTS.md` rende permanente per Claude e GPT il protocollo CHANGELOG: lettura integrale, commit di presa in carico prima della fase, aggiornamenti durante il lavoro e a fine sessione, stato shipped solo dopo merge e copertura completa.
+- **Pubblicazione:** PR #118, GPT. Consegnata soltanto la fase documentale 0; nessun progetto, dominio o dato demo creato. Fasi 1–6 ancora pending.
+- **Verifiche:** documenti UTF-8, link relativi risolti, tabella con tutte le fasi, diff senza errori di whitespace; modifica solo documentale.
+- **Prossimo passo:** prendere in carico la fase 1, inventariare configurazioni e integrazioni, poi realizzare i controlli di isolamento prima del provisioning demo.
+
 
 ### Round 49 Phase 5 — Alerts + dry-run digest _(2026-10-09)_
 

@@ -172,6 +172,56 @@ export async function sendTestNotification(hostId) {
   }
 }
 
+// Round 49 Phase 5 — autofile alerts.
+//
+// Four kinds, all dedup'd elsewhere (property.alloggiati_autofile_alerts
+// jsonb or checkin.autofile_last_alert_at). The job of this helper is
+// JUST to deliver the message across whichever channels the host has
+// configured — same channel precedence as chat notifications
+// (email_mode='always' → always email; 'fallback' → email only if
+// push/telegram both failed; 'off' → no email). The autofile tick
+// passes forceEmail=true so the alert reaches the host even when
+// email_mode is set to 'fallback' and push/telegram happen to deliver.
+//
+// No PII in these messages. The caller composes `text` and `url`.
+export async function notifyHostAutofileAlert({ propertyId, hostId, lang, propertyName, kind, text, url }) {
+  if (!propertyId || !hostId || !kind || !text) {
+    return { ok: false, error: 'missing_required' };
+  }
+  try {
+    // Load the property's reminder_email as the email fallback; the
+    // host settings override takes precedence inside _resolveHostEmail.
+    let reminderEmail = null;
+    try {
+      const prop = await pgrestGET(
+        `properties?id=eq.${encodeURIComponent(propertyId)}&select=reminder_email,host_language&limit=1`
+      );
+      const p = Array.isArray(prop) ? prop[0] : null;
+      reminderEmail = p?.reminder_email || null;
+      lang = (lang || p?.host_language || 'en').toLowerCase() === 'it' ? 'it' : 'en';
+    } catch (_) { /* reminderEmail stays null; _resolveHostEmail falls through to auth email */ }
+
+    const settings = await _loadSettings(hostId);
+    const emailAddr = await _resolveHostEmail(hostId, settings, reminderEmail);
+    const defaultUrl = `${APP_BASE_URL}/host-console.html?notify_prop=${encodeURIComponent(propertyId)}`;
+    const tag = `wbnb-autofile-${kind}-${propertyId}`;
+    const trigger = 'autofile_' + kind;
+
+    const results = await _fireChannels({
+      settings, hostId, propertyId,
+      convKey: 'autofile:' + kind,
+      trigger, text, url: url || defaultUrl, tag, emailAddr,
+      // Autofile alerts always want to reach the host — the host might
+      // only have email configured, or might be filtering push by tag.
+      forceEmail: settings.email_mode !== 'off',
+    });
+    return { ok: true, results };
+  } catch (e) {
+    console.warn('[notify-autofile] failure:', e && e.message || e);
+    return { ok: false, error: String(e && e.message || e) };
+  }
+}
+
 // ═════════════════════════════════════════════════════════════════════
 // Channel dispatch
 // ═════════════════════════════════════════════════════════════════════

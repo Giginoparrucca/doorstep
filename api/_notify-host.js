@@ -1,3 +1,4 @@
+import { SUPABASE_URL, APP_BASE_URL, environmentReady, IS_DEMO } from './_environment.js';
 // api/_notify-host.js — Round 42 shared host-notification pipeline.
 //
 // Called from api/guest-chat.js on every successful chat_messages insert.
@@ -28,11 +29,8 @@
 
 import webpush from 'web-push';
 
-const SUPABASE_URL =
-  process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const APP_BASE_URL       = process.env.APP_BASE_URL || 'https://app.welcomebnb.it';
 const VAPID_PUBLIC       = process.env.VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE      = process.env.VAPID_PRIVATE_KEY;
 const VAPID_SUBJECT      = process.env.VAPID_SUBJECT || 'mailto:welcomebnbadmin@gmail.com';
@@ -59,6 +57,7 @@ function _ensureVapid() {
 
 // ── Public: called from api/guest-chat.js after a successful insert ──
 export async function notifyHostForChatInsert({ propertyId, bookingCode, sender, message, isTest }) {
+  if (!environmentReady() || IS_DEMO) return { skipped: 'demo_or_invalid_environment' };
   try {
     if (isTest === true) return { skipped: 'test' };
     if (!propertyId || !sender) return { skipped: 'missing args' };
@@ -140,6 +139,7 @@ export async function notifyHostForChatInsert({ propertyId, bookingCode, sender,
 
 // ── Public: called by api/notify-test.js. Bypasses throttle. ─────────
 export async function sendTestNotification(hostId) {
+  if (!environmentReady() || IS_DEMO) return { skipped: 'demo_or_invalid_environment' };
   try {
     // Any property the host owns → use its language + name for the payload.
     // If they own none, the test still fires but says "WelcomeBnB".
@@ -185,6 +185,7 @@ export async function sendTestNotification(hostId) {
 //
 // No PII in these messages. The caller composes `text` and `url`.
 export async function notifyHostAutofileAlert({ propertyId, hostId, lang, propertyName, kind, text, url }) {
+  if (!environmentReady() || IS_DEMO) return { skipped: 'demo_or_invalid_environment' };
   if (!propertyId || !hostId || !kind || !text) {
     return { ok: false, error: 'missing_required' };
   }
@@ -226,6 +227,7 @@ export async function notifyHostAutofileAlert({ propertyId, hostId, lang, proper
 // Channel dispatch
 // ═════════════════════════════════════════════════════════════════════
 async function _fireChannels({ settings, hostId, propertyId, convKey, trigger, text, url, tag, emailAddr, forceEmail }) {
+  if (!environmentReady() || IS_DEMO) return [];
   const results = [];
 
   const pushEnabled = settings.push_enabled === true;

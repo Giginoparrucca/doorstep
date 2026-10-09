@@ -122,6 +122,16 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ---
 
+## Round 50 — active implementation notes
+
+### Phase 1 — environment isolation and server guards (GPT, in progress)
+
+- Centralized public/build/server configuration; removed per-page/API production fallbacks from demo paths. Generated browser configuration contains an explicit public-field allowlist.
+- Added failed-config rejection to every handler and demo guards for Alloggiati (including SOAP transport), OTA, invitations, Telegram, push, scheduled dispatch and notification helpers. Facsimile scanning remains blocked until Phase 5 simulation.
+- Browser bootstrap validates deployment origin, separates demo auth/cache, and uses the configured origin for guest links/QR. Inventory, variables and rollback are in `docs/ROUND50_ENVIRONMENT.md`.
+- **Local gates passed:** environment config/actual-handler fetch-spy tests (zero demo outbound calls), cross-fixture guest-token rejection, existing guest-checkin regression, all eight filing due-time cases, API/inline-JS syntax and whitespace checks.
+- **Remaining gate:** publish PR and verify its Vercel preview build, generated config and HTTP behavior before merge. No demo infrastructure or data has been created; Phase 2 remains pending.
+
 ## 📋 Done / Shipped
 
 ### Round 50 Phase 0a — English plan, phase gates and Italian PDF _(2026-10-09)_

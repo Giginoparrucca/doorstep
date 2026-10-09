@@ -352,12 +352,15 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
   <div id="content"><div class="loading">Loading analytics…</div></div>
 </div>
 
+<script src="/app-config.js"></script>
+<script src="/app-bootstrap.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
-const SUPABASE_URL = 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjandhcXFhYmd3cWhoemhmYnRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4OTM0MjMsImV4cCI6MjA4OTQ2OTQyM30.BCskfjawOLqayI7xXV8ebIBEcXf12WygH52w204NzWk';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const APP_CONFIG = window.getWelcomeBnbConfig();
+const SUPABASE_URL = APP_CONFIG.supabaseUrl;
+const SUPABASE_KEY = APP_CONFIG.publicKey;
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, APP_CONFIG.mode === 'demo' ? { auth: { storageKey: `wbnb-demo-auth-${APP_CONFIG.projectRef}` } } : {});
 
 let allEvents = [];
 let allProperties = [];

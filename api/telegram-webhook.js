@@ -1,3 +1,4 @@
+import { rejectInvalidEnvironment, SUPABASE_URL, APP_BASE_URL, rejectDemoIntegration } from './_environment.js';
 // api/telegram-webhook.js — Round 42.
 //
 // Receives Telegram updates. Authenticated by the X-Telegram-Bot-Api-Secret-Token
@@ -13,14 +14,14 @@
 
 import crypto from 'crypto';
 
-const SUPABASE_URL =
-  process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
 const SERVICE_KEY       = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const TELEGRAM_TOKEN    = process.env.TELEGRAM_BOT_TOKEN;
 const WEBHOOK_SECRET    = process.env.TELEGRAM_WEBHOOK_SECRET || '';
-const APP_BASE_URL      = process.env.APP_BASE_URL || 'https://app.welcomebnb.it';
+
 
 export default async function handler(req, res) {
+  if (rejectInvalidEnvironment(res)) return;
+  if (rejectDemoIntegration(res, 'telegram')) return;
   if (req.method !== 'POST') return res.status(405).end();
   const got = req.headers['x-telegram-bot-api-secret-token'] || '';
   if (!WEBHOOK_SECRET || !_constantTimeEq(String(got), WEBHOOK_SECRET)) {

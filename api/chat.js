@@ -1,3 +1,4 @@
+import { rejectInvalidEnvironment, SUPABASE_URL } from './_environment.js';
 // api/chat.js — WelcomeBnB chat endpoint
 //
 // Round 16: Sonnet 4.5 + streaming + vision + contextual followups.
@@ -19,8 +20,6 @@
 import { verifyFromAuthHeader } from './_guest-token.js';
 import { applyCors } from './_cors.js';
 
-const SUPABASE_URL =
-  process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // Round 33 hard limits — hit before Anthropic is called.
@@ -30,6 +29,7 @@ const CHAT_SESSION_HOURLY_LIMIT   = 30;
 const CHAT_PROPERTY_DAILY_LIMIT   = 300;
 
 export default async function handler(req, res) {
+  if (rejectInvalidEnvironment(res)) return;
   // Origin / CORS — Round 34.2 moved the allowlist into api/_cors.js
   // (was byte-identical here + 3 other endpoints, and the .vercel.app
   // regex it contained allowed every deployment on Vercel).

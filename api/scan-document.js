@@ -1,3 +1,4 @@
+import { rejectInvalidEnvironment, SUPABASE_URL, rejectDemoIntegration } from './_environment.js';
 // api/scan-document.js — WelcomeBnB ID / passport scan endpoint.
 //
 // Round 18.1: accepts an image OR a PDF; Claude reads PDFs natively.
@@ -10,8 +11,6 @@
 import { verifyFromAuthHeader } from './_guest-token.js';
 import { applyCors } from './_cors.js';
 
-const SUPABASE_URL =
-  process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const MAX_BASE64_LEN            = 14_000_000;   // ~10 MB decoded
@@ -19,6 +18,8 @@ const SCAN_SESSION_HOURLY_LIMIT = 15;  // Supports nine guests plus scan retries
 const SCAN_PROPERTY_DAILY_LIMIT = 60;
 
 export default async function handler(req, res) {
+  if (rejectInvalidEnvironment(res)) return;
+  if (rejectDemoIntegration(res, 'document_scan')) return;
   // Origin / CORS — Round 34.2: shared api/_cors.js.
   const allowed = applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(allowed ? 200 : 403).end();

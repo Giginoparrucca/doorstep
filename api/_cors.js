@@ -1,3 +1,4 @@
+import { ALLOWED_ORIGINS, environmentReady } from './_environment.js';
 // api/_cors.js — Round 34.2, extended in Round 46 for the domain move.
 //
 // Single source of truth for the WelcomeBnB origin allowlist. Replaces
@@ -23,40 +24,12 @@
 // explicitly here (no regex); add/remove hostnames by editing this
 // list only.
 
-const PROD_ORIGINS = [
-  'https://app.welcomebnb.it',
-  'https://welcomebnb.vercel.app',
-];
-
-// Vercel env vars ship without the scheme. Normalise + validate.
-function _normalizeVercelHost(v) {
-  if (!v) return null;
-  const s = String(v).trim();
-  if (!s) return null;
-  if (s.startsWith('http://') || s.startsWith('https://')) return s;
-  return 'https://' + s;
-}
-
-// Built once per lambda cold start. Set contains exact origin strings
-// only — no wildcards, no regex.
-let _cachedAllowlist = null;
-function _list() {
-  if (_cachedAllowlist) return _cachedAllowlist;
-  const out = new Set(PROD_ORIGINS);
-  const cands = [
-    _normalizeVercelHost(process.env.VERCEL_PROJECT_PRODUCTION_URL),
-    _normalizeVercelHost(process.env.VERCEL_BRANCH_URL),
-    _normalizeVercelHost(process.env.VERCEL_URL),
-  ];
-  for (const c of cands) if (c) out.add(c);
-  _cachedAllowlist = out;
-  return _cachedAllowlist;
-}
+function _list() { return new Set(ALLOWED_ORIGINS); }
 
 // Returns the allowed origin string when the incoming Origin header
 // matches, or null when it doesn't. Callers decide the 403 policy.
 export function resolveOrigin(origin) {
-  if (!origin) return null;
+  if (!environmentReady() || !origin) return null;
   if (_list().has(origin)) return origin;
   // Local dev — a browser under attacker control cannot fake a
   // localhost Origin (browsers refuse to set a cross-origin request's

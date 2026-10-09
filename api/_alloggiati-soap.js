@@ -1,3 +1,4 @@
+import { assertLiveIntegration } from './_environment.js';
 // api/_alloggiati-soap.js — Round 44 Phase 1
 //
 // Thin SOAP client for the two auth operations on Alloggiati Web:
@@ -55,6 +56,7 @@ function pickTag(xml, tag) {
 }
 
 async function postSoap({ soapAction, body, timeoutMs }) {
+  assertLiveIntegration('alloggiati');
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs || DEFAULT_TIMEOUT_MS);
   let res;

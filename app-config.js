@@ -1,0 +1,2 @@
+// Generated public configuration. No server credentials.
+window.WELCOME_BNB_CONFIG = Object.freeze({"mode":"production","projectRef":"jcjwaqqabgwqhhzhfbts","supabaseUrl":"https://jcjwaqqabgwqhhzhfbts.supabase.co","publicKey":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjandhcXFhYmd3cWhoemhmYnRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4OTM0MjMsImV4cCI6MjA4OTQ2OTQyM30.BCskfjawOLqayI7xXV8ebIBEcXf12WygH52w204NzWk","appOrigin":"https://app.welcomebnb.it","allowedOrigins":["https://app.welcomebnb.it","https://welcomebnb.vercel.app"]});

@@ -1,3 +1,4 @@
+import { rejectInvalidEnvironment, SUPABASE_URL } from './_environment.js';
 // api/guest.js — Round 34 chat gateway + Round 48 guest gateway.
 //
 // Round 48 Phase 2 renamed api/guest-chat.js → api/guest.js and
@@ -95,8 +96,6 @@ import { createRequire } from 'node:module';
 // byte-identity enforced by scripts/golden-check.mjs.
 const AllogRecords = createRequire(import.meta.url)('../lib/alloggiati-records.js');
 
-const SUPABASE_URL =
-  process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const MAX_MESSAGE_LEN = 4000;
@@ -105,6 +104,7 @@ const HISTORY_LIMIT = 50;
 const POLL_LIMIT    = 5;
 
 export default async function handler(req, res) {
+  if (rejectInvalidEnvironment(res)) return;
   // Origin / CORS — Round 34.2: shared api/_cors.js.
   const allowed = applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(allowed ? 200 : 403).end();

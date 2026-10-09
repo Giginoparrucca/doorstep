@@ -30,5 +30,26 @@
     "api/chat.js": {
       "maxDuration": 60
     }
-  }
+  },
+  "buildCommand": "node scripts/build-config.mjs",
+  "headers": [
+    {
+      "source": "/app-config.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/app-bootstrap.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
+    }
+  ]
 }

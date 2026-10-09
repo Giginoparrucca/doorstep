@@ -1,3 +1,4 @@
+import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, rejectDemoIntegration } from './_environment.js';
 // api/alloggiati.js — Round 44 Phase 0.5
 //
 // Consolidated Alloggiati Web endpoint. Action-routed to stay under
@@ -53,11 +54,7 @@ import { notifyHostAutofileAlert } from './_notify-host.js';
 // scripts/golden-cross-check.mjs. The function budget is unchanged.
 const AllogRecords = createRequire(import.meta.url)('../lib/alloggiati-records.js');
 
-const SUPABASE_URL =
-  process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
-const SUPABASE_ANON_KEY =
-  process.env.SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjandhcXFhYmd3cWhoemhmYnRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4OTM0MjMsImV4cCI6MjA4OTQ2OTQyM30.BCskfjawOLqayI7xXV8ebIBEcXf12WygH52w204NzWk';
+
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // ── auth + property ownership check ─────────────────────────────────
@@ -940,6 +937,8 @@ async function logFiling({ propertyId, trigger, checkinIds, outcome, errorCode =
 
 // ── main handler ────────────────────────────────────────────────────
 export default async function handler(req, res) {
+  if (rejectInvalidEnvironment(res)) return;
+  if (rejectDemoIntegration(res, 'alloggiati')) return;
   const action = String((req.query && req.query.action) || '').trim();
 
   // Round 49 Phase 3 — autofile_tick is a server-to-server call from

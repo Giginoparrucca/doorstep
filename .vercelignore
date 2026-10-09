@@ -21,3 +21,8 @@ docs/
 # easier for someone to guess at internals.
 migration_*.sql
 seed_*.sql
+
+# Round 50 internal planning and verification files.
+PLAN_*.md
+AGENTS.md
+scripts/*test*.mjs

@@ -15,6 +15,9 @@ assert.doesNotMatch(sql, /cron\.schedule|net\.http|vault\.decrypted_secrets/i);
 assert.doesNotMatch(sql, /GRANT (TRUNCATE|TRIGGER|REFERENCES) ON TABLE/);
 assert.doesNotMatch(sql, /CREATE OR REPLACE FUNCTION public\.purge_old_data_cron/);
 assert.doesNotMatch(sql, /CREATE OR REPLACE FUNCTION public\.capture_chat_qa_pairs/);
+assert.doesNotMatch(sql, /GRANT EXECUTE ON FUNCTION public\.get_reservation_keybox\([^;]+TO authenticated;/);
+assert.equal((sql.match(/CREATE POLICY demo_deny_direct_access/g) || []).length, 2);
+assert.equal((sql.match(/ALTER FUNCTION [^;]+SET search_path = public, extensions;/g) || []).length, 7);
 for (const name of ['documents', 'receipts']) {
   assert.match(sql, new RegExp(`VALUES \\('${name}', '${name}', false,`));
 }

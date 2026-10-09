@@ -24,6 +24,9 @@
       "includeFiles": "lib/**",
       "maxDuration": 60
     },
+    "api/guest.js": {
+      "includeFiles": "lib/**"
+    },
     "api/chat.js": {
       "maxDuration": 60
     }

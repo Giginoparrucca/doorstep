@@ -87,6 +87,13 @@
 import { verifyFromAuthHeader } from './_guest-token.js';
 import { applyCors } from './_cors.js';
 import { notifyHostForChatInsert } from './_notify-host.js';
+import { createRequire } from 'node:module';
+
+// Round 49 Phase 4 — pulls autofileDueAt + the record builder lib so
+// checkin_list can return editable_until for guests of a property in
+// autofile 'live' mode. Shared with api/alloggiati.js + host-console;
+// byte-identity enforced by scripts/golden-check.mjs.
+const AllogRecords = createRequire(import.meta.url)('../lib/alloggiati-records.js');
 
 const SUPABASE_URL =
   process.env.SUPABASE_URL || 'https://jcjwaqqabgwqhhzhfbts.supabase.co';
@@ -446,15 +453,47 @@ async function doCheckinList(res, propertyId, bookingCode, isTest) {
   const r = await pgrestGET(path);
   if (!r.ok) return res.status(500).json({ error: 'checkin_list query failed' });
   const rows = await r.json();
+
+  // Round 49 Phase 4 — when the property is in autofile 'live' mode,
+  // compute editable_until per row so the guest app can show
+  // "You can edit your details until <day, time>" in welcome-back.
+  // In 'off' or 'dry_run' mode we return null — guests can edit
+  // until the host (or the dry-run tick that stays silent on the DB)
+  // flips the row to filed. One property-level fetch keeps this to
+  // two queries total.
+  let propertyRow = null;
+  try {
+    const propRes = await pgrestGET(
+      `properties?id=eq.${encodeURIComponent(propertyId)}` +
+      `&deleted_at=is.null&select=alloggiati_autofile_mode,checkin_time&limit=1`
+    );
+    if (propRes.ok) {
+      const [p] = await propRes.json();
+      propertyRow = p || null;
+    }
+  } catch (_e) { /* non-fatal — editable_until just stays null */ }
+  const autofileLive = propertyRow && propertyRow.alloggiati_autofile_mode === 'live';
+  const now = new Date();
+
   // Server-computed editable flag so the client can't lie about state.
-  const guests = rows.map(row => ({
-    ...row,
-    // Round 49 Phase 2 — 'filing' = the autofile tick has claimed the
-    // row for an in-flight SOAP Send. The DB trigger raises on edits
-    // in that state too; mirror it here so the client doesn't offer
-    // an Edit button that would 409.
-    editable: !['filed', 'filing', 'correction'].includes(row.alloggiati_status),
-  }));
+  const guests = rows.map(row => {
+    let editable_until = null;
+    if (autofileLive && !['filed', 'filing', 'correction'].includes(row.alloggiati_status)) {
+      try {
+        const d = AllogRecords.autofileDueAt(row, propertyRow, now);
+        editable_until = d ? d.toISOString() : null;
+      } catch (_e) { editable_until = null; }
+    }
+    return {
+      ...row,
+      // Round 49 Phase 2 — 'filing' = the autofile tick has claimed the
+      // row for an in-flight SOAP Send. The DB trigger raises on edits
+      // in that state too; mirror it here so the client doesn't offer
+      // an Edit button that would 409.
+      editable: !['filed', 'filing', 'correction'].includes(row.alloggiati_status),
+      editable_until,
+    };
+  });
   // Also expose the reopen flag from ota_reservations if the booking has one.
   let reopened_at = null;
   if (bookingCode) {
@@ -468,7 +507,11 @@ async function doCheckinList(res, propertyId, bookingCode, isTest) {
       reopened_at = r0?.checkin_reopened_at || null;
     }
   }
-  return res.status(200).json({ guests, reopened_at });
+  return res.status(200).json({
+    guests,
+    reopened_at,
+    autofile_mode: propertyRow?.alloggiati_autofile_mode || 'off',
+  });
 }
 
 // ── action: checkin_insert ────────────────────────────────────────────

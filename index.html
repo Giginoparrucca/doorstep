@@ -1968,6 +1968,8 @@ const T = {
     wb_title: 'Welcome back,',
     wb_sub: 'Your check-in is complete. Here\'s your booking summary.',
     wb_hint: 'Need to update your details? Edit the row below (until it\'s been filed with the police).',
+    // Round 49 Phase 4 — shown when the property has autofile 'live' on; {when} is the local date-time.
+    wb_hint_until: 'You can edit your details until {when} (Italy time).',
     wb_main_guest: 'Main guest',
     wb_companion: 'Companion',
     // Round 48 Phase 2 — guest-side edit after submission.
@@ -2118,6 +2120,8 @@ const T = {
     wb_title: 'Bentornato/a,',
     wb_sub: 'Il tuo check-in è completo. Ecco il riepilogo della prenotazione.',
     wb_hint: 'Devi aggiornare i tuoi dati? Modifica la riga qui sotto (finché non è stata inviata alla Questura).',
+    // Round 49 Fase 4 — mostrato quando la struttura ha l\'invio automatico 'live'; {when} è data/ora locale.
+    wb_hint_until: 'Puoi modificare i tuoi dati fino a {when} (ora italiana).',
     wb_main_guest: 'Ospite principale',
     wb_companion: 'Accompagnatore',
     // Round 48 Fase 2 — modifiche dell\'ospite dopo l\'invio.
@@ -2322,7 +2326,24 @@ function showWelcomeBackState(checkins) {
   const wbHint = document.getElementById('welcomeBackHint');
   wbTitle.textContent = `${T[lang].wb_title} ${guestName}!`;
   wbSub.textContent = T[lang].wb_sub;
-  wbHint.textContent = T[lang].wb_hint;
+  // Round 49 Phase 4 — when the gateway tells us the property is in
+  // autofile 'live' mode, surface the per-row editable_until for the
+  // main guest in the hint line ("You can edit your details until
+  // <day, time>"). The earliest editable_until across the main
+  // guest's row is the correct bound; the tick fires it then, and
+  // after that the row flips to 'filing' and the Edit button
+  // vanishes. If every row is already filed or editable_until is
+  // missing, fall back to the generic hint.
+  const mainG = checkins.find(g => ['single','head','group'].includes(g.guest_type)) || checkins[0];
+  const editableUntil = mainG && mainG.editable_until ? new Date(mainG.editable_until) : null;
+  if (editableUntil && !isNaN(editableUntil)) {
+    const dt = editableUntil.toLocaleString(lang === 'it' ? 'it-IT' : 'en-GB', {
+      timeZone: 'Europe/Rome', weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit',
+    });
+    wbHint.textContent = (T[lang].wb_hint_until || T[lang].wb_hint).replace('{when}', dt);
+  } else {
+    wbHint.textContent = T[lang].wb_hint;
+  }
 
   // 4. Render guest summary cards
   // Round 48 Phase 2 — the gateway's checkin_list returns an `editable`

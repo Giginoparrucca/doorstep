@@ -17,6 +17,7 @@ La fase 0 riguarda solo la documentazione; l'ambiente demo non è ancora realizz
 | Phase | Status | Where |
 |---|---|---|
 | 0 — Specifica, scaletta e regole di aggiornamento | shipped — PR #118 — GPT | Piano Round 50, script italiano, `AGENTS.md` |
+| 0a — English plan, phase test gates and Italian PDF | in-progress — GPT | Documentation revision; implementation remains pending |
 | 1 — Configurazione separata e protezioni demo | pending | Configurazione frontend/API, blocchi server delle integrazioni |
 | 2 — Provisioning demo e schema riproducibile | pending | Progetto Vercel demo, progetto Supabase demo, dominio e account |
 | 3 — Dati fittizi e scenari di onboarding | pending | Seed versionato, proprietà demo, prenotazioni e conversazioni |

@@ -17,7 +17,7 @@ Newest entries at the top of each section.
 | 2 — Data model + widened lock + gateway filter | shipped — PR #114 — Claude | `migration_round49_autofile.sql`, trigger `checkins_prevent_filed_edit`, `claim_autofile_rows`, `log_alloggiati_filing`, `alloggiati_filing_log` |
 | 3 — Autofile tick + manual-send audit mirror | shipped — PR #115 — Claude | `api/alloggiati.js` → `action=autofile_tick`, `migration_round49_autofile_tick_cron.sql` (operationally gated — needs `vault.create_secret` + `cron.schedule` by hand) |
 | 4 — Host-console UI + guest `editable_until` | shipped — PR #116 — Claude | host-console.html autofile mode radio + consent + per-row chip + "Non inviare" toggle; `api/guest.js` `checkin_list` returns `editable_until` + `autofile_mode`; index.html welcome-back shows "You can edit until \<day, time\>" |
-| 5 — Alerts + dry-run digest + Trullo pilot | pending | 18:00 heads-up, 09:00 overdue, 3-failures, daily dry-run digest via `_notify-host.js`; blocking item: DPA/privacy notice update |
+| 5 — Alerts + dry-run digest | shipped — PR #117 — Claude | `migration_round49_phase5_alerts.sql` (alerts jsonb + per-row cooldown + `bump_autofile_attempts` RPC); `_notify-host.js` → `notifyHostAutofileAlert`; four alert kinds wired into the tick: 09:00 overdue, 18:00 heads-up, dry-run digest, 3-failures (transport) + rejection (data). Still pending outside Round 49: DPA/privacy notice update before the Trullo pilot. |
 
 ---
 
@@ -103,6 +103,26 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 ---
 
 ## 📋 Done / Shipped
+
+### Round 49 Phase 5 — Alerts + dry-run digest _(2026-10-09)_
+
+Four host-facing alerts the auto-filer tick fires on its own, dedup'd so a 10-minute cron never spams. **Round 49 is now feature-complete from the code side.** The only remaining blocker before the Trullo pilot is the DPA/privacy-notice update (filing on the host's behalf + credentials custody); the rollout steps in the spec kick in once that lands.
+
+**`migration_round49_phase5_alerts.sql`** (applied):
+- `properties.alloggiati_autofile_alerts jsonb not null default '{}'::jsonb` — dedup state for the three property-level alerts (`digest`, `heads_up`, `overdue`). Value is `{ kind: 'yyyy-mm-dd' (Rome date) }`.
+- `checkins.autofile_last_alert_at timestamptz` — per-row cooldown (24 h) for the `failures` + `rejection` row-level alerts.
+- `bump_autofile_attempts(p_ids uuid[]) returns table (id uuid, attempts int)` SECURITY DEFINER — atomic `autofile_attempts = coalesce(autofile_attempts, 0) + 1` so Phase 3's stub attempts counter actually increments. Returns the new value per id so the tick can detect "just crossed 3" in one roundtrip. EXECUTE service_role only.
+
+**`api/_notify-host.js`** — new export `notifyHostAutofileAlert({ propertyId, hostId, kind, lang, propertyName, text, url })` — reuses the existing `_fireChannels` dispatch (push + Telegram + email based on host settings) with a non-chat `convKey` so throttling buckets don't collide with chat notifications. `forceEmail: settings.email_mode !== 'off'` so autofile alerts always reach the host.
+
+**`api/alloggiati.js`** — four alert kinds wired into the tick:
+- **09:00 overdue** (first run after 09:00 Rome, once per property per day): count `checkins` with `arrival_date <= today`, not filed/filing, not excluded. Fires one email with the count.
+- **18:00 heads-up** (first run after 18:00 Rome, once per property per day): count `ota_reservations` with `arrival_date = today` that have no matching check-in row yet. PII-free per the Round 36 PASS B rule — count only, no booking codes in the body.
+- **Dry-run digest** (dry_run mode only, once per property per day): summarises today's `alloggiati_filing_log` entries into "N guests would have filed, X rejected".
+- **3-failures** (per-row, 24 h cooldown): fires when `autofile_attempts` crosses 3 via the new SECURITY DEFINER RPC.
+- **Data rejection** (per-row, 24 h cooldown): fires immediately on `test_rejected` or `send_rejected` outcomes — same cooldown so a stuck row doesn't spam every 10 min.
+
+All alert bodies are PII-free: counts, codes and property names only.
 
 ### Round 49 Phase 4 — Host-console autofile UI + guest editable_until _(2026-10-09)_
 

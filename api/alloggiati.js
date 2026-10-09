@@ -41,6 +41,7 @@ import {
   send as soapSend,
   ricevuta as soapRicevuta,
 } from './_alloggiati-soap.js';
+import { notifyHostAutofileAlert } from './_notify-host.js';
 
 // Round 49 Phase 1 — the Alloggiati reference tables, line builder,
 // autofileDueAt timing function and every lookup helper live in a
@@ -203,7 +204,7 @@ async function runAutofileTick(res) {
     props = await sbGet(
       'properties?alloggiati_autofile_mode=in.(dry_run,live)' +
       '&deleted_at=is.null' +
-      '&select=id,name,owner_id,alloggiati_autofile_mode,checkin_time,timezone'
+      '&select=id,name,owner_id,alloggiati_autofile_mode,checkin_time,timezone,host_language,alloggiati_autofile_alerts'
     );
   } catch (e) {
     console.error('[autofile_tick] property load failed:', e.message);
@@ -246,6 +247,12 @@ async function runAutofileTick(res) {
       console.error('[autofile_tick]', prop.id, 'crashed:', e.message);
       summary.tick_errors++;
     }
+    // Round 49 Phase 5 — property-level time-of-day alerts fire
+    // independently of whether this tick had rows to process. The
+    // helper dedup's internally via properties.alloggiati_autofile_
+    // alerts jsonb (keyed by alert kind + Rome date).
+    try { await maybeFireDailyAlerts(prop, null); }
+    catch (e) { console.warn('[autofile_tick]', prop.id, 'alerts failed:', e.message); }
   }
 
   return res.status(200).json({ ok: true, ...summary, elapsed_ms: Date.now() - started });
@@ -434,7 +441,8 @@ async function processPropertyAutofile(prop) {
   try {
     token = (await generateToken(creds)).token;
   } catch (e) {
-    await _bumpAttempts(okCheckinIds, 'generate_token_failed', e.message);
+    const bumped = await _bumpAttempts(okCheckinIds, 'generate_token_failed', e.message);
+    await maybeFireFailuresAlert(prop, bumped);
     await logFiling({
       propertyId: prop.id, trigger: isDry ? 'autofile_dry_run' : 'autofile',
       checkinIds: okCheckinIds, outcome: 'cred_error',
@@ -465,7 +473,8 @@ async function processPropertyAutofile(prop) {
       summary.rows_dry_run += okLines.length;
       return summary;
     } catch (e) {
-      await _bumpAttempts(okCheckinIds, 'test_failed', e.message);
+      const bumped = await _bumpAttempts(okCheckinIds, 'test_failed', e.message);
+      await maybeFireFailuresAlert(prop, bumped);
       await logFiling({
         propertyId: prop.id, trigger: 'autofile_dry_run',
         checkinIds: okCheckinIds, outcome: 'test_error',
@@ -524,6 +533,7 @@ async function processPropertyAutofile(prop) {
     const anyRejected = (testOutcome.perRow || []).some(r => !r.ok);
     if (anyRejected) {
       await _releaseClaimAndStamp(batchCheckinIds, 'test_rejected');
+      await maybeFireRejectionAlert(prop, batchCheckinIds);
       await logFiling({
         propertyId: prop.id, trigger: 'autofile',
         checkinIds: batchCheckinIds, outcome: 'test_rejected',
@@ -535,6 +545,8 @@ async function processPropertyAutofile(prop) {
     }
   } catch (e) {
     await _releaseClaimAndStamp(batchCheckinIds, 'test_transport_error');
+    const bumped = await _bumpAttempts(batchCheckinIds, 'test_transport_error', e.message);
+    await maybeFireFailuresAlert(prop, bumped);
     await logFiling({
       propertyId: prop.id, trigger: 'autofile',
       checkinIds: batchCheckinIds, outcome: 'test_transport_error',
@@ -549,6 +561,8 @@ async function processPropertyAutofile(prop) {
     sendOutcome = await soapSend({ utente: creds.utente, token, rows: batchLines });
   } catch (e) {
     await _releaseClaimAndStamp(batchCheckinIds, 'send_transport_error');
+    const bumped = await _bumpAttempts(batchCheckinIds, 'send_transport_error', e.message);
+    await maybeFireFailuresAlert(prop, bumped);
     await logFiling({
       propertyId: prop.id, trigger: 'autofile',
       checkinIds: batchCheckinIds, outcome: 'send_transport_error',
@@ -559,6 +573,7 @@ async function processPropertyAutofile(prop) {
   }
   if (!sendOutcome.overall.ok || (sendOutcome.perRow || []).some(r => !r.ok)) {
     await _releaseClaimAndStamp(batchCheckinIds, 'send_rejected');
+    await maybeFireRejectionAlert(prop, batchCheckinIds);
     await logFiling({
       propertyId: prop.id, trigger: 'autofile',
       checkinIds: batchCheckinIds, outcome: 'send_rejected',
@@ -632,14 +647,30 @@ async function processPropertyAutofile(prop) {
 }
 
 async function _bumpAttempts(ids, lastError, detail) {
-  if (!ids || ids.length === 0) return;
+  if (!ids || ids.length === 0) return [];
   const idsList = ids.map(x => `"${x}"`).join(',');
   try {
-    // PostgREST doesn't support `autofile_attempts = autofile_attempts + 1`
-    // in a PATCH body — read-then-write would race. Use a Postgres RPC
-    // next round; for now a plain stamp is enough (the attempt count is
-    // mostly for the "alert after 3 failures" alerting that Phase 5
-    // wires up).
+    // Round 49 Phase 5 — bump_autofile_attempts(uuid[]) is a SECURITY
+    // DEFINER function that atomically increments autofile_attempts
+    // and returns the new value per id, so the tick can see which
+    // rows just crossed the 3-failure threshold without a read+write
+    // race. The last_error + last_attempt_at stamp is a separate
+    // PATCH; order doesn't matter because the trigger allows both.
+    const bumpRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/bump_autofile_attempts`, {
+      method: 'POST',
+      headers: {
+        apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ p_ids: ids }),
+    });
+    let bumped = [];
+    if (bumpRes.ok) {
+      const body = await bumpRes.json();
+      bumped = Array.isArray(body) ? body.map(r => ({ id: r.id, attempts: r.attempts })) : [];
+    } else {
+      console.warn('[autofile_tick] bump RPC', bumpRes.status, await bumpRes.text().catch(() => ''));
+    }
     await sbPatch(
       `checkins?id=in.(${encodeURIComponent(idsList)})`,
       {
@@ -647,8 +678,10 @@ async function _bumpAttempts(ids, lastError, detail) {
         autofile_last_error: (lastError || 'error') + (detail ? ': ' + String(detail).slice(0, 120) : ''),
       },
     );
+    return bumped;
   } catch (e) {
     console.warn('[autofile_tick] _bumpAttempts failed:', e.message);
+    return [];
   }
 }
 
@@ -668,6 +701,214 @@ async function _releaseClaimAndStamp(ids, lastError) {
   } catch (e) {
     console.warn('[autofile_tick] _releaseClaimAndStamp failed:', e.message);
   }
+}
+
+// ── Round 49 Phase 5 — alerts ────────────────────────────────────────
+//
+// Three property-level alerts dedup'd via properties.alloggiati_
+// autofile_alerts jsonb (key = kind, value = Rome yyyy-mm-dd):
+//   • 09:00 overdue — anything due and unfiled, first run after 09:00
+//     Rome, once/day.
+//   • 18:00 heads-up — ota_reservations arriving today with no check-
+//     in row, first run after 18:00 Rome, once/day. Count only, no
+//     booking codes (Round 36 PASS B rule).
+//   • Dry-run digest — "tonight we would have filed N guests, X
+//     rejected", for properties in dry_run mode, once/day (first run
+//     after 09:00 Rome).
+// And one row-level alert with its own 24h cooldown on
+// checkins.autofile_last_alert_at:
+//   • 3 consecutive failures — fired when autofile_attempts crosses 3.
+//
+// All messages are PII-free: counts, booking codes (never names) and
+// error codes only.
+
+function _romeYmd(d) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(d);
+    const g = (t) => parts.find(p => p.type === t)?.value;
+    return `${g('year')}-${g('month')}-${g('day')}`;
+  } catch (_e) { return d.toISOString().slice(0, 10); }
+}
+function _romeHour(d) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/Rome', hour: '2-digit', hour12: false,
+    }).formatToParts(d);
+    const h = parts.find(p => p.type === 'hour')?.value || '0';
+    return Number(h === '24' ? '0' : h);
+  } catch (_e) { return d.getUTCHours(); }
+}
+
+async function maybeFireDailyAlerts(prop, perTickCounts) {
+  const now = new Date();
+  const todayRome = _romeYmd(now);
+  const hourRome = _romeHour(now);
+  const alertsState = (prop.alloggiati_autofile_alerts && typeof prop.alloggiati_autofile_alerts === 'object')
+    ? prop.alloggiati_autofile_alerts : {};
+  const toStamp = {}; // what we'll write back if we fire anything
+
+  // 09:00 overdue sweep — anything with arrival <= today Rome,
+  // status not filed, not excluded, not deleted. Count only; the
+  // host sees per-row chips in the console.
+  if (hourRome >= 9 && alertsState.overdue !== todayRome) {
+    try {
+      const r = await pgrestGET(
+        `checkins?property_id=eq.${encodeURIComponent(prop.id)}` +
+        '&is_test=eq.false&deleted_at=is.null&autofile_excluded=eq.false' +
+        '&alloggiati_status=not.in.(filed,filing)' +
+        `&arrival_date=lte.${todayRome}` +
+        '&select=id&limit=200'
+      );
+      const rows = r.ok ? await r.json() : [];
+      if (rows.length > 0) {
+        await _sendAutofileAlert(prop, 'overdue', {
+          en: `⚠ ${rows.length} Alloggiati row${rows.length === 1 ? '' : 's'} overdue for ${prop.name || 'your property'}. Open the host console → Check-in Data → Alloggiati panel to review.`,
+          it: `⚠ ${rows.length} riga/e Alloggiati scaduta/e per ${prop.name || 'la tua struttura'}. Apri il pannello Alloggiati nella console host per rivedere.`,
+        });
+      }
+      toStamp.overdue = todayRome;
+    } catch (e) { console.warn('[autofile_tick] overdue sweep failed:', e.message); }
+  }
+
+  // 18:00 heads-up — today's arrivals in ota_reservations without a
+  // matching check-in row. Count only (no booking codes, Round 36
+  // PASS B rule — the email body is "N bookings arriving today
+  // haven't checked in", nothing identifying).
+  if (hourRome >= 18 && alertsState.heads_up !== todayRome) {
+    try {
+      const resv = await pgrestGET(
+        `ota_reservations?property_id=eq.${encodeURIComponent(prop.id)}` +
+        `&arrival_date=eq.${todayRome}` +
+        '&select=booking_code&limit=200'
+      );
+      const resvRows = resv.ok ? await resv.json() : [];
+      if (resvRows.length > 0) {
+        const codes = resvRows.map(r => r.booking_code).filter(Boolean);
+        let noCheckin = 0;
+        if (codes.length > 0) {
+          const inList = codes.map(x => `"${x}"`).join(',');
+          const chk = await pgrestGET(
+            `checkins?property_id=eq.${encodeURIComponent(prop.id)}` +
+            `&booking_code=in.(${encodeURIComponent(inList)})` +
+            '&deleted_at=is.null&select=booking_code'
+          );
+          const seen = new Set(chk.ok ? (await chk.json()).map(r => r.booking_code) : []);
+          noCheckin = codes.filter(c => !seen.has(c)).length;
+        }
+        if (noCheckin > 0) {
+          await _sendAutofileAlert(prop, 'heads_up', {
+            en: `ℹ ${noCheckin} booking${noCheckin === 1 ? '' : 's'} arriving today at ${prop.name || 'your property'} ha${noCheckin === 1 ? 'sn\'t' : 've not'} checked in. ${noCheckin === 1 ? 'It' : 'They'} can't be filed tonight.`,
+            it: `ℹ ${noCheckin} prenotazion${noCheckin === 1 ? 'e' : 'i'} in arrivo oggi a ${prop.name || 'la tua struttura'} non ${noCheckin === 1 ? 'ha' : 'hanno'} fatto il check-in. Non ${noCheckin === 1 ? 'è' : 'sono'} inviabil${noCheckin === 1 ? 'e' : 'i'} stanotte.`,
+          });
+        }
+      }
+      toStamp.heads_up = todayRome;
+    } catch (e) { console.warn('[autofile_tick] heads_up sweep failed:', e.message); }
+  }
+
+  // Dry-run digest — once per day for properties in dry_run mode.
+  // Pulls today's alloggiati_filing_log entries for this property to
+  // summarise. Fires on the first tick after 09:00 Rome.
+  if (prop.alloggiati_autofile_mode === 'dry_run' && hourRome >= 9 && alertsState.digest !== todayRome) {
+    try {
+      const todayStart = `${todayRome}T00:00:00Z`;
+      const r = await pgrestGET(
+        `alloggiati_filing_log?property_id=eq.${encodeURIComponent(prop.id)}` +
+        `&trigger=eq.autofile_dry_run&run_at=gte.${encodeURIComponent(todayStart)}` +
+        '&select=outcome,checkin_ids&limit=200'
+      );
+      const rows = r.ok ? await r.json() : [];
+      // Only fire the digest after a dry-run day has actually produced
+      // log entries (otherwise the first morning after enabling would
+      // mail an empty digest).
+      if (rows.length > 0) {
+        let okCount = 0, rejected = 0;
+        for (const row of rows) {
+          const n = Array.isArray(row.checkin_ids) ? row.checkin_ids.length : 0;
+          if (row.outcome === 'test_all_ok') okCount += n;
+          else if (row.outcome && row.outcome.startsWith('test_rejected')) rejected += n;
+        }
+        await _sendAutofileAlert(prop, 'digest', {
+          en: `📋 Dry-run digest for ${prop.name || 'your property'}: ${okCount} guest${okCount === 1 ? '' : 's'} would have been filed, ${rejected} rejected by Alloggiati Test. Switch to Live when you're ready.`,
+          it: `📋 Riepilogo Prova per ${prop.name || 'la tua struttura'}: ${okCount} ospit${okCount === 1 ? 'e' : 'i'} sarebb${okCount === 1 ? 'e' : 'ero'} stato/i inviato/i, ${rejected} rifiutato/i dalla validazione Alloggiati. Passa ad Attivo quando sei pronto.`,
+        });
+      }
+      toStamp.digest = todayRome;
+    } catch (e) { console.warn('[autofile_tick] digest failed:', e.message); }
+  }
+
+  if (Object.keys(toStamp).length > 0) {
+    try {
+      const next = { ...alertsState, ...toStamp };
+      await sbPatch(
+        `properties?id=eq.${encodeURIComponent(prop.id)}`,
+        { alloggiati_autofile_alerts: next },
+      );
+      Object.assign(prop.alloggiati_autofile_alerts || (prop.alloggiati_autofile_alerts = {}), toStamp);
+    } catch (e) { console.warn('[autofile_tick] alerts stamp failed:', e.message); }
+  }
+}
+
+async function maybeFireFailuresAlert(prop, bumped) {
+  // bumped: [{ id, attempts }] from _bumpAttempts. Fires once per row
+  // when attempts crosses 3, cooldown 24h via autofile_last_alert_at.
+  if (!Array.isArray(bumped) || bumped.length === 0) return;
+  const crossed = bumped.filter(x => x && x.attempts === 3);
+  if (crossed.length === 0) return;
+  await _fireRowAlert(prop, crossed.map(x => x.id), 'failures');
+}
+
+async function maybeFireRejectionAlert(prop, ids) {
+  // Data rejection — spec says alert the host immediately. We still
+  // dedup per-row on a 24h cooldown so a stuck row doesn't spam every
+  // 10 minutes; the host either fixes it (next tick finds no row to
+  // re-alert) or waits out the day.
+  if (!Array.isArray(ids) || ids.length === 0) return;
+  await _fireRowAlert(prop, ids, 'rejection');
+}
+
+async function _fireRowAlert(prop, ids, kind) {
+  try {
+    const inList = ids.map(x => `"${x}"`).join(',');
+    const r = await pgrestGET(
+      `checkins?id=in.(${encodeURIComponent(inList)})&select=id,autofile_last_alert_at`
+    );
+    const rows = r.ok ? await r.json() : [];
+    const now = Date.now();
+    const toAlert = rows.filter(row => {
+      if (!row.autofile_last_alert_at) return true;
+      return (now - new Date(row.autofile_last_alert_at).getTime()) >= 86400 * 1000;
+    });
+    if (toAlert.length === 0) return;
+    const texts = kind === 'rejection' ? {
+      en: `⚠ ${toAlert.length} Alloggiati row${toAlert.length === 1 ? '' : 's'} at ${prop.name || 'your property'} rejected by the portal (data issue). Open the host console → Check-in Data to see which fields to fix.`,
+      it: `⚠ ${toAlert.length} riga/e Alloggiati per ${prop.name || 'la tua struttura'} rifiutata/e dal portale (dati da correggere). Apri Check-in Data nella console host per vedere i campi da sistemare.`,
+    } : {
+      en: `⚠ ${toAlert.length} Alloggiati row${toAlert.length === 1 ? '' : 's'} at ${prop.name || 'your property'} failed 3 consecutive autofile attempts. Check the host console for the error.`,
+      it: `⚠ ${toAlert.length} riga/e Alloggiati per ${prop.name || 'la tua struttura'} ha/hanno fallito 3 tentativi consecutivi di invio automatico. Controlla la console host per il dettaglio dell'errore.`,
+    };
+    await _sendAutofileAlert(prop, kind, texts);
+    const stampIds = toAlert.map(x => `"${x.id}"`).join(',');
+    await sbPatch(
+      `checkins?id=in.(${encodeURIComponent(stampIds)})`,
+      { autofile_last_alert_at: new Date().toISOString() },
+    );
+  } catch (e) { console.warn('[autofile_tick] row alert', kind, 'failed:', e.message); }
+}
+
+async function _sendAutofileAlert(prop, kind, texts) {
+  if (!prop || !prop.owner_id) return;
+  const lang = (prop.host_language || 'en').toLowerCase() === 'it' ? 'it' : 'en';
+  const text = (texts && (texts[lang] || texts.en)) || '';
+  if (!text) return;
+  try {
+    await notifyHostAutofileAlert({
+      propertyId: prop.id, hostId: prop.owner_id, lang,
+      propertyName: prop.name, kind, text,
+    });
+  } catch (e) { console.warn('[autofile_tick] notify', kind, 'failed:', e.message); }
 }
 
 async function logFiling({ propertyId, trigger, checkinIds, outcome, errorCode = null, errorDetail = null, receiptPath = null, actor = null }) {

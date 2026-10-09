@@ -3,29 +3,30 @@
 Living document tracking what's been built, what's pending, and what to revisit.
 Newest entries at the top of each section.
 
-> **Contratto di manutenzione (Claude e GPT):** leggere questo CHANGELOG dall'inizio alla fine prima di iniziare qualsiasi Round. Aggiornarlo durante il lavoro e alla fine di ogni sessione, insieme alla modifica pertinente: stato delle fasi, PR, verifiche, blocchi e prossimi passi. Daniele non deve chiedere un aggiornamento separato. Le istruzioni permanenti sono in `AGENTS.md`.
+> **Maintenance contract (Claude and GPT):** read this CHANGELOG top-to-bottom before starting any Round. Update it during work and at every session end, together with the relevant delivery: phase status, PRs, tests, blockers and next steps. Daniele does not need to request updates separately. Permanent instructions are in `AGENTS.md`.
 
-> **Passaggio multi-modello (Claude ↔ GPT):** prima di iniziare una fase, passare da `pending` a `in-progress — <modello>` e creare un commit. Dopo il merge, indicare `shipped — PR #N — <modello>` soltanto se la specifica della fase è completamente coperta. Prefisso dei commit: `Round R Phase N · `. Le consegne parziali devono essere esplicite (es. `Phase 5a`); documentazione pronta non significa ambiente operativo.
+> **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
 ### Current round — in-flight
 
-**Round 50 — Ambiente demo e onboarding host**
+**Round 50 — Demo environment and host onboarding**
 
-Specifica: `PLAN_round50_demo_onboarding.md`. Scaletta: `docs/DEMO_ONBOARDING_IT.md`.
-La fase 0 riguarda solo la documentazione; l'ambiente demo non è ancora realizzato.
+Specification: `PLAN_round50_demo_onboarding.md` (English).
+Presenter script: `docs/DEMO_ONBOARDING_IT.md` and its generated PDF (Italian).
+Phases 0/0a cover documentation only; the demo environment has not been provisioned.
 
-| Phase | Status | Where |
+| Phase | Status | Where / test gate |
 |---|---|---|
-| 0 — Specifica, scaletta e regole di aggiornamento | shipped — PR #118 — GPT | Piano Round 50, script italiano, `AGENTS.md` |
-| 0a — English plan, phase test gates and Italian PDF | in-progress — GPT | Documentation revision; implementation remains pending |
-| 1 — Configurazione separata e protezioni demo | pending | Configurazione frontend/API, blocchi server delle integrazioni |
-| 2 — Provisioning demo e schema riproducibile | pending | Progetto Vercel demo, progetto Supabase demo, dominio e account |
-| 3 — Dati fittizi e scenari di onboarding | pending | Seed versionato, proprietà demo, prenotazioni e conversazioni |
-| 4 — Ripristino e gestione delle sessioni | pending | Reset autenticato, date relative, isolamento tra presentazioni |
-| 5 — Esperienza demo e simulazioni | pending | Banner demo, link/QR, Alloggiati simulato, casella notifiche demo |
-| 6 — Verifica completa e consegna operativa | pending | Collaudo, prova della scaletta, gestione aggiornamenti e rollback |
+| 0 — Specification, script and maintenance rules | shipped — PR #118 — GPT | Original planning delivery |
+| 0a — English plan, autonomy and Italian PDF | in-progress — GPT | English docs, mandatory phase gates, Italian script/PDF; content/link/render checks |
+| 1 — Environment configuration and demo guards | pending | Config/guard tests, failed-config denial, production regressions |
+| 2 — Provisioning and reproducible schema | pending | Deployed auth/API/storage tests, RLS and environment isolation |
+| 3 — Fictional fixtures and scenarios | pending | Seed repeatability, relationships, dashboard/date boundaries |
+| 4 — Reset and session management | pending | Two resets, authorization, concurrency and recovery |
+| 5 — Demo UX and simulations | pending | Real chat flow, fake external calls, demo links and AI/place checks |
+| 6 — End-to-end verification and operational release | pending | Full script twice, mobile/desktop checks and rollback |
 
-### Round precedente — stato conservato
+### Previous round — preserved status
 
 **Round 49 — Automatic Alloggiati filing** (spec: Daniele's prompt pinned 2026-10-05)
 
@@ -57,7 +58,7 @@ La fase 0 riguarda solo la documentazione; l'ambiente demo non è ancora realizz
 Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ### High value, ready to build
-- **Round 50 — Ambiente demo e onboarding host** _(pianificato 2026-10-09)_: istanza separata con dati esclusivamente fittizi, integrazioni esterne simulate/bloccate, reset ripetibile e scaletta italiana. Specifica: `PLAN_round50_demo_onboarding.md`; onboarding: `docs/DEMO_ONBOARDING_IT.md`. Le fasi operative restano pending fino all'implementazione e alla verifica.
+- **Round 50 — Demo environment and host onboarding** _(planned 2026-10-09)_: isolated projects, fictional fixtures, guarded/simulated integrations, repeatable reset and an Italian onboarding script/PDF. The English plan assigns all technical work to GPT or Claude, with mandatory tests between phases; Daniele acts only when strictly necessary. Specification: `PLAN_round50_demo_onboarding.md`; script: `docs/DEMO_ONBOARDING_IT.md`. Implementation phases remain pending until completed and verified.
 - **Multi-language for host free-text content** _(scoped Round 23, building next)_
   **Decision made**: JSONB-per-field architecture (`{"en": "...", "it": "...", "de": "..."}` in one column per translatable field — welcome message, check-in/checkout instructions, transport info, reco descriptions), so adding a language never needs a schema migration. Guest app reads `field[guestLang] || field[hostDefaultLang]`. Plus an optional **"suggest translation"** button per field that pre-fills a language via the Anthropic API for the host to review/edit — **never auto-published**, especially for safety-critical check-in instructions. Migration: convert existing TEXT columns to JSONB, back-filling current content under the host's default language key. Guest + host render/save paths updated to read/write the active language key. **This is the agreed next round.**
 
@@ -123,15 +124,13 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ## 📋 Done / Shipped
 
-### Round 50 Phase 0 — Piano demo e scaletta onboarding _(2026-10-09)_
+### Round 50 Phase 0 — Demo plan and onboarding script _(2026-10-09)_
 
-- Specifica italiana in `PLAN_round50_demo_onboarding.md`: sei fasi operative con attività, dipendenze e criteri di accettazione per configurazione separata, provisioning, dati fittizi, reset, simulazioni e collaudo.
-- Scaletta italiana in `docs/DEMO_ONBOARDING_IT.md`: preparazione, presentazione di circa 15 minuti, frasi suggerite, domande al nuovo host, alternative in caso di problemi e controlli dopo l'incontro.
-- `AGENTS.md` rende permanente per Claude e GPT il protocollo CHANGELOG: lettura integrale, commit di presa in carico prima della fase, aggiornamenti durante il lavoro e a fine sessione, stato shipped solo dopo merge e copertura completa.
-- **Pubblicazione:** PR #118, GPT. Consegnata soltanto la fase documentale 0; nessun progetto, dominio o dato demo creato. Fasi 1–6 ancora pending.
-- **Verifiche:** documenti UTF-8, link relativi risolti, tabella con tutte le fasi, diff senza errori di whitespace; modifica solo documentale.
-- **Prossimo passo:** prendere in carico la fase 1, inventariare configurazioni e integrazioni, poi realizzare i controlli di isolamento prima del provisioning demo.
-
+- Delivered the original planning specification and Italian 15-minute presenter script with preparation, sample dialogue, fallback options and post-meeting checks.
+- Added permanent CHANGELOG and multi-model handoff instructions in `AGENTS.md`.
+- **Publication:** PR #118 — GPT. Documentation phase only; no demo project, domain or dataset created. Implementation phases 1–6 remain pending.
+- **Checks:** UTF-8 content, local links, complete phase table and whitespace validation.
+- **Follow-up:** Phase 0a revises technical documentation into English, adds agent ownership and mandatory per-phase tests, and generates the Italian script PDF. Operational work starts with Phase 1 after planning delivery.
 
 ### Round 49 Phase 5 — Alerts + dry-run digest _(2026-10-09)_
 

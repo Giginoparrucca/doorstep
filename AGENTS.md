@@ -1,42 +1,56 @@
-# WelcomeBnB — istruzioni permanenti per gli agenti
+# WelcomeBnB - permanent agent instructions
 
-Queste istruzioni si applicano a tutto il repository, a Claude, GPT e agli altri
-agenti che intervengono sul progetto.
+These instructions apply throughout the repository to GPT, Claude and any other
+agent working on the project.
 
-## CHANGELOG e passaggio tra modelli
+## CHANGELOG and multi-model handoff
 
-1. Prima di qualsiasi Round, leggere `CHANGELOG.md` dall'inizio alla fine e la
-   specifica del Round. La tabella `Current round — in-flight` è la fonte dello
-   stato; verificare il ramo remoto corrente prima di modificarla.
-2. Prima di lavorare su una fase, cambiarla da `pending` a
-   `in-progress — <modello>` e creare un commit. Non prendere una fase già
-   assegnata a un altro modello senza risolvere il passaggio di responsabilità.
-3. Usare commit con prefisso `Round R Phase N · `, dove R e N corrispondono al
-   Round e alla fase effettivi. Per Round 49 resta `Round 49 Phase N · `.
-4. Aggiornare il CHANGELOG durante il lavoro e alla fine di ogni sessione:
-   modifiche, verifiche eseguite, PR, blocchi, consegne parziali e prossimo passo.
-   Includere l'aggiornamento nella consegna pertinente. Non aspettare una richiesta
-   separata di Daniele e non lasciare questa attività come promessa futura.
-5. Dopo il merge, registrare `shipped — PR #N — <modello>` solo se tutti i criteri
-   della fase sono soddisfatti. Una parte si registra come `Phase Na` con ambito
-   esplicito; documentazione pronta, codice unito e ambiente operativo sono stati
-   distinti. Le fasi di implementazione non sono shipped solo perché esiste un piano.
-6. Conservare la cronologia dei Round precedenti e i PR dei rispettivi modelli.
-   Quando si apre un nuovo Round, spostare la tabella precedente in uno storico
-   visibile; non cancellarla. Non rinumerare fasi già pubblicate.
-7. Se manca accesso per pubblicare o un controllo fallisce, riportarlo nel
-   CHANGELOG e nel risultato finale; non inventare merge, deployment o verifiche.
+1. Before any Round, read CHANGELOG.md top-to-bottom and its specification. The
+   `Current round - in-flight` table is authoritative; inspect the current remote
+   branch before editing it. Preserve existing phase ownership.
+2. Before starting a phase, change `pending` to `in-progress - <model>` and commit.
+   Resolve a handoff before taking a phase already owned by another model.
+3. Prefix commits with `Round R Phase N · ` using the actual Round and phase.
+   Round 49 subjects remain `Round 49 Phase N · `.
+4. Update CHANGELOG during work and at every session end: concrete changes, tests,
+   PRs, blockers, partial delivery and next step. Include it in the relevant
+   delivery; do not wait for a separate request from Daniele.
+5. Each implementation phase has a mandatory test gate. Implement, test, fix
+   failures, record evidence, merge and verify the deployment where applicable
+   before moving to the next phase. Do not claim a passing test from deployment
+   status alone. Follow the phase-specific tests in the Round specification.
+6. After merge, mark `shipped - PR #N - <model>` only when every phase acceptance
+   criterion is covered. Label partial scope explicitly, e.g. `Phase 5a`.
+   Documentation, merged code and an operational environment are distinct states.
+7. Preserve previous Round tables, PRs and model attribution. Move a completed
+   table into visible history when opening a new Round; never erase or renumber
+   published phases.
+8. If publication/access fails or tests fail, record the real blocker. Never
+   invent a merge, deployment, test result or background execution.
+
+## Agent-owned execution
+
+GPT or Claude performs all authorized technical work and routine verification,
+including configuration, provisioning, secrets, migrations, fixtures, PRs,
+deployments, tests, fixes, documentation and cleanup. Continue automatically
+between phases after their gates pass; do not ask Daniele to run tools or approve
+routine decisions when the agent has sufficient authorization and access.
+
+Involve Daniele only for a strictly necessary owner-only action, unavailable
+access, actual billing approval or personal/legal consent/signature. First
+complete independent work and prepare the smallest concrete remaining action;
+explain the observed blocker and record it in CHANGELOG. Do not invent approval
+or schedule background work without an active agent/verified automation.
 
 ## Round 50
 
-Specifica: `PLAN_round50_demo_onboarding.md`.
-Scaletta per onboarding: `docs/DEMO_ONBOARDING_IT.md`.
+Specification: `PLAN_round50_demo_onboarding.md` (English).
+Presenter script: `docs/DEMO_ONBOARDING_IT.md` and its generated PDF (Italian).
+Phases 0/0a are documentation; phases 1-6 implement and verify the demo.
 
-La fase 0 è documentale. Le fasi 1–6 realizzano e verificano la demo. Quando
-cambiano comportamenti mostrati durante l'onboarding, aggiornare anche seed,
-scaletta e guide interessate nella stessa consegna.
-
-La demo usa un database separato e dati fittizi. I blocchi di integrazioni esterne
-sono server-side; il reset deve rifiutare l'ambiente di produzione. Non copiare
-dati, documenti, Vault o credenziali reali nella demo. Non indebolire i controlli
-di produzione per consentire simulazioni o ripristino.
+Update fixtures, script/PDF and affected guides when the demonstrated behavior
+changes. Use an isolated demo database with fictional data. Enforce external
+integration restrictions and reset authorization server-side. Never copy real
+PII, documents, Vault or credentials into demo, and never weaken production
+controls to enable simulations/reset. Every phase must pass its documented tests
+before the next starts.

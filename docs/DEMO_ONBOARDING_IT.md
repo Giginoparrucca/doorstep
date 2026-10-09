@@ -6,7 +6,20 @@ L'ambiente e i controlli descritti devono essere realizzati prima di usare quest
 scaletta. Aggiornare i nomi dei pulsanti dopo il collaudo; non presentare una
 funzione pianificata come già disponibile.
 
-## Prima dell'incontro — 5 minuti di preparazione
+## Preparazione tecnica automatica
+
+GPT o Claude prepara e verifica l'ambiente: reset del dataset, date aggiornate,
+link ospite e QR nuovi, controllo AI, simulazioni e casella notifiche. Ripete i
+controlli dopo ogni modifica e aggiorna questa scaletta e il PDF. La preparazione
+avviene in una sessione agente attiva o tramite un'automazione configurata e
+verificata; non è garantita in background dal solo documento.
+
+Il presentatore apre i link forniti e conduce l'incontro. Serve il suo intervento
+tecnico soltanto per un accesso personale/MFA, un permesso non disponibile oppure
+un'azione che l'agente non può eseguire. I controlli sotto sono eseguiti dall'agente;
+se un controllo fallisce, corregge il problema prima di consegnare la demo.
+
+## Prima dell'incontro — controlli dell'agente
 
 - Accedere con il proprio account presentatore alla demo; mai alla console reale.
 - Verificare che non sia in corso un'altra presentazione. Ripristinare la demo.
@@ -159,6 +172,9 @@ Non promettere funzioni che non risultano rilasciate nel CHANGELOG.
 | Un altro presentatore usa la demo | Non ripristinare il suo dataset; usare la sessione separata prevista oppure rimandare il reset. |
 
 ## Dopo l'incontro
+
+GPT o Claude gestisce il ripristino e gli aggiornamenti tecnici. Il presentatore
+comunica le domande emerse e i prossimi passi concordati con il nuovo host.
 
 - Chiudere la sessione demo e ripristinare il dataset quando nessun altro lo usa.
 - Annotare domande, contenuti richiesti e prossimo appuntamento nel sistema

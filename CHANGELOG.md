@@ -5,6 +5,20 @@ Newest entries at the top of each section.
 
 > **Maintenance contract:** Claude updates this file automatically at the end of every working session — Daniele does not need to ask. New "Done / Shipped" entry per round, items moved between Pending and Done as work progresses, gotchas appended whenever a recurring pattern surfaces. Daniele's only job is to push the updated file to the repo alongside the code.
 
+> **Multi-model hand-off (Claude ↔ GPT):** before you touch Round 49, read the "Current round — in-flight" block below. Mark your phase `in-progress — <model>` when you start, flip to `shipped — PR #N — <model>` when you merge. Every Round 49 commit subject must start with `Round 49 Phase N · ` so `git log --oneline | grep "Round 49"` lists the full timeline. If you only shipped part of a phase, say so (`Phase 4a (radio + consent)`); don't mark a phase shipped if its spec isn't fully covered.
+
+### Current round — in-flight
+
+**Round 49 — Automatic Alloggiati filing** (spec: Daniele's prompt pinned 2026-10-05)
+
+| Phase | Status | Where |
+|---|---|---|
+| 1 — Shared record builder + autofileDueAt | shipped — PR #113 — Claude | `lib/alloggiati-records.js`, `scripts/autofile-due.test.mjs`, `scripts/golden-check.mjs` |
+| 2 — Data model + widened lock + gateway filter | shipped — PR #114 — Claude | `migration_round49_autofile.sql`, trigger `checkins_prevent_filed_edit`, `claim_autofile_rows`, `log_alloggiati_filing`, `alloggiati_filing_log` |
+| 3 — Autofile tick + manual-send audit mirror | shipped — PR #115 — Claude | `api/alloggiati.js` → `action=autofile_tick`, `migration_round49_autofile_tick_cron.sql` (operationally gated — needs `vault.create_secret` + `cron.schedule` by hand) |
+| 4 — Host-console UI + guest `editable_until` | shipped — PR #116 — Claude | host-console.html autofile mode radio + consent + per-row chip + "Non inviare" toggle; `api/guest.js` `checkin_list` returns `editable_until` + `autofile_mode`; index.html welcome-back shows "You can edit until \<day, time\>" |
+| 5 — Alerts + dry-run digest + Trullo pilot | pending | 18:00 heads-up, 09:00 overdue, 3-failures, daily dry-run digest via `_notify-host.js`; blocking item: DPA/privacy notice update |
+
 ---
 
 ## Hotfix — additional guest check-in (2026-10-07)
@@ -89,6 +103,25 @@ Things we've discussed but haven't built. Roughly ordered by leverage.
 ---
 
 ## 📋 Done / Shipped
+
+### Round 49 Phase 4 — Host-console autofile UI + guest editable_until _(2026-10-09)_
+
+Everything the host and guest need in order to flip the Phase 3 autofile tick on. Nothing in this PR runs on its own — it just surfaces the state that Phases 2-3 already understand, and gives the host a one-click way to set `alloggiati_autofile_mode`.
+
+**Host-console (`host-console.html`)**
+- `renderAutofilePanel()` renders a radio **Off / Dry-run / Live** inline inside the Alloggiati card, visible only when credentials are verified. Switching **to** `live` reveals a consent panel with the exact spec text; the actual PATCH is held until the host ticks the consent checkbox, at which point the row stamps `alloggiati_autofile_consent_at` + `_consent_by=auth.uid()`. Switching back to `off` / `dry_run` is one click, no re-consent needed.
+- Plain-language timing rules sit under the radio so the host sees them before enabling: "Multi-night: 03:00 Rome the day after arrival. One-night: immediately on arrival day, or at check-in start if completed earlier. Past arrival+1 23:59 the portal rejects the date."
+- Per-row chip in the check-in table (`_renderAutofileRowChip`): hidden when the property is `off`; "⏸ Excluded" when `autofile_excluded`; "⚠ Not fileable: \<reason\>" when `autofile_last_error` is `past_portal_window` / `group_already_filed` / `builder_warning`; otherwise "⏱ Auto-send: \<Europe/Rome time\>" via the shared `autofileDueAt` from Phase 1. All text runs through the destructured `AllogRecords` so the chip and the auto-filer tick never disagree about when a row is due.
+- Per-row "Non inviare (no-show)" / "Include in autofile" toggle in the row ⋯ menu. One `UPDATE checkins SET autofile_excluded = NOT autofile_excluded` with the Round 20.2 `.select()` guard so an RLS block is loud. Manual Send keeps taking precedence — it files whatever lines it's given, independent of this flag.
+
+**Guest gateway (`api/guest.js`)**
+- `checkin_list` now returns `editable_until` per guest row and `autofile_mode` at the top level. Server computes `editable_until = autofileDueAt(row, property, now).toISOString()` when `alloggiati_autofile_mode === 'live'` AND status is not `filed`/`filing`/`correction`; `null` in every other case. Pulls the lib via `createRequire(import.meta.url)('../lib/alloggiati-records.js')` (same byte-identity guarantee as the auto-filer tick) and adds `includeFiles: lib/**` on `api/guest.js` in `vercel.json`.
+
+**Guest app (`index.html`)**
+- Welcome-back hint shows "You can edit your details until \<Europe/Rome day, time\> (Italy time)" when the main guest's row has `editable_until`. Falls back to the generic `wb_hint` when autofile is off or the time can't be computed. New i18n strings `wb_hint_until` (EN + IT), single-line, both use `{when}` placeholder.
+
+**Multi-model hand-off**
+- Added a "Current round — in-flight" status block to the top of CHANGELOG.md so Claude and GPT can both see the active phase, who owns it, and which PR shipped what, without having to grep the whole git log.
 
 ### Round 49 Phase 3 — Autofile tick + manual-send audit mirror _(2026-10-06)_
 

@@ -3927,6 +3927,9 @@ const HT = {
     doc_complete: '✓ Complete', doc_partial: '⏳ Partial', doc_missing: '✗ Missing',
     alloggiati_filed: '✓ Filed', alloggiati_pending: 'Pending',
     btn_view: 'View', btn_delete_single: 'Delete', btn_edit_single: 'Edit',
+    // Round 49 Phase 4 — per-row autofile toggle (shown in the row ⋯ menu).
+    btn_autofile_exclude: 'Do not autofile (no-show)',
+    btn_autofile_include: 'Include in autofile',
     btn_edit_list: 'Edit', btn_done_editing: 'Done', btn_cancel_edit: 'Cancel',
     prop_readonly_hint: 'View mode — click Edit to change these details.',
     // Round 30 — edit check-in modal (single-line values; applyLang collapses newlines)
@@ -4456,6 +4459,9 @@ const HT = {
     doc_complete: '✓ Completo', doc_partial: '⏳ Parziale', doc_missing: '✗ Mancante',
     alloggiati_filed: '✓ Inviato', alloggiati_pending: 'In attesa',
     btn_view: 'Vedi', btn_delete_single: 'Elimina', btn_edit_single: 'Modifica',
+    // Round 49 Fase 4 — toggle per-riga invio automatico (menu ⋯).
+    btn_autofile_exclude: 'Non inviare (no-show)',
+    btn_autofile_include: 'Includi nell\'invio automatico',
     btn_edit_list: 'Modifica', btn_done_editing: 'Fatto', btn_cancel_edit: 'Annulla',
     prop_readonly_hint: 'Modalità visualizzazione — clicca Modifica per aggiornare i dettagli.',
     // Round 30 — modifica check-in
@@ -7018,6 +7024,79 @@ function _closeRowMenus() {
     }
   });
 }
+// Round 49 Phase 4 — the per-row autofile chip. Returns HTML.
+// • filed/correction: hidden (the main rowPill already covers it).
+// • autofile_excluded: amber "⏸ Escluso" pill.
+// • past_portal_window / group_already_filed / builder_warning: red "⚠ Non inviabile".
+// • dry_run / live with a computable due time: muted "⏱ <ora>".
+function _renderAutofileRowChip(c, it) {
+  const mode = propertyData?.alloggiati_autofile_mode;
+  if (!mode || mode === 'off') return '';
+  if (['filed','correction'].includes(c.alloggiati_status)) return '';
+  if (c.autofile_excluded) {
+    return ` <span style="display:inline-block;font-size:0.56rem;padding:1px 6px;background:rgba(154,107,0,0.12);color:#9a6b00;border-radius:8px;font-weight:500;letter-spacing:0.04em;margin-left:6px;vertical-align:middle;" title="${it ? 'Escluso dall&apos;invio automatico' : 'Excluded from autofile'}">${it ? '⏸ Escluso' : '⏸ Excluded'}</span>`;
+  }
+  const err = c.autofile_last_error;
+  if (err === 'past_portal_window' || err === 'group_already_filed' || err === 'builder_warning') {
+    const label = it
+      ? (err === 'past_portal_window' ? 'Non inviabile: finestra portale scaduta' : err === 'group_already_filed' ? 'Non inviabile: gruppo già inviato' : 'Non inviabile: dato da correggere')
+      : (err === 'past_portal_window' ? 'Not fileable: portal window elapsed' : err === 'group_already_filed' ? 'Not fileable: group already filed' : 'Not fileable: data needs correction');
+    return ` <span style="display:inline-block;font-size:0.56rem;padding:1px 6px;background:rgba(176,57,57,0.12);color:#b03939;border-radius:8px;font-weight:500;letter-spacing:0.04em;margin-left:6px;vertical-align:middle;" title="${label}">${it ? '⚠ Non inviabile' : '⚠ Not fileable'}</span>`;
+  }
+  // Compute due time if we can.
+  let dueLabel = '';
+  try {
+    const d = autofileDueAt(c, propertyData, new Date());
+    if (d) {
+      const fmt = new Date(d).toLocaleString(it ? 'it-IT' : 'en-GB', { timeZone: 'Europe/Rome', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      dueLabel = (mode === 'live')
+        ? (it ? 'Invio automatico: ' : 'Auto-send: ') + fmt
+        : (it ? 'Verifica automatica: ' : 'Auto-validate: ') + fmt;
+    }
+  } catch (_) {}
+  if (!dueLabel) {
+    dueLabel = mode === 'live'
+      ? (it ? 'Invio automatico attivo' : 'Autofile enabled')
+      : (it ? 'Prova automatica attiva' : 'Dry-run enabled');
+  }
+  const shortLabel = (dueLabel.length > 38 ? dueLabel.slice(0, 36) + '…' : dueLabel);
+  return ` <span style="display:inline-block;font-size:0.56rem;padding:1px 6px;background:rgba(0,91,255,0.07);color:#005BFF;border-radius:8px;font-weight:500;letter-spacing:0.04em;margin-left:6px;vertical-align:middle;" title="${dueLabel.replace(/"/g,'&quot;')}">⏱ ${shortLabel}</span>`;
+}
+
+// Round 49 Phase 4 — flip autofile_excluded for one check-in row.
+// Round 20.2 .select() pattern: a 0-row result raises instead of
+// silently succeeding (= RLS trap).
+async function _toggleAutofileExcluded(id) {
+  const it = hostLang === 'it';
+  const row = allCheckins.find(c => c.id === id);
+  if (!row) { toast(it ? 'Riga non trovata' : 'Row not found'); return; }
+  const next = !row.autofile_excluded;
+  if (next && !confirm(it
+      ? 'Escludere questo ospite dall’invio automatico? L’invio manuale continua a funzionare.'
+      : 'Exclude this guest from automatic filing? Manual send still works.')) return;
+  try {
+    const { data, error } = await sb.from('checkins')
+      .update({ autofile_excluded: next })
+      .eq('id', id)
+      .select();
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      toast(it ? 'Aggiornamento bloccato (RLS)' : 'Update blocked (RLS)');
+      return;
+    }
+    const idx = allCheckins.findIndex(c => c.id === id);
+    if (idx > -1) allCheckins[idx] = { ...allCheckins[idx], ...data[0] };
+    renderCheckins();
+    toast(next
+      ? (it ? '⏸ Escluso dall’invio automatico' : '⏸ Excluded from autofile')
+      : (it ? '▶ Reincluso nell’invio automatico' : '▶ Included in autofile'));
+    track('autofile_excluded_toggle', { excluded: next });
+  } catch (e) {
+    console.error('autofile_excluded toggle failed:', e);
+    toast((it ? 'Errore: ' : 'Error: ') + (e.message || e));
+  }
+}
+
 function _toggleRowMenu(btn) {
   const menu = btn.parentElement.querySelector('.row-menu');
   if (!menu) return;
@@ -7249,6 +7328,14 @@ function renderCheckins() {
       const guestEditChip = c.guest_edited_at
         ? ` <span style="display:inline-block;font-size:0.56rem;padding:1px 6px;background:rgba(0,91,255,0.07);color:#005BFF;border-radius:8px;font-weight:500;letter-spacing:0.04em;margin-left:6px;vertical-align:middle;" title="${it ? 'Modificato dall&apos;ospite' : 'Edited by guest'}">${it ? '✎ ospite · ' : '✎ guest · '}${_gEdDate}</span>`
         : '';
+      // Round 49 Phase 4 — per-row autofile chip. Shows only when the
+      // property is in dry_run or live, and never on already-filed
+      // rows (the filed pill above says it all). "Non inviabile"
+      // signals a Phase 3 block (past_portal_window, group_already_
+      // filed, builder_warning); "Escluso" shows for host-opted-out
+      // rows; otherwise we show the next computed due time via
+      // AllogRecords.autofileDueAt.
+      const autofileChip = _renderAutofileRowChip(c, it);
       // Round 40 T1 — citizenship / document / submitted / docs
       // moved to the detail view (viewGuest opens the modal that already
       // shows them). Keeping them in the table caused the sticky-right
@@ -7262,7 +7349,7 @@ function renderCheckins() {
       html += `
         <tr data-checkin-group="${groupToken}"${hideAttr}
             onclick="viewGuest('${c.id}')" style="cursor:pointer;">
-          <td data-label=""><strong>${c.surname} ${c.name}</strong>${rowPill}${guestEditChip}</td>
+          <td data-label=""><strong>${c.surname} ${c.name}</strong>${rowPill}${guestEditChip}${autofileChip}</td>
           <td data-label="${h('th_type')}">${typeLabel}</td>
           <td data-label="${h('th_arrival')}">${fmtDate(c.arrival_date)}</td>
           <td data-label="${h('th_departure')}">${fmtDate(c.departure_date)}</td>
@@ -7275,11 +7362,13 @@ function renderCheckins() {
               aria-label="${h('btn_row_menu')}" title="${h('btn_row_menu')}"
               onclick="event.stopPropagation();_toggleRowMenu(this)"
               style="background:none;border:1px solid transparent;border-radius:6px;padding:4px 10px;cursor:pointer;color:var(--ink-2);font-size:1.05rem;line-height:1;">⋯</button>
-            <div class="row-menu" style="display:none;position:absolute;right:16px;margin-top:4px;background:var(--white);border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.10);z-index:20;min-width:140px;overflow:hidden;">
+            <div class="row-menu" style="display:none;position:absolute;right:16px;margin-top:4px;background:var(--white);border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.10);z-index:20;min-width:160px;overflow:hidden;">
               <button type="button" onclick="event.stopPropagation();_closeRowMenus();editGuest('${c.id}')"
                 style="display:block;width:100%;text-align:left;background:none;border:none;padding:8px 14px;font-size:0.82rem;color:var(--warm);cursor:pointer;font-family:inherit;">${h('btn_edit_single') || 'Edit'}</button>
+              <button type="button" onclick="event.stopPropagation();_closeRowMenus();_toggleAutofileExcluded('${c.id}')"
+                style="display:block;width:100%;text-align:left;background:none;border:none;padding:8px 14px;font-size:0.82rem;color:var(--ink);cursor:pointer;font-family:inherit;border-top:1px solid var(--border);">${h(c.autofile_excluded ? 'btn_autofile_include' : 'btn_autofile_exclude')}</button>
               <button type="button" onclick="event.stopPropagation();_closeRowMenus();deleteCheckin('${c.id}','${escName}')"
-                style="display:block;width:100%;text-align:left;background:none;border:none;padding:8px 14px;font-size:0.82rem;color:var(--red);cursor:pointer;font-family:inherit;">${h('btn_delete_single')}</button>
+                style="display:block;width:100%;text-align:left;background:none;border:none;padding:8px 14px;font-size:0.82rem;color:var(--red);cursor:pointer;font-family:inherit;border-top:1px solid var(--border);">${h('btn_delete_single')}</button>
             </div>
           </td>
         </tr>`;
@@ -8575,6 +8664,13 @@ function renderAlloggiatiCard() {
     const verifyBtnLabel = isVerified
       ? (it ? '🔄 Verifica di nuovo' : '🔄 Verify again')
       : (it ? '✓ Verifica ora' : '✓ Verify now');
+    // Round 49 Phase 4 — automatic filing controls. Visible only when
+    // credentials are verified. Switching TO 'live' requires an
+    // explicit consent checkbox (consent_at + consent_by are stamped
+    // on the property row); switching back to 'off' or 'dry_run' does
+    // not re-ask. Timing rules are shown in plain language under the
+    // radio so the host sees them before enabling.
+    const autofileBlock = isVerified ? renderAutofilePanel() : '';
     body.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;">
         <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#2f7a44;background:rgba(109,191,130,0.16);padding:3px 10px;border-radius:999px;">${safe(it ? 'Configurato' : 'Configured')}</span>
@@ -8586,7 +8682,8 @@ function renderAlloggiatiCard() {
         <button type="button" class="${verifyBtnClass}" onclick="verifyAlloggiatiCredentials(this)">${safe(verifyBtnLabel)}</button>
         <button type="button" class="btn btn-secondary btn-sm" onclick="openAlloggiatiForm(true)">✏️ ${safe(it ? 'Aggiorna credenziali' : 'Update credentials')}</button>
         <button type="button" class="btn btn-secondary btn-sm" onclick="removeAlloggiatiCredentials()" style="color:var(--red);border-color:rgba(224,69,94,0.3);">${safe(it ? '🗑 Rimuovi' : '🗑 Remove')}</button>
-      </div>`;
+      </div>
+      ${autofileBlock}`;
     return;
   }
   // Not configured — show entry form.
@@ -8594,6 +8691,125 @@ function renderAlloggiatiCard() {
     <div style="padding:6px 0;">
       <button type="button" class="btn btn-primary btn-sm" onclick="openAlloggiatiForm(false)">🔑 ${safe(it ? 'Configura Alloggiati Web' : 'Configure Alloggiati Web')}</button>
     </div>`;
+}
+
+// Round 49 Phase 4 — autofile radio + consent + timing-rules copy.
+// Rendered inline inside the verified credentials card so the control
+// lives one scroll next to the credentials it depends on. On change,
+// _onAutofileModeChange() does one PATCH on properties — switching TO
+// 'live' writes alloggiati_autofile_consent_at/_by too.
+function renderAutofilePanel() {
+  const it = hostLang === 'it';
+  const safe = _alloggiatiSafe;
+  const mode = (propertyData && propertyData.alloggiati_autofile_mode) || 'off';
+  const consentAt = propertyData && propertyData.alloggiati_autofile_consent_at;
+  const consentLine = consentAt
+    ? `<div style="font-size:0.72rem;color:#2f7a44;margin-top:6px;">${safe(it ? 'Consenso: ' : 'Consent: ')}${safe(new Date(consentAt).toLocaleString(it ? 'it-IT' : 'en-GB'))}</div>`
+    : '';
+  const checked = (v) => mode === v ? ' checked' : '';
+  const rulesHtml = it ? `
+    <ul style="margin:6px 0 0;padding-left:18px;font-size:0.74rem;color:var(--ink-soft);line-height:1.5;">
+      <li>Più notti: alle 03:00 (ora italiana) del giorno dopo l'arrivo. Gli ospiti possono modificare fino a quel momento.</li>
+      <li>Check-in completato dopo quelle 03:00: al controllo successivo (ogni 10 min).</li>
+      <li>Una sola notte: subito se il check-in è il giorno dell'arrivo; se completato prima, dall'orario di check-in della struttura.</li>
+      <li>Dopo arrivo+1 23:59 il portale rifiuta la data: la riga diventa manuale.</li>
+    </ul>` : `
+    <ul style="margin:6px 0 0;padding-left:18px;font-size:0.74rem;color:var(--ink-soft);line-height:1.5;">
+      <li>Multi-night: 03:00 Rome the day after arrival. Guests can edit up to that moment.</li>
+      <li>Check-in completed after that 03:00: next tick (every 10 min).</li>
+      <li>One-night: immediately if the check-in is on arrival day; otherwise at the property's check-in start on arrival day.</li>
+      <li>Past arrival+1 23:59 the portal rejects the date and the row goes manual.</li>
+    </ul>`;
+  const consentText = it
+    ? 'Autorizzo WelcomeBnB a trasmettere automaticamente ad Alloggiati Web, a mio nome e con le mie credenziali, i dati degli ospiti che hanno completato il check-in, secondo gli orari indicati. Resto responsabile della correttezza dei dati e delle correzioni presso la Questura.'
+    : 'I authorise WelcomeBnB to automatically transmit guest check-in data to Alloggiati Web on my behalf, using my credentials, according to the timing rules shown. I remain responsible for data correctness and for any corrections at my Questura.';
+  return `
+    <div style="margin-top:14px;padding:12px 14px;background:rgba(0,91,255,0.04);border:1px solid rgba(0,91,255,0.15);border-radius:8px;">
+      <div style="font-size:0.78rem;font-weight:600;color:var(--ink);margin-bottom:8px;">${safe(it ? 'Invio automatico ad Alloggiati Web' : 'Automatic Alloggiati filing')}</div>
+      <div id="autofileRadioRow" style="display:flex;gap:14px;flex-wrap:wrap;font-size:0.82rem;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="radio" name="autofile_mode" value="off"${checked('off')} onchange="_onAutofileModeChange('off')"> ${safe(it ? 'Spento' : 'Off')}
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;" title="${safe(it ? 'Esegue solo la validazione; non invia nulla' : 'Runs validation only; never sends')}">
+          <input type="radio" name="autofile_mode" value="dry_run"${checked('dry_run')} onchange="_onAutofileModeChange('dry_run')"> ${safe(it ? 'Prova (consigliato per iniziare)' : 'Dry-run (recommended first)')}
+        </label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="radio" name="autofile_mode" value="live"${checked('live')} onchange="_onAutofileModeChange('live')"> ${safe(it ? 'Attivo' : 'Live')}
+        </label>
+      </div>
+      ${rulesHtml}
+      <div id="autofileConsentRow" style="display:none;margin-top:10px;padding:10px 12px;background:rgba(232,184,75,0.14);border-left:3px solid #c89632;border-radius:4px;">
+        <label style="display:flex;gap:10px;align-items:flex-start;font-size:0.76rem;line-height:1.5;color:#5a3f00;cursor:pointer;">
+          <input type="checkbox" id="autofileConsentCheckbox" onchange="_onAutofileConsentToggle(this.checked)" style="margin-top:3px;">
+          <span>${safe(consentText)}</span>
+        </label>
+      </div>
+      <div id="autofileMsg" style="font-size:0.76rem;color:var(--ink-soft);min-height:1em;margin-top:8px;"></div>
+      ${consentLine}
+    </div>`;
+}
+
+async function _onAutofileModeChange(newMode) {
+  const it = hostLang === 'it';
+  const msg = document.getElementById('autofileMsg');
+  const consentRow = document.getElementById('autofileConsentRow');
+  const currentMode = (propertyData && propertyData.alloggiati_autofile_mode) || 'off';
+  if (newMode === currentMode) return;
+  // Switching TO 'live' requires an explicit consent click. Show the
+  // consent row and WAIT for the checkbox — don't PATCH yet. If the
+  // host flips back to Off/Prova before ticking, revert the radio.
+  if (newMode === 'live' && !(propertyData && propertyData.alloggiati_autofile_consent_at)) {
+    if (consentRow) consentRow.style.display = 'block';
+    if (msg) msg.textContent = it
+      ? '👇 Spunta la casella per confermare il consenso e attivare l’invio automatico.'
+      : '👇 Tick the box to confirm consent and enable automatic filing.';
+    // Store the pending choice so the consent click knows what to flip to.
+    document.getElementById('autofileRadioRow')?.setAttribute('data-pending', 'live');
+    return;
+  }
+  if (consentRow) consentRow.style.display = 'none';
+  await _patchAutofileMode(newMode, { stampConsent: false });
+}
+
+async function _onAutofileConsentToggle(checked) {
+  if (!checked) return;
+  await _patchAutofileMode('live', { stampConsent: true });
+}
+
+async function _patchAutofileMode(newMode, { stampConsent }) {
+  const it = hostLang === 'it';
+  const msg = document.getElementById('autofileMsg');
+  if (!propertyId) { if (msg) msg.textContent = it ? '⚠ Nessuna proprietà selezionata.' : '⚠ No property selected.'; return; }
+  const patch = { alloggiati_autofile_mode: newMode };
+  if (stampConsent) {
+    patch.alloggiati_autofile_consent_at = new Date().toISOString();
+    try {
+      const { data: u } = await sb.auth.getUser();
+      patch.alloggiati_autofile_consent_by = u?.user?.id || null;
+    } catch (_) { patch.alloggiati_autofile_consent_by = null; }
+  }
+  if (msg) msg.textContent = it ? 'Salvataggio…' : 'Saving…';
+  try {
+    const { data, error } = await sb.from('properties').update(patch).eq('id', propertyId).select();
+    if (error) throw error;
+    if (!data || data.length === 0) throw new Error(it ? 'Nessuna riga aggiornata' : 'No row updated');
+    propertyData = { ...(propertyData || {}), ...data[0] };
+    renderAlloggiatiCard();
+    if (msg) msg.textContent = (newMode === 'live')
+      ? (it ? '✓ Invio automatico attivato.' : '✓ Automatic filing enabled.')
+      : (newMode === 'dry_run')
+        ? (it ? '✓ Modalità Prova attivata.' : '✓ Dry-run enabled.')
+        : (it ? '✓ Invio automatico disattivato.' : '✓ Automatic filing disabled.');
+    track('alloggiati_autofile_mode_change', { mode: newMode, consent: !!stampConsent });
+    renderCheckins?.();
+    renderExportChecklist?.();
+  } catch (e) {
+    console.error('autofile mode save failed:', e);
+    if (msg) msg.textContent = (it ? '⚠ Salvataggio fallito: ' : '⚠ Save failed: ') + (e.message || e);
+    // Revert the radio to the current (unchanged) mode.
+    const cur = (propertyData && propertyData.alloggiati_autofile_mode) || 'off';
+    document.querySelectorAll('input[name="autofile_mode"]').forEach(r => { r.checked = r.value === cur; });
+  }
 }
 
 // Renders the credential-entry inputs inline in the card so a save

@@ -9,6 +9,11 @@ const excludedFunctions = new Set([
   'purge_old_data_admin', 'set_purge_live_after', 'capture_chat_qa_pairs',
   'purge_old_id_photos', 'enqueue_orphan_documents', 'purge_old_data_cron',
 ]);
+const fixedSearchPathFunctions = new Set([
+  'anonymize_text', 'compute_season', 'tg_touch_updated_at',
+  '_ota_reservations_touch_updated_at', '_tax_rulesets_touch_updated_at',
+  '_pilot_hosts_touch_updated_at', 'checkins_prevent_filed_edit',
+]);
 
 // No network or database execution: render a reviewed schema-only baseline.
 // Applying it requires separate project identity, cost and deployment checks.
@@ -45,9 +50,14 @@ export function renderDemoSchema(catalog, projectRef) {
   for (const f of catalog.functions) {
     if (excludedFunctions.has(f.name)) continue;
     sql.push(f.ddl.trimEnd() + ';');
+    if (fixedSearchPathFunctions.has(f.name)) {
+      sql.push(`ALTER FUNCTION ${f.identity} SET search_path = public, extensions;`);
+    }
     sql.push(`REVOKE ALL ON FUNCTION ${f.identity} FROM PUBLIC, anon, authenticated, service_role;`);
     for (const acl of f.acl || []) {
       const role = acl.split('=')[0];
+      // Guest access is validated by the server before using this RPC.
+      if (f.name === 'get_reservation_keybox' && role === 'authenticated') continue;
       if (['authenticated', 'service_role'].includes(role) && acl.split('=')[1].startsWith('X')) {
         sql.push(`GRANT EXECUTE ON FUNCTION ${f.identity} TO ${role};`);
       }
@@ -64,6 +74,9 @@ export function renderDemoSchema(catalog, projectRef) {
   for (const g of catalog.grants) {
     if (!['SELECT', 'INSERT', 'UPDATE', 'DELETE'].includes(g.privilege_type)) continue;
     sql.push(`GRANT ${g.privilege_type} ON TABLE ${quoteId(g.table_schema)}.${quoteId(g.table_name)} TO ${quoteId(g.grantee)};`);
+  }
+  for (const table of ['storage_purge_queue', 'telegram_link_tokens']) {
+    sql.push(`CREATE POLICY demo_deny_direct_access ON public.${quoteId(table)} FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);`);
   }
   for (const g of catalog.sequence_grants || []) {
     sql.push(`GRANT ${g.privilege_type} ON SEQUENCE ${quoteId(g.object_schema)}.${quoteId(g.object_name)} TO ${quoteId(g.grantee)};`);

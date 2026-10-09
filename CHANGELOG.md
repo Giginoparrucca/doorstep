@@ -19,7 +19,7 @@ Phases 0/0a cover documentation only; the demo environment has not been provisio
 |---|---|---|
 | 0 — Specification, script and maintenance rules | shipped — PR #118 — GPT | Original planning delivery |
 | 0a — English plan, autonomy and Italian PDF | shipped — PR #119 — GPT | English docs, mandatory phase gates, Italian script/PDF; content/link/render checks |
-| 1 — Environment configuration and demo guards | pending | Config/guard tests, failed-config denial, production regressions |
+| 1 — Environment configuration and demo guards | in-progress — GPT | Config/guard tests, failed-config denial, production regressions |
 | 2 — Provisioning and reproducible schema | pending | Deployed auth/API/storage tests, RLS and environment isolation |
 | 3 — Fictional fixtures and scenarios | pending | Seed repeatability, relationships, dashboard/date boundaries |
 | 4 — Reset and session management | pending | Two resets, authorization, concurrency and recovery |

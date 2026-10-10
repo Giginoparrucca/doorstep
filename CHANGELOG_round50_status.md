@@ -20,3 +20,5 @@ Hosted provisioning checkpoint: demo configuration and server secrets are saved;
 An opt-in, positive-project-guarded build runner now provisions fictional presenter accounts through the supported Auth API and tests actual JWT ownership and private-object access. It emits no secrets. Hosted execution pending.
 
 Hosted runner checkpoint: two fictional presenter accounts exist. Receipt ownership policies corrected for an alias-shadowing bug and rerun completed; explicit served test evidence is being added. Production remains untouched.
+
+Hosted gate evidence now confirms 16 passing Auth/ownership/guest-check-in/receipt/document checks; probe rows/files cleaned, presenters retained. Public demo access approved and enabled. Provisioning flag disabled after tests. Rebuild/recovery remains incomplete: corrected rollback-only SQL execution declined; automatic review rejected persistent chunked alternative. Custom-domain DNS and repository automatic deployment connection remain pending. Phase 2 remains in progress; no later phase started.

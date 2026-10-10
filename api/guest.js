@@ -150,6 +150,7 @@ export default async function handler(req, res) {
     if (action === 'checkin_update')   return await doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, isTest);
     if (action === 'checkin_lookup')   return await doCheckinLookup(res, propertyId, sessionId, body, isTest);
     if (action === 'consent_withdraw') return await doConsentWithdraw(res, propertyId, body);
+    if (action === 'track_event')      return await doTrackEvent(res, propertyId, bookingCode, sessionId, body, isTest);
     return res.status(400).json({ error: 'Unknown action' });
   } catch (e) {
     console.error('[guest] exception in action=', action, e);
@@ -790,6 +791,68 @@ async function checkLookupRateLimit(sessionId) {
 }
 
 // ── action: consent_withdraw ──────────────────────────────────────────
+// ── action: track_event ───────────────────────────────────────────────
+//
+// Guest-side analytics have always written to `analytics_events`
+// directly as anon from the browser. That path is widely blocked on
+// modern phones: ad blockers, Brave Shields, Firefox Enhanced Tracking
+// Protection and DNS-level blocklists match `*.supabase.co` + the
+// POST shape as "tracker" and drop it. Observed in production on
+// booking TRU-TURWX5 (9 real chat messages reached the gateway, zero
+// `guest_*` events landed on the same device). This action moves the
+// write behind the same-origin `/api/guest` endpoint — same host as
+// the rest of the app, invisible to tracker-list heuristics.
+//
+// property_id, booking_code and is_test come from the token payload
+// (never from the request body) so a tampered client can't attribute
+// activity to another property. event_data is bounded in size and
+// shape to keep hostile payloads out of the dashboard renderer.
+//
+// Return 204 on success — the caller never needs the row id and the
+// response goes down a `keepalive: true` pipe for beacon-style
+// writes, where a tiny response matters.
+async function doTrackEvent(res, propertyId, bookingCode, sessionId, body, isTest) {
+  const eventType = String(body.event_type || '').trim();
+  if (!eventType) return res.status(400).json({ error: 'event_type required' });
+  if (eventType.length > 120) return res.status(400).json({ error: 'event_type too long' });
+  if (!/^[a-z0-9_]+$/i.test(eventType)) return res.status(400).json({ error: 'event_type invalid' });
+
+  // Clamp event_data so a hostile client can't push a 1 MB blob into
+  // the analytics table. The real payload is a handful of fields: lang,
+  // length, has_image, category, page, etc.
+  let eventData = body.event_data;
+  if (eventData != null && typeof eventData !== 'object') eventData = null;
+  if (eventData && JSON.stringify(eventData).length > 4096) {
+    return res.status(400).json({ error: 'event_data too large' });
+  }
+
+  const row = {
+    event_type: eventType,
+    event_data: eventData || null,
+    session_id: sessionId || null,
+    property_id: propertyId,
+    is_test: isTest === true,
+  };
+  if (bookingCode) row.booking_code = bookingCode;
+
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/analytics_events`, {
+    method: 'POST',
+    headers: {
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify(row),
+  });
+  if (!r.ok) {
+    const t = await r.text().catch(() => '');
+    console.warn('[guest] track_event insert failed', r.status, t.slice(0, 200));
+    return res.status(500).json({ error: 'track_event failed' });
+  }
+  return res.status(204).end();
+}
+
 async function doConsentWithdraw(res, propertyId, body) {
   const id = String(body.id || '').trim();
   if (!id) return res.status(400).json({ error: 'id required' });

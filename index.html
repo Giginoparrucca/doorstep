@@ -1733,45 +1733,45 @@ async function trackGuest(eventType, eventData = {}) {
   // we just drop events that fire pre-resolution (very few).
   if (!propertyId) return;
   try {
-    const row = {
+    // Route via the same-origin /api/guest gateway so ad-blockers /
+    // Brave Shields / Firefox ETP / DNS blocklists that match
+    // `*.supabase.co` don't drop guest analytics. property_id,
+    // booking_code, session_id and is_test are derived server-side
+    // from the token payload — nothing on the body is trusted.
+    const r = await _guestCall('track_event', {
       event_type: eventType,
       event_data: { ...eventData, lang },
-      session_id: _guestSessionId,
-      property_id: propertyId,
-      // Round 19.5: ?test=1 → flag all events from this session as test
-      is_test: IS_TEST_SESSION,
-    };
-    // Include booking_code when known so events can be attributed to a guest.
-    if (bookingCode) row.booking_code = bookingCode;
-    // Anonymous — user_id / user_email stay null by design.
-    const { error } = await sb.from('analytics_events').insert(row);
-    if (error) console.warn('📊 guest analytics:', error.message);
-    else console.log('📊', eventType, eventData, IS_TEST_SESSION ? '(test mode)' : '');
+    });
+    if (r && r.ok) console.log('📊', eventType, eventData, IS_TEST_SESSION ? '(test mode)' : '');
+    else console.warn('📊 guest analytics:', r && r.status);
   } catch (e) { console.warn('📊 guest analytics error:', e); }
 }
 
 // Fire a guest event even on page unload (keepalive).
 function trackGuestBeacon(eventType, eventData = {}) {
   if (!propertyId) return;
+  // Beacon writes have to use `keepalive: true` — the browser flushes
+  // the request even after the page starts unloading. We can't await
+  // mintGuestToken() here (it's an async promise and the page is
+  // leaving), so we only fire when a token is already in memory.
+  // Any guest who has interacted with the app for more than a few
+  // seconds will have one; dropping the first-paint-only edge case
+  // is acceptable.
+  const token = _guestToken;
+  if (!token) return;
   try {
-    const row = {
-      event_type: eventType,
-      event_data: { ...eventData, lang },
-      session_id: _guestSessionId,
-      property_id: propertyId,
-      is_test: IS_TEST_SESSION,  // Round 19.5
-    };
-    if (bookingCode) row.booking_code = bookingCode;
-    fetch(`${SUPABASE_URL}/rest/v1/analytics_events`, {
+    fetch('/api/guest', {
       method: 'POST',
       keepalive: true,
       headers: {
         'Content-Type': 'application/json',
-        'apikey': SUPABASE_KEY,
-        'Authorization': 'Bearer ' + SUPABASE_KEY,
-        'Prefer': 'return=minimal',
+        'Authorization': 'Bearer ' + token,
       },
-      body: JSON.stringify(row),
+      body: JSON.stringify({
+        action: 'track_event',
+        event_type: eventType,
+        event_data: { ...eventData, lang },
+      }),
     }).catch(()=>{});
   } catch (e) {}
 }

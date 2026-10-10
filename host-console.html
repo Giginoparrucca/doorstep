@@ -2776,6 +2776,13 @@ async function loadGuestAnalytics() {
 
     if (error) throw error;
 
+    // Round 50 — merge in guest chat_messages for the same window so
+    // engagement is correct for guests whose device blocks direct
+    // analytics_events writes. See _loadGuestChatAsEvents comment.
+    const chatEvents = await _loadGuestChatAsEvents(propertyId, cutoff);
+    const merged = (data || []).concat(chatEvents)
+      .sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+
     loadingEl.style.display = 'none';
     // Stamp "Updated at HH:MM" in the user's locale
     if (lastUpdatedEl) {
@@ -2784,14 +2791,14 @@ async function loadGuestAnalytics() {
                                           { hour: '2-digit', minute: '2-digit' });
       lastUpdatedEl.textContent = (hostLang === 'it' ? 'Aggiornato alle ' : 'Updated at ') + hhmm;
     }
-    if (!data || data.length === 0) {
+    if (merged.length === 0) {
       emptyEl.style.display = 'block';
       _gaLoading = false;
       if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.classList.remove('spinning'); }
       return;
     }
 
-    await renderGuestAnalytics(data);
+    await renderGuestAnalytics(merged);
     contentEl.style.display = 'block';
   } catch (e) {
     console.error('GA load error:', e);
@@ -3180,6 +3187,40 @@ function _gpgComputeEngagement(perGuestEvents) {
   if (chats >= 1 || recos >= 3 || escs >= 1) return { bucket: 'high',  label: h('ga_eng_high')   || 'High',   recos, chats, escs };
   if (total >= 2)                              return { bucket: 'normal', label: h('ga_eng_normal') || 'Normal', recos, chats, escs };
   return { bucket: 'low', label: h('ga_eng_low') || 'Low', recos, chats, escs };
+}
+
+// Round 50 fallback — some guest devices block direct `*.supabase.co`
+// writes (ad blockers / privacy extensions) and no `guest_*`
+// analytics_events ever land, even when the guest clearly used the
+// app. chat_messages goes through the same-origin /api/guest gateway
+// and is not blocked. Load the property's guest-authored chat rows for
+// the same window and synthesize them as `guest_chat_message` events
+// so the engagement bucket, nudges and Guest Analytics panel reflect
+// real engagement. One query, no behavior change for guests whose
+// analytics_events do land.
+async function _loadGuestChatAsEvents(propertyIdArg, sinceIso) {
+  try {
+    const { data, error } = await sb.from('chat_messages')
+      .select('id, booking_code, message, created_at')
+      .eq('property_id', propertyIdArg)
+      .eq('is_test', false)
+      .is('deleted_at', null)
+      .eq('sender', 'guest')
+      .gte('created_at', sinceIso)
+      .order('created_at', { ascending: true })
+      .limit(5000);
+    if (error) throw error;
+    return (data || []).map(row => ({
+      event_type: 'guest_chat_message',
+      event_data: { length: (row.message || '').length, synthesized_from: 'chat_messages' },
+      session_id: '_chat_' + row.id,
+      booking_code: row.booking_code,
+      created_at: row.created_at,
+    }));
+  } catch (e) {
+    console.warn('_loadGuestChatAsEvents failed:', e && e.message);
+    return [];
+  }
 }
 
 function _gpgTopRecoCategories(perGuestEvents) {
@@ -5227,6 +5268,14 @@ async function renderDashboard() {
       .limit(2000);
     events = data || [];
   } catch (_) { events = []; }
+  // Round 50 — merge guest chat_messages into the dashboard engagement
+  // signal so a guest whose device blocks direct Supabase writes still
+  // registers as "engaged" instead of triggering the "share the QR"
+  // nudge. See _loadGuestChatAsEvents comment.
+  try {
+    const chatEvents = await _loadGuestChatAsEvents(propertyId, cutoff);
+    if (chatEvents.length > 0) events = events.concat(chatEvents);
+  } catch (_) { /* non-fatal */ }
 
   // Build summary map (booking_code → { name, arrival, departure, ... })
   // Reuse the same helper Guest Analytics uses, so labels stay consistent.

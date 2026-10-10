@@ -20,7 +20,7 @@ Phases 0/0a cover documentation only; the demo environment has not been provisio
 | 0 — Specification, script and maintenance rules | shipped — PR #118 — GPT | Original planning delivery |
 | 0a — English plan, autonomy and Italian PDF | shipped — PR #119 — GPT | English docs, mandatory phase gates, Italian script/PDF; content/link/render checks |
 | 1 — Environment configuration and demo guards | shipped — PR #120 — GPT | Local config/guard/production regressions and served preview/production checks pass |
-| 2 — Provisioning and reproducible schema | in-progress — GPT | Deployed auth/API/storage tests, RLS and environment isolation |
+| 2 — Provisioning and reproducible schema | in-progress — Claude (handed off from GPT 2026-10-10) | Deployed auth/API/storage tests, RLS and environment isolation. GPT shipped the offline schema renderer and provisioning checkpoint in draft PR #121; demo Supabase project exists at `wmegnnlmcrabndyzywmj` with baseline + privilege-hardening migrations applied (28 RLS tables, private documents/receipts, no auth users / vault secrets / cron / production rows). Demo Vercel project `prj_MafDkEOAUye8uC9M8Mtb993vFagy` exists but has no deployment, env config or domain. Claude continues from the exact point GPT stopped: service key transfer to Vercel is pending. |
 | 3 — Fictional fixtures and scenarios | pending | Seed repeatability, relationships, dashboard/date boundaries |
 | 4 — Reset and session management | pending | Two resets, authorization, concurrency and recovery |
 | 5 — Demo UX and simulations | pending | Real chat flow, fake external calls, demo links and AI/place checks |

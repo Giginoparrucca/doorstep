@@ -15,3 +15,7 @@ node_modules/
 .env
 .env.local
 .vercel
+# package-lock.json is intentionally untracked — the repo deploys on Vercel
+# without a committed lockfile (web-push is the only runtime dep). A local
+# `npm install` run for script tests should not surface a dirty tree.
+package-lock.json

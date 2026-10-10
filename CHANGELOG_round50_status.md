@@ -14,3 +14,5 @@ GPT resumes under Daniele's instruction after Claude reached its usage limit. Ph
 Automatic approval review previously rejected publication of detailed operational notes. This supplement records generic phase status only.
 
 Resumption checkpoint: deployment configuration now selects schedules by environment; smoke checks fail on generic errors and require actual guest token/gateway success. Local regression checks passed. Full hosted Phase 2 gate remains pending.
+
+Hosted provisioning checkpoint: demo configuration and server secrets are saved; dedicated deployment is READY; invite-only signup and exact demo Auth redirects are configured. Unit regressions pass. Public guest access awaits explicit protection-setting approval; custom-domain DNS remains external. Presenter accounts, complete hosted isolation tests, clean rebuild and recovery remain pending. Phase 2 is not shipped.

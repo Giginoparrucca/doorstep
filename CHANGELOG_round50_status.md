@@ -18,3 +18,5 @@ Resumption checkpoint: deployment configuration now selects schedules by environ
 Hosted provisioning checkpoint: demo configuration and server secrets are saved; dedicated deployment is READY; invite-only signup and exact demo Auth redirects are configured. Unit regressions pass. Public guest access approved and enabled; served configuration and real guest token/gateway/integration-denial smoke passed; custom-domain DNS remains external. Presenter accounts, complete hosted isolation tests, clean rebuild and recovery remain pending. Phase 2 is not shipped.
 
 An opt-in, positive-project-guarded build runner now provisions fictional presenter accounts through the supported Auth API and tests actual JWT ownership and private-object access. It emits no secrets. Hosted execution pending.
+
+Hosted runner checkpoint: two fictional presenter accounts exist. Receipt ownership policies corrected for an alias-shadowing bug and rerun completed; explicit served test evidence is being added. Production remains untouched.

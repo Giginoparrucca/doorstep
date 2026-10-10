@@ -79,4 +79,8 @@ export async function runGate(env = process.env) {
     for (const owner of owners) await call('/auth/v1/logout?scope=local', 'POST', {}, owner.token, true);
   }
   console.log('PASS partial Phase 2 Auth/ownership/receipt gate; document gateway, rebuild and recovery remain separate gates');
+  return { passed: true, checks: ['presenter-password-login', 'owner-row-read', 'cross-owner-row-read-denied',
+    'cross-owner-row-update-denied', 'ownership-reassignment-denied', 'private-object-upload',
+    'private-object-owner-read', 'private-object-cross-owner-read-denied', 'private-object-anonymous-read-denied',
+    'private-object-cleanup'], partial: true };
 }

@@ -66,9 +66,12 @@ export function renderDemoSchema(catalog, projectRef) {
   for (const t of catalog.triggers || []) sql.push(t.ddl);
   for (const p of catalog.policies) {
     // Policies refer to owner IDs/auth.uid(), not identities or copied accounts.
+    const receiptScope = value => p.schemaname === 'storage' && p.tablename === 'objects'
+      && /^receipts_owner_(read|write|delete)$/.test(p.policyname)
+      ? value?.replaceAll('split_part(p.name,', 'split_part(storage.objects.name,') : value;
     let ddl = `CREATE POLICY ${quoteId(p.policyname)} ON ${quoteId(p.schemaname)}.${quoteId(p.tablename)} AS ${p.permissive} FOR ${p.cmd} TO ${p.roles.map(role => role === 'public' ? 'PUBLIC' : quoteId(role)).join(', ')}`;
-    if (p.qual) ddl += ` USING (${p.qual})`;
-    if (p.with_check) ddl += ` WITH CHECK (${p.with_check})`;
+    if (p.qual) ddl += ` USING (${receiptScope(p.qual)})`;
+    if (p.with_check) ddl += ` WITH CHECK (${receiptScope(p.with_check)})`;
     sql.push(ddl + ';');
   }
   for (const g of catalog.grants) {

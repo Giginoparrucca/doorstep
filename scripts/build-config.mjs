@@ -7,5 +7,8 @@ writeFileSync(new URL('../app-config.js', import.meta.url),
 console.log(`Public application configuration generated for ${config.mode}.`);
 if (process.env.DEMO_PHASE2_GATE === '1') {
   const { runGate } = await import('./demo-auth-storage-gate.mjs');
-  await runGate();
+  const result = await runGate();
+  writeFileSync(new URL('../phase2-check-result.json', import.meta.url), JSON.stringify({
+    ...result, sourceCommit: process.env.VERCEL_GIT_COMMIT_SHA, checkedAt: new Date().toISOString(),
+  }));
 }

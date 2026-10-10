@@ -12,3 +12,5 @@ This short status file supplements CHANGELOG.md.
 GPT resumes under Daniele's instruction after Claude reached its usage limit. Phase 2 remains incomplete. Preserve Claude's evidence and attribution.
 
 Automatic approval review previously rejected publication of detailed operational notes. This supplement records generic phase status only.
+
+Resumption checkpoint: deployment configuration now selects schedules by environment; smoke checks fail on generic errors and require actual guest token/gateway success. Local regression checks passed. Full hosted Phase 2 gate remains pending.

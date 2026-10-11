@@ -6,8 +6,8 @@ This short status file supplements CHANGELOG.md.
 | --- | --- | --- |
 | 1 | shipped - PR #120 - GPT | Required checks passed |
 | 2a | partial draft - PR #121 - GPT | Offline renderer and syntax tests passed |
-| 2 | implementation complete - Claude 2026-10-11 (PR pending) | 16-check Auth/ownership gate (GPT) + 3-check public-URL smoke (Claude) + 28-check clean-rebuild fingerprint (Claude) + 10-case negative-mutation test; recovery runbook recorded |
-| 3-6 | pending | Previous phase gates must pass first |
+| 2 | shipped - PR #121 - GPT + Claude 2026-10-11 | 16-check Auth/ownership gate (GPT) + 3-check public-URL smoke (Claude) + 28-check clean-rebuild fingerprint (Claude) + 10-case negative-mutation test re-run against main-branch deployment `dpl_Gm6KFuxjxwodhqFd9gw5gV6q4fB9`; recovery runbook recorded |
+| 3-6 | pending | Phase 3 ready to start on top of PR #121 |
 
 GPT resumes under Daniele's instruction after Claude reached its usage limit. Phase 2 remains incomplete. Preserve Claude's evidence and attribution.
 

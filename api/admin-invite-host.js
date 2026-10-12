@@ -191,7 +191,11 @@ async function _generateInviteLink(email) {
   // password and flip pilot_invites.status → accepted.
   var first = await _callGenerateLink({ type: 'invite', email });
   if (first.ok) return first;
-  if (first.status === 422 && /email_exists/i.test(first.text || '')) {
+  // Match on 422 + any of the user-already-registered error signals the
+  // various Supabase versions use. The GoTrue versions return
+  // {error_code:"email_exists"}; others return {msg:"...already been
+  // registered"}; the raw text is checked case-insensitively.
+  if (first.status === 422 && /email_exists|already.*registered|already been/i.test(first.text || '')) {
     var second = await _callGenerateLink({ type: 'magiclink', email });
     if (second.ok) return { ok: true, url: second.url, fallback: 'magiclink' };
     return second;
@@ -201,7 +205,11 @@ async function _generateInviteLink(email) {
 
 async function _callGenerateLink(body) {
   if (INVITE_REDIRECT_TO) body.redirect_to = INVITE_REDIRECT_TO;
-  const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/generatelink`, {
+  // GoTrue path. Earlier versions exposed /admin/generatelink (no
+  // underscore); current Supabase hosts expose /admin/generate_link.
+  // The older path 404s on today's GoTrue, so we use the underscored
+  // one — same payload shape in the response.
+  const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
     method: 'POST',
     headers: {
       apikey: SERVICE_KEY,

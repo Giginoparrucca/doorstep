@@ -33,9 +33,10 @@ for (const override of [
 assert.throws(() => readEnvironment({ VERCEL_PROJECT_PRODUCTION_URL: 'demo.welcomebnb.it' }));
 assert.throws(() => readEnvironment({ APP_ENV: 'production', SUPABASE_URL: demo.SUPABASE_URL }));
 const pub = publicConfiguration(readEnvironment(demo));
-assert.deepEqual(Object.keys(pub).sort(), ['mode','projectRef','supabaseUrl','publicKey','appOrigin','allowedOrigins'].sort());
+assert.deepEqual(Object.keys(pub).sort(), ['mode','projectRef','supabaseUrl','publicKey','appOrigin','allowedOrigins','support'].sort());
 assert.equal(JSON.stringify(pub).includes(demo.SUPABASE_SERVICE_ROLE_KEY), false);
 assert.equal(JSON.stringify(pub).includes(demo.GUEST_TOKEN_SECRET), false);
+assert.deepEqual(pub.support, {whatsapp:'',email:'',calendly:''});
 
 // Actual browser bootstrap: origin checks and cache migration without a browser/network.
 function storage(initial = {}) {

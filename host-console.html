@@ -17,6 +17,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#061A3D">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/host-onboarding.css">
 <style>
 :root {
   --warm: #005BFF;
@@ -2408,6 +2409,9 @@ See you soon!</textarea>
      and autofileDueAt live in a shared lib so the auto-filer (Round 49
      tick) runs the same code as the host-console Export panel. -->
 <script src="/lib/alloggiati-records.js"></script>
+<script src="/lib/onboarding-readiness.js"></script>
+<script src="/lib/onboarding-support.js"></script>
+<script src="/host-onboarding.js"></script>
 <script>
 /* ══════════════════════════════════════
    SUPABASE CONNECTION
@@ -3782,6 +3786,53 @@ async function handleCoverUpload(input) {
 ══════════════════════════════════════ */
 const HT = {
   en: {
+    ob_title: "Get your property ready",
+    ob_ready: "Ready ✓",
+    ob_of: "of",
+    ob_progress: "Property setup progress",
+    ob_details: "View steps",
+    ob_help: "Help",
+    ob_help_title: "How can we help?",
+    ob_close: "Close",
+    ob_no_documents: "Please do not send guest documents or photos: we handle them only inside WelcomeBnB.",
+    ob_channel_whatsapp: "Message us on WhatsApp",
+    ob_channel_email: "Email us",
+    ob_channel_calendly: "Book a 20-minute call",
+    ob_support_unavailable: "Support contacts will be available soon.",
+    ob_add_title: "Start with your property",
+    ob_add: "Add your property",
+    ob_missing: "Missing",
+    ob_continue: "Complete this step",
+    ob_need_help: "Need help?",
+    ob_guide: "How it works",
+    ob_hide: "Hide",
+    ob_skipped: "Choice confirmed",
+    ob_undo_skip: "Review this choice",
+    ob_save_error: "We could not save your checklist. Please retry.",
+    ob_skip_direct_only: "Direct bookings only",
+    ob_skip_test_checkin: "I will try it later",
+    ob_skip_tax_not_applicable: "Tourist tax does not apply",
+    ob_skip_alloggiati_manual: "I use the manual Alloggiati file",
+    ob_step_property: "Property details and codes",
+    ob_step_calendar: "Connect your calendar",
+    ob_step_content: "Prepare your welcome",
+    ob_step_test: "Try the guest experience",
+    ob_step_notifications: "Enable notifications",
+    ob_field_name: "property name",
+    ob_field_city: "city",
+    ob_field_region: "region",
+    ob_field_cir_code: "CIN",
+    ob_field_cir_code_format: "valid CIN",
+    ob_field_ross1000_codice: "ROSS1000 code",
+    ob_field_tax_rules: "tourist tax rules",
+    ob_field_alloggiati: "Alloggiati method",
+    ob_field_ical_feeds: "iCal calendar",
+    ob_field_welcome_message: "welcome message",
+    ob_field_wifi_name: "Wi-Fi name",
+    ob_field_checkin_instructions: "arrival instructions",
+    ob_field_test_checkin: "test check-in (optional)",
+    ob_field_notification_channel: "a notification channel",
+
     // Sidebar
     sidebar_overview: 'Overview', sidebar_property_sec: 'Property', sidebar_guests_sec: 'Guests', sidebar_share_sec: 'Share',
     // Login
@@ -4321,6 +4372,53 @@ const HT = {
     recos_info: 'These appear in the guest app\'s "Explore" tab. Add your favorite restaurants, bars, sights, beaches, and shops. Include an address for the Google Maps link.',
   },
   it: {
+    ob_title: "Prepara la tua struttura",
+    ob_ready: "Pronta ✓",
+    ob_of: "di",
+    ob_progress: "Configurazione della struttura",
+    ob_details: "Vedi i passaggi",
+    ob_help: "Aiuto",
+    ob_help_title: "Come possiamo aiutarti?",
+    ob_close: "Chiudi",
+    ob_no_documents: "Non inviarci documenti o foto degli ospiti: li gestiamo solo dentro WelcomeBnB.",
+    ob_channel_whatsapp: "Scrivici su WhatsApp",
+    ob_channel_email: "Scrivici una email",
+    ob_channel_calendly: "Prenota una chiamata di 20 minuti",
+    ob_support_unavailable: "I contatti di supporto saranno disponibili a breve.",
+    ob_add_title: "Inizia dalla tua struttura",
+    ob_add: "Aggiungi la tua struttura",
+    ob_missing: "Manca",
+    ob_continue: "Completa questo passaggio",
+    ob_need_help: "Serve aiuto?",
+    ob_guide: "Come funziona",
+    ob_hide: "Nascondi",
+    ob_skipped: "Scelta confermata",
+    ob_undo_skip: "Rivedi la scelta",
+    ob_save_error: "Non siamo riusciti a salvare la checklist. Riprova.",
+    ob_skip_direct_only: "Solo prenotazioni dirette",
+    ob_skip_test_checkin: "Proverò più tardi",
+    ob_skip_tax_not_applicable: "L’imposta di soggiorno non si applica",
+    ob_skip_alloggiati_manual: "Uso il file Alloggiati manuale",
+    ob_step_property: "Dati e codici della struttura",
+    ob_step_calendar: "Collega il calendario",
+    ob_step_content: "Prepara l’accoglienza",
+    ob_step_test: "Prova come ospite",
+    ob_step_notifications: "Attiva le notifiche",
+    ob_field_name: "nome della struttura",
+    ob_field_city: "comune",
+    ob_field_region: "regione",
+    ob_field_cir_code: "CIN",
+    ob_field_cir_code_format: "CIN valido",
+    ob_field_ross1000_codice: "codice ROSS1000",
+    ob_field_tax_rules: "regole dell’imposta di soggiorno",
+    ob_field_alloggiati: "modalità Alloggiati",
+    ob_field_ical_feeds: "calendario iCal",
+    ob_field_welcome_message: "messaggio di benvenuto",
+    ob_field_wifi_name: "nome Wi-Fi",
+    ob_field_checkin_instructions: "istruzioni di arrivo",
+    ob_field_test_checkin: "check-in di prova (facoltativo)",
+    ob_field_notification_channel: "un canale di notifica",
+
     sidebar_overview: 'Panoramica', sidebar_property_sec: 'Proprietà', sidebar_guests_sec: 'Ospiti', sidebar_share_sec: 'Condividi',
     // Login
     login_badge: 'Console Host',
@@ -4935,6 +5033,7 @@ function setHostLang(l) {
   if (gaPanel && gaPanel.classList.contains('active') && typeof loadGuestAnalytics === 'function') {
     loadGuestAnalytics();
   }
+  window.HostOnboarding?.paint();
   // Update current panel title
   const activePanel = document.querySelector('.panel.active')?.id?.replace('panel-','');
   if (activePanel && titles[activePanel]) {
@@ -5269,6 +5368,7 @@ async function renderDashboard() {
   if (!el) return;
   if (!propertyId) {
     el.innerHTML = `<div style="text-align:center;padding:40px;color:var(--ink-soft);">${h('dashboard_loading') || 'Loading…'}</div>`;
+    window.HostOnboarding?.paint();
     return;
   }
 
@@ -5612,6 +5712,7 @@ async function renderDashboard() {
 
   el.innerHTML = `
     <div style="max-width:920px;">
+      <div id="hostOnboardingChecklist" class="onboarding-card"></div>
       ${helpBanner}
       ${coverageLostBanner}
       ${urgentPanel}
@@ -5620,6 +5721,7 @@ async function renderDashboard() {
       ${allCaughtUp}
     </div>
   `;
+  window.HostOnboarding?.paint();
 }
 
 // Round 45 Step 5 — coverage-lost banner. Reads OTA rows on the current
@@ -7818,6 +7920,7 @@ async function saveProperty() {
   const idx = allProperties.findIndex(p => p.id === propertyId);
   if (idx > -1) allProperties[idx] = { ...allProperties[idx], ...update };
   renderPropertySwitcher();
+  window.HostOnboarding?.changed();
   toast(h('toast_property_saved'));
   track('save_property', { name: document.getElementById('propName').value });
 
@@ -8703,6 +8806,7 @@ async function loadAlloggiatiCard() {
     _alloggiatiState = { status: 'error', propertyId, error: e.message };
   }
   renderAlloggiatiCard();
+  window.HostOnboarding?.changed();
 }
 
 function renderAlloggiatiCard() {
@@ -12425,7 +12529,7 @@ async function initNotifCard() {
     ]);
     const settings = settingsRes.data || _notifDefaults();
     const subs = Array.isArray(subsRes.data) ? subsRes.data : [];
-    _notifState = { uid, settings, subs, swRegistered: false };
+    _notifState = { uid, settings, subs, swRegistered: false, settingsPersisted: !!settingsRes.data };
 
     // Detect whether THIS device already has a subscription (so we can
     // suppress the in-tab Notification duplicate).
@@ -12622,6 +12726,8 @@ async function notifSaveField(field, value) {
   if (error) { toast(hostLang === 'it' ? 'Errore salvataggio: ' + error.message : 'Save failed: ' + error.message); return; }
   if (!data || data.length === 0) { toast(hostLang === 'it' ? 'Salvataggio bloccato (RLS?)' : 'Save blocked (RLS?)'); return; }
   _notifState.settings = data[0];
+  _notifState.settingsPersisted = true;
+  window.HostOnboarding?.changed();
   renderNotifCard();
 }
 
@@ -14361,16 +14467,7 @@ async function init() {
       allProperties = res.data || [];
     }
 
-    if (allProperties.length === 0 && !adminPropId) {
-      // Round 33 — the legacy "claim any orphan property" branch was removed
-      // before opening self-serve signup. A fresh account must NEVER inherit
-      // an existing property's guest data, check-ins or reservations. New
-      // signups always start with a fresh empty 'My Property' row.
-      const { data: newProp } = await sb.from('properties').insert({
-        owner_id: userId, name: 'My Property', city: '', region: '', property_type: 'apartment',
-      }).select('*').single();
-      if (newProp) { allProperties = [newProp]; }
-    }
+    // Round 51: a new account explicitly adds its first property.
 
     // Pick which property to show: persisted selection if it's still owned,
     // else the first in the list.
@@ -14387,18 +14484,13 @@ async function init() {
         setHostLang(chosen.host_language);
       }
       fillPropertyForm(chosen);
-      // First-property onboarding banner (only when the single property is blank)
-      if (allProperties.length === 1 && !chosen.address && !chosen.wifi_name) {
-        showPanel('property', document.querySelector('[onclick*=property]'));
-        const ob = document.getElementById('onboardingBanner');
-        if (ob) ob.style.display = 'block';
-      }
     }
     renderPropertySwitcher();
   } catch (e) { console.log('Property list load error:', e); }
 
   // 2. Load all property-scoped data for the selected property
   await loadPropertyData();
+  if (!propertyId) { await window.HostOnboarding?.refresh(); renderDashboard(); }
 
   // 3. Round 25: if launched from the admin panel (?admin=1), AND the
   // logged-in user is genuinely an admin, show the warning banner and lock
@@ -14779,6 +14871,8 @@ async function loadPropertyData() {
   // Round 37 (redux) — tax config now lives per-property (columns on
   // propertyData itself). No extra fetch, no shared ruleset table.
 
+  await Promise.all([initNotifCard(), loadAlloggiatiCard()]);
+  await window.HostOnboarding?.refresh();
   renderDashboard();
   renderCheckins();
   renderRules();
@@ -14890,6 +14984,29 @@ function fillPropertyForm(data) {
   }
 }
 
+window.HostOnboarding.init({
+  db: sb, h, toast, regionCompliance: regionComplianceFor, addProperty,
+  context: () => ({ userId: _hostUserId, property: propertyData, properties: allProperties, lang: hostLang,
+    hostName: propertyData?.host_names || '', support: APP_CONFIG.support || {}, readOnly: !!_isAdminView(),
+    credentials: _alloggiatiState.propertyId === propertyId && _alloggiatiState.status === 'ready' ? _alloggiatiState.data : null,
+    notifications: _notifState?.settingsPersisted ? _notifState.settings : null }),
+  sectionId: () => panelSection(document.querySelector('.panel.active')?.id.replace('panel-', '') || 'dashboard'),
+  section: () => h(SECTION_TITLES[panelSection(document.querySelector('.panel.active')?.id.replace('panel-', '') || 'dashboard')]?.[0] || 'sidebar_oggi'),
+  guide: step => { showSection(step === 'property' ? 'conf' : 'prop', step === 'property' ? 'compliance' : 'property'); _hgLoad().then(() => window.HG?.openGuide(step === 'property' ? 'compliance' : 'property')).catch(() => toast(h('ob_save_error'))); },
+  focusStep: (step, missing) => {
+    if (step === 'calendar') { showSection('prop', 'property'); document.getElementById('icalFeedsList')?.scrollIntoView({block:'center'}); return; }
+    if (step === 'test') { showSection('cond', 'qrlink'); return; }
+    if (step === 'notifications') { showSection('prop', 'property'); const card=document.getElementById('notifCard'); if(card){card.open=true;card.scrollIntoView({block:'center'});} return; }
+    showSection('prop', 'property'); if (!propertyEditMode) startPropertyEdit();
+    const fields={name:'propName',city:'propCity',region:'propRegion',cir_code:'cirCode',cir_code_format:'cirCode',ross1000_codice:'propRossCodice',tax_rules:'propTaxRate',alloggiati:'alloggiatiCardBody',welcome_message:'propWelcome',wifi_name:'propWifiName',checkin_instructions:'propCheckinInstructions'};
+    const field=document.getElementById(fields[missing[0]] || 'propName'); field?.scrollIntoView({block:'center'}); field?.focus();
+  },
+  track: (event_type,event_data) => { if (_hostUserId && propertyId) sb.from('analytics_events').insert({event_type,event_data,user_id:_hostUserId,property_id:propertyId,is_test:APP_CONFIG.mode==='demo'}).then(({error})=>{if(error)console.warn('Onboarding analytics unavailable');}); },
+  paintBadges: statuses => {
+    const nav=document.querySelector('.sidebar-item[data-section="prop"]'); if(nav){let dot=nav.querySelector('.onboarding-ready-dot');if(!dot){dot=document.createElement('span');dot.className='onboarding-ready-dot';nav.append(dot);}dot.hidden=!statuses.some(s=>!s.ready);dot.title=h('ob_title');}
+    document.querySelectorAll('.prop-switcher-option:not(.prop-switcher-add)').forEach((button,i)=>{const state=statuses[i];if(!state)return;let badge=button.querySelector('.onboarding-property-status');if(!badge){badge=document.createElement('span');badge.className='onboarding-property-status';button.append(badge);}badge.textContent=state.ready?h('ob_ready'):`${h('ob_title')} (${state.doneCount}/5)`;});
+  }
+});
 init();
 setTimeout(() => setHostLang('it'), 200);
 </script>

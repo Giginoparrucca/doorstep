@@ -85,7 +85,7 @@ SELECT jsonb_build_object(
     'cron_schema', (SELECT COUNT(*) FROM pg_namespace WHERE nspname = 'cron'),
     'production_properties_rows', (SELECT COUNT(*) FROM public.properties WHERE is_test = false),
     'production_checkins_rows', (SELECT COUNT(*) FROM public.checkins WHERE is_test = false),
-    'ota_reservations_rows', (SELECT COUNT(*) FROM public.ota_reservations),
+    'ota_reservations_rows', (SELECT COUNT(*) FROM public.ota_reservations WHERE is_test = false),
     'host_alloggiati_credentials_rows', (SELECT COUNT(*) FROM public.host_alloggiati_credentials),
     'alloggiati_filing_log_rows', (SELECT COUNT(*) FROM public.alloggiati_filing_log),
     'admin_users_rows', (SELECT COUNT(*) FROM public.admin_users),

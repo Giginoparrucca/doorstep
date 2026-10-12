@@ -189,6 +189,7 @@ migration body (hashed as `array_to_string(statements, E';\n')`):
 | `20261009070108` | `round50_demo_baseline` | 82701 | `2a8b2ecdf1a159c39e39845557c91dc27216b553f35a3d34cd279bd7b3cc594f` |
 | `20261009070254` | `round50_demo_privilege_hardening` | 970 | `3feed9b43ecba130c1a23575b9685119ff4638940de9abda86dea9bf48375697` |
 | `20261010101252` | `round50_receipt_owner_scope` | 758 | `b44ecb48afb05d810d45c6e623dd55634af39deb2f56b36ac6106372c46a09c5` |
+| `20261011044424` | `round50_phase4_demo_reset` | 7977 | `74a69117cc7f019c2ee115789f3b5f32823d864c034c78930452c24fc32190a1` |
 
 ### Clean-rebuild verification (2026-10-11, Claude)
 
@@ -206,9 +207,11 @@ Live schema fingerprint and isolation evidence collected via
 `scripts/demo-rebuild-verify.sql` and validated by
 `scripts/demo-rebuild-verify.mjs` (28/28 checks PASS):
 
-- Schema shape SHA-256: `a2a71990b80766aadd5641e1c7246b838be472b3e7d4bfcd2240d94c99e9ab81`
+- Schema shape SHA-256: `1a9a5f8177bcaa89a7ec1c0deb7713df9d92b96f43fb3c37b6cb05367d3374e8`
   (28 tables, 372 columns, 258 constraints, 82 indexes, 86 policies,
-  16 functions, 5 triggers, 3 buckets, 14 storage policies).
+  17 functions, 5 triggers, 3 buckets, 14 storage policies). Phase 2's
+  original fingerprint `a2a71990…` had 16 functions; Phase 4 added
+  `public.demo_reset_v1` and bumped the function count to 17.
 - Isolation invariants: 2 presenter auth users (expected steady state),
   0 storage objects, 0 vault secrets, 0 cron entries, no `pg_cron` or
   `pg_net` extensions, 0 production-shaped rows across `properties`,

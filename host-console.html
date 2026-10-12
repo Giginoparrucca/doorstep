@@ -2408,6 +2408,9 @@ See you soon!</textarea>
      and autofileDueAt live in a shared lib so the auto-filer (Round 49
      tick) runs the same code as the host-console Export panel. -->
 <script src="/lib/alloggiati-records.js"></script>
+<!-- Round 51 Phase 1-3 — pure readiness module + checklist/widget UI. -->
+<script src="/lib/onboarding-readiness.js"></script>
+<script src="/host-onboarding.js"></script>
 <script>
 /* ══════════════════════════════════════
    SUPABASE CONNECTION
@@ -2627,6 +2630,29 @@ function sendSessionSummary() {
   } catch (e) {}
 }
 window.addEventListener('beforeunload', sendSessionSummary);
+
+// Round 51 Phase 3 — nudge-email deep link. Open with
+// #onboarding=<step>: navigate to Oggi, scroll to the checklist and
+// focus the matching step. Only the five known step ids are honored.
+window.addEventListener('hashchange', _handleOnboardingHash);
+function _handleOnboardingHash() {
+  try {
+    var m = (location.hash || '').match(/^#onboarding=([a-z]+)$/);
+    if (!m) return;
+    var ids = ['property', 'calendar', 'content', 'test', 'notifications'];
+    if (ids.indexOf(m[1]) < 0) return;
+    if (typeof showSection === 'function') showSection('oggi');
+    setTimeout(function () {
+      var step = document.querySelector('.obx-step[data-step="' + m[1] + '"]');
+      if (step && step.scrollIntoView) step.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (step) step.classList.add('obx-focus');
+    }, 350);
+  } catch (_) {}
+}
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _handleOnboardingHash, { once: true });
+  else _handleOnboardingHash();
+}
 
 /* ══════════════════════════════════════
    GUEST ANALYTICS — host-side dashboard
@@ -3809,6 +3835,16 @@ const HT = {
     // stray reference still resolves.
     sidebar_oggi: 'Today', sidebar_ospiti: 'Guests', sidebar_conf: 'Compliance',
     sidebar_prop: 'Property', sidebar_cond: 'Share',
+    obx_title: 'Property setup', obx_intro_todo: 'A few steps and you are ready for your guests.', obx_intro_ready: 'Ready for your first guests.',
+    obx_hide: 'Hide', obx_skipped: 'skipped', obx_help_link: 'Need help?', obx_help_open: 'Open help', obx_help_fab: 'Help',
+    obx_help_title: 'How can we help?', obx_help_whatsapp: 'Message us on WhatsApp', obx_help_email: 'Send us an email', obx_help_calendly: 'Book a 20-minute call',
+    obx_help_none: 'No contact channels configured.', obx_help_pii: 'Do not send us guest documents or photos — we handle those only inside WelcomeBnB.', obx_close: 'Close',
+    obx_ready_badge: 'Property ready',
+    obx_step_property_title: 'Property data and codes', obx_step_property_cta: 'Open property',
+    obx_step_calendar_title: 'Connect the calendar', obx_step_calendar_cta: 'Open iCal',
+    obx_step_content_title: 'Prepare the welcome content', obx_step_content_cta: 'Open property',
+    obx_step_test_title: 'Try as a guest', obx_step_test_cta: 'Run test check-in',
+    obx_step_notifications_title: 'Turn on notifications', obx_step_notifications_cta: 'Open notifications',
     sidebar_oggi_title:   'Today',      sidebar_oggi_sub:   'What needs your attention right now',
     sidebar_ospiti_title: 'Guests',     sidebar_ospiti_sub: 'Check-ins, calendar, analytics and contacts',
     sidebar_conf_title:   'Compliance', sidebar_conf_sub:   'Filings for the Italian authorities',
@@ -4344,6 +4380,16 @@ const HT = {
     sidebar_compliance: 'Guida Conformità',
     sidebar_oggi: 'Oggi', sidebar_ospiti: 'Ospiti', sidebar_conf: 'Conformità',
     sidebar_prop: 'Proprietà', sidebar_cond: 'Condividi',
+    obx_title: 'Avvio struttura', obx_intro_todo: 'Pochi passaggi e sei pronto per i tuoi ospiti.', obx_intro_ready: 'Pronta per i tuoi primi ospiti.',
+    obx_hide: 'Nascondi', obx_skipped: 'saltato', obx_help_link: 'Serve aiuto?', obx_help_open: 'Apri assistenza', obx_help_fab: 'Aiuto',
+    obx_help_title: 'Come possiamo aiutarti?', obx_help_whatsapp: 'Scrivici su WhatsApp', obx_help_email: 'Scrivici una email', obx_help_calendly: 'Prenota una chiamata di 20 minuti',
+    obx_help_none: 'Nessun canale configurato.', obx_help_pii: 'Non inviarci documenti o foto degli ospiti: li gestiamo solo dentro WelcomeBnB.', obx_close: 'Chiudi',
+    obx_ready_badge: 'Proprietà pronta',
+    obx_step_property_title: 'Dati e codici della struttura', obx_step_property_cta: 'Apri proprietà',
+    obx_step_calendar_title: 'Collega il calendario', obx_step_calendar_cta: 'Apri iCal',
+    obx_step_content_title: "Prepara l'accoglienza", obx_step_content_cta: 'Apri proprietà',
+    obx_step_test_title: 'Prova come ospite', obx_step_test_cta: 'Fai un check-in di prova',
+    obx_step_notifications_title: 'Attiva le notifiche', obx_step_notifications_cta: 'Apri notifiche',
     sidebar_oggi_title:   'Oggi',       sidebar_oggi_sub:   'Cosa richiede la tua attenzione adesso',
     sidebar_ospiti_title: 'Ospiti',     sidebar_ospiti_sub: 'Check-in, calendario, analisi e contatti',
     sidebar_conf_title:   'Conformità', sidebar_conf_sub:   'Adempimenti per le autorità italiane',
@@ -5271,6 +5317,11 @@ async function renderDashboard() {
     el.innerHTML = `<div style="text-align:center;padding:40px;color:var(--ink-soft);">${h('dashboard_loading') || 'Loading…'}</div>`;
     return;
   }
+  // Round 51 Phase 3 — paint the onboarding checklist before the rest
+  // of the dashboard so the first thing a new host sees is the five
+  // steps. HostOnboarding re-inserts its own container on each call,
+  // so it survives the dashboard rebuilds below.
+  try { if (window.HostOnboarding) await window.HostOnboarding.renderChecklist(); } catch (_) {}
 
   // Fetch the last 60 days of events for this property — wide enough
   // to catch any guest currently staying or recently active. We use the

@@ -12,11 +12,16 @@ Newest entries at the top of each section.
 **Round 50 — Demo environment and host onboarding**
 
 Specification: `PLAN_round50_demo_onboarding.md` (English).
-Presenter script: `docs/DEMO_ONBOARDING_IT.md` and its generated PDF (Italian).
-Phase 6 Phase 2–5 are now shipped; the demo environment is operational at
-`https://demo.welcomebnb.it`. Phase 6 verification + release notes land in
-PR #127; the Round is officially closed once that PR merges and its deployment
-verifier re-runs green.
+Presenter script: `docs/DEMO_ONBOARDING_IT.md` and its generated PDF
+`docs/Onboarding_WelcomeBnB_IT.pdf` (Italian, 4 A4 pages, regenerated
+2026-10-12 — source sha256 `7e3163dd…`, PDF sha256 `5d1bd53c…`).
+Generator: `scripts/demo-onboarding-pdf.mjs` (Playwright/Chromium,
+no external install). Keep PDF and script aligned on future edits.
+**Round 50 is operational.** Live at `https://demo.welcomebnb.it` and
+`https://welcomebnb-demo.vercel.app`, deployment
+`dpl_BviYbssEeemeijbdSjphsDvsteU8` (`956cba7`). All phase gates passed
+on the main-branch deployment of each phase. Rollback target
+`dpl_2neFse8DktpBp9F5CSwix4KuuhPD` (`08aaf6e`) available.
 
 | Phase | Status | Where / test gate |
 |---|---|---|
@@ -27,7 +32,7 @@ verifier re-runs green.
 | 3 — Fictional fixtures and scenarios | shipped — PR #124 — Claude 2026-10-11 | Fixture manifest in `lib/demo-fixtures.mjs`: 2 presenters, 2 properties (Casa Demo WelcomeBnB + Trullo Fico Vicino), 6 Ostuni recommendations with Maps-ready addresses, 2 house rules, 10 booking scenarios with stable UUIDs and Rome-relative dates, 6 IT/EN chat seeds (DEMO-AIUTO escalated), 7 analytics events. Seeder `scripts/demo-seed.mjs` opt-in via APP_ENV=demo + Vercel project guard; idempotent upserts on stable UUIDs. Live verifier `scripts/demo-seed-live.mjs`. Unit tests `scripts/demo-seed.test.mjs` 17/17 PASS. Main-branch deployment `dpl_GeTfNiKKcRQ4K2Nig1gzuhvRiQUD` (`823b510`) READY on `demo.welcomebnb.it`; Phase 2 gates still PASS (live-smoke 3/3, rebuild-verify 28/28, schema fingerprint `a2a71990…` unchanged). Hosted DB state: 2 properties, 6 recos, 2 rules, 10 OTA, 9 checkins (lead + 2 group members), 6 chats, 7 analytics; idempotent across re-upsert. |
 | 4 — Reset and session management | shipped — PR #125 — Claude 2026-10-12 | SECURITY DEFINER function `public.demo_reset_v1(reset_day)` added via `migration_round50_phase4_demo_reset.sql` (version `20261011044424`, 7977 bytes, SHA-256 `74a69117…`). Internal auth gate: `auth.uid()` must match presenter allowlist (2 UUIDs) or raises 42501. `pg_try_advisory_xact_lock(505050004)` serializes concurrent resets. Deletes non-fixture rows for the two demo properties, then rebases scenario dates to the chosen reset day in Europe/Rome. Alloggiati filing log and host credentials are never referenced. Grants: authenticated + service_role only, anon REVOKEd. Mandatory tests all PASS post-merge: 12 unit checks + 5 live-DB auth probes (null-caller 42501, random-authenticated 42501, anon RPC 42501, both presenters succeed, probe-row deletion, fixture restoration + Rome date rebase, second reset idempotent). Main-branch deployment `dpl_2neFse8DktpBp9F5CSwix4KuuhPD` (`08aaf6e`) READY. Schema fingerprint `1a9a5f8177bcaa89a7ec1c0deb7713df9d92b96f43fb3c37b6cb05367d3374e8` (17 functions, +1 vs Phase 2); rebuild-verify reports 29/29 PASS. |
 | 5 — Demo UX and simulations | shipped — PR #126 — Claude 2026-10-12 | Persistent Italian demo banner injected on `index.html` and `host-console.html` (visible only when `WELCOME_BNB_CONFIG.mode==='demo'`). `demo-launch.html` standalone page lists all ten scenarios with guest URLs, inline QR codes, presenter sign-in and a Ripristina-demo button that calls `supabase.rpc('demo_reset_v1', ...)`. Alloggiati simulation added as `?action=demo_simulate_filing` with three stages; demo-gated, zero SOAP symbols in the sim body, zero network calls in the in-process test. Mandatory tests all PASS post-merge: `scripts/demo-ux.test.mjs` static sweep + `scripts/demo-ux-sim.test.mjs` in-process. Main-branch deployment `dpl_3bBKKg6PYk7nyC4H5nir8Q7ycFsj` (`2359ab5`) READY; `/demo-launch.html` serves `text/html` 200 on `demo.welcomebnb.it`. Phase 2-4 regressions remain green. |
-| 6 — End-to-end verification and operational release | implementation complete — Claude 2026-10-12; PR pending | `scripts/demo-e2e.test.mjs` sweeps every public asset for secret patterns + production ref; cross-env token denial; 9 integration-denial endpoints; 3 simulation stages; all PASS against `https://welcomebnb-demo.vercel.app`. Full guest journey executed twice via DB (chat+checkin+analytics+dismissal → reset → fixtures restored; alloggiati_filing_log untouched; 0 vault/cron/production rows after both runs). Rollback-eligible deployment identified (`dpl_2neFse8DktpBp9F5CSwix4KuuhPD` = Phase 4 build `08aaf6e`, schema-compatible). Full Phase 6 release notes incl. operating cost, maintenance owner, honest limitations and procedure in `docs/ROUND50_PROVISIONING.md` → "Phase 6 release verification". |
+| 6 — End-to-end verification and operational release | shipped — PR #127 — Claude 2026-10-12 | `scripts/demo-e2e.test.mjs` sweeps every public asset for secret patterns + production ref; cross-env token denial; 9 integration-denial endpoints; 3 simulation stages; all PASS post-merge against `dpl_BviYbssEeemeijbdSjphsDvsteU8` (`956cba7`). Full guest journey executed twice via DB (chat+checkin+analytics+dismissal → reset → fixtures restored; alloggiati_filing_log untouched; 0 vault/cron/production rows after both runs). Rollback-eligible: `dpl_2neFse…` (Phase 4 `08aaf6e`). Release notes + operating cost + maintenance owner + honest limitations in `docs/ROUND50_PROVISIONING.md` → "Phase 6 release verification". **Round 50 operational on `https://demo.welcomebnb.it`.** |
 
 ### Previous round — preserved status
 

@@ -1207,8 +1207,15 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <input class="form-input" type="password" id="loginPassword" placeholder="••••••••" onkeydown="if(event.key==='Enter')handleAuth()">
       </div>
       <button class="login-btn" id="authBtn" onclick="handleAuth()">Sign In</button>
-      <div style="text-align:center;margin-top:8px;">
+      <div style="text-align:center;margin-top:8px;display:flex;flex-direction:column;gap:4px;">
         <a onclick="forgotPassword()" style="font-size:0.72rem;color:var(--warm);cursor:pointer;text-decoration:underline;" data-h="login_forgot">Forgot password?</a>
+        <!-- Round 51 hotfix — a magic-link invite confirms the token in
+             the URL hash the first time the user clicks the email link.
+             Subsequent visits land here with no session. "Set up my
+             password" is the escape hatch: enter your email, we send a
+             password-recovery link, you set the password, you can sign
+             in with it on any future visit. -->
+        <a onclick="firstTimeSetup()" style="font-size:0.72rem;color:var(--warm);cursor:pointer;text-decoration:underline;" data-h="login_first_time">First time? Set up my password</a>
       </div>
       <!-- Round 38 — invite-only. Sign-up removed here and gated at the
            Supabase project level (Authentication → Providers → Email
@@ -2415,6 +2422,23 @@ See you soon!</textarea>
 /* ══════════════════════════════════════
    SUPABASE CONNECTION
 ══════════════════════════════════════ */
+// Round 51 hotfix — Supabase JS auto-processes magic-link / invite
+// URL hashes synchronously inside `createClient`, which strips the
+// hash before our `onAuthStateChange` handler is attached. Capture
+// the hash's `type=<kind>` marker here (synchronously, before the
+// SDK runs) and stash it in sessionStorage; the handler reads it
+// below. This is the race condition that caused the "logged in with
+// no password set" bug after a magic-link click.
+try {
+  const _initialHash = (window.location && window.location.hash) || '';
+  const _m = _initialHash.match(/[#&]type=([a-z_]+)/i);
+  if (_m && _m[1]) {
+    const kind = _m[1].toLowerCase();
+    if (['invite', 'magiclink', 'recovery', 'signup'].includes(kind)) {
+      sessionStorage.setItem('wbnb_auth_hint', kind);
+    }
+  }
+} catch (_) { /* best-effort */ }
 const APP_CONFIG = window.getWelcomeBnbConfig();
 const SUPABASE_URL = APP_CONFIG.supabaseUrl;
 const SUPABASE_KEY = APP_CONFIG.publicKey;
@@ -3573,9 +3597,19 @@ sb.auth.onAuthStateChange(async (event, session) => {
   // (magiclink is the fallback the server uses when the auth user
   // already exists; same ergonomics as invite — one-click sign-in,
   // then set a password). We treat them identically.
+  //
+  // Supabase JS can strip the URL hash before this handler runs, so
+  // the `type` marker is also captured synchronously at page load
+  // and stashed in sessionStorage. Consume it here.
   var hash = (location.hash || '');
   var hashType = (hash.match(/\btype=([a-z_]+)\b/) || [])[1] || null;
-  var isFirstTimeHashLink = hashType === 'invite' || hashType === 'magiclink';
+  if (!hashType) {
+    try {
+      var hinted = sessionStorage.getItem('wbnb_auth_hint');
+      if (hinted) hashType = hinted;
+    } catch (_) {}
+  }
+  var isFirstTimeHashLink = hashType === 'invite' || hashType === 'magiclink' || hashType === 'signup';
   if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && isFirstTimeHashLink)) {
     var isIt = hostLang === 'it';
     var promptMsg;
@@ -3612,8 +3646,10 @@ sb.auth.onAuthStateChange(async (event, session) => {
     } else if (passwordSet) {
       alert(isIt ? '✅ Password aggiornata! Ora puoi accedere.' : '✅ Password updated! You can now sign in.');
     }
-    // Clean the hash so a page refresh doesn't re-trigger the prompt.
+    // Clean the hash and the sessionStorage hint so a page refresh
+    // doesn't re-trigger the prompt.
     try { history.replaceState({}, document.title, window.location.pathname + window.location.search); } catch (_) {}
+    try { sessionStorage.removeItem('wbnb_auth_hint'); } catch (_) {}
     if (passwordSet) {
       window.location.href = window.location.origin + '/host-console.html';
     }
@@ -3808,6 +3844,42 @@ async function forgotPassword() {
   }
 }
 
+// Round 51 hotfix — "First time? Set up my password" escape hatch for
+// an invitee whose magic-link session already evaporated (one-click
+// sign-in burned the token, then the tab was closed, or Safari's
+// cookie policy blocked the session cookie, or the password-set
+// prompt was dismissed before a password was chosen). Sends a
+// recovery link to the inviter's email with the same redirect_to as
+// the invite flow; the PASSWORD_RECOVERY handler above completes the
+// password set.
+async function firstTimeSetup() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const errEl = document.getElementById('loginError');
+  const isIt = hostLang === 'it';
+  if (!email) {
+    errEl.textContent = isIt
+      ? 'Inserisci la tua email, poi clicca "Imposta la mia password".'
+      : 'Enter your email, then click "Set up my password".';
+    errEl.classList.add('show');
+    return;
+  }
+  errEl.classList.remove('show');
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/host-console.html`,
+  });
+  if (error) {
+    errEl.textContent = error.message;
+    errEl.classList.add('show');
+    return;
+  }
+  errEl.style.color = 'var(--green)';
+  errEl.textContent = isIt
+    ? '📧 Email inviata! Controlla la tua casella: il link ti porta qui a impostare la password.'
+    : '📧 Email sent! Check your inbox: the link brings you back here to set your password.';
+  errEl.classList.add('show');
+  setTimeout(() => { errEl.style.color = ''; }, 7000);
+}
+
 /* ══════════════════════════════════════
    COVER PHOTO UPLOAD
 ══════════════════════════════════════ */
@@ -3869,6 +3941,7 @@ const HT = {
     login_invite_only: 'Access is by invitation. Contact <a href="mailto:info@welcomebnb.it" style="color:var(--warm);">info@welcomebnb.it</a> to join the pilot.',
     login_signing_in: 'Signing in…',
     login_forgot: 'Forgot password?',
+    login_first_time: 'First time? Set up my password',
     login_err_fields: 'Please fill in both fields',
     login_err_password: 'Password must be at least 6 characters',
     login_err_connection: 'Connection error. Please try again.',
@@ -4417,6 +4490,7 @@ const HT = {
     login_invite_only: 'L\'accesso è su invito. Contatta <a href="mailto:info@welcomebnb.it" style="color:var(--warm);">info@welcomebnb.it</a> per partecipare al programma pilota.',
     login_signing_in: 'Accesso in corso…',
     login_forgot: 'Password dimenticata?',
+    login_first_time: 'Prima volta? Imposta la mia password',
     login_err_fields: 'Compila entrambi i campi',
     login_err_password: 'La password deve essere di almeno 6 caratteri',
     login_err_connection: 'Errore di connessione. Riprova.',

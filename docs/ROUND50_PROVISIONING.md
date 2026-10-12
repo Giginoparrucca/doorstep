@@ -304,4 +304,124 @@ Agent-owned recovery paths, none of which touch production.
    of the live-smoke + rebuild-verify checks.**
 
 No production DDL/DML was executed in this delivery. All Phase 2 tests pass
-against the demo project and its deployed origin. Phases 3-6 remain pending.
+against the demo project and its deployed origin.
+
+## Phase 6 release verification (2026-10-12, Claude)
+
+Round 50 operational release. Deployed revision
+`dpl_3bBKKg6PYk7nyC4H5nir8Q7ycFsj` (`2359ab5`) serving
+`https://welcomebnb-demo.vercel.app` and `https://demo.welcomebnb.it`.
+
+### End-to-end journey (run twice)
+
+| Round | Presenter | Mutations before reset | After reset |
+|---|---|---|---|
+| 1 | `edcf2a10…7417` (presenter 1) | +1 chat (DEMO-NUOVO), +1 check-in (DEMO-NUOVO), +1 analytics (DEMO-NUOVO reco_click), +1 host-dismissed (DEMO-SCADUTO) | probes 0; 10 OTA; 9 fixture check-ins; 6 fixture chats; dates rebased (DEMO-ARRIVO `2026-10-13`, DEMO-SCADUTO depart `2026-10-04`) |
+| 2 | `fec66ee7…5839` (presenter 2) | +1 escalated chat (DEMO-AIUTO), +1 check-in (DEMO-GRUPPO group_member), +1 analytics session_start | probes 0; 10 OTA; 9 fixture check-ins; 6 fixture chats; alloggiati_filing_log untouched (0 rows); 0 production properties; 0 vault secrets; 0 cron schema |
+
+Both rounds executed in a single transaction and succeeded. Alloggiati
+filing log, production properties, Vault and cron schema remained at
+zero rows throughout.
+
+### Secrets-leakage sweep
+
+`scripts/demo-e2e.test.mjs` fetches `/app-config.js`,
+`/demo-launch.html`, `/index.html`, `/host-console.html` and
+`/lib/demo-fixtures.mjs` from the deployed origin and checks each
+payload against five secret patterns (sb_secret value, JWT body with
+service_role, Anthropic key, OpenAI key, production project ref). All
+five assets pass; the demo publishable anon JWT in `app-config.js` is
+explicitly allowed because it is public by design. The two residual
+mentions of `welcomebnb.vercel.app` and `app.welcomebnb.it` in
+`host-console.html` are both inside long-standing JS comments and are
+never used at runtime — every request origin is derived from
+`WELCOME_BNB_CONFIG.appOrigin`, verified by the cross-environment
+token-denial test that follows the sweep.
+
+### Integration denial + simulation
+
+Nine demo-integration endpoints (`/api/alloggiati?action=send|status|verify`,
+`/api/scan-document`, `/api/ical-sync`, `/api/send-arrival-reminders`,
+`/api/admin-invite-host`, `/api/telegram-link`, `/api/push-config`)
+each returned `403` with `code: "demo_integration_disabled"`. The
+Alloggiati simulation (`?action=demo_simulate_filing`) returned
+FACSIMILE payloads for all three stages and `400` for an unknown
+stage, with zero SOAP symbols in the handler body (verified by
+`scripts/demo-ux-sim.test.mjs`).
+
+### Rollback eligibility
+
+The two most recent production deployments are rollback candidates:
+
+| Deployment | Commit | Target | isRollbackCandidate |
+|---|---|---|---|
+| `dpl_3bBKKg6PYk7nyC4H5nir8Q7ycFsj` | `2359ab5` (Phase 5 merge) | current | true (self) |
+| `dpl_2neFse8DktpBp9F5CSwix4KuuhPD` | `08aaf6e` (Phase 4 merge) | previous | **true** |
+
+A rollback to `08aaf6e` is schema-compatible: the Phase 5 PR added no
+new migration (only the UX layer and the opt-in sim action). The
+Phase 4 Postgres function `public.demo_reset_v1` ships in the Phase 4
+migration and remains callable after rollback.
+
+Rollback procedure (owner-only step via Vercel dashboard):
+
+1. Visit `https://vercel.com/giginoparruccas-projects/welcomebnb-demo`.
+2. Open the deployment list and find `08aaf6e`
+   (deployment ID `dpl_2neFse8DktpBp9F5CSwix4KuuhPD`).
+3. Open its detail page and click **Promote to Production**.
+4. Confirm the alias moves to the previous build.
+5. Verify with `node scripts/demo-live-smoke.mjs https://welcomebnb-demo.vercel.app`
+   (expect 3/3 PASS).
+
+Supabase-side recovery stays as documented in the "Recovery and
+rollback (demo-only)" section above: the demo project retains daily
+backups on the Free plan.
+
+### Regression suite (2026-10-12 against main-branch deployment)
+
+| Suite | Result |
+|---|---|
+| `demo-live-smoke.mjs https://welcomebnb-demo.vercel.app` | 3/3 PASS |
+| `demo-rebuild-verify.mjs <evidence.json>` | 29/29 PASS |
+| `demo-rebuild-verify.test.mjs` | PASS (10 negative mutations) |
+| `demo-seed.test.mjs` | 17/17 PASS |
+| `demo-reset.test.mjs` | 12/12 PASS |
+| `demo-ux.test.mjs` | PASS (5 static checks) |
+| `demo-ux-sim.test.mjs` | PASS (zero network calls across every path) |
+| `demo-e2e.test.mjs https://welcomebnb-demo.vercel.app` | PASS (assets, headers, cross-env, integration denial, sim stages) |
+| `environment.test.mjs` (demo + production + invalid) | PASS |
+| `deployment-config.test.mjs` | PASS |
+| `demo-live-smoke.test.mjs` (harness-self) | PASS |
+
+### Operating cost and maintenance owner
+
+- **Supabase Free plan** — the demo project (`wmegnnlmcrabndyzywmj`)
+  stays on Free alongside production; the plan cap is two projects, so
+  a third concurrent demo would need a plan upgrade.
+- **Vercel Hobby plan** — serverless function cap is 12 and we are
+  exactly at it. Adding a 13th function would fail the deploy; Phase 4
+  deliberately shipped `demo_reset_v1` as a Postgres function to avoid
+  this.
+- **No new external usage** — the demo never calls Anthropic, Google
+  Maps billable endpoints, Alloggiati SOAP, Telegram, email providers
+  or OTA webhooks. Live AI/place-search are opt-in and remain disabled.
+- **Maintenance owner**: GPT or Claude via this agent protocol. Daniele
+  is the owner of record and is involved only for owner-only actions
+  (DNS, billing, legal consent).
+
+### Honest limitations
+
+- The in-session agent cannot drive a real browser, so mobile- and
+  desktop-view readability of `demo-launch.html`, the banner and the
+  host console must be verified visually by the presenter before the
+  first external meeting.
+- The Italian PDF generated from `docs/DEMO_ONBOARDING_IT.md` was
+  last regenerated at Phase 0a (PR #119). If the script changes before
+  the first meeting, regenerate the PDF to keep script and PDF aligned.
+- Supabase advisor still reports five SECURITY DEFINER warnings on the
+  pre-existing `is_admin()`, `list_hosts_for_admin()`, `purge_booking`,
+  `record_qa_exclusion`, `remove_qa_exclusion` functions. Each is
+  gated internally (see "Supabase advisor warnings" above) and the
+  Phase 4 `demo_reset_v1` carries its own presenter allowlist, so
+  these remain documented noise, not an unresolved security gap.
+

@@ -9,32 +9,49 @@ Newest entries at the top of each section.
 
 ### Current round — in-flight
 
-**Round 50 — Demo environment and host onboarding**
+**Round 51 — Self-serve host onboarding: setup checklist + contact widget**
 
-Specification: `PLAN_round50_demo_onboarding.md` (English).
-Presenter script: `docs/DEMO_ONBOARDING_IT.md` and its generated PDF
-`docs/Onboarding_WelcomeBnB_IT.pdf` (Italian, 4 A4 pages, regenerated
-2026-10-12 — source sha256 `7e3163dd…`, PDF sha256 `5d1bd53c…`).
-Generator: `scripts/demo-onboarding-pdf.mjs` (Playwright/Chromium,
-no external install). Keep PDF and script aligned on future edits.
-**Round 50 is operational.** Live at `https://demo.welcomebnb.it` and
-`https://welcomebnb-demo.vercel.app`, deployment
-`dpl_BviYbssEeemeijbdSjphsDvsteU8` (`956cba7`). All phase gates passed
-on the main-branch deployment of each phase. Rollback target
-`dpl_2neFse8DktpBp9F5CSwix4KuuhPD` (`08aaf6e`) available.
+Specification: `PLAN_round51_host_onboarding.md` (English). The gate before
+every host today is a Calendly call; Round 51 replaces it with a derived
+five-step readiness checklist, a contact widget on every host-console page
+(WhatsApp / email / book-a-call), nudge emails for unfinished setup, and an
+admin view that shows which host is stuck on which step. Readiness is always
+computed from real data in `lib/onboarding-readiness.js` so it can't drift.
+No feature is blocked behind the checklist; the call becomes an optional
+rescue path, not a gate.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 0 — Specification | in-progress — Claude 2026-10-12 | `PLAN_round51_host_onboarding.md` + this CHANGELOG table; no code |
+| 1 — Readiness model (pure, shared) | pending | `lib/onboarding-readiness.js` + `scripts/onboarding-readiness.test.mjs` |
+| 2 — Data model | pending | `migration_round51_host_onboarding.sql`; `host_onboarding` RLS probes; `is_test` flag(s) wired; `scripts/audit_policies.sql` unchanged otherwise |
+| 3 — Checklist UI + contact widget | pending | Checklist on **Oggi**, sidebar readiness dot, floating "Aiuto" sheet (WhatsApp / email / Calendly), prefill without PII; `scripts/onboarding-ui.test.mjs` static sweep + manual mobile/desktop screenshots |
+| 4 — "Prova come ospite" (test check-in) | pending | Test check-in path; `is_test=true` rows excluded server-side from autofile tick, manual send, `.txt`/ROSS1000/PayTourist exports, arrival reminders and stats; purge within 24h |
+| 5 — Nudge emails | pending | Hourly job on existing scheduler; 24h + 72h windows; dedup via `notification_log`; opt-out; hash-link handler `#onboarding=<step>` |
+| 6 — Admin readiness view | pending | Per-host readiness, "Bloccati" sortable list, aggregate funnel of support clicks per step; `is_admin()` gated |
+| 7 — End-to-end, demo and docs | pending | Fresh test host journey in production; demo fixtures + script + PDF updated; demo gates (live-smoke, rebuild-verify, e2e) still green |
+
+### Previous round — preserved status
+
+**Round 50 — Demo environment and host onboarding** _(spec: `PLAN_round50_demo_onboarding.md`; operational 2026-10-12)_
+
+Live at `https://demo.welcomebnb.it` and `https://welcomebnb-demo.vercel.app`,
+deployment `dpl_BviYbssEeemeijbdSjphsDvsteU8` (`956cba7`). All phase gates
+passed on the main-branch deployment of each phase. Rollback target
+`dpl_2neFse8DktpBp9F5CSwix4KuuhPD` (`08aaf6e`) available. Italian presenter
+PDF `docs/Onboarding_WelcomeBnB_IT.pdf` (regenerated 2026-10-12, source
+sha256 `7e3163dd…`, PDF sha256 `5d1bd53c…`).
 
 | Phase | Status | Where / test gate |
 |---|---|---|
 | 0 — Specification, script and maintenance rules | shipped — PR #118 — GPT | Original planning delivery |
 | 0a — English plan, autonomy and Italian PDF | shipped — PR #119 — GPT | English docs, mandatory phase gates, Italian script/PDF; content/link/render checks |
 | 1 — Environment configuration and demo guards | shipped — PR #120 — GPT | Local config/guard/production regressions and served preview/production checks pass |
-| 2 — Provisioning and reproducible schema | shipped — PR #121 — GPT + Claude | Hosted demo at `https://welcomebnb-demo.vercel.app` and verified `https://demo.welcomebnb.it`. Main-branch production deployment `dpl_Gm6KFuxjxwodhqFd9gw5gV6q4fB9` (`811c0a0`) READY. Demo Supabase `wmegnnlmcrabndyzywmj`: three migrations tracked and SHA-256 fingerprinted; schema shape fingerprinted (`a2a71990…`); 28 RLS tables, 86 policies, 16 functions, 3 private buckets, 14 storage policies; zero vault/cron/pg_net/production rows; 2 presenter auth users. Mandatory tests all PASS post-merge: hosted Auth/ownership/receipt/document gate 16/16 (GPT, `scripts/demo-auth-storage-gate.mjs`); public-URL smoke 3/3 against the main-branch deployment (Claude, `scripts/demo-live-smoke.mjs` property `50505050-0000-4000-8000-000000000002`); clean-rebuild fingerprint 28/28 with 10 negative-mutation checks (Claude, `scripts/demo-rebuild-verify.{mjs,sql,test.mjs}`). Recovery/rollback runbook in `docs/ROUND50_PROVISIONING.md`. No production project DDL/DML was executed. |
-| 3 — Fictional fixtures and scenarios | shipped — PR #124 — Claude 2026-10-11 | Fixture manifest in `lib/demo-fixtures.mjs`: 2 presenters, 2 properties (Casa Demo WelcomeBnB + Trullo Fico Vicino), 6 Ostuni recommendations with Maps-ready addresses, 2 house rules, 10 booking scenarios with stable UUIDs and Rome-relative dates, 6 IT/EN chat seeds (DEMO-AIUTO escalated), 7 analytics events. Seeder `scripts/demo-seed.mjs` opt-in via APP_ENV=demo + Vercel project guard; idempotent upserts on stable UUIDs. Live verifier `scripts/demo-seed-live.mjs`. Unit tests `scripts/demo-seed.test.mjs` 17/17 PASS. Main-branch deployment `dpl_GeTfNiKKcRQ4K2Nig1gzuhvRiQUD` (`823b510`) READY on `demo.welcomebnb.it`; Phase 2 gates still PASS (live-smoke 3/3, rebuild-verify 28/28, schema fingerprint `a2a71990…` unchanged). Hosted DB state: 2 properties, 6 recos, 2 rules, 10 OTA, 9 checkins (lead + 2 group members), 6 chats, 7 analytics; idempotent across re-upsert. |
-| 4 — Reset and session management | shipped — PR #125 — Claude 2026-10-12 | SECURITY DEFINER function `public.demo_reset_v1(reset_day)` added via `migration_round50_phase4_demo_reset.sql` (version `20261011044424`, 7977 bytes, SHA-256 `74a69117…`). Internal auth gate: `auth.uid()` must match presenter allowlist (2 UUIDs) or raises 42501. `pg_try_advisory_xact_lock(505050004)` serializes concurrent resets. Deletes non-fixture rows for the two demo properties, then rebases scenario dates to the chosen reset day in Europe/Rome. Alloggiati filing log and host credentials are never referenced. Grants: authenticated + service_role only, anon REVOKEd. Mandatory tests all PASS post-merge: 12 unit checks + 5 live-DB auth probes (null-caller 42501, random-authenticated 42501, anon RPC 42501, both presenters succeed, probe-row deletion, fixture restoration + Rome date rebase, second reset idempotent). Main-branch deployment `dpl_2neFse8DktpBp9F5CSwix4KuuhPD` (`08aaf6e`) READY. Schema fingerprint `1a9a5f8177bcaa89a7ec1c0deb7713df9d92b96f43fb3c37b6cb05367d3374e8` (17 functions, +1 vs Phase 2); rebuild-verify reports 29/29 PASS. |
-| 5 — Demo UX and simulations | shipped — PR #126 — Claude 2026-10-12 | Persistent Italian demo banner injected on `index.html` and `host-console.html` (visible only when `WELCOME_BNB_CONFIG.mode==='demo'`). `demo-launch.html` standalone page lists all ten scenarios with guest URLs, inline QR codes, presenter sign-in and a Ripristina-demo button that calls `supabase.rpc('demo_reset_v1', ...)`. Alloggiati simulation added as `?action=demo_simulate_filing` with three stages; demo-gated, zero SOAP symbols in the sim body, zero network calls in the in-process test. Mandatory tests all PASS post-merge: `scripts/demo-ux.test.mjs` static sweep + `scripts/demo-ux-sim.test.mjs` in-process. Main-branch deployment `dpl_3bBKKg6PYk7nyC4H5nir8Q7ycFsj` (`2359ab5`) READY; `/demo-launch.html` serves `text/html` 200 on `demo.welcomebnb.it`. Phase 2-4 regressions remain green. |
-| 6 — End-to-end verification and operational release | shipped — PR #127 — Claude 2026-10-12 | `scripts/demo-e2e.test.mjs` sweeps every public asset for secret patterns + production ref; cross-env token denial; 9 integration-denial endpoints; 3 simulation stages; all PASS post-merge against `dpl_BviYbssEeemeijbdSjphsDvsteU8` (`956cba7`). Full guest journey executed twice via DB (chat+checkin+analytics+dismissal → reset → fixtures restored; alloggiati_filing_log untouched; 0 vault/cron/production rows after both runs). Rollback-eligible: `dpl_2neFse…` (Phase 4 `08aaf6e`). Release notes + operating cost + maintenance owner + honest limitations in `docs/ROUND50_PROVISIONING.md` → "Phase 6 release verification". **Round 50 operational on `https://demo.welcomebnb.it`.** |
-
-### Previous round — preserved status
+| 2 — Provisioning and reproducible schema | shipped — PR #121 — GPT + Claude | Hosted demo + verified `demo.welcomebnb.it`; 3 migrations SHA-256 fingerprinted, schema shape fingerprinted; 16/16 Auth/ownership/receipt/document gate, 3/3 public-URL smoke, 28/28 rebuild-verify |
+| 3 — Fictional fixtures and scenarios | shipped — PR #124 — Claude 2026-10-11 | `lib/demo-fixtures.mjs`: 2 presenters, 2 properties, 6 Ostuni recos, 2 rules, 10 scenarios with Rome-relative dates, 6 chats, 7 analytics; seeder idempotent; 17/17 unit + hosted idempotency |
+| 4 — Reset and session management | shipped — PR #125 — Claude 2026-10-12 | `public.demo_reset_v1(reset_day)` SECURITY DEFINER with internal presenter allowlist + `pg_try_advisory_xact_lock(505050004)`; Alloggiati filing log untouched; 12 unit + 5 live-DB auth probes |
+| 5 — Demo UX and simulations | shipped — PR #126 — Claude 2026-10-12 | Demo banner on guest + host; `demo-launch.html` with QR + Ripristina button; Alloggiati `?action=demo_simulate_filing` (three FACSIMILE stages, zero SOAP symbols, zero network calls) |
+| 6 — End-to-end verification and operational release | shipped — PR #127 — Claude 2026-10-12 | `demo-e2e.test.mjs` + full twice-journey + rollback evidence + release notes; **Round 50 operational** |
 
 **Round 49 — Automatic Alloggiati filing** (spec: Daniele's prompt pinned 2026-10-05)
 

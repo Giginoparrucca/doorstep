@@ -9,7 +9,7 @@ This short status file supplements CHANGELOG.md.
 | 2 | shipped - PR #121 - GPT + Claude 2026-10-11 | 16-check Auth/ownership gate (GPT) + 3-check public-URL smoke (Claude) + 28-check clean-rebuild fingerprint (Claude) + 10-case negative-mutation test re-run against main-branch deployment `dpl_Gm6KFuxjxwodhqFd9gw5gV6q4fB9`; recovery runbook recorded |
 | 3 | shipped - PR #124 - Claude 2026-10-11 | 17-check unit tests + hosted idempotent seed + 10-scenario date-math and 7-day-boundary verification; schema fingerprint unchanged; main-branch deployment `dpl_GeTf…` READY |
 | 4 | shipped - PR #125 - Claude 2026-10-12 | SECURITY DEFINER `demo_reset_v1` + advisory lock + presenter-only internal gate; 12 unit checks + 5 live-DB auth probes PASS post-merge; schema fingerprint `1a9a5f81…` (17 functions) and rebuild-verify 29/29; main-branch deployment `dpl_2neFse…` READY |
-| 5 | implementation complete - Claude 2026-10-12 (PR pending) | Demo banner + demo-launch.html + Alloggiati simulation; 5 static + 8 in-process checks PASS, zero SOAP imports and zero network calls in sim path |
+| 5 | shipped - PR #126 - Claude 2026-10-12 | Demo banner + demo-launch.html + Alloggiati simulation; 5 static + 8 in-process checks PASS post-merge; `dpl_3bBKKg6…` READY and serving `/demo-launch.html` |
 | 6 | pending | Phase 6 ready to start |
 
 GPT resumes under Daniele's instruction after Claude reached its usage limit. Phase 2 remains incomplete. Preserve Claude's evidence and attribution.

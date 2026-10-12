@@ -3082,6 +3082,7 @@ function renderInvitesPanel() {
           <td style="text-align:center;font-size:0.82rem;font-family:monospace;">${escapeHtml(String(propCount ?? '—'))}</td>
           <td style="white-space:nowrap;">
             ${inv.status !== 'accepted' ? `<button onclick="opsInviteAction('resend','${escapeHtml(email)}')" style="padding:4px 10px;background:var(--warm);color:#fff;border:none;border-radius:4px;font-size:0.7rem;cursor:pointer;font-family:inherit;">Resend</button>` : ''}
+            ${inv.status !== 'accepted' ? `<button onclick="opsCopyInviteLink('${escapeHtml(email)}', this)" title="Copia il link e inviaglielo dalla tua email personale" style="padding:4px 10px;background:#111827;color:#fff;border:none;border-radius:4px;font-size:0.7rem;cursor:pointer;font-family:inherit;margin-left:4px;">Copy link</button>` : ''}
             ${inv.status !== 'revoked' ? `<button onclick="opsInviteAction('revoke','${escapeHtml(email)}')" style="padding:4px 10px;background:transparent;color:#b03a3a;border:1px solid #b03a3a;border-radius:4px;font-size:0.7rem;cursor:pointer;font-family:inherit;margin-left:4px;">Revoke</button>` : ''}
           </td>
         </tr>`;
@@ -3174,6 +3175,39 @@ async function opsInviteAction(action, emailArg) {
     _opsInvToast('Request failed: ' + (e?.message || e), 'error');
   } finally {
     if (btn && action === 'invite') { btn.disabled = false; btn.textContent = 'Send invitation'; }
+  }
+}
+
+// Round 51 hotfix — generate an invite link and copy it to the
+// clipboard without sending the Supabase email. Daniele uses this to
+// forward the invite from his personal Gmail (better deliverability
+// than our automated sender). The server-side action is `generate_link`.
+async function opsCopyInviteLink(email, btn) {
+  _opsInvToast('Generating link…', 'info');
+  try {
+    const { data: sess } = await sb.auth.getSession();
+    const jwt = sess?.session?.access_token;
+    if (!jwt) { _opsInvToast('Not signed in.', 'error'); return; }
+    const resp = await fetch('/api/admin-invite-host', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
+      body: JSON.stringify({ action: 'generate_link', email }),
+    });
+    const body = await resp.json().catch(() => ({}));
+    if (!resp.ok || body?.ok === false || !body?.link) {
+      _opsInvToast('Failed: ' + (body?.error || body?.detail || `HTTP ${resp.status}`), 'error');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(body.link);
+      _opsInvToast('✓ Invite link copied — paste it into your email to ' + email, 'ok');
+      if (btn) { const prev = btn.textContent; btn.textContent = 'Copied ✓'; setTimeout(() => btn.textContent = prev, 1800); }
+    } catch (_) {
+      // Fallback: show it in a prompt so the admin can copy manually.
+      window.prompt('Copy the invite link below:', body.link);
+    }
+  } catch (e) {
+    _opsInvToast('Request failed: ' + (e?.message || e), 'error');
   }
 }
 

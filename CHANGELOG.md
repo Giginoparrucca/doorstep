@@ -65,6 +65,25 @@ sha256 `7e3163dd…`, PDF sha256 `5d1bd53c…`).
 
 ---
 
+## Hotfix — host-invite accept flow (2026-10-12)
+
+The previous invite link landed on `index.html` (the guest app), which immediately rendered "Invalid check-in link"; the Supabase default email came from `noreply@mail.app.supabase.io` and often landed in spam; the body was English-only; and `pilot_invites.status` never flipped to `accepted` — the admin table lied.
+
+Fix shipped in a single PR:
+
+- `api/admin-invite-host.js` now uses `POST /auth/v1/admin/generatelink` with `type=invite` and `redirect_to=<APP_BASE_URL>/host-console.html` so the invitee lands on the host console. Supabase sends no email itself; we send a bilingual (IT + EN) HTML message through Resend from `WelcomeBnB <notifiche@welcomebnb.it>` (already DKIM/SPF/DMARC-signed on `welcomebnb.it` since Round 42) with `List-Unsubscribe` and `List-Unsubscribe-Post: One-Click` headers to satisfy the Gmail/Yahoo 2024 bulk-sender rules. The `invite` and `resend` actions both go through this path; the response carries the real Resend `email_id` and the raw `link` so the admin can still copy it when deliverability is a concern.
+- New `?action=generate_link` returns the invite URL without touching email. Admin can copy it into a personal Gmail (bypasses our automated sender entirely).
+- `admin.html` grows a **Copy link** button next to each pending invite that calls the new action, writes the URL to the clipboard and falls back to a `prompt` when `navigator.clipboard` is unavailable.
+- `migration_round51_accept_invite.sql` adds a SECURITY DEFINER `public.accept_my_invite()`. It uses `auth.email()` to find the caller's `pilot_invites` row and flips `status→accepted`, `accepted_at=now()`. Idempotent (second call returns `already:true`). Granted to `authenticated` + `service_role`; `anon` revoked. Verified in production: `anon` call returns 42501, no-session call returns `{ok:false,code:"no_session"}`, authenticated-with-matching-email flips the row (RLS still blocks a direct SELECT, which is the point — only admin reads).
+- `host-console.html` detects `type=invite` in the URL hash on `SIGNED_IN`, prompts for a password (IT/EN by `hostLang`), calls `supabase.rpc('accept_my_invite')`, cleans the hash via `history.replaceState`, and redirects to the clean host-console URL. The existing `PASSWORD_RECOVERY` path is unchanged.
+
+**Owner-only follow-up** (Supabase dashboard):
+
+- Authentication → URL Configuration → **Redirect URLs**: add `https://app.welcomebnb.it/host-console.html` and the preview-origin equivalent so GoTrue accepts the `redirect_to`. The deploy ships the back-end change, but the token exchange refuses an unlisted redirect.
+- Optional: keep the Site URL unchanged (it's used only as a fallback). The invite now always carries an explicit `redirect_to`.
+
+---
+
 ## Hotfix — additional guest check-in (2026-10-07)
 
 - Fixed the guest gateway dropping explicitly empty `document_type` and

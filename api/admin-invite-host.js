@@ -1,4 +1,4 @@
-import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, rejectDemoIntegration } from './_environment.js';
+import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, HOST_CONSOLE_URL, rejectDemoIntegration } from './_environment.js';
 // api/admin-invite-host.js — Round 38, invite-only host access.
 //
 // Admin-only endpoint that manages `pilot_invites` and drives Supabase's
@@ -41,6 +41,14 @@ import { applyCors } from './_cors.js';
 
 
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const RESEND_KEY  = process.env.RESEND_API_KEY;
+const INVITE_FROM = process.env.INVITE_FROM || 'WelcomeBnB <notifiche@welcomebnb.it>';
+const INVITE_REPLY_TO = process.env.INVITE_REPLY_TO || 'info@welcomebnb.it';
+// Where the invite link lands after Supabase confirms the token. The
+// host-console detects type=invite in the URL hash and prompts the
+// invitee to set a password. Must be in the Supabase Auth redirect
+// allowlist (dashboard → Authentication → URL Configuration).
+const INVITE_REDIRECT_TO = HOST_CONSOLE_URL || (APP_BASE_URL ? APP_BASE_URL + '/host-console.html' : '');
 
 const MAX_BODY_BYTES = 4 * 1024;
 
@@ -86,14 +94,15 @@ export default async function handler(req, res) {
   const email = normEmail(emailRaw);
   if (!email) return res.status(400).json({ error: 'email required' });
   if (!isEmailShape(email)) return res.status(400).json({ error: 'email malformed' });
-  if (!['invite', 'resend', 'revoke'].includes(action)) {
-    return res.status(400).json({ error: 'action must be invite | resend | revoke' });
+  if (!['invite', 'resend', 'revoke', 'generate_link'].includes(action)) {
+    return res.status(400).json({ error: 'action must be invite | resend | revoke | generate_link' });
   }
 
   try {
-    if (action === 'invite') return res.status(200).json(await doInvite(email, userId, notes || null));
-    if (action === 'resend') return res.status(200).json(await doResend(email, userId));
-    if (action === 'revoke') return res.status(200).json(await doRevoke(email));
+    if (action === 'invite')        return res.status(200).json(await doInvite(email, userId, notes || null));
+    if (action === 'resend')        return res.status(200).json(await doResend(email, userId));
+    if (action === 'revoke')        return res.status(200).json(await doRevoke(email));
+    if (action === 'generate_link') return res.status(200).json(await doGenerateLink(email));
   } catch (e) {
     console.error('[admin-invite-host]', action, email, e);
     return res.status(500).json({ error: String(e && e.message || e) });
@@ -102,19 +111,26 @@ export default async function handler(req, res) {
 
 // ── Actions ─────────────────────────────────────────────────────────────
 async function doInvite(email, actorId, notes) {
-  // Send Supabase's invitation email via the GoTrue invite endpoint.
-  // Round 46 — path was '/auth/v1/admin/invite' when R38 shipped;
-  // Supabase upgraded GoTrue and removed that alias, so the admin API
-  // now 404s. The live path is '/auth/v1/invite' (also what
-  // supabase.auth.admin.inviteUserByEmail() in supabase-js uses). The
-  // service-role bearer in the request headers is what authorises it.
-  const invited = await gotruePost('/auth/v1/invite', { email });
-  if (!invited.ok) {
-    console.warn('[admin-invite-host] GoTrue invite failed', email, invited.status, invited.text?.slice(0, 300));
-    return { ok: false, stage: 'invite', status: invited.status, detail: invited.text };
+  // Round 51 hotfix — we no longer rely on Supabase to send the invite
+  // email. The default sender `noreply@mail.app.supabase.io` lands in
+  // spam often, the recipient lands on the guest `index.html` (because
+  // the Supabase Site URL points at the app root), and the body is
+  // monolingual English. We solve all three problems by:
+  //   1. generating the token-bearing confirmation URL via
+  //      `/auth/v1/admin/generatelink` (no email sent), passing a
+  //      `redirect_to` of the host console; and
+  //   2. sending our own bilingual (IT + EN) HTML email through Resend
+  //      from `notifiche@welcomebnb.it`, which already has DKIM/SPF
+  //      configured for welcomebnb.it (arrival-reminder sender since
+  //      Round 42).
+  const linkRes = await _generateInviteLink(email);
+  if (!linkRes.ok) {
+    console.warn('[admin-invite-host] generatelink failed', email, linkRes.status, linkRes.text?.slice(0, 300));
+    return { ok: false, stage: 'generatelink', status: linkRes.status, detail: linkRes.text };
   }
   // Upsert pilot_invites row. Reset a `revoked` row to `invited` so the
-  // history stays legible.
+  // history stays legible. We do this BEFORE sending so a Resend outage
+  // still records the invite (admin can resend / copy link).
   await pgrestPOST('/rest/v1/pilot_invites?on_conflict=email', {
     email,
     status: 'invited',
@@ -123,7 +139,14 @@ async function doInvite(email, actorId, notes) {
     invited_by: actorId,
     notes,
   }, { Prefer: 'resolution=merge-duplicates,return=minimal' });
-  return { ok: true, action: 'invite', email };
+
+  const sent = await _sendInviteEmail(email, linkRes.url);
+  if (!sent.ok) {
+    // Record the row anyway; expose the link so the admin can send
+    // manually (from their personal mailbox).
+    return { ok: false, stage: 'send', detail: sent.error, link: linkRes.url };
+  }
+  return { ok: true, action: 'invite', email, email_id: sent.id || null, link: linkRes.url };
 }
 
 async function doResend(email, actorId) {
@@ -132,17 +155,140 @@ async function doResend(email, actorId) {
   const row = await pgrestGET(`/rest/v1/pilot_invites?email=eq.${encodeURIComponent(email)}&select=status`);
   if (!row || row.length === 0) return { ok: false, error: 'no invite row for that email' };
   if (row[0].status === 'accepted') return { ok: false, error: 'already accepted; no resend' };
-  const invited = await gotruePost('/auth/v1/invite', { email });
-  if (!invited.ok) {
-    console.warn('[admin-invite-host] GoTrue resend failed', email, invited.status, invited.text?.slice(0, 300));
-    return { ok: false, stage: 'resend', status: invited.status, detail: invited.text };
+  const linkRes = await _generateInviteLink(email);
+  if (!linkRes.ok) {
+    return { ok: false, stage: 'generatelink', status: linkRes.status, detail: linkRes.text };
   }
   await pgrestPATCH(`/rest/v1/pilot_invites?email=eq.${encodeURIComponent(email)}`, {
     status: 'invited',
     invited_at: new Date().toISOString(),
     invited_by: actorId,
   });
-  return { ok: true, action: 'resend', email };
+  const sent = await _sendInviteEmail(email, linkRes.url);
+  if (!sent.ok) {
+    return { ok: false, stage: 'send', detail: sent.error, link: linkRes.url };
+  }
+  return { ok: true, action: 'resend', email, email_id: sent.id || null, link: linkRes.url };
+}
+
+// Returns the confirmation URL without sending any email. The admin UI
+// then shows a Copy button; the admin can forward the invite from their
+// personal mailbox for deliverability.
+async function doGenerateLink(email) {
+  const linkRes = await _generateInviteLink(email);
+  if (!linkRes.ok) return { ok: false, stage: 'generatelink', status: linkRes.status, detail: linkRes.text };
+  return { ok: true, action: 'generate_link', email, link: linkRes.url };
+}
+
+// ── Invite link + email helpers ─────────────────────────────────────────
+async function _generateInviteLink(email) {
+  const body = { type: 'invite', email };
+  if (INVITE_REDIRECT_TO) body.redirect_to = INVITE_REDIRECT_TO;
+  const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/generatelink`, {
+    method: 'POST',
+    headers: {
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await r.text().catch(() => '');
+  if (!r.ok) return { ok: false, status: r.status, text };
+  let payload = null;
+  try { payload = JSON.parse(text); } catch (_) {}
+  // GoTrue returns { action_link, email_otp, hashed_token, ... } under
+  // `properties`. Different Supabase versions nest it differently; try
+  // both shapes.
+  const url = (payload && (
+    (payload.properties && payload.properties.action_link) ||
+    payload.action_link
+  )) || null;
+  if (!url) return { ok: false, status: r.status, text: 'generatelink response missing action_link' };
+  return { ok: true, url };
+}
+
+async function _sendInviteEmail(email, actionLink) {
+  if (!RESEND_KEY) return { ok: false, error: 'RESEND_API_KEY not set' };
+  const subject = 'WelcomeBnB — Il tuo invito · Your invitation';
+  const linkEsc = _escAttr(actionLink);
+  const html = _renderInviteEmail(linkEsc);
+  const plain =
+    'Benvenuto in WelcomeBnB!\n\n' +
+    "Fai clic sul link qui sotto per creare la tua password e accedere alla console host.\n" +
+    actionLink + '\n\n' +
+    '— — —\n\n' +
+    'Welcome to WelcomeBnB!\n\n' +
+    'Click the link below to set your password and sign in to the host console.\n' +
+    actionLink + '\n';
+  try {
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${RESEND_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: INVITE_FROM,
+        to: [email],
+        reply_to: INVITE_REPLY_TO,
+        subject,
+        html,
+        text: plain,
+        // Lightweight anti-spam headers Resend passes to upstream SMTP.
+        // We rely on DKIM+SPF+DMARC on welcomebnb.it (already deployed
+        // for notifiche@) for authentication; List-Unsubscribe is a
+        // bulk-mail requirement for Gmail/Yahoo 2024.
+        headers: {
+          'List-Unsubscribe': '<mailto:' + INVITE_REPLY_TO + '?subject=unsubscribe>',
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        },
+      }),
+    });
+    if (!r.ok) {
+      const t = await r.text().catch(() => '');
+      return { ok: false, status: r.status, error: t };
+    }
+    const json = await r.json().catch(() => ({}));
+    return { ok: true, status: r.status, id: json.id || null };
+  } catch (e) {
+    return { ok: false, error: String(e && e.message || e) };
+  }
+}
+
+function _renderInviteEmail(linkEsc) {
+  return `<!doctype html><html><body style="margin:0;padding:0;background:#f6f3ee;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1a1a1a;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f6f3ee;padding:28px 12px;">
+    <tr><td align="center">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+        <tr><td style="padding:28px 32px 8px;">
+          <div style="font-size:14pt;font-weight:700;letter-spacing:-0.01em;">WelcomeBnB</div>
+          <div style="font-size:10pt;color:#6b7280;">Host console · access invitation</div>
+        </td></tr>
+        <tr><td style="padding:16px 32px 0;">
+          <h2 style="margin:0 0 8px;font-size:16pt;">Benvenuto in WelcomeBnB</h2>
+          <p style="margin:0 0 10px;line-height:1.55;">Qualcuno ti ha invitato a usare la console host di WelcomeBnB. Clicca sul pulsante qui sotto per impostare la tua password e accedere.</p>
+          <p style="margin:0 0 12px;color:#4b5563;font-size:0.92rem;line-height:1.55;">Questo link scade dopo l'uso o dopo il periodo di validità impostato da Supabase. Se non lo usi oggi, chiedici un nuovo invito.</p>
+          <p style="margin:16px 0;"><a href="${linkEsc}" style="display:inline-block;background:#111827;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:0.95rem;">Imposta la password e accedi →</a></p>
+          <hr style="border:0;border-top:1px solid #e5e7eb;margin:22px 0;">
+          <h2 style="margin:0 0 8px;font-size:16pt;">Welcome to WelcomeBnB</h2>
+          <p style="margin:0 0 10px;line-height:1.55;">Someone invited you to use the WelcomeBnB host console. Click the button below to set your password and sign in.</p>
+          <p style="margin:0 0 12px;color:#4b5563;font-size:0.92rem;line-height:1.55;">This link expires after it is used or after the window set in Supabase. If you don't use it today, ask us for a fresh invite.</p>
+          <p style="margin:16px 0;"><a href="${linkEsc}" style="display:inline-block;background:#111827;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:0.95rem;">Set your password and sign in →</a></p>
+        </td></tr>
+        <tr><td style="padding:18px 32px 28px;color:#6b7280;font-size:0.78rem;line-height:1.5;">
+          <p style="margin:0 0 6px;">Se il pulsante non funziona, apri questo link nel browser:<br><span style="word-break:break-all;color:#1f2937;">${linkEsc}</span></p>
+          <p style="margin:10px 0 0;">If the button does not work, open this link in your browser:<br><span style="word-break:break-all;color:#1f2937;">${linkEsc}</span></p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table></body></html>`;
+}
+
+function _escAttr(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+  });
 }
 
 async function doRevoke(email) {
@@ -192,19 +338,6 @@ async function callerIsAdmin(jwt) {
     const v = await r.json();
     return v === true;
   } catch (_) { return false; }
-}
-async function gotruePost(path, body) {
-  const r = await fetch(`${SUPABASE_URL}${path}`, {
-    method: 'POST',
-    headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-  const text = await r.text().catch(() => '');
-  return { ok: r.ok, status: r.status, text };
 }
 async function gotrueGetJSON(path) {
   const r = await fetch(`${SUPABASE_URL}${path}`, {

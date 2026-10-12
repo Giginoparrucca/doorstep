@@ -1,4 +1,4 @@
-import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, rejectDemoIntegration } from './_environment.js';
+import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, rejectDemoIntegration, IS_DEMO } from './_environment.js';
 // api/alloggiati.js — Round 44 Phase 0.5
 //
 // Consolidated Alloggiati Web endpoint. Action-routed to stay under
@@ -935,11 +935,94 @@ async function logFiling({ propertyId, trigger, checkinIds, outcome, errorCode =
   }
 }
 
+// ── Round 50 Phase 5 — demo filing simulation ───────────────────────
+// Returns a canned validate/send/receipt payload for one of the ten
+// Phase 3 scenarios. The handler never imports or references the
+// Alloggiati SOAP module; the scenario payloads are derived from the
+// request body and the fixture allowlist. The response is deliberately
+// labelled FACSIMILE and includes a visible disclaimer so a screenshot
+// cannot be mistaken for a real receipt.
+async function runDemoFilingSimulation(req, res) {
+  const allowed = applyCors(req, res);
+  if (req.method === 'OPTIONS') return res.status(allowed ? 200 : 403).end();
+  if (!allowed) return res.status(403).json({ error: 'Origin not allowed' });
+  if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
+
+  const body = req.body || {};
+  const stage = String(body.stage || 'validate').trim();
+  const bookingCode = String(body.booking_code || '').trim();
+  const nowIso = new Date().toISOString();
+
+  const demoFacsimileReceiptPath = 'receipts/demo/FACSIMILE-' + encodeURIComponent(bookingCode || 'DEMO') + '.pdf';
+  const facsimileLine = {
+    cognome: 'FACSIMILE', nome: 'DEMO', data_nascita: '1990-01-01',
+    tipo_documento: 'PASSAPORTO', numero_documento: 'FACSIMILE-00',
+    tipo_alloggiato: 'OSPITE', note: 'DEMO · nessuna chiamata SOAP',
+  };
+
+  if (stage === 'validate') {
+    // One deliberately correctable error — the presenter demonstrates
+    // the fix flow before clicking "Invia".
+    return res.status(200).json({
+      ok: true, demo: true, stage,
+      facsimile: true,
+      line: facsimileLine,
+      per_row: [{ line_number: 1, valid: false, errors: [
+        { field: 'luogo_nascita', message: 'FACSIMILE: compilare "DEMO" per la demo (correzione dimostrativa).' },
+      ] }],
+      disclaimer: 'Validazione simulata. Nessuna chiamata SOAP.',
+      run_at: nowIso,
+    });
+  }
+  if (stage === 'send') {
+    return res.status(200).json({
+      ok: true, demo: true, stage,
+      facsimile: true,
+      filed_count: 1,
+      per_row: [{ line_number: 1, filed: true }],
+      receipt_path: demoFacsimileReceiptPath,
+      receipt_token: 'FACSIMILE-' + Math.random().toString(36).slice(2, 10),
+      disclaimer: 'Invio simulato. Nessuna chiamata SOAP; nessun invio reale a Questura.',
+      run_at: nowIso,
+    });
+  }
+  if (stage === 'receipt') {
+    return res.status(200).json({
+      ok: true, demo: true, stage,
+      facsimile: true,
+      receipt_path: demoFacsimileReceiptPath,
+      receipt_body: {
+        emesso_il: nowIso,
+        emesso_da: 'Alloggiati Web — SIMULATO · FACSIMILE',
+        righe: [facsimileLine],
+      },
+      disclaimer: 'Ricevuta FACSIMILE. Non vale come prova di invio.',
+      run_at: nowIso,
+    });
+  }
+  return res.status(400).json({ error: 'Unknown demo_simulate_filing stage',
+    allowed_stages: ['validate', 'send', 'receipt'] });
+}
+
 // ── main handler ────────────────────────────────────────────────────
 export default async function handler(req, res) {
   if (rejectInvalidEnvironment(res)) return;
-  if (rejectDemoIntegration(res, 'alloggiati')) return;
   const action = String((req.query && req.query.action) || '').trim();
+
+  // Round 50 Phase 5 — demo-only simulation path.
+  // Lives BEFORE `rejectDemoIntegration` so a presenter demo build
+  // can exercise validate → rejection → send → receipt without any
+  // SOAP call. The handler returns canned responses derived from the
+  // Phase 3 fixture allowlist and never invokes `generateToken`,
+  // `authenticationTest`, `soapTest`, `soapSend` or `soapRicevuta`.
+  // Verified by scripts/alloggiati-demo-sim.test.mjs — a static
+  // regex ensures the function body under this branch does not
+  // reference any SOAP symbol.
+  if (action === 'demo_simulate_filing' && IS_DEMO) {
+    return await runDemoFilingSimulation(req, res);
+  }
+
+  if (rejectDemoIntegration(res, 'alloggiati')) return;
 
   // Round 49 Phase 3 — autofile_tick is a server-to-server call from
   // Supabase pg_cron. It has no Origin and no host JWT; the whole

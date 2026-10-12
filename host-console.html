@@ -3566,35 +3566,56 @@ async function checkAuth() {
 
 // Handle password recovery and invite from email links.
 sb.auth.onAuthStateChange(async (event, session) => {
-  // Round 51 hotfix — a magic-link invite lands here with
-  // `type=invite` in the URL hash. Supabase emits SIGNED_IN once the
-  // token exchange completes, so detect the invite marker in the hash
-  // and run the one-shot "set a password" flow before anything else.
+  // Round 51 hotfix — an invite / magic-link / recovery lands here
+  // with `type=<kind>` in the URL hash. Supabase emits SIGNED_IN once
+  // the token exchange completes. On BOTH `type=invite` and
+  // `type=magiclink` the recipient may not have a password yet
+  // (magiclink is the fallback the server uses when the auth user
+  // already exists; same ergonomics as invite — one-click sign-in,
+  // then set a password). We treat them identically.
   var hash = (location.hash || '');
-  var isInvite = /\btype=invite\b/.test(hash);
-  if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && isInvite)) {
+  var hashType = (hash.match(/\btype=([a-z_]+)\b/) || [])[1] || null;
+  var isFirstTimeHashLink = hashType === 'invite' || hashType === 'magiclink';
+  if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && isFirstTimeHashLink)) {
     var isIt = hostLang === 'it';
-    var promptMsg = (event === 'PASSWORD_RECOVERY')
-      ? (isIt ? 'Inserisci la tua nuova password (minimo 6 caratteri):' : 'Enter your new password (minimum 6 characters):')
-      : (isIt ? 'Benvenuto! Imposta la tua password (minimo 6 caratteri):' : 'Welcome! Set your password (minimum 6 characters):');
+    var promptMsg;
+    if (event === 'PASSWORD_RECOVERY') {
+      promptMsg = isIt
+        ? 'Inserisci la tua nuova password (minimo 6 caratteri):'
+        : 'Enter your new password (minimum 6 characters):';
+    } else {
+      // Magic-link resend into an already-existing account can mean the
+      // user already has a password and just wanted a one-click sign-in.
+      // Make the prompt explicit about the choice (OK sets a password,
+      // Cancel skips — a password that was already set stays as it was).
+      promptMsg = isIt
+        ? 'Benvenuto! Imposta la tua password (minimo 6 caratteri). Lascia vuoto o Annulla per mantenere quella esistente.'
+        : 'Welcome! Set your password (minimum 6 characters). Leave empty or Cancel to keep your existing one.';
+    }
     var newPass = prompt(promptMsg);
+    var passwordSet = false;
     if (newPass && newPass.length >= 6) {
       var upd = await sb.auth.updateUser({ password: newPass });
       if (upd.error) {
         alert((isIt ? 'Errore: ' : 'Error: ') + upd.error.message);
-      } else {
-        if (isInvite) {
-          // Flip pilot_invites.status → accepted. The RPC uses auth.email()
-          // internally, so no PII in the request body.
-          try { await sb.rpc('accept_my_invite'); } catch (_) {}
-          alert(isIt ? '✅ Benvenuto! Password impostata, accesso riuscito.' : '✅ Welcome! Password set, you are signed in.');
-        } else {
-          alert(isIt ? '✅ Password aggiornata! Ora puoi accedere.' : '✅ Password updated! You can now sign in.');
-        }
-        // Clean the hash so a page refresh doesn't re-trigger the prompt.
-        try { history.replaceState({}, document.title, window.location.pathname + window.location.search); } catch (_) {}
-        window.location.href = window.location.origin + '/host-console.html';
+        return;
       }
+      passwordSet = true;
+    }
+    if (isFirstTimeHashLink) {
+      // Flip pilot_invites.status → accepted. The RPC uses auth.email()
+      // internally, so no PII in the request body.
+      try { await sb.rpc('accept_my_invite'); } catch (_) {}
+      alert(isIt
+        ? (passwordSet ? '✅ Benvenuto! Password impostata, accesso riuscito.' : '✅ Benvenuto! Accesso riuscito.')
+        : (passwordSet ? '✅ Welcome! Password set, you are signed in.' : '✅ Welcome! You are signed in.'));
+    } else if (passwordSet) {
+      alert(isIt ? '✅ Password aggiornata! Ora puoi accedere.' : '✅ Password updated! You can now sign in.');
+    }
+    // Clean the hash so a page refresh doesn't re-trigger the prompt.
+    try { history.replaceState({}, document.title, window.location.pathname + window.location.search); } catch (_) {}
+    if (passwordSet) {
+      window.location.href = window.location.origin + '/host-console.html';
     }
     return;
   }

@@ -182,7 +182,24 @@ async function doGenerateLink(email) {
 
 // ── Invite link + email helpers ─────────────────────────────────────────
 async function _generateInviteLink(email) {
-  const body = { type: 'invite', email };
+  // Try `type=invite` first — that's the right link for a brand new
+  // auth user. If GoTrue says the user already exists (422
+  // `email_exists`), the invite was previously generated and the user
+  // row is still present. In that case a magic-link does the same job
+  // for a resend: it signs the user in with a one-time token and the
+  // host-console still runs its SIGNED_IN handler to prompt for a
+  // password and flip pilot_invites.status → accepted.
+  var first = await _callGenerateLink({ type: 'invite', email });
+  if (first.ok) return first;
+  if (first.status === 422 && /email_exists/i.test(first.text || '')) {
+    var second = await _callGenerateLink({ type: 'magiclink', email });
+    if (second.ok) return { ok: true, url: second.url, fallback: 'magiclink' };
+    return second;
+  }
+  return first;
+}
+
+async function _callGenerateLink(body) {
   if (INVITE_REDIRECT_TO) body.redirect_to = INVITE_REDIRECT_TO;
   const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/generatelink`, {
     method: 'POST',

@@ -3564,21 +3564,49 @@ async function checkAuth() {
   return false;
 }
 
-// Handle password recovery from email link
+// Handle password recovery and invite from email links.
 sb.auth.onAuthStateChange(async (event, session) => {
-  if (event === 'PASSWORD_RECOVERY') {
-    const newPass = prompt(hostLang === 'it'
-      ? 'Inserisci la tua nuova password (minimo 6 caratteri):'
-      : 'Enter your new password (minimum 6 characters):');
+  // Round 51 hotfix — a magic-link invite lands here with
+  // `type=invite` in the URL hash. Supabase emits SIGNED_IN once the
+  // token exchange completes, so detect the invite marker in the hash
+  // and run the one-shot "set a password" flow before anything else.
+  var hash = (location.hash || '');
+  var isInvite = /\btype=invite\b/.test(hash);
+  if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && isInvite)) {
+    var isIt = hostLang === 'it';
+    var promptMsg = (event === 'PASSWORD_RECOVERY')
+      ? (isIt ? 'Inserisci la tua nuova password (minimo 6 caratteri):' : 'Enter your new password (minimum 6 characters):')
+      : (isIt ? 'Benvenuto! Imposta la tua password (minimo 6 caratteri):' : 'Welcome! Set your password (minimum 6 characters):');
+    var newPass = prompt(promptMsg);
     if (newPass && newPass.length >= 6) {
-      const { error } = await sb.auth.updateUser({ password: newPass });
-      if (error) {
-        alert((hostLang === 'it' ? 'Errore: ' : 'Error: ') + error.message);
+      var upd = await sb.auth.updateUser({ password: newPass });
+      if (upd.error) {
+        alert((isIt ? 'Errore: ' : 'Error: ') + upd.error.message);
       } else {
-        alert(hostLang === 'it' ? '✅ Password aggiornata! Ora puoi accedere.' : '✅ Password updated! You can now sign in.');
+        if (isInvite) {
+          // Flip pilot_invites.status → accepted. The RPC uses auth.email()
+          // internally, so no PII in the request body.
+          try { await sb.rpc('accept_my_invite'); } catch (_) {}
+          alert(isIt ? '✅ Benvenuto! Password impostata, accesso riuscito.' : '✅ Welcome! Password set, you are signed in.');
+        } else {
+          alert(isIt ? '✅ Password aggiornata! Ora puoi accedere.' : '✅ Password updated! You can now sign in.');
+        }
+        // Clean the hash so a page refresh doesn't re-trigger the prompt.
+        try { history.replaceState({}, document.title, window.location.pathname + window.location.search); } catch (_) {}
         window.location.href = window.location.origin + '/host-console.html';
       }
     }
+    return;
+  }
+  // Round 51 — ensure invite acceptance is recorded even if the user
+  // signed in via a magic link whose hash was consumed by Supabase JS
+  // before this handler ran.
+  if (event === 'SIGNED_IN') {
+    try {
+      var meta = session && session.user && session.user.user_metadata || {};
+      if (meta.invite_accepted) return;
+      await sb.rpc('accept_my_invite');
+    } catch (_) { /* non-fatal */ }
   }
 });
 

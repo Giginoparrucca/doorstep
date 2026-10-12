@@ -12,7 +12,11 @@ Newest entries at the top of each section.
 **Round 50 — Demo environment and host onboarding**
 
 Specification: `PLAN_round50_demo_onboarding.md` (English).
-Presenter script: `docs/DEMO_ONBOARDING_IT.md` and its generated PDF (Italian).
+Presenter script: `docs/DEMO_ONBOARDING_IT.md` and its generated PDF
+`docs/Onboarding_WelcomeBnB_IT.pdf` (Italian, 4 A4 pages, regenerated
+2026-10-12 — source sha256 `7e3163dd…`, PDF sha256 `5d1bd53c…`).
+Generator: `scripts/demo-onboarding-pdf.mjs` (Playwright/Chromium,
+no external install). Keep PDF and script aligned on future edits.
 **Round 50 is operational.** Live at `https://demo.welcomebnb.it` and
 `https://welcomebnb-demo.vercel.app`, deployment
 `dpl_BviYbssEeemeijbdSjphsDvsteU8` (`956cba7`). All phase gates passed

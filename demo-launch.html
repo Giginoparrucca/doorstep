@@ -1,0 +1,190 @@
+<!doctype html>
+<!--
+  Round 50 Phase 5 — demo launch page.
+
+  Static HTML served at `/demo-launch.html`. Nothing on this page runs
+  in production: every link derives its origin from
+  `WELCOME_BNB_CONFIG.appOrigin`, so if the config is for production
+  mode the launch panel renders a visible error and no demo link.
+
+  Deliberately standalone (no shared layout, no framework): the
+  presenter opens this once at the start of a session, then switches
+  to the host console or a guest device.
+-->
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Demo WelcomeBnB — avvio sessione</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: #1a1a1a; background: #f6f3ee; min-height: 100dvh; }
+    header { background: #fbbf24; color: #4a3100; padding: 10px 16px; font-weight: 600; text-align: center; letter-spacing: 0.01em; }
+    main { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+    h1 { font-size: 24px; margin: 20px 0 4px; }
+    .lead { color: #4b5563; margin: 0 0 24px; }
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px 20px; margin: 16px 0; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+    .card h2 { margin: 0 0 12px; font-size: 17px; }
+    .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .row a.btn, .row button { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 8px; border: 1px solid #d1d5db; background: #fff; color: #111827; text-decoration: none; font: inherit; cursor: pointer; }
+    .row a.btn:hover, .row button:hover { background: #f3f4f6; }
+    .row .btn-primary { background: #111827; color: #fff; border-color: #111827; }
+    .row .btn-primary:hover { background: #1f2937; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+    th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    th { color: #4b5563; font-weight: 600; background: #f9fafb; }
+    tr:last-child td { border-bottom: 0; }
+    code { font: 13px/1.4 ui-monospace, "SF Mono", Menlo, monospace; background: #f3f4f6; padding: 1px 6px; border-radius: 4px; color: #111827; }
+    .qr { width: 72px; height: 72px; }
+    .warn { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+    .warn h2 { color: #991b1b; }
+    .scenario-cell { max-width: 320px; }
+    .scenario-cell small { color: #6b7280; display: block; margin-top: 2px; }
+    .reset-note { color: #4b5563; font-size: 13px; margin-top: 10px; }
+    .status { font-size: 13px; color: #4b5563; margin-top: 10px; min-height: 1.4em; }
+    .status.ok { color: #065f46; }
+    .status.err { color: #991b1b; }
+  </style>
+</head>
+<body>
+
+<header>Demo WelcomeBnB · ambiente dimostrativo · dati FACSIMILE</header>
+
+<main>
+  <h1>Avvio sessione demo</h1>
+  <p class="lead">Scegli un ruolo o apri il link ospite per uno dei dieci scenari. Al termine, premi <strong>Ripristina demo</strong> per riportare lo stato iniziale.</p>
+
+  <div class="card" id="env-ok" hidden>
+    <h2>Ambiente demo attivo</h2>
+    <div class="row">
+      <a class="btn btn-primary" id="host-link" href="#">Apri host console</a>
+      <a class="btn" id="landing-link" href="#">Apri home ospite</a>
+      <button type="button" id="reset-btn" title="Richiede l'accesso presenter">Ripristina demo</button>
+    </div>
+    <div class="status" id="reset-status" aria-live="polite"></div>
+    <p class="reset-note">Il reset elimina i dati di sessione e riallinea le date degli scenari a oggi (Europa/Roma). I conti presenter restano.</p>
+  </div>
+
+  <div class="card warn" id="env-wrong" hidden>
+    <h2>Ambiente non demo</h2>
+    <p id="env-reason"></p>
+    <p>Questa pagina serve solo nell'ambiente dimostrativo. Non si apre con dati di produzione.</p>
+  </div>
+
+  <div class="card">
+    <h2>Scenari</h2>
+    <p class="lead" style="margin:0 0 8px">Dieci prenotazioni fittizie con date relative al giorno di oggi (fuso Europa/Roma). I link ospite si aggiornano a ogni reset.</p>
+    <table>
+      <thead>
+        <tr><th>Codice</th><th>Scenario</th><th>Date</th><th>Link ospite</th><th>QR</th></tr>
+      </thead>
+      <tbody id="scenarios"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Raccomandazioni dimostrative</h2>
+    <p class="lead" style="margin:0 0 8px">Sei luoghi reali verificati su Google Maps. Non inseriamo orari né recensioni inventate.</p>
+    <ul id="recos" style="margin:0;padding-left:20px"></ul>
+  </div>
+</main>
+
+<script src="/app-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.10/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script type="module">
+import {
+  PROPERTY_PRIMARY, PROPERTY_SECONDARY, PRESENTERS, RECOMMENDATIONS,
+  buildManifest, romeToday,
+} from '/lib/demo-fixtures.mjs';
+
+const cfg = window.WELCOME_BNB_CONFIG;
+const wrong = document.getElementById('env-wrong');
+const ok = document.getElementById('env-ok');
+const reason = document.getElementById('env-reason');
+
+if (!cfg || cfg.mode !== 'demo') {
+  wrong.hidden = false;
+  reason.textContent = 'Modalità rilevata: ' + (cfg?.mode || 'non configurata') + '. Nessun link demo generato.';
+} else {
+  ok.hidden = false;
+  const origin = cfg.appOrigin;
+  const host = document.getElementById('host-link');
+  const landing = document.getElementById('landing-link');
+  host.href = origin + '/host-console.html';
+  landing.href = origin + '/?p=' + PROPERTY_PRIMARY.id;
+
+  const manifest = buildManifest(romeToday());
+  const tbody = document.getElementById('scenarios');
+  for (const s of manifest.scenarios) {
+    const tr = document.createElement('tr');
+    const guestUrl = origin + '/?p=' + s.property_id + '&booking=' + encodeURIComponent(s.code);
+    tr.innerHTML = `
+      <td><code>${s.code}</code></td>
+      <td class="scenario-cell">${escapeHtml(s.demonstration)}<small>${s.checkin_date} → ${s.checkout_date} · ${s.guest_count} ospiti</small></td>
+      <td style="white-space:nowrap">${s.checkin_date}<br/>${s.checkout_date}</td>
+      <td><a target="_blank" rel="noopener" href="${guestUrl}">Apri</a></td>
+      <td class="qr-cell" data-url="${guestUrl}"></td>`;
+    tbody.appendChild(tr);
+  }
+  // Render QR codes (one per scenario; small inline SVG).
+  if (window.qrcode) {
+    document.querySelectorAll('.qr-cell').forEach(cell => {
+      try {
+        const url = cell.getAttribute('data-url');
+        const qr = qrcode(0, 'M'); qr.addData(url); qr.make();
+        cell.innerHTML = qr.createSvgTag({ cellSize: 2, margin: 0, scalable: true });
+        const svg = cell.querySelector('svg'); if (svg) { svg.classList.add('qr'); svg.setAttribute('aria-label', 'QR link ospite'); }
+      } catch (_) { cell.textContent = ''; }
+    });
+  }
+  // Recommendations.
+  const recoList = document.getElementById('recos');
+  for (const r of RECOMMENDATIONS) {
+    const li = document.createElement('li');
+    const href = 'https://www.google.com/maps/search/' + encodeURIComponent(r.name + ' ' + r.address);
+    li.innerHTML = `<a target="_blank" rel="noopener" href="${href}">${escapeHtml(r.name)}</a> — <small>${escapeHtml(r.address)}</small>`;
+    recoList.appendChild(li);
+  }
+  // Reset button — requires presenter sign-in.
+  const btn = document.getElementById('reset-btn');
+  const status = document.getElementById('reset-status');
+  btn.addEventListener('click', async () => {
+    status.classList.remove('ok', 'err');
+    status.textContent = 'Preparo il reset…';
+    try {
+      const sb = window.supabase.createClient(cfg.supabaseUrl, cfg.publicKey);
+      let { data: { session } } = await sb.auth.getSession();
+      if (!session) {
+        const email = prompt('Email presenter (esempio: ' + PRESENTERS[0].email + '):');
+        if (!email) { status.textContent = 'Reset annullato.'; return; }
+        const password = prompt('Password presenter:');
+        if (!password) { status.textContent = 'Reset annullato.'; return; }
+        const { data: login, error: loginErr } = await sb.auth.signInWithPassword({ email, password });
+        if (loginErr) throw loginErr;
+        session = login.session;
+      }
+      const { data, error } = await sb.rpc('demo_reset_v1', { reset_day: romeToday() });
+      if (error) throw error;
+      if (!data?.ok) {
+        status.classList.add('err');
+        status.textContent = data?.message || 'Reset non eseguito (' + (data?.code || 'ignoto') + ').';
+        return;
+      }
+      status.classList.add('ok');
+      status.textContent = 'Reset completato (' + data.reset_day + '). Ricarico in 2 s…';
+      setTimeout(() => location.reload(), 2000);
+    } catch (e) {
+      status.classList.add('err');
+      status.textContent = 'Reset non riuscito: ' + (e?.message || e);
+    }
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+</script>
+</body>
+</html>

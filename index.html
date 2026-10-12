@@ -1524,6 +1524,29 @@ function icon(name, cls) {
 
 <script src="/app-config.js"></script>
 <script src="/app-bootstrap.js"></script>
+<script>
+// Round 50 Phase 5 — persistent demo banner. Appears on top of every
+// guest page when APP_ENV=demo (window.WELCOME_BNB_CONFIG.mode). Fixed
+// positioning so sticky-header pages still get the banner; Italian
+// copy with a FACSIMILE marker so no screenshot ever gets mistaken
+// for a real guest-facing session.
+(function () {
+  try {
+    var cfg = window.WELCOME_BNB_CONFIG;
+    if (!cfg || cfg.mode !== 'demo') return;
+    var style = document.createElement('style');
+    style.textContent = '.demo-banner-r50{position:fixed;top:0;left:0;right:0;z-index:2147483647;background:#fbbf24;color:#4a3100;font:600 13px/1.4 system-ui,sans-serif;padding:6px 12px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,0.08)}body.demo-r50-pad{padding-top:28px}';
+    document.head.appendChild(style);
+    var el = document.createElement('div');
+    el.className = 'demo-banner-r50';
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-label', 'Ambiente dimostrativo');
+    el.textContent = 'Demo WelcomeBnB · dati FACSIMILE · nessun ospite reale';
+    document.body.insertBefore(el, document.body.firstChild);
+    document.body.classList.add('demo-r50-pad');
+  } catch (e) { /* non-fatal: banner must never break the guest flow */ }
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 /* ══════════════════════════════════════

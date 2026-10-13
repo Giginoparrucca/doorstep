@@ -31,6 +31,11 @@ rescue path, not a gate.
 | 6 — Admin readiness view | pending | Per-host readiness, "Bloccati" sortable list, aggregate funnel of support clicks per step; `is_admin()` gated |
 | 7 — End-to-end, demo and docs | pending | Fresh test host journey in production; demo fixtures + script + PDF updated; demo gates (live-smoke, rebuild-verify, e2e) still green |
 
+### Hotfix — host tax choice and horizontal checklist actions (GPT-6.1, 2026-10-13)
+
+- Removed the property-specific no-tax declaration recorded in the previous session at Daniele's request. No exemption is hard-coded or automatically assigned; missing tax configuration prompts the host to set it up or use the generic Confirm/Dismiss controls. Removed the separate tax applicability/review buttons.
+- Checklist actions now sit horizontally, with Confirm/Dismiss grouped together, responsive wrapping on narrow screens and the guest-test hint beneath its description. Preserved reversible automatic-check restoration and the language feedback fix. Updated DOM regression and Italian guide/PDF. Release evidence follows.
+
 ### Hotfix — tax applicability, host checklist choices and language feedback (GPT-6.1, 2026-10-13)
 
 - Recorded the owner's explicit no-tax declaration for their property. This is a host declaration, not an inferred municipal rule. Readiness now recognises configured base rates (including explicit zero) as well as optional tax rules and not-applicable flags; null/blank tax data remains unknown.

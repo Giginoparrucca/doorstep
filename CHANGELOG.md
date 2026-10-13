@@ -31,6 +31,13 @@ rescue path, not a gate.
 | 6 — Admin readiness view | pending | Per-host readiness, "Bloccati" sortable list, aggregate funnel of support clicks per step; `is_admin()` gated |
 | 7 — End-to-end, demo and docs | pending | Fresh test host journey in production; demo fixtures + script + PDF updated; demo gates (live-smoke, rebuild-verify, e2e) still green |
 
+### Hotfix — tax applicability, host checklist choices and language feedback (GPT-6.1, 2026-10-13)
+
+- Recorded the owner's explicit no-tax declaration for their property. This is a host declaration, not an inferred municipal rule. Readiness now recognises configured base rates (including explicit zero) as well as optional tax rules and not-applicable flags; null/blank tax data remains unknown.
+- Added reversible per-step Confirm done / Dismiss / Restore automatic checks and a reversible tourist-tax applicability choice, stored in existing owner-scoped onboarding JSON. Badges distinguish host confirmations/dismissals from derived completion. The host can hide an unfinished checklist without labelling it ready. No filing/export/property settings are changed by these preferences. Updated the specification to reflect Daniele's requested override of the original data-only restriction.
+- Cached checklist relabelling is synchronous on language change. Dashboard now shows translated loading feedback while rebuilding; generation/property/language checks reject stale render results. Existing form translations remain immediate.
+- DOM regressions cover choice persistence/restoration, no-fetch language repaint and a stalled-request language switch. Readiness tests cover base rates/zero/null/invalid values and explicit/manual/dismissed choices. Demo rollback SQL gate verifies owner writes, merged state, stale-write refusal and cross-owner denial. Italian guide/PDF and the fictional zero-rate demo fixture/seeder updated. WhatsApp already uses public environment configuration; no number was supplied, so no channel/number is invented. Release evidence follows.
+
 ### Hotfix — checklist visibility and actionable Property dot (GPT-6.1, 2026-10-13)
 
 - Fixed the reported checklist flash: dashboard refresh now updates a separate body and preserves the checklist DOM and its controls. Property now explains its orange dot with a list of incomplete blocking steps and their missing fields, derived from the same readiness snapshot. Navigation opens the correct details, settings or notification panel and enables the relevant form. Corrected stale field IDs.

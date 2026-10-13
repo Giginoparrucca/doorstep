@@ -64,6 +64,8 @@ export async function runSeed(env = process.env, { today = romeToday(), fetchImp
     checkin_instructions_it: p.checkin_instructions_it, checkin_instructions_en: p.checkin_instructions_en,
     checkout_instructions_it: p.checkout_instructions_it, checkout_instructions_en: p.checkout_instructions_en,
     transport_info_it: p.transport_info_it, transport_info_en: p.transport_info_en,
+    // Empty optional overrides do not mean the configured base rate is missing.
+    tax_rules: p.tax_rules || [],
     tax_rate_eur: p.tax_rate_eur, tax_max_nights: p.tax_max_nights, tax_max_nights_basis: p.tax_max_nights_basis,
     tax_exempt_under_age: p.tax_exempt_under_age, tax_source_note: p.tax_source_note,
     rooms_available: p.rooms_available, beds_available: p.beds_available,

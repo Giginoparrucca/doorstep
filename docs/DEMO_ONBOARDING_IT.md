@@ -71,6 +71,8 @@ e rimozione effettiva delle foto di prova.
 
 In **Oggi**, la checklist **Avvio struttura** resta visibile dopo il caricamento e gli aggiornamenti. Il pallino arancione su **Proprietà** corrisponde al riquadro **Da completare per questa struttura**, che elenca i passaggi mancanti: **Completa** apre il modulo o le impostazioni corrispondenti. Se la checklist è stata nascosta dopo il completamento, **Mostra checklist** la riapre.
 
+Ogni passo offre **Conferma completato**, **Ignora passaggio** e **Ripristina controlli automatici**: le scelte sono salvate e indicate come decisioni del gestore, senza modificare i dati della struttura. Se l’imposta non si applica, scegliere **Imposta di soggiorno non applicabile**; **Rivedi applicabilità imposta** annulla la scelta. Il secondo immobile demo usa una tariffa zero di esempio, non una regola comunale. Si può nascondere anche una checklist incompleta. Il cambio lingua traduce subito la checklist e mostra un avviso durante l’aggiornamento della bacheca.
+
 In **Oggi → Avvio struttura → Prova come ospite**, premere
 **Fai un check-in di prova**. Si apre il link della propria struttura in una nuova scheda, con
 il banner **Check-in di prova — nessun dato reale**. Inserire soltanto dati

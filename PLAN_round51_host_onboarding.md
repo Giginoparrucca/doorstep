@@ -36,6 +36,10 @@ turns the call into an optional rescue path, and nudge emails + an admin
 - Readiness never blocks a feature. A host whose property is incomplete can
   still take a real booking; the checklist is a hint, not a gate.
 
+## Host-choice amendment (13 October 2026)
+
+Daniele requested explicit, reversible checklist controls. A host can confirm a step done, dismiss it, restore automatic checks, and hide an unfinished checklist. These preferences live in `host_onboarding.skips.step_decisions`; their badges distinguish host choices from data-derived completion. They affect checklist readiness/nudges only. Tax readiness accepts a configured base rate (including explicit zero), optional rules, or an explicit `tax_not_applicable` declaration. Empty/missing tax data remains unknown rather than implying a municipal exemption. This amendment supersedes the original dismiss-after-completion/data-only checklist restriction above.
+
 ## The five steps
 
 Each step has a stable `id`, Italian title, "done-when" rule evaluated from

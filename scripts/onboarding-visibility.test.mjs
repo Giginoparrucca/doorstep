@@ -8,7 +8,7 @@ const source=read('host-console.html');
 const {document,window:dom}=parseHTML(source);
 let focused;
 for(const n of document.querySelectorAll('*')) {n.scrollIntoView=()=>{};n.focus=()=>{focused=n.id;};}
-const strings={};for(const m of source.matchAll(/(obx_\w+):\s*('(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*")/g)) (strings[m[1]] ||= []).push(vm.runInNewContext(m[2]));
+const strings={};for(const m of source.matchAll(/(obx_\w+|lang_refreshing):\s*('(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*")/g)) (strings[m[1]] ||= []).push(vm.runInNewContext(m[2]));
 for(const key of ['obx_attention_title','obx_attention_intro','obx_show','obx_load_error','obx_retry']) assert.equal(strings[key].length,2,key+' EN/IT');
 let settings={push_enabled:false,email_mode:'off'},ob={skips:{}},failBooking=false,section='oggi',lastPanel,edited;
 const query=table=>new Proxy({}, {get(_,key){if(key==='then') return resolve=>resolve(table==='ota_reservations'&&failBooking?{error:new Error('offline')}:{data:table==='host_notification_settings'?settings:table==='host_onboarding'?ob:[]});return arg=>{if(key==='update'&&table==='host_onboarding') Object.assign(ob,arg);return query(table);};}});
@@ -19,8 +19,9 @@ const w={document,hostLang:'it',propertyId:'fixture',propertyData:{id:'fixture'}
   startPropertyEdit:()=>{edited='property';},startSettingsEdit:()=>{edited='settings';},
 };
 const ctx=vm.createContext({window:w,document,console,Date,Map,Set,setTimeout:fn=>fn(),fetch:async()=>({ok:true,json:async()=>({configured:false})}),
-  propertyId:'fixture',allCheckins:[],sb:w.sb,hostLang:'it',h:w.h,APP_CONFIG:{mode:'production'},dismissedBookingCodes:new Set(),
+  dashboardRenderVersion:0,propertyId:'fixture',allCheckins:[],sb:w.sb,hostLang:'it',h:w.h,APP_CONFIG:{mode:'production'},dismissedBookingCodes:new Set(),
   _loadGuestChatAsEvents:async()=>[],loadGuestSummariesByCode:async()=>({}),renderUpcomingReservationsPanel:async()=>'',renderCoverageLostBanner:async()=>''});
+Object.defineProperty(w,'hostLang',{get:()=>ctx.hostLang,set:value=>{ctx.hostLang=value;}});
 vm.runInContext(read('lib/onboarding-readiness.js'),ctx);vm.runInContext(read('host-onboarding.js'),ctx);
 const start=source.indexOf('async function renderDashboard()');const end=source.indexOf('\n}\n',start)+2;
 vm.runInContext(source.slice(start,end),ctx);
@@ -41,5 +42,30 @@ w.hostLang='it';w.propertyData=readyProperty;
 console.log('PASS tax, Alloggiati and welcome-field destinations plus English attention copy');
 failBooking=true;await w.HostOnboarding.renderChecklist();assert.ok(document.querySelector('.obx-retry'));assert.match(document.getElementById('onboardingHostContainer').textContent,/Impossibile/);failBooking=false;await document.querySelector('.obx-retry').onclick();assert.equal(document.querySelectorAll('#onboardingHostContainer .obx-step').length,5);
 console.log('PASS load failure stays visible with a working retry');
+w.propertyData={id:'fixture'};settings={push_enabled:false,email_mode:'off'};ob={skips:{},updated_at:'2026-10-13T00:00:00Z'};
+await w.HostOnboarding.renderChecklist();
+const card=document.getElementById('onboardingHostContainer');
+await card.querySelector('[data-step="content"] [data-choice="done"]').onclick();
+assert.equal(ob.skips.step_decisions.content,'done');assert.match(card.textContent,/confermato dal gestore/);assert.equal(w.propertyData.welcome_message,undefined);
+await card.querySelector('[data-step="calendar"] [data-choice="dismissed"]').onclick();assert.equal(ob.skips.step_decisions.calendar,'dismissed');
+await card.querySelector('[data-step="content"] [data-choice="auto"]').onclick();assert.equal(ob.skips.step_decisions.content,undefined);
+await card.querySelector('[data-choice="tax"]').onclick();assert.equal(ob.skips.tax_not_applicable,true);assert.ok(!card.querySelector('[data-choice="tax"]'));
+await card.querySelector('[data-choice="tax_auto"]').onclick();assert.equal(ob.skips.tax_not_applicable,undefined);
+await card.querySelector('.obx-dismiss').onclick();assert.ok(card.querySelector('.obx-collapsed-badge'));assert.ok(!card.querySelector('.obx-ready-badge'));
+await card.querySelector('.obx-expand').onclick();assert.equal(card.querySelectorAll('.obx-step').length,5);
+console.log('PASS incomplete checklist can be hidden/reopened without claiming readiness');
+let networkCalls=0;const originalFetch=ctx.fetch;ctx.fetch=async()=>{networkCalls++;return originalFetch();};
+w.hostLang='en';w.HostOnboarding.repaint();assert.match(card.textContent,/Property setup/);assert.equal(networkCalls,0);w.hostLang='it';
+console.log('PASS reversible step/tax choices persist separately from property data; language repaint requires no fetch');
+const ls=source.indexOf('function setHostLang('),le=source.indexOf('\n}',ls)+2;
+for(const name of ['renderCheckins','renderRules','renderRecos','renderCompliance','renderPropertySwitcher','renderExportChecklist','_updatePropPrivacyWarnings','renderNotifCard','loadGuestAnalytics','renderCalendarPanel','_hgEnsurePill','_renderSectionTabs']) ctx[name]=()=>{};
+ctx.propertyData=w.propertyData;
+ctx.titles={dashboard:['Dashboard','Fixture']};ctx.panelSection=()=> 'oggi';ctx._notifState=null;
+vm.runInContext(source.slice(ls,le),ctx);
+let releaseFetch;ctx.fetch=()=>new Promise(resolve=>{releaseFetch=resolve;});
+ctx.setHostLang('en');
+assert.match(card.textContent,/Property setup/);assert.match(document.getElementById('dashboardContent').textContent,/Updating this view/);
+ctx.fetch=originalFetch;if(releaseFetch)releaseFetch({ok:true,json:async()=>({configured:false})});
+console.log('PASS actual language switch instantly relabels checklist and shows loading before slow requests finish');
 w.HostOnboarding.renderPropertyAttention('oggi');assert.equal(attention.style.display,'none');w.propertyId='other';w.HostOnboarding.renderPropertyAttention('prop');assert.equal(attention.style.display,'none');
 console.log('PASS section/property switches hide stale attention state');

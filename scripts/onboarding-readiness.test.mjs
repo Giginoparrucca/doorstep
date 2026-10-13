@@ -257,3 +257,11 @@ assert.deepEqual([...BLOCKING_IDS], ['property', 'calendar', 'content', 'notific
 console.log('PASS STEP_IDS and BLOCKING_IDS constants');
 
 console.log('PASS onboarding-readiness: all mandatory cases');
+
+// Base tax configuration and explicit host choices are distinct from empty rules.
+for (const rate of [0,2.5,'2.50']) {const x=baseReadyVeneto();x.taxRules=[];x.property.tax_rules=[];x.property.tax_rate_eur=rate;assert.ok(!computeReadiness(x).steps[0].missing.includes('tax_rules'));}
+for (const rate of [null,undefined,'',-1,'invalid']) {const x=baseReadyVeneto();x.taxRules=[];x.property.tax_rules=[];x.property.tax_rate_eur=rate;assert.ok(computeReadiness(x).steps[0].missing.includes('tax_rules'));}
+const overrides=computeReadiness({property:{},onboardingState:{skips:{step_decisions:{property:'done',calendar:'dismissed',content:'done',notifications:'dismissed',test:'unrecognised'}}}});
+assert.equal(overrides.ready,true);assert.equal(overrides.steps[0].manual,true);assert.equal(overrides.steps[1].skipped,true);assert.equal(overrides.steps[0].derivedDone,false);assert.equal(overrides.steps[4].done,true);assert.equal(overrides.steps[3].done,false);
+assert.equal(computeReadiness({property:{},onboardingState:{skips:{step_decisions:{property:true}}}}).steps[0].done,false);
+console.log('PASS base tax rates, explicit zero, invalid/missing values and distinct host-confirmed/dismissed decisions');

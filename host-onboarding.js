@@ -153,31 +153,27 @@
     var ui = STEP_UI[step.id] || { icon: '•', ctaSection: 'oggi' };
     var state = step.done ? (step.skipped ? 'skipped' : 'done') : 'todo';
     var title = _stepTitle(step.id);
-    var choiceButtons = step.decision ? '<button type="button" class="obx-choice" data-choice="auto" data-step="' + esc(step.id) + '">' + esc(hk('obx_auto')) + '</button>' : '<button type="button" class="obx-choice" data-choice="done" data-step="' + esc(step.id) + '">' + esc(hk('obx_mark_done')) + '</button><button type="button" class="obx-choice" data-choice="dismissed" data-step="' + esc(step.id) + '">' + esc(hk('obx_dismiss_step')) + '</button>';
-    choiceButtons = '<div class="obx-choice-row">' + choiceButtons + '</div>';
+    var choiceButtons = step.done ? '' : '<div class="obx-choice-row"><button type="button" class="obx-choice" data-choice="done" data-step="' + esc(step.id) + '">' + esc(hk('obx_mark_done')) + '</button><button type="button" class="obx-choice" data-choice="dismissed" data-step="' + esc(step.id) + '">' + esc(hk('obx_dismiss_step')) + '</button></div>';
     var hint = '';
     var cta = step.done ? '' :
       '<button class="obx-cta" type="button" data-section="' + esc(ui.ctaSection) + '" data-focus="' + esc(step.missing[0] || '') + '">' +
       esc(_stepCta(step.id)) + '</button>';
-    if (step.id === 'test') {
+    if (step.id === 'test' && !step.done) {
       cta = '<button class="obx-test-start obx-cta" type="button">' + esc(testBooking ? hk('obx_test_open') : _stepCta('test')) + '</button>';
-      if (testBooking) cta += '<button class="obx-test-delete obx-help" type="button">' + esc(hk('obx_test_delete')) + '</button>';
       hint = '<div class="obx-test-hint">' + esc(hk('obx_test_hint')) + '</div>';
     }
     var help = step.done ? '' :
       '<button class="obx-help" type="button" data-step="' + esc(step.id) + '">' +
       esc(hk('obx_help_link', it() ? 'Serve aiuto?' : 'Need help?')) + '</button>';
-    var manualBadge = step.manual ? '<span class="obx-badge-skip">' + esc(hk('obx_manual_note')) + '</span>' : '';
-    var skippedBadge = step.skipped ? '<span class="obx-badge-skip">' +
-      esc(hk(step.decision === 'dismissed' ? 'obx_dismissed_note' : 'obx_skipped', it() ? 'saltato' : 'skipped')) + '</span>' : '';
+    var statusBadge = step.done ? '<span class="obx-step-status">' + esc(hk(step.skipped ? 'obx_skipped' : 'obx_done')) + '</span>' : '';
     return '' +
       '<li class="obx-step obx-' + state + '" data-step="' + esc(step.id) + '">' +
       '  <span class="obx-icon" aria-hidden="true">' + ui.icon + '</span>' +
       '  <div class="obx-body">' +
-      '    <div class="obx-title">' + esc(title) + ' ' + skippedBadge + manualBadge + '</div>' +
+      '    <div class="obx-title">' + esc(title) + ' ' + statusBadge + '</div>' +
       _renderMissing(step) + hint +
       '  </div>' +
-      '  <div class="obx-actions">' + cta + help + choiceButtons + '</div>' +
+      (step.done ? '' : '  <div class="obx-actions">' + cta + help + choiceButtons + '</div>') +
       '</li>';
   }
   function _renderCard(readiness, dismissed) {
@@ -209,6 +205,7 @@
       '  <div class="obx-progress"><span style="width:' + pct + '%"></span></div>' +
       '  <div class="obx-intro">' + esc(intro) + '</div>' +
       '  <ul class="obx-steps">' + stepsHtml + '</ul>' +
+      (testBooking ? '<button class="obx-test-delete obx-help" type="button">' + esc(hk('obx_test_delete')) + '</button>' : '') +
       '</div>';
   }
 
@@ -270,8 +267,7 @@
       if (row.error || !row.data) throw new Error('onboarding read failed');
       var skips = Object.assign({}, row.data.skips || {});
       skips.step_decisions = Object.assign({}, skips.step_decisions || {});
-      if (choice === 'auto') delete skips.step_decisions[step];
-      else skips.step_decisions[step] = choice;
+      skips.step_decisions[step] = choice;
       var saved = await W.sb.from('host_onboarding').update({ skips: skips }).eq('user_id', inputs.userId).eq('property_id', inputs.property.id).eq('updated_at', row.data.updated_at).select('skips').maybeSingle();
       if (saved.error) throw saved.error;
       if (!saved.data) continue;
@@ -569,7 +565,8 @@
       '.obx-body{flex:1;min-width:0}',
       '.obx-title{font-size:0.9rem;font-weight:600;color:#111827}',
       '.obx-missing{font-size:0.78rem;color:#991b1b;margin-top:2px}',
-      '.obx-badge-skip{display:inline-block;background:#fef3c7;color:#78350f;padding:1px 6px;border-radius:4px;font-size:0.7rem;margin-left:6px}',
+      '.obx-step-status{display:inline-block;background:#d1fae5;color:#065f46;padding:1px 6px;border-radius:4px;font-size:0.7rem;margin-left:6px}',
+      '.obx-skipped .obx-step-status{background:#fef3c7;color:#78350f}',
       '.obx-actions{display:flex;flex-direction:row;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end;max-width:60%}',
       '.obx-choice-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}',
       '@media(max-width:560px){.obx-step{flex-wrap:wrap}.obx-actions{max-width:100%;width:100%;justify-content:flex-start;padding-left:40px;box-sizing:border-box}}',

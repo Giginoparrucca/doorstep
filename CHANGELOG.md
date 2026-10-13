@@ -31,6 +31,11 @@ rescue path, not a gate.
 | 6 — Admin readiness view | pending | Per-host readiness, "Bloccati" sortable list, aggregate funnel of support clicks per step; `is_admin()` gated |
 | 7 — End-to-end, demo and docs | pending | Fresh test host journey in production; demo fixtures + script + PDF updated; demo gates (live-smoke, rebuild-verify, e2e) still green |
 
+### Hotfix — completed checklist steps require no further action (GPT-6.1, 2026-10-13)
+
+- Confirm/Dismiss are rendered only for incomplete steps. Automatic and host-confirmed completion share the same Completed state and have no further checklist buttons, restore controls or provenance labels. Completed test steps no longer offer another check-in; active-test deletion remains separate cleanup beneath the card.
+- Regression compares the actual DOM of automatic and confirmed completion, checks all five completed steps have no buttons, and verifies completion survives refresh. Preserved horizontal incomplete-step actions and instant language relabelling. Italian guide/PDF updated. Release evidence follows.
+
 ### Hotfix — host tax choice and horizontal checklist actions (GPT-6.1, 2026-10-13)
 
 - Removed the property-specific no-tax declaration recorded in the previous session at Daniele's request. No exemption is hard-coded or automatically assigned; missing tax configuration prompts the host to set it up or use the generic Confirm/Dismiss controls. Removed the separate tax applicability/review buttons.

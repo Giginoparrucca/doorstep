@@ -5468,8 +5468,14 @@ async function renderDashboard() {
   const renderLanguage = hostLang;
   const el = document.getElementById('panel-dashboard');
   if (!el) return;
+  let dashboardContent = document.getElementById('dashboardContent');
+  if (!dashboardContent) {
+    dashboardContent = document.createElement('div');
+    dashboardContent.id = 'dashboardContent';
+    el.appendChild(dashboardContent);
+  }
   if (!propertyId) {
-    el.innerHTML = `<div style="text-align:center;padding:40px;color:var(--ink-soft);">${h('dashboard_loading') || 'Loading…'}</div>`;
+    dashboardContent.innerHTML = `<div role="status" style="text-align:center;padding:40px;color:var(--ink-soft);">${h('dashboard_loading') || 'Loading…'}</div>`;
     return;
   }
   // Keep onboarding outside the replaceable dashboard body. Updating guest
@@ -5815,12 +5821,6 @@ async function renderDashboard() {
     </button>`;
 
   if (renderVersion !== dashboardRenderVersion || propertyId !== renderPropertyId || hostLang !== renderLanguage) return;
-  let dashboardContent = document.getElementById('dashboardContent');
-  if (!dashboardContent) {
-    dashboardContent = document.createElement('div');
-    dashboardContent.id = 'dashboardContent';
-    el.appendChild(dashboardContent);
-  }
   dashboardContent.innerHTML = `
     <div style="max-width:920px;">
       ${helpBanner}
@@ -5876,9 +5876,12 @@ async function renderCoverageLostBanner() {
   const directById = {};
   for (const d of directs) directById[d.id] = d;
 
+  // iCal DTEND is exclusive: on checkout day the occupied nights are over.
+  // OTAs can drop old blocks normally; that is not a future coverage failure.
+  const todayISO = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
   const rows = echoes
     .map(e => ({ echo: e, direct: directById[e.covered_by_reservation_id] }))
-    .filter(x => x.direct); // hide entries whose direct row is gone.
+    .filter(x => x.direct && x.direct.checkout_date > todayISO);
   if (rows.length === 0) return '';
 
   const platformLabel = p => (p === 'airbnb' ? 'Airbnb' : p === 'booking' ? 'Booking.com' : p === 'vrbo' ? 'Vrbo' : (p ? p[0].toUpperCase() + p.slice(1) : 'OTA'));

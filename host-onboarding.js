@@ -178,21 +178,22 @@
   }
   function _renderCard(readiness, dismissed) {
     var n = readiness.doneCount, total = readiness.total;
-    var ready = readiness.ready;
+    // Finished setup leaves the dashboard. Keep only disposable-test cleanup.
+    if (readiness.ready) return testBooking
+      ? '<button class="obx-test-delete obx-help" type="button">' + esc(hk('obx_test_delete')) + '</button>'
+      : '';
     if (dismissed && !testBooking) {
       // Collapsed badge version
       return '' +
-        '<div class="' + (ready ? 'obx-ready-badge' : 'obx-collapsed-badge') + '">' +
-        '  <span>' + (ready ? '✓ ' : '') + esc(hk(ready ? 'obx_ready_badge' : 'obx_checklist_hidden')) + '</span>' +
+        '<div class="obx-collapsed-badge">' +
+        '  <span>' + esc(hk('obx_checklist_hidden')) + '</span>' +
         '  <button type="button" class="obx-expand obx-help">' + esc(hk('obx_show')) + '</button>' +
         '</div>';
     }
     var pct = Math.round((n / total) * 100);
     var stepsHtml = readiness.steps.map(_renderStep).join('');
     var dismissBtn = '<button class="obx-dismiss" type="button">' + esc(hk('obx_hide', it() ? 'Nascondi' : 'Hide')) + '</button>';
-    var intro = ready
-      ? hk('obx_intro_ready', it() ? 'Pronta per i tuoi primi ospiti.' : 'Ready for your first guests.')
-      : hk('obx_intro_todo', it()
+    var intro = hk('obx_intro_todo', it()
           ? 'Pochi passaggi e sei pronto per i tuoi ospiti.'
           : 'A few steps and you are ready for your guests.');
     return '' +
@@ -542,6 +543,7 @@
   function _css() {
     return [
       '#onboardingHostContainer{margin:0 0 18px}',
+      '#onboardingHostContainer:empty{display:none}',
       '.obx-attention{border-color:#f59e0b}',
       '.obx-focus-target{outline:3px solid #f59e0b;outline-offset:4px}',
       '.obx-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px 18px;margin:0 0 12px;box-shadow:0 1px 2px rgba(0,0,0,0.04)}',

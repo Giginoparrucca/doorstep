@@ -41,9 +41,9 @@ import {
   authenticationTest,
   test as soapTest,
   send as soapSend,
-  ricevuta as soapRicevuta,
 } from './_alloggiati-soap.js';
 import { notifyHostAutofileAlert } from './_notify-host.js';
+import { collectReceipts } from './_alloggiati-receipts.js';
 
 // Round 49 Phase 1 — the Alloggiati reference tables, line builder,
 // autofileDueAt timing function and every lookup helper live in a
@@ -156,7 +156,7 @@ async function sbPatch(pathAndQuery, body) {
 // (dry_run,live), has a 45-second budget (the cron is every 10 min
 // and Vercel caps the function at 60s), and for each one picks the
 // due rows + builds lines via the shared record builder + files them
-// (dry_run → SOAP Test only; live → Test + Send + Ricevuta + stamp).
+// (dry_run → SOAP Test only; live → Test + Send + stamp + deferred receipt).
 // Every claim/success/failure is logged into alloggiati_filing_log
 // via the SECURITY DEFINER log_alloggiati_filing RPC.
 //
@@ -187,7 +187,9 @@ const AUTOFILE_MAX_PROPS_PER_TICK = 25;  // Hobby safety net; most ticks process
 
 async function runAutofileTick(res, testCleanup) {
   const started = Date.now();
+  const receipts = await collectReceipts({ budgetMs: 12000 });
   const summary = {
+    receipts,
     testCleanup,
     properties_processed: 0,
     properties_skipped_budget: 0,
@@ -525,7 +527,7 @@ async function processPropertyAutofile(prop) {
     }
   }
 
-  // SOAP Test → Send → Ricevuta. Same Round 44 safety order the host
+  // SOAP Test → Send → deferred receipt. Same Round 44 safety order the host
   // manual send uses: refuse to Send if Test rejects any row.
   try {
     const testOutcome = await soapTest({ utente: creds.utente, token, rows: batchLines });
@@ -583,31 +585,11 @@ async function processPropertyAutofile(prop) {
     return summary;
   }
 
-  // Send succeeded. Fetch Ricevuta best-effort (do not revert stamps if it fails).
+  // Receipts are available only after the filing day. The existing tick
+  // collects them separately; successful filing must not wait for a PDF.
   const filedAt = new Date();
   const filedAtIso = filedAt.toISOString();
-  const filedDateRome = _romeDateYmd(filedAt);
-  let receiptPath = null;
-  try {
-    const rec = await soapRicevuta({ utente: creds.utente, token, date: filedDateRome });
-    const stamp = filedAtIso.slice(0, 19).replace(/[-:T]/g, '');
-    const path = `${prop.id}/alloggiati-autofile-${stamp}.pdf`;
-    const upRes = await fetch(
-      `${SUPABASE_URL}/storage/v1/object/receipts/${path}`,
-      {
-        method: 'POST',
-        headers: {
-          apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
-          'Content-Type': 'application/pdf', 'x-upsert': 'true',
-        },
-        body: rec.pdf,
-      },
-    );
-    if (upRes.ok) receiptPath = path;
-    else console.warn('[autofile_tick] receipt upload', upRes.status);
-  } catch (e) {
-    console.warn('[autofile_tick] ricevuta failed (non-fatal):', e.message);
-  }
+  const receiptPath = null;
 
   // Stamp rows filed. The lock trigger allows filing → filed with no
   // sensitive-column change, so this UPDATE lands cleanly.
@@ -1032,13 +1014,17 @@ export default async function handler(req, res) {
   // the Vercel AUTOFILE_CRON_SECRET env var. Skip the CORS gate and
   // the property-owner resolve entirely for this one action — the
   // tick operates across every autofile-enabled property.
-  if (action === 'autofile_tick') {
+  if (action === 'autofile_tick' || action === 'receipt_tick') {
     if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
     if (!SERVICE_KEY) return res.status(500).json({ error: 'Server misconfigured' });
     const want = process.env.AUTOFILE_CRON_SECRET || '';
     const got = String(req.headers['x-cron-secret'] || req.headers['X-Cron-Secret'] || '').trim();
     if (!want || !got || !_timingSafeStringCompare(want, got)) {
       return res.status(401).json({ error: 'Invalid cron secret' });
+    }
+    if (action === 'receipt_tick') {
+      const receipts = await collectReceipts({ budgetMs: 30000 });
+      return res.status(200).json({ ok: true, receipts });
     }
     const cleanup = await runTestCleanup(false);
     return await runAutofileTick(res, cleanup);
@@ -1505,41 +1491,8 @@ export default async function handler(req, res) {
     // silently succeeding OR silently losing state.
     const filedAt = new Date();
     const filedAtIso = filedAt.toISOString();
-    const filedDateRome = filedAtIso.slice(0, 10);
-
-    let receiptPath = null;
-    let receiptMissing = null;
-    try {
-      const rec = await soapRicevuta({ utente: creds.utente, token, date: filedDateRome });
-      // Storage path: <property_id>/ so the RLS policy (which keys off
-      // the first path segment) recognises it as this property's file.
-      const stamp = filedAtIso.slice(0, 19).replace(/[-:T]/g, '');
-      const path = `${propertyId}/alloggiati-batch-${stamp}.pdf`;
-      const upRes = await fetch(
-        `${SUPABASE_URL}/storage/v1/object/receipts/${path}`,
-        {
-          method: 'POST',
-          headers: {
-            apikey: SERVICE_KEY,
-            Authorization: `Bearer ${SERVICE_KEY}`,
-            'Content-Type': 'application/pdf',
-            'x-upsert': 'true',
-          },
-          body: rec.pdf,
-        },
-      );
-      if (!upRes.ok) {
-        const text = await upRes.text().catch(() => '');
-        throw new Error(`storage upload ${upRes.status}: ${text.slice(0, 200)}`);
-      }
-      receiptPath = path;
-    } catch (e) {
-      // Portal accepted the batch — losing the PDF here does not
-      // undo the filing. Log loud, warn the client, continue to
-      // stamp the check-ins so the "filed" state matches reality.
-      console.error('[alloggiati] send: receipt fetch/upload failed:', e.message);
-      receiptMissing = `Receipt PDF could not be retrieved (${e.message}). The filing itself succeeded — you can download the receipt manually from the Alloggiati portal.`;
-    }
+    const receiptPath = null;
+    const receiptMissing = 'scheduled';
 
     // ── Stamp check-ins ──────────────────────────────────────────
     // Uses PATCH so we don't hit the same ON CONFLICT trap the verify

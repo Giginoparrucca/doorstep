@@ -18,8 +18,14 @@ at Daniele's request while this round is completed; its table is preserved below
 
 | Phase | Status | Where / test gate |
 |---|---|---|
-| 0 — Specification and handoff | in-progress — GPT-6.1 | Scope, date window, exclusions, tests, live receipt-only probe and rollback |
-| 1 — Implement, verify and release | pending | Collector, dispatcher/scheduler, host copy, demo docs/PDF; local and live gates in specification |
+| 0 — Specification and handoff | shipped — PR #146 — GPT-6.1 | Scope, date window, exclusions, tests, live receipt-only probe and rollback |
+| 1 — Implement, verify and release | in-progress — GPT-6.1 | Collector, dispatcher/scheduler, host copy, demo docs/PDF; local and live gates in specification |
+
+### Round 52 Phase 1 — implementation and local gate (GPT-6.1, 2026-10-13)
+
+- Receipt-only collector derives missing receipts from successful host/autofile audits and matching current filed timestamps. Rome date window, test/deleted/correction/property boundaries, rotating missing-row pages and fair date retries; deterministic private daily PDFs, conditional receipt-only updates and existing-upload preservation. No schema, function or cron added; existing ten-minute tick runs collection even if autofile is off. Cron-secret-only receipt_tick supports operational recovery without Send/Test/claims/notifications.
+- Manual and automatic filing no longer call same-day Ricevuta. Bilingual success copy explains automatic next-day retrieval/retry; manual portal upload remains. Updated guide FAQ/cache version and Italian demo guide/PDF. Fake-transport collector/real dispatcher, runtime/pagination/failure/retry/concurrency, Rome midnight/DST/window, six-exporter isolation, environment guards, onboarding DOM/i18n, autofile timing, demo UX/simulation/fixtures/reset/rebuild-negative and deployment configuration gates pass. Guide checker unchanged from baseline (four dynamic dashboard targets absent in initial static DOM); no new target failures. PDF regenerated with scratch-only WeasyPrint dependencies after read-only runtime installation failed; all five pages reviewed. Source SHA-256 `5d5394ec06bbc5c7d84f58ca5fa4f7f50d6b1c22318e6bfa5164ae4d975807ef`, PDF `263ac46c78382e7426826b3ebe98c95aa8c327fc7abeb31fe0390111a5f517fb`.
+- Production read-only eligibility probe identifies two confirmed filing days (7 and 11 October), seven plus six rows, with matching filing/audit timestamps. Private receipt bucket and verified credentials exist; original ten-minute cron is active. Live retrieval/attachment gate pending; no receipt downloaded or filing performed yet in this round.
 
 ### Round 51 — preserved in-flight status (paused for Round 52)
 

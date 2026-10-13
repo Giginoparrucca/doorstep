@@ -425,3 +425,18 @@ backups on the Free plan.
   Phase 4 `demo_reset_v1` carries its own presenter allowlist, so
   these remain documented noise, not an unresolved security gap.
 
+
+### Round 51 Phase 4 schema extension
+
+Rebuild applies `migration_round51_host_onboarding.sql` and
+`migration_round51_test_checkin.sql` after the preserved Round 50 migrations.
+The schema verifier records their hashes and the verified extended shape;
+no isolation limit or drift check has been relaxed. Non-production probes
+leave the steady-state fixture dataset unchanged.
+
+Live Phase 4 Auth/Storage gate passed on 2026-10-13, source `cdedb2c`:
+owner and foreign-owner JWTs, guest completion, actual synthetic PNG upload,
+private reads and actual application deletion. Shared scheduler cleanup also
+deleted a second PNG before row expiry; a controlled 24h boundary probe removed
+only its managed test rows. Both probes fully cleaned up. The temporary preview
+build gate is disabled; no demo cron was added.

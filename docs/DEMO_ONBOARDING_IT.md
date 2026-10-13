@@ -66,8 +66,8 @@ Risultato atteso: il nuovo host riconosce dove inserire le risposte che oggi rip
 
 ## Prova autonoma dalla checklist (Round 51 Fase 4)
 
-Questa funzione è in collaudo sulla branch GPT: mostrarla soltanto dopo il
-rilascio e il completamento del gate della Fase 4.
+La funzione è verificata con accesso host autenticato, isolamento tra proprietari
+e rimozione effettiva delle foto di prova.
 
 In **Oggi → Avvio struttura → Prova come ospite**, premere
 **Fai un check-in di prova**. Si apre il link della propria struttura in una nuova scheda, con

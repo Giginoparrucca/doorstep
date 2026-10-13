@@ -31,6 +31,17 @@ rescue path, not a gate.
 | 6 — Admin readiness view | pending | Per-host readiness, "Bloccati" sortable list, aggregate funnel of support clicks per step; `is_admin()` gated |
 | 7 — End-to-end, demo and docs | pending | Fresh test host journey in production; demo fixtures + script + PDF updated; demo gates (live-smoke, rebuild-verify, e2e) still green |
 
+### Round 51 Phase 4 — verified delivery (GPT-6.1, 2026-10-13)
+
+- PR #139: host-owned direct test booking via the existing mint dispatcher and guest gateway, bilingual start/open/delete controls and authoritative guest test banner. Fixed the checklist lexical/window integration, first-seen persistence and overlapping demo/test banners. No new API route or cron.
+- Test rows are excluded from claims, manual send before credentials/SOAP, all six exporters, arrival reminders, calendars and metrics. SQL rejects test filing logs. Completion persists after deletion. Photos queue immediately; the existing ten-minute tick drains Storage and removes managed test rows after 24h.
+- Live authenticated gate passed on the isolated demo preview, source `cdedb2c`: actual password sign-in for both fictional presenters; owner mint/reuse; cross-owner mint/delete/photo denial; guest completion, gated access and welcome-back; durable checklist completion; normal-only claim; zero test filings/notifications. A real synthetic PNG was uploaded, read by its owner and deleted through the application's delete endpoint; a subsequent Storage read confirmed absence and the queue was empty.
+- A second real synthetic PNG was deleted by the shared scheduler cleanup routine before row expiry. Backdating only the disposable booking past 24h verified test row/booking deletion, normal-row survival and persistent checklist completion. This is a controlled TTL-boundary probe, not a 24h wall-clock wait. After both probes: zero photos, queue entries, disposable properties or real check-in rows; original two presenter accounts retained. Gate evidence timestamp: 2026-10-13T03:31:02.027Z. Temporary build gate disabled afterward.
+- Migration `20261013020000` / `migration_round51_test_checkin.sql` applied and tracked in production and demo. Owner-only authenticated create/delete RPCs and service-only purge grants checked. Existing production ten-minute scheduler is active.
+- Local readiness (16 cases), onboarding UI/i18n, six actual mixed-cache exporters, manual-send guard, guest gateway, environment, demo UX/sim/seed/reset, rebuild drift-negative and deployment configuration regressions pass. Live schema/isolation verification: 31/31. Private golden fixtures are unavailable; no golden pass claimed.
+- Italian presenter guide and five-page PDF updated and visually reviewed. Demo fixture scenarios remain separate from transient onboarding tests. Production first-time password link and authoritative Italian test banner/language switching verified in browser.
+- Previous documentation publication was automatically rejected for retained operational metadata. Daniele explicitly authorized pushing all verified changes to main on 2026-10-13; this delivery includes the retained CHANGELOG and provisioning notes. Final merge/deployment evidence follows below.
+
 ### Previous round — preserved status
 
 **Round 50 — Demo environment and host onboarding** _(spec: `PLAN_round50_demo_onboarding.md`; operational 2026-10-12)_

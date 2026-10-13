@@ -87,7 +87,7 @@ if(mode==='demo'){
  const blocked=['alloggiati','ical-sync','admin-invite-host','telegram-link','telegram-webhook','send-arrival-reminders','push-config','scan-document'];
  for(const name of blocked){
   const {default:handler}=await import('./api/'+name+'.js');
-  for(const action of ['autofile_tick','send','save','test','verify','invite','resend']){
+  for(const action of ['autofile_tick','receipt_tick','send','save','test','verify','invite','resend']){
    const r=res();await handler({method:'POST',headers:{origin:'https://demo.welcomebnb.it','x-cron-secret':'fixture'},query:{action,t:'11111111-1111-4111-8111-111111111111'},body:{mode:'live',consent:true}},r);
    assert.equal(r.statusCode,403,name+':'+action);assert.equal(r.body.code,'demo_integration_disabled');
   }
@@ -98,6 +98,8 @@ if(mode==='demo'){
  await notify.notifyHostAutofileAlert({propertyId:'p',hostId:'h',kind:'overdue',text:'fixture'});
  const soap=await import('./api/_alloggiati-soap.js');
  await assert.rejects(()=>soap.generateToken({utente:'fixture',password:'fixture',wskey:'fixture'}),{code:'demo_integration_disabled'});
+ const {collectReceipts}=await import('./api/_alloggiati-receipts.js');
+ await assert.rejects(()=>collectReceipts(),{code:'demo_integration_disabled'});
  assert.equal(calls,0);
  const {signGuestToken,verifyGuestToken}=await import('./api/_guest-token.js');
  const signed=signGuestToken({p:'p',s:'s'});assert.equal(verifyGuestToken(signed.token).ok,true);

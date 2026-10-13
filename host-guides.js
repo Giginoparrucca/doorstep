@@ -798,6 +798,7 @@ const GUIDES = {
     warn: { it: 'Obbligo di legge. WelcomeBnB prepara il file, ma a inviarlo sei tu.', en: 'Required by Italian law. WelcomeBnB prepares the file; you send it.' },
     tip: { target: 'checkin-markfiled-btn', it: 'Senza ricevuta? Premi «Segna inviato». Il reminder si ferma.', en: 'No receipt? Press “Mark filed”. The reminder stops.' },
     faq: [
+      { q_it: 'Quando arriva la ricevuta automatica?', a_it: 'Per gli invii effettuati da WelcomeBnB, la ricevuta giornaliera viene scaricata dal giorno successivo e allegata agli ospiti inviati. Se hai inviato dal portale, carica tu il PDF con «Ricevuta».', q_en: 'When does the automatic receipt arrive?', a_en: 'For filings made through WelcomeBnB, the daily receipt is downloaded from the next day and attached to the filed guests. If you filed on the portal, upload the PDF with Receipt.' },
       { q_it: 'Un ospite non compare nella lista.', a_it: 'L’ospite non ha finito il check-in. Mandagli di nuovo il link da «QR Code & Link».', q_en: 'A guest is missing from the list.', a_en: 'The guest hasn’t finished check-in. Send them the link again from QR Code & Link.' },
       { q_it: 'Il portale rifiuta il file.', a_it: 'Di solito un dato è sbagliato. Apri l’ospite dal menu ⋯, premi «Modifica», correggi e genera di nuovo il file.', q_en: 'The portal rejects the file.', a_en: 'Usually one detail is wrong. Open the guest via the ⋯ menu, press “Edit”, fix the field and generate the file again.' },
       { q_it: 'Ho premuto «Segna inviato» per sbaglio.', a_it: 'Non c’è un pulsante per annullare. Apri l’ospite dal menu ⋯, premi «Modifica» e togli manualmente lo stato «inviato».', q_en: 'I pressed “Mark filed” by mistake.', a_en: 'There is no one-click undo. Open the guest via the ⋯ menu, press “Edit” and reset the filed status by hand.' },
@@ -1558,7 +1559,7 @@ window.HG = {
   closeGuide,
   checkGuides,
   guides: GUIDES,       // read-only reference for tests
-  version: '51.4',
+  version: '52.1',
 };
 // Alias for the console-side dev command name the spec asks for.
 window.__checkGuides = checkGuides;

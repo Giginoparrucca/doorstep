@@ -4412,6 +4412,7 @@ const HT = {
     ical_export_delay: 'OTAs poll external calendars every 2–4 hours, so a new direct booking may take that long to appear as blocked on Airbnb / Booking / Vrbo.',
     // Round 44 Phase 0.5 — Alloggiati Web credentials card
     alloggiati_title: 'Alloggiati Web · automatic filing',
+    receipt_auto_pending: 'Filing succeeded. WelcomeBnB will download the receipt from the next day (Italy time) and attach it automatically. If the portal is unavailable, we will retry. Do not submit the guests again.',
     alloggiati_desc: 'Connect your Alloggiati Web account to skip the manual .txt upload. WelcomeBnB will validate every guest row before filing and store the receipt automatically. Credentials are encrypted at rest and never shown again after you save them.',
     alloggiati_loading: 'Loading…',
     ical_where: 'Airbnb: Calendar → Availability → Connect calendars → Export. Booking.com: Calendar → Sync calendars. Vrbo: Calendar → Import/Export → Export calendar.',
@@ -4953,6 +4954,7 @@ const HT = {
     ical_export_delay: 'Gli OTA scaricano i calendari esterni ogni 2–4 ore, quindi una nuova prenotazione diretta potrebbe impiegare quel tempo per comparire come bloccata su Airbnb / Booking / Vrbo.',
     // Round 44 Phase 0.5 — Credenziali Alloggiati Web
     alloggiati_title: 'Alloggiati Web · Invio automatico',
+    receipt_auto_pending: 'L’invio è riuscito. WelcomeBnB scaricherà la ricevuta dal giorno successivo (ora italiana) e la allegherà automaticamente. Se il portale non è disponibile, riproveremo. Non ripetere l’invio.',
     alloggiati_desc: 'Collega il tuo account Alloggiati Web per saltare il caricamento manuale del file .txt. WelcomeBnB validerà ogni riga prima dell\'invio e conserverà automaticamente la ricevuta. Le credenziali sono crittografate a riposo e non vengono più mostrate dopo il salvataggio.',
     alloggiati_loading: 'Caricamento…',
     ical_where: 'Airbnb: Calendario → Disponibilità → Collega calendari → Esporta. Booking.com: Calendario → Sincronizza calendari. Vrbo: Calendario → Importa/Esporta → Esporta calendario.',
@@ -5381,7 +5383,7 @@ function showPanel(id, btn) {
 const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','settings','rules','recos','qrlink'];
 // Bump on every host-guides.js change so browsers never see a stale
 // copy even if their cache is aggressive.
-const _HG_VERSION = '51.4';
+const _HG_VERSION = '52.1';
 let _hgLoadPromise = null;
 function _hgLoad() {
   if (window.HG) return Promise.resolve();
@@ -10222,7 +10224,7 @@ function _openAlloggiatiSendSuccessModal(out, rowMeta) {
   const receiptBlock = out.receipt_missing
     ? `<div style="margin-top:12px;padding:10px 12px;background:rgba(232,184,75,0.14);border:1px solid rgba(232,184,75,0.4);border-radius:8px;font-size:0.78rem;color:#7d5e10;">
         <div style="font-weight:700;margin-bottom:4px;">${safe(it ? 'Ricevuta disponibile dal giorno successivo' : 'Receipt available from the next day')}</div>
-        <div>${safe(it ? 'L’invio è riuscito. Alloggiati non rilascia la ricevuta del giorno corrente: scaricala dal portale dal giorno successivo (ora italiana) e caricala nella scheda check-in. Non ripetere l’invio.' : 'Filing succeeded. Alloggiati does not provide receipts for the current day: download it from the portal from the next day (Italy time), then upload it to the check-in record. Do not submit the guests again.')}</div>
+        <div>${safe(h('receipt_auto_pending'))}</div>
         <div style="margin-top:6px;"><a href="https://alloggiatiweb.poliziadistato.it" target="_blank" rel="noopener" style="color:#7d5e10;text-decoration:underline;">${safe(it ? 'Apri Alloggiati Web →' : 'Open Alloggiati Web →')}</a></div>
        </div>`
     : (out.receipt_path

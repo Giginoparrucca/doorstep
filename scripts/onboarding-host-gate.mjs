@@ -88,6 +88,23 @@ export async function runHostGate(env = process.env) {
     const expired=await hosted('/api/guest-token',{property_id:propertyId,booking_code:booking.booking_code,session_id:sessionId+'-expired',is_test:false});assert.equal(expired.status,410);
     pass('actual application photo deletion, cleared queue/rows, normal survival and durable completion');
     pass('deleted test link cannot become a real booking');
+    // Exercise the very same cleanup routine used by the existing scheduler.
+    // Backdate only our disposable booking to test the 24-hour boundary.
+    const second=await hosted('/api/guest-token',{action:'test_booking',property_id:propertyId},owner.token);expect(second,'Second scheduled test');booking=second.data.booking;
+    const secondMint=await hosted('/api/guest-token',{property_id:propertyId,booking_code:booking.booking_code,session_id:sessionId+'-scheduled'});expect(secondMint,'Scheduled guest mint');
+    const uploadAgain=await fetch(cfg.supabaseUrl+'/storage/v1/object/documents/'+photoPath,{method:'POST',signal:AbortSignal.timeout(20000),headers:{apikey:cfg.publicKey,Authorization:'Bearer '+cfg.publicKey,'Content-Type':'image/png'},body:png});assert.ok(uploadAgain.ok);photoUploaded=true;
+    const secondRow=await hosted('/api/guest',{action:'checkin_insert',record:{guest_type:'single',surname:'FACSIMILE',name:'SCHEDULED',sex:'F',date_of_birth:'1980-01-01',place_of_birth:'Paris',birth_province:'EE',birth_country:'France',citizenship:'France',document_type:'passport',document_number:'FACSIMILE-ONLY',doc_issue_place:'France',arrival_date:booking.checkin_date,departure_date:booking.checkout_date,nights:1,docs_status:'completed',id_photo_path:photoPath}},secondMint.data.token);expect(secondRow,'Scheduled guest completion');
+    const {runTestCleanup}=await import('../api/send-arrival-reminders.js');
+    const early=await runTestCleanup(false);assert.equal(early.failed,0);assert.ok(!early.test_error);assert.ok(early.deleted>=1);
+    assert.ok(!(await db('/storage/v1/object/authenticated/documents/'+photoPath)).ok);photoUploaded=false;
+    assert.equal((await db('/rest/v1/checkins?id=eq.'+secondRow.data.id+'&select=id')).data.length,1);
+    expect(await db('/rest/v1/ota_reservations?id=eq.'+booking.id,{method:'PATCH',body:{created_at:new Date(Date.now()-25*3600000).toISOString()}}),'Advance disposable booking TTL');
+    const late=await runTestCleanup(false);assert.equal(late.failed,0);assert.ok(!late.test_error);
+    assert.equal((await db('/rest/v1/checkins?id=eq.'+secondRow.data.id+'&select=id')).data.length,0);
+    assert.equal((await db('/rest/v1/ota_reservations?id=eq.'+booking.id+'&select=id')).data.length,0);
+    assert.equal((await db('/rest/v1/checkins?id=eq.'+normalId+'&select=id')).data.length,1);
+    assert.ok((await db(obPath,{token:owner.token,publicClient:true})).data[0].test_checkin_done_at);
+    pass('actual scheduler routine deletes photo before row TTL; 24h expiry preserves normal row and checklist');
     return {passed:true,checks,origin:target.origin};
   } finally {
     if (photoUploaded) expect(await db('/storage/v1/object/documents',{method:'DELETE',body:{prefixes:[photoPath]}}),'Fictional photo cleanup');

@@ -20,6 +20,12 @@ at Daniele's request while this round is completed; its table is preserved below
 |---|---|---|
 | 0 — Specification and handoff | shipped — PR #146 — GPT-6.1 | Scope, date window, exclusions, tests, live receipt-only probe and rollback |
 | 1 — Implement, verify and release | shipped — PR #147 + #148 — GPT-6.1 | Collector, dispatcher/scheduler, host copy, demo docs/PDF; local and live gates in specification |
+| 2 — Group receipt access | in-progress — GPT-6.1 | Replace group upload with View receipt when attached; remove individual receipt links; bilingual, multiple-PDF and scope regression gates |
+
+### Round 52 Phase 2 — group receipt access (GPT-6.1, 2026-10-13)
+
+- Group headers replace the receipt upload control with Visualizza ricevuta / View receipt whenever a PDF is attached. Shared paths are deduplicated; multiple PDFs remain accessible through a group chooser scoped to property and booking. Empty groups retain their existing upload action. Individual guest details show filing state and direct hosts to the group header, without signing or downloading an individual receipt. Existing blue badges denote guest edits and their dates.
+- Real renderer/interaction regression passes in IT and EN for absent/shared/multiple/partial/solo receipts, upload-to-view transition, property/booking isolation, private five-minute signing, signing failure and individual modal isolation; every inline script compiles. Real browser desktop/mobile group clicks and multiple-PDF dialog/Escape pass; screenshots reviewed. Full receipt collector/dispatcher regression, six-exporter test isolation, onboarding UI and demo UX gates pass. Updated bilingual guide/cache version and presenter document; regenerated five-page PDF and visually reviewed all pages. Source SHA-256 bf491082e893257c49aed905bdbc32666078fd9993989db2ea07fcde9b3803af; PDF dc10ebbdc41414a89423d45ac2df11947bb563498545e72e1db145b7b34654a4. No API/database change. Daniele explicitly authorized publication/deployment after automatic approval review blocked the first push. Release is now in progress; verify preview and served production source before marking shipped.
 
 ### Round 52 Phase 1 — live receipt gate and owner-read repair (GPT-6.1, 2026-10-13)
 

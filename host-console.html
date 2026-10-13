@@ -5383,7 +5383,7 @@ function showPanel(id, btn) {
 const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','settings','rules','recos','qrlink'];
 // Bump on every host-guides.js change so browsers never see a stale
 // copy even if their cache is aggressive.
-const _HG_VERSION = '52.1';
+const _HG_VERSION = '52.1-group-receipts';
 let _hgLoadPromise = null;
 function _hgLoad() {
   if (window.HG) return Promise.resolve();
@@ -7427,6 +7427,65 @@ function _isValidPastDOB(s) {
   return dt.getTime() < oneYearAgo.getTime();
 }
 
+// Receipt paths stay in application state, never inside inline handlers.
+// A booking can have more than one daily PDF when guests were filed separately.
+function viewGroupReceipts(control) {
+  const scope = control.dataset;
+  const rows = allCheckins.filter(c => scope.scope === 'checkin'
+    ? c.id === scope.id
+    : c.property_id === scope.property && c.booking_code === scope.booking);
+  const paths = [...new Set(rows.map(c => c.receipt_path).filter(Boolean))];
+  if (!paths.length) { renderCheckins(); return; }
+  if (paths.length === 1) { return _openAlloggiatiReceipt(paths[0]); }
+  const it = hostLang === 'it';
+  document.getElementById('groupReceiptsModal')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'groupReceiptsModal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;';
+  const panel = document.createElement('div');
+  panel.setAttribute('role', 'dialog');
+  panel.setAttribute('aria-modal', 'true');
+  panel.setAttribute('aria-labelledby', 'groupReceiptsTitle');
+  panel.style.cssText = 'background:var(--white);border-radius:14px;padding:24px;max-width:480px;width:100%;max-height:80vh;overflow:auto;';
+  const title = document.createElement('h3');
+  title.id = 'groupReceiptsTitle';
+  title.textContent = it ? 'Ricevute del gruppo' : 'Group receipts';
+  panel.appendChild(title);
+  const hint = document.createElement('p');
+  hint.textContent = it ? 'Il gruppo ha più ricevute di invio. Puoi aprire e scaricare ogni PDF.' : 'This group has multiple filing receipts. You can view and download each PDF.';
+  panel.appendChild(hint);
+  paths.forEach((path, index) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn btn-primary btn-sm';
+    button.style.cssText = 'display:block;margin-bottom:10px;';
+    button.textContent = (it ? 'Visualizza ricevuta ' : 'View receipt ') + (index + 1);
+    button.onclick = () => _openAlloggiatiReceipt(path);
+    panel.appendChild(button);
+  });
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'btn btn-secondary btn-sm';
+  close.textContent = it ? 'Chiudi' : 'Close';
+  const previousFocus = document.activeElement;
+  const dismiss = () => { overlay.remove(); previousFocus?.focus(); };
+  close.onclick = dismiss;
+  panel.appendChild(close);
+  overlay.onclick = event => { if (event.target === overlay) dismiss(); };
+  overlay.onkeydown = event => {
+    if (event.key === 'Escape') { event.preventDefault(); dismiss(); }
+    if (event.key === 'Tab') {
+      const buttons = Array.from(panel.querySelectorAll('button'));
+      const first = buttons[0], last = buttons[buttons.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+  };
+  overlay.appendChild(panel);
+  document.body.appendChild(overlay);
+  panel.querySelector('button').focus();
+}
+
 function renderCheckins() {
   const it = hostLang === 'it';
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString(it?'it-IT':'en-GB') : '—';
@@ -7484,14 +7543,17 @@ function renderCheckins() {
       ? ` <span style="font-size:0.66rem;color:#9a6b00;background:rgba(232,184,75,0.14);border-radius:8px;padding:2px 8px;">${it ? 'nessuna ricevuta caricata' : 'no receipt on file'}</span>`
       : '';
 
-    // Group-level actions. Fan-out to every guest in the group. When the
-    // group is already filed we keep the upload input available (so a
-    // receipt can be attached after the fact) but hide the mark-without-
-    // receipt button.
+    // Group receipt access replaces upload as soon as a receipt is attached.
+    // Shared daily PDFs are viewed once per group, including partial groups.
     const scopeAttr = isSolo
       ? `data-scope="checkin" data-id="${rows[0].id}"`
       : `data-scope="group" data-booking="${bookingCode}" data-property="${propertyId}"`;
-    const uploadBtn = `
+    const uploadBtn = anyReceipt ? `
+      <button type="button" data-guide="checkin-receipt-btn" ${scopeAttr}
+        onclick="event.stopPropagation();viewGroupReceipts(this)"
+        style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--warm);color:#fff;border:none;border-radius:6px;font-size:0.78rem;cursor:pointer;font-family:inherit;">
+        ${it ? '📄 Visualizza ricevuta' : '📄 View receipt'}
+      </button>` : `
       <label data-guide="checkin-receipt-btn" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--warm);color:#fff;border-radius:6px;font-size:0.78rem;cursor:pointer;font-family:inherit;position:relative;">
         <span>${it ? '📎 Ricevuta' : '📎 Receipt'}</span>
         <input type="file" id="receiptFileInput_${groupToken}" accept=".pdf,image/*"
@@ -13655,15 +13717,12 @@ function viewGuest(id) {
     </div>
     <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:6px;line-height:1.4;">
       ${it
-        ? 'La foto viene cancellata 48 ore dopo l\'arrivo (nota Garante aprile 2026). La ricevuta di invio caricata sotto è conservata 5 anni come prova di adempimento.'
-        : 'Photo is deleted 48 hours after arrival (Garante April 2026 note). The filing receipt uploaded below is kept for 5 years as proof of compliance.'}
+        ? 'La foto viene cancellata 48 ore dopo l\'arrivo (nota Garante aprile 2026). La ricevuta di invio del gruppo è conservata 5 anni come prova di adempimento.'
+        : 'Photo is deleted 48 hours after arrival (Garante April 2026 note). The group filing receipt is kept for 5 years as proof of compliance.'}
     </div>
   ` : '';
 
-  // Round 36: filing receipt slot. Optional — nothing is gated on it.
-  // Uploading a file marks the guest as filed and stamps filed_at, so the
-  // day-after filing reminder stops for this row. Receipt lives in the
-  // 'receipts' storage bucket (owner-scoped RLS), 5-year retention.
+  // Filing state remains per guest; receipt actions live on the group header.
   const isFiled      = c.alloggiati_status === 'filed';
   const isCorrection = c.alloggiati_status === 'correction';
   // Round 48 Phase 4 — 'correction' is "filed once, needs re-filing after a
@@ -13676,36 +13735,14 @@ function viewGuest(id) {
   const filedAtLine = c.filed_at
     ? `<div style="font-size:0.72rem;color:var(--ink-soft);margin-top:4px;">${it ? 'Inviato il' : 'Filed at'}: ${safe(fmtDT(c.filed_at))}</div>`
     : '';
-  const receiptViewLink = c.receipt_path
-    ? `<div id="guestModalReceiptBox" style="margin-top:8px;font-size:0.78rem;color:var(--ink-soft);">${it ? 'Caricamento ricevuta…' : 'Loading receipt…'}</div>`
-    : '';
-  // If they marked filed but never uploaded a receipt, nudge them —
-  // gently — so the 5-year compliance record isn't left empty.
-  const noReceiptNote = (isFiled && !c.receipt_path)
-    ? `<div style="margin-top:8px;font-size:0.72rem;color:#9a6b00;background:rgba(232,184,75,0.12);border-radius:6px;padding:6px 10px;">${it
-        ? '⚠ Nessuna ricevuta caricata — carica il PDF sotto per avere la prova di adempimento a 5 anni.'
-        : '⚠ No receipt on file — upload the PDF below to have the 5-year proof of compliance.'}</div>`
-    : '';
-  // Round 36 follow-up: the filing action lives on the Check-in Data
-  // table's group header now (one action per booking-code, since
-  // Alloggiati accepts a group at a time and returns one receipt). The
-  // modal shows the resulting state only — read-only status pill,
-  // filed_at, uploaded-receipt link, and the amber "no receipt on
-  // file" nudge when applicable.
-  const filingActionHint = c.booking_code
-    ? (it
-        ? 'Per caricare la ricevuta o segnare come inviato, usa il pulsante sull\'intestazione del gruppo nella tabella Check-in — l\'azione si applica a tutti gli ospiti dello stesso codice prenotazione.'
-        : 'To upload the receipt or mark as filed, use the button on the group header in the Check-in Data table — the action applies to every guest sharing the same booking code.')
-    : (it
-        ? 'Per caricare la ricevuta o segnare come inviato, usa il pulsante sulla riga dell\'ospite nella tabella Check-in.'
-        : 'To upload the receipt or mark as filed, use the button on the guest\'s row in the Check-in Data table.');
+  const filingActionHint = it
+    ? 'La ricevuta è disponibile sull’intestazione del gruppo nella tabella Check-in: Visualizza ricevuta se allegata, oppure Ricevuta per caricarla. Vale per gli ospiti inclusi nel PDF.'
+    : 'Use the group header in the Check-in table: View receipt when attached, or Receipt to upload it. The PDF covers the guests included in that filing.';
   const filingSection = `
     ${sectionTitle(it ? 'Invio Alloggiati' : 'Alloggiati filing')}
     <div style="background:rgba(107,122,144,0.04);border-radius:8px;padding:12px 14px;">
       <div>${filedBadge}</div>
       ${filedAtLine}
-      ${receiptViewLink}
-      ${noReceiptNote}
       <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:10px;line-height:1.4;">${filingActionHint}</div>
     </div>
   `;
@@ -13791,22 +13828,6 @@ function viewGuest(id) {
     }).catch(() => {
       const box = document.getElementById('guestModalPhotoBox');
       if (box) box.innerHTML = `<div style="font-size:0.78rem;color:#b03939;padding:8px;">${it ? '⚠ Errore caricamento foto' : '⚠ Photo load error'}</div>`;
-    });
-  }
-
-  // Round 36: signed URL for the filing receipt (private 'receipts' bucket).
-  if (c.receipt_path) {
-    sb.storage.from('receipts').createSignedUrl(c.receipt_path, 300).then(({ data, error }) => {
-      const box = document.getElementById('guestModalReceiptBox');
-      if (!box) return;
-      if (error || !data?.signedUrl) {
-        box.innerHTML = `<span style="color:#b03939;">${it ? '⚠ Ricevuta non leggibile' : '⚠ Receipt not readable'}</span>`;
-        return;
-      }
-      box.innerHTML = `📄 <a href="${data.signedUrl}" target="_blank" rel="noopener" style="color:#005BFF;text-decoration:underline;">${it ? 'Apri ricevuta caricata (link valido 5 min)' : 'Open uploaded receipt (link valid 5 min)'}</a>`;
-    }).catch(() => {
-      const box = document.getElementById('guestModalReceiptBox');
-      if (box) box.innerHTML = `<span style="color:#b03939;">${it ? '⚠ Errore ricevuta' : '⚠ Receipt error'}</span>`;
     });
   }
 }

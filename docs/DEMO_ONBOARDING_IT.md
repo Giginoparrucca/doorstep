@@ -147,7 +147,7 @@ Risultato atteso: il nuovo host sa da quale pannello iniziare la giornata.
 
 **Fare:** aprire Conformità e lo scenario `DEMO-CONFORMITA`. Mostrare il controllo
 di un errore dimostrativo, la sua correzione e il risultato dell'invio simulato.
-Aprire la ricevuta con marcatura **FACSIMILE**. Nella produzione, per gli invii fatti da WelcomeBnB, la ricevuta giornaliera viene scaricata dal giorno successivo e allegata automaticamente agli ospiti inviati, con nuovi tentativi se il portale non risponde. L’invio non viene ripetuto. Nella demo resta una simulazione immediata e non parte alcun recupero reale.
+Aprire la ricevuta con marcatura **FACSIMILE**. Nella produzione, per gli invii fatti da WelcomeBnB, la ricevuta giornaliera viene scaricata dal giorno successivo e allegata automaticamente agli ospiti inviati, con nuovi tentativi se il portale non risponde. L’invio non viene ripetuto. Nella tabella Check-in, «Visualizza ricevuta» sull’intestazione del gruppo sostituisce il caricamento appena un PDF è allegato; permette di aprire e scaricare le ricevute del gruppo. Nella demo resta una simulazione immediata e non parte alcun recupero reale.
 
 **Dire prima di fare clic:** «Questo invio è una simulazione: non mandiamo nulla
 alla Questura e questa ricevuta è un esempio. Nella tua proprietà reale servono

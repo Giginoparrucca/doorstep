@@ -15,6 +15,8 @@
   var W = typeof window !== 'undefined' ? window : {};
   var testBooking = null;
   var renderVersion = 0;
+  var latestReadiness = null;
+  var readinessPropertyId = null;
   var SEL_HOST = 'onboardingHostContainer';
   var SEL_WIDGET = 'onboardingSupportWidget';
   var SEL_SHEET = 'onboardingSupportSheet';
@@ -181,6 +183,7 @@
       return '' +
         '<div class="obx-ready-badge">' +
         '  <span>✓ ' + esc(hk('obx_ready_badge', it() ? 'Proprietà pronta' : 'Property ready')) + '</span>' +
+        '  <button type="button" class="obx-expand obx-help">' + esc(hk('obx_show')) + '</button>' +
         '</div>';
     }
     var pct = Math.round((n / total) * 100);
@@ -203,6 +206,55 @@
       '  <div class="obx-intro">' + esc(intro) + '</div>' +
       '  <ul class="obx-steps">' + stepsHtml + '</ul>' +
       '</div>';
+  }
+
+  // The same readiness data drives the dot and its explanation on Property.
+  function renderPropertyAttention(section) {
+    var holder = document.getElementById('onboardingPropertyAttention');
+    if (!holder) return;
+    var visible = (section || _currentSection()) === 'prop' &&
+      readinessPropertyId === W.propertyId && latestReadiness && !latestReadiness.ready;
+    holder.style.display = visible ? '' : 'none';
+    if (!visible) { holder.innerHTML = ''; return; }
+    var steps = latestReadiness.steps.filter(function (s) { return !s.done && s.id !== 'test'; });
+    holder.innerHTML = '<div class="obx-card obx-attention" role="region" aria-label="' + esc(hk('obx_attention_title')) + '">' +
+      '<div class="obx-head-title">' + esc(hk('obx_attention_title')) + '</div>' +
+      '<p class="obx-intro">' + esc(hk('obx_attention_intro')) + '</p>' +
+      '<ul class="obx-steps">' + steps.map(_renderStep).join('') + '</ul></div>';
+    _wireNavigation(holder);
+    _wireHelp(holder);
+  }
+  function _wireHelp(holder) {
+    Array.prototype.forEach.call(holder.querySelectorAll('.obx-help[data-step]'), function (b) {
+      b.onclick = function () { openSupportSheet({ step: b.getAttribute('data-step') }); };
+    });
+  }
+  function _wireNavigation(holder) {
+    Array.prototype.forEach.call(holder.querySelectorAll('.obx-cta[data-section]'), function (b) {
+      b.onclick = function () {
+        var key = b.getAttribute('data-focus') || '';
+        var targets = {
+          name: ['property', 'propName'], city: ['property', 'propCity'], region: ['property', 'propRegion'],
+          cir_code: ['property', 'cirCode'], cir_code_format: ['property', 'cirCode'], ross1000_codice: ['property', 'propRossCodice'],
+          wifi_name: ['property', 'propWifiName'], welcome_message: ['property', 'propWelcome'], checkin_instructions: ['property', 'propCheckinInstructions'],
+          tax_rules: ['settings', 'propTaxRate'], ical_feeds: ['settings', 'icalFeedsList'], alloggiati: ['settings', 'alloggiatiCard'],
+          notification_channel: ['chat', 'notifCard']
+        };
+        var target = targets[key];
+        if (!target) { if (W.showSection) W.showSection(b.getAttribute('data-section')); return; }
+        W.showPanel(target[0]);
+        if (target[0] === 'property' && W.startPropertyEdit) W.startPropertyEdit();
+        if (target[0] === 'settings' && W.startSettingsEdit) W.startSettingsEdit();
+        var el = document.getElementById(target[1]);
+        if (!el) return;
+        if (el.tagName === 'DETAILS') el.open = true;
+        if (!el.hasAttribute('tabindex') && !/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(el.tagName)) el.setAttribute('tabindex', '-1');
+        el.classList.add('obx-focus-target');
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.focus({ preventScroll: true });
+        setTimeout(function () { el.classList.remove('obx-focus-target'); }, 2500);
+      };
+    });
   }
 
   // ── sidebar readiness dot ───────────────────────────────────────────
@@ -362,18 +414,21 @@
       holder.id = SEL_HOST;
       panel.insertBefore(holder, panel.firstChild);
     }
-    if (!W.propertyData) { holder.innerHTML = ''; _showSidebarDot(false); return; }
+    if (!W.propertyData) { holder.innerHTML = ''; latestReadiness = null; _showSidebarDot(false); renderPropertyAttention(); return; }
 
     var inputs;
     try { inputs = await _loadReadinessInputs(W.propertyData); } catch (_) { inputs = null; }
-    if (version !== renderVersion || (inputs && W.propertyData.id !== inputs.property.id)) return;
+    if (version !== renderVersion || (inputs && (!W.propertyData || W.propertyData.id !== inputs.property.id))) return;
     var bookingForRender = testBooking;
-    if (!inputs) { holder.innerHTML = ''; return; }
+    if (!inputs) { latestReadiness = null; _showSidebarDot(false); renderPropertyAttention(); holder.innerHTML = '<div class="obx-card" role="status">' + esc(hk('obx_load_error')) + ' <button type="button" class="obx-retry obx-cta">' + esc(hk('obx_retry')) + '</button></div>'; holder.querySelector('.obx-retry').onclick = renderChecklist; return; }
     var R = (W.OnboardingReadiness && W.OnboardingReadiness.computeReadiness);
     if (typeof R !== 'function') return;
     var readiness = R(inputs);
 
+    latestReadiness = readiness;
+    readinessPropertyId = inputs.property.id;
     _showSidebarDot(!readiness.ready);
+    renderPropertyAttention();
     var dismissed = !!(inputs.onboardingState && inputs.onboardingState.checklist_dismissed_at);
     holder.innerHTML = _renderCard(readiness, dismissed);
 
@@ -408,31 +463,14 @@
       } catch (_) { W.alert(hk('obx_test_error')); }
       finally { del.disabled = false; }
     });
-    // Wire navigation buttons.
-    Array.prototype.forEach.call(holder.querySelectorAll('.obx-cta[data-section]'), function (b) {
-      b.addEventListener('click', function () {
-        var section = b.getAttribute('data-section') || 'prop';
-        var focus = b.getAttribute('data-focus') || '';
-        try { if (typeof W.showSection === 'function') W.showSection(section); } catch (_) {}
-        if (focus) {
-          setTimeout(function () {
-            var map = { name: 'propName', city: 'propCity', region: 'propRegion',
-                        cir_code: 'cirCode', cir_code_format: 'cirCode',
-                        ross1000_codice: 'ross1000Codice', wifi_name: 'wifiName',
-                        welcome_message: 'welcomeMsg', checkin_instructions: 'checkinInstructions',
-                        tax_rules: 'propRegion', ical_feeds: 'propRegion', alloggiati: 'alloggiatiCard' };
-            var el = document.getElementById(map[focus] || focus);
-            if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            if (el && typeof el.focus === 'function') try { el.focus(); } catch (_) {}
-          }, 150);
-        }
-      });
-    });
-    Array.prototype.forEach.call(holder.querySelectorAll('.obx-help'), function (b) {
-      b.addEventListener('click', function () {
-        openSupportSheet({ step: b.getAttribute('data-step') });
-      });
-    });
+    _wireNavigation(holder);
+    _wireHelp(holder);
+    var expandBtn = holder.querySelector('.obx-expand');
+    if (expandBtn) expandBtn.onclick = async function () {
+      await W.sb.from('host_onboarding').update({ checklist_dismissed_at: null })
+        .eq('user_id', inputs.userId).eq('property_id', inputs.property.id);
+      renderChecklist();
+    };
     var dismissBtn = holder.querySelector('.obx-dismiss');
     if (dismissBtn) dismissBtn.addEventListener('click', async function () {
       try {
@@ -455,6 +493,8 @@
   function _css() {
     return [
       '#onboardingHostContainer{margin:0 0 18px}',
+      '.obx-attention{border-color:#f59e0b}',
+      '.obx-focus-target{outline:3px solid #f59e0b;outline-offset:4px}',
       '.obx-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px 18px;margin:0 0 12px;box-shadow:0 1px 2px rgba(0,0,0,0.04)}',
       '.obx-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}',
       '.obx-head-title{font-weight:600;font-size:0.98rem;flex:1}',
@@ -507,6 +547,7 @@
   // ── public API ──────────────────────────────────────────────────────
   W.HostOnboarding = {
     renderChecklist: renderChecklist,
+    renderPropertyAttention: renderPropertyAttention,
     openSupportSheet: openSupportSheet,
     closeSupportSheet: closeSupportSheet,
     buildSupportPrefill: buildSupportPrefill,

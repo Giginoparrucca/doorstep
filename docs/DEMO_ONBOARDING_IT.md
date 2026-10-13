@@ -69,6 +69,8 @@ Risultato atteso: il nuovo host riconosce dove inserire le risposte che oggi rip
 La funzione è verificata con accesso host autenticato, isolamento tra proprietari
 e rimozione effettiva delle foto di prova.
 
+In **Oggi**, la checklist **Avvio struttura** resta visibile dopo il caricamento e gli aggiornamenti. Il pallino arancione su **Proprietà** corrisponde al riquadro **Da completare per questa struttura**, che elenca i passaggi mancanti: **Completa** apre il modulo o le impostazioni corrispondenti. Se la checklist è stata nascosta dopo il completamento, **Mostra checklist** la riapre.
+
 In **Oggi → Avvio struttura → Prova come ospite**, premere
 **Fai un check-in di prova**. Si apre il link della propria struttura in una nuova scheda, con
 il banner **Check-in di prova — nessun dato reale**. Inserire soltanto dati

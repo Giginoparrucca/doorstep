@@ -31,6 +31,12 @@ rescue path, not a gate.
 | 6 — Admin readiness view | pending | Per-host readiness, "Bloccati" sortable list, aggregate funnel of support clicks per step; `is_admin()` gated |
 | 7 — End-to-end, demo and docs | pending | Fresh test host journey in production; demo fixtures + script + PDF updated; demo gates (live-smoke, rebuild-verify, e2e) still green |
 
+### Hotfix — checklist visibility and actionable Property dot (GPT-6.1, 2026-10-13)
+
+- Fixed the reported checklist flash: dashboard refresh now updates a separate body and preserves the checklist DOM and its controls. Property now explains its orange dot with a list of incomplete blocking steps and their missing fields, derived from the same readiness snapshot. Navigation opens the correct details, settings or notification panel and enables the relevant form. Corrected stale field IDs.
+- Ready/dismissed checklist has a bilingual Show checklist button. Failed checklist loads show a bilingual retry action instead of disappearing; stale attention is hidden on section/property changes. No DB or API changes. Added a development-only DOM dependency and a regression exercising the actual dashboard/module across repeated refreshes, navigation, ready/dismissed state, failed loads/retry and property switches.
+- Italian presenter guide/PDF updated. Verification and release evidence pending below.
+
 ### Round 51 Phase 4 — verified delivery (GPT-6.1, 2026-10-13)
 
 - PR #139: host-owned direct test booking via the existing mint dispatcher and guest gateway, bilingual start/open/delete controls and authoritative guest test banner. Fixed the checklist lexical/window integration, first-seen persistence and overlapping demo/test banners. No new API route or cron.

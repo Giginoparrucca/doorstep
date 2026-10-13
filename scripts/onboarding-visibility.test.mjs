@@ -30,6 +30,8 @@ ctx.propertyId=null;await ctx.renderDashboard();
 assert.match(document.getElementById('dashboardContent').textContent,/dashboard_loading/);
 ctx.propertyId='fixture';await ctx.renderDashboard();
 assert.ok(!document.getElementById('panel-dashboard').textContent.includes('dashboard_loading'));
+assert.doesNotMatch(document.getElementById('panel-dashboard').textContent,/Loading dashboard|Caricamento dashboard/);
+assert.equal(document.querySelectorAll('#panel-dashboard [data-h="dashboard_loading"]').length,0);
 assert.equal(document.querySelectorAll('#dashboardContent').length,1);
 console.log('PASS initial loading is replaced by dashboard content without a leftover sibling');
 // This failed with the original dashboard: its final innerHTML wiped the card.

@@ -31,6 +31,11 @@ rescue path, not a gate.
 | 6 — Admin readiness view | pending | Per-host readiness, "Bloccati" sortable list, aggregate funnel of support clicks per step; `is_admin()` gated |
 | 7 — End-to-end, demo and docs | pending | Fresh test host journey in production; demo fixtures + script + PDF updated; demo gates (live-smoke, rebuild-verify, e2e) still green |
 
+### Hotfix — initial HTML dashboard placeholder (GPT-6.1, 2026-10-13)
+
+- Corrected the remaining literal English Loading dashboard placeholder in the initial HTML. It now lives inside the same `dashboardContent` body replaced by loaded results and carries the existing bilingual translation key. The preceding fix handled the JavaScript-created loader but missed this static sibling.
+- Regression now checks actual English/Italian loading text and the initial placeholder element after data renders; it failed before this change and passes afterward. Full dashboard/onboarding DOM, UI/i18n, inline syntax/export isolation and calendar coverage regressions pass. No API, schema, database or demo fixture change; existing guide/PDF behavior remains accurate. Release pending.
+
 ### Hotfix — finished dashboard setup and expired calendar coverage (GPT-6.1, 2026-10-13)
 
 - Ready properties automatically remove the dashboard checklist, without a ready badge or reopen control. Active test deletion remains accessible separately. Both detected readiness and the final host confirmation clear the checklist and stay cleared after refresh.

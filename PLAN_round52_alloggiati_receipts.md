@@ -117,3 +117,18 @@ necessary, amend this plan before implementation and include RLS/GRANT gates.
 Credential or portal failures leave a missing receipt for retry within the
 documented window. Removed credentials prevent recovery until restored.
 Receipt retention and receipt bucket permissions keep their existing rules.
+
+## Phase 2 — Group receipt access (13 October 2026)
+
+Requested follow-up: explain the existing blue guest-edit/date badges. Receipt
+view/download belongs on the booking group header. When any current group
+receipt exists, replace the upload control with View receipt (Visualizza
+ricevuta); deduplicate shared paths and offer every distinct group receipt
+when filings span several PDFs. Keep upload for groups with no receipt.
+Remove individual guest receipt downloads; direct guest details to the group
+header. Preserve private signed URLs and property/booking scope.
+
+Gate: execute actual rendering and group interaction for empty, shared, mixed,
+multiple-PDF and solo groups in both languages; prove correct signing and no
+individual receipt signing; run inline syntax and relevant UI regressions.
+Verify deployed source before marking shipped. No database/API change.

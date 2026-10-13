@@ -66,3 +66,6 @@ assert.match(mintWalkinCode(true),/^WB-TEST[0-9A-HJKMNP-TV-Z]{4}$/);
 for(let i=0;i<100;i++) assert.ok(!mintWalkinCode().startsWith('WB-TEST'));
 assert.match(read('api/guest-token.js'),/Test booking expired/);
 console.log('PASS reserved test prefix and expired-link rejection');
+
+assert.match(read('index.html'),/banner.style.top = demoHeight/);
+for (const key of ['test_banner_title','test_banner_hint','test_banner_exit']) assert.equal((read('index.html').match(new RegExp(key+':','g'))||[]).length,2);

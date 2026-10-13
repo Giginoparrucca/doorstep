@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import vm from 'node:vm';
 const {collectReceipts, romeDate, receiptWindow} = await import('../api/_alloggiati-receipts.js');
 const pdf = Buffer.from('%PDF-1.7\n' + 'FACSIMILE '.repeat(40));
 const now = new Date('2026-10-13T08:00:00Z');
@@ -74,6 +75,18 @@ assert.match(api,/action === 'receipt_tick'/);assert.match(api,/const receipts =
 assert.ok(!api.includes('await soapRicevuta('));assert.ok(!fs.readFileSync(new URL('../api/_alloggiati-receipts.js',import.meta.url),'utf8').match(/import[^;]*\b(send|test)\b/s));
 const html=fs.readFileSync(new URL('../host-console.html',import.meta.url),'utf8');assert.equal((html.match(/receipt_auto_pending:/g)||[]).length,2);assert.match(html,/safe\(h\('receipt_auto_pending'\)\)/);
 console.log('PASS existing scheduler reuse, no same-day Ricevuta, no filing imports and bilingual pending status');
+// Execute the real post-Send branches: corrected filings must not keep an
+// old daily PDF as their current proof. No SOAP code is executed by this gate.
+for (const mode of ['host','autofile']) {
+ const record={alloggiati_status:'correction',receipt_path:'previous.pdf',filed_at:'2026-10-01T00:00:00Z'};
+ const context=vm.createContext({console,Date,prop:{id:property},propertyId:property,owner:{hostId:'fixture'},batchCheckinIds:['x'],checkinIdsFlat:['x'],lines:['fixture'],summary:{rows_filed:0,errors:0},
+   sbPatch:async(_path,patch)=>Object.assign(record,patch),logFiling:async()=>{},res:{status(){return this},json(v){return v}}});
+ const start=api.indexOf(mode==='host'?'    const filedAt = new Date();':'  const filedAt = new Date();',api.indexOf(mode==='host'?"  if (action === 'send')":'async function processPropertyAutofile'));
+ const end=mode==='host'?api.indexOf("\n  }\n\n  if (action === 'delete')",start):api.indexOf('\n}\n',start);
+ assert.ok(start>=0&&end>start);vm.runInContext('async function finish(){'+api.slice(start,end)+'}',context);await context.finish();
+ assert.equal(record.alloggiati_status,'filed');assert.equal(record.receipt_path,null);assert.notEqual(record.filed_at,'2026-10-01T00:00:00Z');
+}
+console.log('PASS actual host/autofile completion schedules a fresh receipt for corrected submissions');
 process.env.SUPABASE_SERVICE_ROLE_KEY='fixture';process.env.AUTOFILE_CRON_SECRET='fixture-cron';
 const handler=(await import('../api/alloggiati.js')).default;
 const originalFetch=globalThis.fetch;let dispatcherCalls=0;

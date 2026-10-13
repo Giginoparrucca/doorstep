@@ -595,7 +595,7 @@ async function processPropertyAutofile(prop) {
   // sensitive-column change, so this UPDATE lands cleanly.
   try {
     const idsList = batchCheckinIds.map(x => `"${x}"`).join(',');
-    const patch = { alloggiati_status: 'filed', filed_at: filedAtIso };
+    const patch = { alloggiati_status: 'filed', filed_at: filedAtIso, receipt_path: null };
     if (receiptPath) patch.receipt_path = receiptPath;
     await sbPatch(
       `checkins?id=in.(${encodeURIComponent(idsList)})&property_id=eq.${encodeURIComponent(prop.id)}`,
@@ -1503,6 +1503,7 @@ export default async function handler(req, res) {
       const patch = {
         alloggiati_status: 'filed',
         filed_at: filedAtIso,
+        receipt_path: null, // a new/corrected filing needs its new daily receipt
       };
       if (receiptPath) patch.receipt_path = receiptPath;
       const idsList = Array.from(new Set(checkinIdsFlat)).map(x => `"${x}"`).join(',');

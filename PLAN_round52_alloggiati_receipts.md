@@ -45,6 +45,8 @@ Official reference: https://alloggiatiweb.poliziadistato.it/PortaleAlloggiati/Do
 - Verify a nonempty PDF before storing; report sanitized failure counts,
   retry subsequent ticks and bound query sizes, requests and elapsed time.
   Failed old jobs must not indefinitely starve other properties/dates.
+- A successful new/corrected Send clears the current receipt link so the new
+  filing can obtain its matching receipt; the previous stored PDF is retained.
 - Stop calling Ricevuta for the current day after Send. Mark filing normally
   and explain that automatic receipt download is pending.
 - Provide a `receipt_tick` action behind the same constant-time cron-secret

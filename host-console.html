@@ -1325,6 +1325,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   </div>
 
   <div class="content">
+    <div id="onboardingPropertyAttention" style="display:none;"></div>
 
     <!-- ════════════ DASHBOARD ════════════ -->
     <div class="panel active" id="panel-dashboard">
@@ -3963,6 +3964,7 @@ const HT = {
     // stray reference still resolves.
     sidebar_oggi: 'Today', sidebar_ospiti: 'Guests', sidebar_conf: 'Compliance',
     sidebar_prop: 'Property', sidebar_cond: 'Share',
+    obx_attention_title: 'Needs attention for this property', obx_attention_intro: 'The orange dot marks these unfinished setup steps. Choose Complete to open the relevant form or settings.', obx_show: 'Show checklist', obx_load_error: 'Could not load property setup. Please retry.', obx_retry: 'Retry',
     obx_title: 'Property setup', obx_intro_todo: 'A few steps and you are ready for your guests.', obx_intro_ready: 'Ready for your first guests.',
     obx_hide: 'Hide', obx_skipped: 'skipped', obx_help_link: 'Need help?', obx_help_open: 'Open help', obx_help_fab: 'Help',
     obx_help_title: 'How can we help?', obx_help_whatsapp: 'Message us on WhatsApp', obx_help_email: 'Send us an email', obx_help_calendly: 'Book a 20-minute call',
@@ -4515,6 +4517,7 @@ const HT = {
     sidebar_compliance: 'Guida Conformità',
     sidebar_oggi: 'Oggi', sidebar_ospiti: 'Ospiti', sidebar_conf: 'Conformità',
     sidebar_prop: 'Proprietà', sidebar_cond: 'Condividi',
+    obx_attention_title: 'Da completare per questa struttura', obx_attention_intro: 'Il pallino arancione indica questi passaggi ancora da completare. Premi Completa per aprire il modulo o le impostazioni corrispondenti.', obx_show: 'Mostra checklist', obx_load_error: 'Impossibile caricare i passaggi della struttura. Riprova.', obx_retry: 'Riprova',
     obx_title: 'Avvio struttura', obx_intro_todo: 'Pochi passaggi e sei pronto per i tuoi ospiti.', obx_intro_ready: 'Pronta per i tuoi primi ospiti.',
     obx_hide: 'Nascondi', obx_skipped: 'saltato', obx_help_link: 'Serve aiuto?', obx_help_open: 'Apri assistenza', obx_help_fab: 'Aiuto',
     obx_help_title: 'Come possiamo aiutarti?', obx_help_whatsapp: 'Scrivici su WhatsApp', obx_help_email: 'Scrivici una email', obx_help_calendly: 'Prenota una chiamata di 20 minuti',
@@ -5303,6 +5306,7 @@ function showPanel(id, btn) {
   // matches the visible state.
   const sectionId = panelSection(id) || 'oggi';
   _paintSidebarActive(sectionId);
+  if (window.HostOnboarding) window.HostOnboarding.renderPropertyAttention(sectionId);
   _renderSectionTabs(sectionId, id);
   _writeLastTab(sectionId, id);
   _writeLastSection(sectionId);
@@ -5458,10 +5462,8 @@ async function renderDashboard() {
     el.innerHTML = `<div style="text-align:center;padding:40px;color:var(--ink-soft);">${h('dashboard_loading') || 'Loading…'}</div>`;
     return;
   }
-  // Round 51 Phase 3 — paint the onboarding checklist before the rest
-  // of the dashboard so the first thing a new host sees is the five
-  // steps. HostOnboarding re-inserts its own container on each call,
-  // so it survives the dashboard rebuilds below.
+  // Keep onboarding outside the replaceable dashboard body. Updating guest
+  // activity must preserve the checklist and its bound controls.
   try { if (window.HostOnboarding) await window.HostOnboarding.renderChecklist(); } catch (_) {}
 
   // Fetch the last 60 days of events for this property — wide enough
@@ -5802,7 +5804,13 @@ async function renderDashboard() {
       </span>
     </button>`;
 
-  el.innerHTML = `
+  let dashboardContent = document.getElementById('dashboardContent');
+  if (!dashboardContent) {
+    dashboardContent = document.createElement('div');
+    dashboardContent.id = 'dashboardContent';
+    el.appendChild(dashboardContent);
+  }
+  dashboardContent.innerHTML = `
     <div style="max-width:920px;">
       ${helpBanner}
       ${coverageLostBanner}

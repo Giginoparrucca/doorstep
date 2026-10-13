@@ -31,6 +31,12 @@ rescue path, not a gate.
 | 6 — Admin readiness view | pending | Per-host readiness, "Bloccati" sortable list, aggregate funnel of support clicks per step; `is_admin()` gated |
 | 7 — End-to-end, demo and docs | pending | Fresh test host journey in production; demo fixtures + script + PDF updated; demo gates (live-smoke, rebuild-verify, e2e) still green |
 
+### Alloggiati receipt audit — next-day retrieval gap (GPT-6.1, 2026-10-13)
+
+- Read-only code/database audit: manual Send and live autofile attempt Ricevuta for the current filing day, upload to private receipts Storage and stamp receipt_path only if successful. The official MANUALEWS Ricevuta specification accepts the last 30 days excluding the current day. Neither the existing tick nor another job retries receipts on subsequent days. The manual-send UI currently directs the host to download/upload later.
+- Production owner-property aggregate: 169 non-test, undeleted rows marked filed, zero receipt links, all have filed_at. Recent successful host/autofile audit entries also have no receipt_path. Marked-filed rows include historical manual declarations, so this is not proof that every one was submitted through the SOAP flow. No receipt was downloaded and no guest, receipt or filing state was changed by this audit.
+- Next implementation: reuse the existing scheduler to fetch eligible previous-day receipts, save one property/date PDF and attach it to the matching confirmed filings; retry without resending guests, cover manual API submissions as well as autofile, respect test exclusion/property scope and the documented retrieval window. Correct manual Send's UTC date derivation to Rome time. No implementation or passing retrieval gate is claimed here.
+
 ### Hotfix — initial HTML dashboard placeholder (GPT-6.1, 2026-10-13)
 
 - Corrected the remaining literal English Loading dashboard placeholder in the initial HTML. It now lives inside the same `dashboardContent` body replaced by loaded results and carries the existing bilingual translation key. The preceding fix handled the JavaScript-created loader but missed this static sibling.

@@ -12,3 +12,12 @@ if (process.env.DEMO_PHASE2_GATE === '1') {
     ...result, sourceCommit: process.env.VERCEL_GIT_COMMIT_SHA, checkedAt: new Date().toISOString(),
   }));
 }
+// Opt-in Round 51 live gate; dedicated demo build only. Result contains counts
+// and labels, never credentials, tokens or guest data.
+if (process.env.ROUND51_HOST_GATE_ORIGIN) {
+  const {runHostGate} = await import('./onboarding-host-gate.mjs');
+  const result = await runHostGate();
+  writeFileSync(new URL('../phase4-check-result.json', import.meta.url), JSON.stringify({
+    ...result, sourceCommit: process.env.VERCEL_GIT_COMMIT_SHA, checkedAt: new Date().toISOString(),
+  }));
+}

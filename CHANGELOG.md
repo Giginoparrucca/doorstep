@@ -9,6 +9,20 @@ Newest entries at the top of each section.
 
 ### Current round — in-flight
 
+**Round 52 — Automatic Alloggiati receipt retrieval**
+
+Specification: `PLAN_round52_alloggiati_receipts.md`. Uses the existing
+scheduler to retrieve next-day receipts and attach the daily PDF to confirmed
+filings. Receipt collection never resubmits guest data. Round 51 is paused
+at Daniele's request while this round is completed; its table is preserved below.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 0 — Specification and handoff | in-progress — GPT-6.1 | Scope, date window, exclusions, tests, live receipt-only probe and rollback |
+| 1 — Implement, verify and release | pending | Collector, dispatcher/scheduler, host copy, demo docs/PDF; local and live gates in specification |
+
+### Round 51 — preserved in-flight status (paused for Round 52)
+
 **Round 51 — Self-serve host onboarding: setup checklist + contact widget**
 
 Specification: `PLAN_round51_host_onboarding.md` (English). The gate before

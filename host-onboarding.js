@@ -154,15 +154,15 @@
     var state = step.done ? (step.skipped ? 'skipped' : 'done') : 'todo';
     var title = _stepTitle(step.id);
     var choiceButtons = step.decision ? '<button type="button" class="obx-choice" data-choice="auto" data-step="' + esc(step.id) + '">' + esc(hk('obx_auto')) + '</button>' : '<button type="button" class="obx-choice" data-choice="done" data-step="' + esc(step.id) + '">' + esc(hk('obx_mark_done')) + '</button><button type="button" class="obx-choice" data-choice="dismissed" data-step="' + esc(step.id) + '">' + esc(hk('obx_dismiss_step')) + '</button>';
-    if (step.id === 'property' && step.missing.indexOf('tax_rules') >= 0) choiceButtons += '<button type="button" class="obx-choice" data-choice="tax" data-step="property">' + esc(hk('obx_tax_na')) + '</button>';
-    if (step.id === 'property' && latestInputs && latestInputs.onboardingState.skips.tax_not_applicable) choiceButtons += '<button type="button" class="obx-choice" data-choice="tax_auto" data-step="property">' + esc(hk('obx_tax_restore')) + '</button>';
+    choiceButtons = '<div class="obx-choice-row">' + choiceButtons + '</div>';
+    var hint = '';
     var cta = step.done ? '' :
       '<button class="obx-cta" type="button" data-section="' + esc(ui.ctaSection) + '" data-focus="' + esc(step.missing[0] || '') + '">' +
       esc(_stepCta(step.id)) + '</button>';
     if (step.id === 'test') {
       cta = '<button class="obx-test-start obx-cta" type="button">' + esc(testBooking ? hk('obx_test_open') : _stepCta('test')) + '</button>';
       if (testBooking) cta += '<button class="obx-test-delete obx-help" type="button">' + esc(hk('obx_test_delete')) + '</button>';
-      cta += '<div class="obx-test-hint">' + esc(hk('obx_test_hint')) + '</div>';
+      hint = '<div class="obx-test-hint">' + esc(hk('obx_test_hint')) + '</div>';
     }
     var help = step.done ? '' :
       '<button class="obx-help" type="button" data-step="' + esc(step.id) + '">' +
@@ -175,7 +175,7 @@
       '  <span class="obx-icon" aria-hidden="true">' + ui.icon + '</span>' +
       '  <div class="obx-body">' +
       '    <div class="obx-title">' + esc(title) + ' ' + skippedBadge + manualBadge + '</div>' +
-      _renderMissing(step) +
+      _renderMissing(step) + hint +
       '  </div>' +
       '  <div class="obx-actions">' + cta + help + choiceButtons + '</div>' +
       '</li>';
@@ -269,13 +269,9 @@
       var row = await W.sb.from('host_onboarding').select('skips,updated_at').eq('user_id', inputs.userId).eq('property_id', inputs.property.id).maybeSingle();
       if (row.error || !row.data) throw new Error('onboarding read failed');
       var skips = Object.assign({}, row.data.skips || {});
-      if (choice === 'tax') skips.tax_not_applicable = true;
-      else if (choice === 'tax_auto') delete skips.tax_not_applicable;
-      else {
-        skips.step_decisions = Object.assign({}, skips.step_decisions || {});
-        if (choice === 'auto') delete skips.step_decisions[step];
-        else skips.step_decisions[step] = choice;
-      }
+      skips.step_decisions = Object.assign({}, skips.step_decisions || {});
+      if (choice === 'auto') delete skips.step_decisions[step];
+      else skips.step_decisions[step] = choice;
       var saved = await W.sb.from('host_onboarding').update({ skips: skips }).eq('user_id', inputs.userId).eq('property_id', inputs.property.id).eq('updated_at', row.data.updated_at).select('skips').maybeSingle();
       if (saved.error) throw saved.error;
       if (!saved.data) continue;
@@ -574,10 +570,12 @@
       '.obx-title{font-size:0.9rem;font-weight:600;color:#111827}',
       '.obx-missing{font-size:0.78rem;color:#991b1b;margin-top:2px}',
       '.obx-badge-skip{display:inline-block;background:#fef3c7;color:#78350f;padding:1px 6px;border-radius:4px;font-size:0.7rem;margin-left:6px}',
-      '.obx-actions{display:flex;flex-direction:column;gap:4px;align-items:flex-end}',
+      '.obx-actions{display:flex;flex-direction:row;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end;max-width:60%}',
+      '.obx-choice-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}',
+      '@media(max-width:560px){.obx-step{flex-wrap:wrap}.obx-actions{max-width:100%;width:100%;justify-content:flex-start;padding-left:40px;box-sizing:border-box}}',
       '.obx-cta{background:#111827;color:#fff;border:0;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-family:inherit}',
       '.obx-cta:hover{background:#1f2937}',
-      '.obx-test-hint{max-width:210px;font-size:0.72rem;color:#4b5563;text-align:right}',
+      '.obx-test-hint{font-size:0.72rem;color:#4b5563;text-align:left;margin-top:4px}',
       '.obx-help{background:transparent;border:0;color:#4b5563;text-decoration:underline;font-size:0.74rem;cursor:pointer}',
       '.obx-help:hover{color:#111827}',
       '.obx-ready-badge{display:inline-flex;align-items:center;gap:6px;background:#d1fae5;color:#065f46;padding:6px 12px;border-radius:999px;font-size:0.82rem;font-weight:600}',

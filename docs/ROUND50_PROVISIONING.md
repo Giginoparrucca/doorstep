@@ -440,3 +440,15 @@ private reads and actual application deletion. Shared scheduler cleanup also
 deleted a second PNG before row expiry; a controlled 24h boundary probe removed
 only its managed test rows. Both probes fully cleaned up. The temporary preview
 build gate is disabled; no demo cron was added.
+
+
+### Round 52 receipt recovery (13 October 2026)
+
+Real receipt collection is blocked in demo; filing/receipt FACSIMILE simulation
+remains unchanged. No real PDFs, credentials, cron or new migration are added
+to demo. Its existing `round50_receipt_owner_scope` migration already qualifies
+`objects.name`; production required the separate additive
+`migration_round52_receipt_policies.sql` correction because its older Round 36
+policies bound the unqualified name to `properties.name`. Demo rebuild retains
+the existing migration bodies and schema fingerprints. Production rebuild must
+apply the Round 52 correction after Round 36.

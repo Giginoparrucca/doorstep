@@ -94,6 +94,19 @@ Exercise the real collector with a fake transport, covering:
 6. Mark shipped only after these gates pass; unavailable portal/access is a
    blocker, not a fabricated pass. No repeat Send as a recovery strategy.
 
+## Live-gate amendment - receipt owner policy binding
+
+The live owner-read probe returned zero after successful download. Existing
+Round 36 policies resolve unqualified `name` inside the property subquery to
+`p.name`, not the storage object's path. Correct owner SELECT/INSERT/DELETE
+policies with explicit `objects.name` in production via an additive ALTER
+POLICY migration. Demo already has this correction from Round 50; verify it
+without changing its baseline or migration fingerprints. Existing service grants and private bucket remain.
+Gate: owner sees the two real receipts, non-owner/anon see zero; migration
+contains only the three owner-policy corrections; production rebuild applies the new migration; demo rebuild retains its
+existing Round 50 receipt-owner-scope correction and fingerprints.
+Rollback: restore the previous policy expressions if needed, retaining files.
+
 ## Rollback and operations
 
 Revert the implementation commit and redeploy. Existing stored PDFs and links

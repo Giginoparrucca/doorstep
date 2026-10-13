@@ -34,7 +34,7 @@ rescue path, not a gate.
 ### Hotfix — host tax choice and horizontal checklist actions (GPT-6.1, 2026-10-13)
 
 - Removed the property-specific no-tax declaration recorded in the previous session at Daniele's request. No exemption is hard-coded or automatically assigned; missing tax configuration prompts the host to set it up or use the generic Confirm/Dismiss controls. Removed the separate tax applicability/review buttons.
-- Checklist actions now sit horizontally, with Confirm/Dismiss grouped together, responsive wrapping on narrow screens and the guest-test hint beneath its description. Preserved reversible automatic-check restoration and the language feedback fix. Updated DOM regression and Italian guide/PDF. Release evidence follows.
+- Checklist actions now sit horizontally, with Confirm/Dismiss grouped together, responsive wrapping on narrow screens and the guest-test hint beneath its description. Preserved reversible automatic-check restoration and the language feedback fix. Updated DOM regression and Italian guide/PDF. DOM visibility/choice/layout, readiness, onboarding i18n, export isolation, environment and demo UX regressions pass. Served demo preview matches the tested module. **Release:** shipped — PR #142 — GPT-6.1; merge `4fd0c2d`. Production `dpl_8iTBPP6qNogdXBdcFJMM4YpZpFXX` and demo `dpl_1wEyUvvuarDQyk939JNr4QY8gTUE` READY. An initial live source check ran during BUILDING; after READY, both served production files match verified source. The previous no-tax declaration was removed and its absence confirmed. No schema/API change; guide/PDF updated and all five pages reviewed.
 
 ### Hotfix — tax applicability, host checklist choices and language feedback (GPT-6.1, 2026-10-13)
 

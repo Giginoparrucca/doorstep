@@ -13,6 +13,8 @@
 (function () {
   'use strict';
   var W = typeof window !== 'undefined' ? window : {};
+  var testBooking = null;
+  var renderVersion = 0;
   var SEL_HOST = 'onboardingHostContainer';
   var SEL_WIDGET = 'onboardingSupportWidget';
   var SEL_SHEET = 'onboardingSupportSheet';
@@ -91,6 +93,10 @@
       if (obq && obq.data) ob = obq.data;
     } catch (_) {}
 
+    testBooking = null;
+    var tq = await sb.from('ota_reservations').select('booking_code').eq('property_id', property.id).eq('is_test', true).contains('raw', { onboarding_test: true }).is('deleted_at', null).gte('created_at', new Date(Date.now()-86400000).toISOString()).limit(1);
+    if (tq.error) throw tq.error;
+    testBooking = tq.data && tq.data[0] || null;
     var hasTestCheckin = !!(ob && ob.test_checkin_done_at);
 
     return {
@@ -147,6 +153,11 @@
     var cta = step.done ? '' :
       '<button class="obx-cta" type="button" data-section="' + esc(ui.ctaSection) + '" data-focus="' + esc(step.missing[0] || '') + '">' +
       esc(_stepCta(step.id)) + '</button>';
+    if (step.id === 'test') {
+      cta = '<button class="obx-test-start obx-cta" type="button">' + esc(testBooking ? hk('obx_test_open') : _stepCta('test')) + '</button>';
+      if (testBooking) cta += '<button class="obx-test-delete obx-help" type="button">' + esc(hk('obx_test_delete')) + '</button>';
+      cta += '<div class="obx-test-hint">' + esc(hk('obx_test_hint')) + '</div>';
+    }
     var help = step.done ? '' :
       '<button class="obx-help" type="button" data-step="' + esc(step.id) + '">' +
       esc(hk('obx_help_link', it() ? 'Serve aiuto?' : 'Need help?')) + '</button>';
@@ -165,7 +176,7 @@
   function _renderCard(readiness, dismissed) {
     var n = readiness.doneCount, total = readiness.total;
     var ready = readiness.ready;
-    if (ready && dismissed) {
+    if (ready && dismissed && !testBooking) {
       // Collapsed badge version
       return '' +
         '<div class="obx-ready-badge">' +
@@ -331,7 +342,7 @@
     try {
       await W.sb.from('host_onboarding').upsert(
         { user_id: userId, property_id: propId, first_seen_at: new Date().toISOString() },
-        { onConflict: 'user_id,property_id', ignoreDuplicates: false }
+        { onConflict: 'user_id,property_id', ignoreDuplicates: true }
       );
     } catch (_) {}
   }
@@ -342,6 +353,7 @@
     } catch (_) {}
   }
   async function renderChecklist() {
+    var version = ++renderVersion;
     var panel = document.getElementById('panel-dashboard');
     if (!panel) return;
     var holder = document.getElementById(SEL_HOST);
@@ -354,6 +366,8 @@
 
     var inputs;
     try { inputs = await _loadReadinessInputs(W.propertyData); } catch (_) { inputs = null; }
+    if (version !== renderVersion || (inputs && W.propertyData.id !== inputs.property.id)) return;
+    var bookingForRender = testBooking;
     if (!inputs) { holder.innerHTML = ''; return; }
     var R = (W.OnboardingReadiness && W.OnboardingReadiness.computeReadiness);
     if (typeof R !== 'function') return;
@@ -363,8 +377,39 @@
     var dismissed = !!(inputs.onboardingState && inputs.onboardingState.checklist_dismissed_at);
     holder.innerHTML = _renderCard(readiness, dismissed);
 
-    // Wire buttons.
-    Array.prototype.forEach.call(holder.querySelectorAll('.obx-cta'), function (b) {
+    // Wire buttons. Open the new tab in the click gesture (mobile-safe).
+    var start = holder.querySelector('.obx-test-start');
+    if (start) start.addEventListener('click', async function () {
+      var propId = inputs.property.id;
+      var tab = W.open('about:blank', '_blank');
+      if (tab) tab.opener = null;
+      start.disabled = true;
+      try {
+        var session = (await W.sb.auth.getSession()).data.session;
+        var r = await fetch('/api/guest-token', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token }, body: JSON.stringify({ action: 'test_booking', property_id: propId }) });
+        if (!r.ok) throw new Error('test booking failed');
+        var booking = (await r.json()).booking;
+        var url = W.WELCOME_BNB_CONFIG.appOrigin + '/?p=' + encodeURIComponent(propId) + '&b=' + encodeURIComponent(booking.booking_code) + '&test=1';
+        if (tab) tab.location = url; else W.location.href = url;
+        _trackEvent('onboarding_test_started', {});
+        renderChecklist();
+      } catch (_) { if (tab) tab.close(); W.alert(hk('obx_test_error')); }
+      finally { start.disabled = false; }
+    });
+    var del = holder.querySelector('.obx-test-delete');
+    if (del) del.addEventListener('click', async function () {
+      if (!W.confirm(hk('obx_test_confirm'))) return;
+      del.disabled = true;
+      try {
+        var session = (await W.sb.auth.getSession()).data.session;
+        var out = await fetch('/api/guest-token', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token }, body: JSON.stringify({ action: 'test_booking_delete', property_id: inputs.property.id, booking_code: bookingForRender.booking_code }) });
+        if (!out.ok) throw new Error('delete failed');
+        renderChecklist();
+      } catch (_) { W.alert(hk('obx_test_error')); }
+      finally { del.disabled = false; }
+    });
+    // Wire navigation buttons.
+    Array.prototype.forEach.call(holder.querySelectorAll('.obx-cta[data-section]'), function (b) {
       b.addEventListener('click', function () {
         var section = b.getAttribute('data-section') || 'prop';
         var focus = b.getAttribute('data-focus') || '';
@@ -399,9 +444,9 @@
 
     // Side effects: upsert first_seen_at the first time we see this
     // (host, property), and set completed_at the first time ready flips.
-    _upsertFirstSeen(inputs.userId, W.propertyData.id);
+    await _upsertFirstSeen(inputs.userId, inputs.property.id);
     if (readiness.ready && inputs.onboardingState && !inputs.onboardingState.completed_at) {
-      _markCompleted(inputs.userId, W.propertyData.id);
+      _markCompleted(inputs.userId, inputs.property.id);
     }
     _trackEvent('onboarding_checklist_viewed',
       { done: readiness.doneCount, total: readiness.total, ready: readiness.ready, first_incomplete: readiness.firstIncompleteStep });
@@ -433,6 +478,7 @@
       '.obx-actions{display:flex;flex-direction:column;gap:4px;align-items:flex-end}',
       '.obx-cta{background:#111827;color:#fff;border:0;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-family:inherit}',
       '.obx-cta:hover{background:#1f2937}',
+      '.obx-test-hint{max-width:210px;font-size:0.72rem;color:#4b5563;text-align:right}',
       '.obx-help{background:transparent;border:0;color:#4b5563;text-decoration:underline;font-size:0.74rem;cursor:pointer}',
       '.obx-help:hover{color:#111827}',
       '.obx-ready-badge{display:inline-flex;align-items:center;gap:6px;background:#d1fae5;color:#065f46;padding:6px 12px;border-radius:999px;font-size:0.82rem;font-weight:600}',
@@ -455,6 +501,8 @@
       '@media (max-width: 560px){.obx-support-fab{bottom:14px;right:14px;padding:9px 14px;font-size:0.82rem} .obx-sheet-panel{right:8px;left:8px;bottom:70px;max-width:none;width:auto}}',
     ].join('\n');
   }
+
+  if (typeof document !== 'undefined') W.addEventListener('focus', function () { renderChecklist(); });
 
   // ── public API ──────────────────────────────────────────────────────
   W.HostOnboarding = {

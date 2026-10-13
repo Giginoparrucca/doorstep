@@ -1,6 +1,6 @@
 # Scaletta demo WelcomeBnB — onboarding di un nuovo host
 
-Round 50 · Versione di pianificazione · 9 ottobre 2026.
+Round 50 / Round 51 Fase 4 · Revisione del 13 ottobre 2026.
 Durata indicativa: 15 minuti, più 5 minuti per le domande.
 L'ambiente e i controlli descritti devono essere realizzati prima di usare questa
 scaletta. Aggiornare i nomi dei pulsanti dopo il collaudo; non presentare una
@@ -63,6 +63,21 @@ Se il codice di accesso è subordinato al check-in, mostrarlo al passaggio succe
 **Chiedere:** «Quali sono le tre domande che ti fanno più spesso prima di arrivare?»
 
 Risultato atteso: il nuovo host riconosce dove inserire le risposte che oggi ripete.
+
+## Prova autonoma dalla checklist (Round 51 Fase 4)
+
+La funzione è verificata con accesso host autenticato, isolamento tra proprietari
+e rimozione effettiva delle foto di prova.
+
+In **Oggi → Avvio struttura → Prova come ospite**, premere
+**Fai un check-in di prova**. Si apre il link della propria struttura in una nuova scheda, con
+il banner **Check-in di prova — nessun dato reale**. Inserire soltanto dati
+inventati o il facsimile: la prova è esclusa da Alloggiati, export, promemoria,
+calendario pubblicato e statistiche. Tornare alla console: il passo risulta
+completato. **Elimina prova** cancella prenotazione e dati; le foto entrano
+nella coda di rimozione immediata. La prova scade automaticamente dopo 24 ore,
+senza far perdere il completamento del passo. Nell’ambiente demo i cron sono
+disattivati: chiudere sempre la prova con **Elimina prova**.
 
 ## 3:00–6:00 — Un check-in dall'inizio alla fine
 

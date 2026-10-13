@@ -1594,7 +1594,7 @@ function getUrlParams() {
 // events from this session are flagged is_test=true. A small banner is
 // shown at the top of the screen so the host always knows tracking is
 // off. The flag is sticky for the session (closing the tab clears it).
-const IS_TEST_SESSION = (() => {
+let IS_TEST_SESSION = (() => {
   try {
     const params = new URLSearchParams(window.location.search);
     return params.get('test') === '1';
@@ -1648,7 +1648,7 @@ async function mintGuestToken(force = false) {
       if (raw) {
         const obj = JSON.parse(raw);
         const expMs = new Date(obj.expires_at).getTime();
-        const matches = obj.p === propertyId && obj.s === _guestSessionId && obj.b === (bookingCode || null);
+        const matches = obj.p === propertyId && obj.s === _guestSessionId && obj.b === (bookingCode || null) && obj.is_test === IS_TEST_SESSION;
         if (matches && expMs > Date.now() + 5 * 60 * 1000) {
           _guestToken = obj.token;
           return _guestToken;
@@ -1676,12 +1676,13 @@ async function mintGuestToken(force = false) {
       });
       if (!r.ok) { console.warn('[token] mint failed:', r.status); return null; }
       const body = await r.json();
+      if (body.is_test === true) { IS_TEST_SESSION = true; setupTestModeBanner(); }
       _guestToken = body.token || null;
       try {
         sessionStorage.setItem(_WBNB_TOKEN_KEY, JSON.stringify({
           token: _guestToken,
           expires_at: body.expires_at,
-          p: propertyId, s: _guestSessionId, b: bookingCode || null,
+          p: propertyId, s: _guestSessionId, b: bookingCode || null, is_test: IS_TEST_SESSION,
         }));
       } catch (_) { /* sessionStorage may be blocked; keep in-memory */ }
       return _guestToken;
@@ -1957,6 +1958,7 @@ const T = {
     unsub_title: 'You\'ve been unsubscribed',
     unsub_text: 'You won\'t receive any further offers or news from us. Thank you for staying with us.',
     privacy_link: 'Privacy',
+    test_banner_title: 'Test check-in — no real data', test_banner_hint: 'your activity is not being tracked', test_banner_exit: 'Exit',
     unsub_err: 'This unsubscribe link is invalid or has already been used.',
     review_saved: 'already registered',
     review_fill: 'Fill details for each guest',
@@ -2110,6 +2112,7 @@ const T = {
     unsub_title: 'Iscrizione annullata',
     unsub_text: 'Non riceverai più offerte o novità da parte nostra. Grazie per essere stato nostro ospite.',
     privacy_link: 'Privacy',
+    test_banner_title: 'Check-in di prova — nessun dato reale', test_banner_hint: 'la tua attività non viene registrata', test_banner_exit: 'Esci',
     unsub_err: 'Questo link di annullamento non è valido o è già stato utilizzato.',
     review_saved: 'già registrati',
     review_fill: 'Compila i dati per ogni ospite',
@@ -5389,8 +5392,8 @@ function setupTestModeBanner() {
   const it = (typeof lang !== 'undefined' && lang === 'it');
   banner.innerHTML = `
     <span style="font-size:0.95rem;">🧪</span>
-    <span><strong>${it ? 'Modalità anteprima' : 'Preview mode'}</strong> · ${it ? 'la tua attività non viene registrata' : 'your activity is not being tracked'}</span>
-    <button onclick="exitTestMode()" style="margin-left:8px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.22);color:#fff;padding:3px 10px;border-radius:4px;font-size:0.7rem;cursor:pointer;font-family:inherit;">${it ? 'Esci' : 'Exit'}</button>`;
+    <span><strong data-i18n="test_banner_title">${T[lang].test_banner_title}</strong> · <span data-i18n="test_banner_hint">${T[lang].test_banner_hint}</span></span>
+    <button data-i18n="test_banner_exit" onclick="exitTestMode()" style="margin-left:8px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.22);color:#fff;padding:3px 10px;border-radius:4px;font-size:0.7rem;cursor:pointer;font-family:inherit;">${it ? 'Esci' : 'Exit'}</button>`;
   document.body.insertBefore(banner, document.body.firstChild);
   document.body.classList.add('has-test-banner');
   // Measure the banner's ACTUAL height (it wraps to two lines on narrow
@@ -5399,8 +5402,10 @@ function setupTestModeBanner() {
   // on resize/orientation change.
   const applyBannerHeight = () => {
     const h = banner.offsetHeight || 36;
-    document.documentElement.style.setProperty('--test-banner-h', h + 'px');
-    document.body.style.paddingTop = h + 'px';
+    const demoHeight = document.querySelector('.demo-banner-r50')?.offsetHeight || 0;
+    banner.style.top = demoHeight + 'px';
+    document.documentElement.style.setProperty('--test-banner-h', (h + demoHeight) + 'px');
+    document.body.style.paddingTop = (h + demoHeight) + 'px';
   };
   applyBannerHeight();
   // One more pass after fonts/layout settle.

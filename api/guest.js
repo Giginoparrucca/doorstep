@@ -87,6 +87,7 @@ import { rejectInvalidEnvironment, SUPABASE_URL } from './_environment.js';
 
 import { verifyFromAuthHeader } from './_guest-token.js';
 import { applyCors } from './_cors.js';
+import { mintWalkinCode } from './_booking-code.js';
 import { notifyHostForChatInsert } from './_notify-host.js';
 import { createRequire } from 'node:module';
 
@@ -401,7 +402,7 @@ const CHECKIN_READ_FIELDS = [
 ];
 
 const CHECKIN_LOOKUP_HOURLY_LIMIT_PER_SESSION = 10;
-const WALKIN_PREFIX = 'WB-';
+
 
 // ── action: property ──────────────────────────────────────────────────
 async function doProperty(res, propertyId, bookingCode, isTest) {
@@ -927,9 +928,3 @@ function validateCheckinRecord(rec, { requireAll }) {
 
 // Crockford base32 — unambiguous human-readable, 8 chars = 40 bits of
 // entropy. `WB-` prefix mirrors the OTA-side pattern (TRU-, ALB-, …).
-function mintWalkinCode() {
-  const alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
-  let s = '';
-  for (let i = 0; i < 8; i++) s += alphabet[Math.floor(Math.random() * 32)];
-  return WALKIN_PREFIX + s;
-}

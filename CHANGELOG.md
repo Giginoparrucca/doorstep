@@ -35,7 +35,8 @@ rescue path, not a gate.
 
 - Fixed the reported checklist flash: dashboard refresh now updates a separate body and preserves the checklist DOM and its controls. Property now explains its orange dot with a list of incomplete blocking steps and their missing fields, derived from the same readiness snapshot. Navigation opens the correct details, settings or notification panel and enables the relevant form. Corrected stale field IDs.
 - Ready/dismissed checklist has a bilingual Show checklist button. Failed checklist loads show a bilingual retry action instead of disappearing; stale attention is hidden on section/property changes. No DB or API changes. Added a development-only DOM dependency and a regression exercising the actual dashboard/module across repeated refreshes, navigation, ready/dismissed state, failed loads/retry and property switches.
-- Italian presenter guide/PDF updated. Verification and release evidence pending below.
+- Italian presenter guide/PDF updated and all five rendered pages reviewed. DOM regression (six groups), onboarding UI/i18n, readiness (16 cases), six-exporter isolation, demo UX/sim/seed/reset/rebuild-negative, environment and deployment configuration checks pass. Hosted demo end-to-end checks pass; its served onboarding module matches the DOM-tested source. Production-project preview requires Vercel login, so no authenticated preview browser pass is claimed.
+- **Release:** shipped — PR #140 — GPT-6.1; merged as `c787fb7`. Production `dpl_Fi4vFFd1guopdRUvaWjCUWqXm5EC` and demo `dpl_9JKrgNiohW6ZYFuNFY7qyP8WPi9D` READY. Production custom-domain host-console and onboarding module match verified source exactly. No database migration or production data change. Round 51 Phase 5 remains the next planned phase.
 
 ### Round 51 Phase 4 — verified delivery (GPT-6.1, 2026-10-13)
 

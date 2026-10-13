@@ -25,6 +25,13 @@ Object.defineProperty(w,'hostLang',{get:()=>ctx.hostLang,set:value=>{ctx.hostLan
 vm.runInContext(read('lib/onboarding-readiness.js'),ctx);vm.runInContext(read('host-onboarding.js'),ctx);
 const start=source.indexOf('async function renderDashboard()');const end=source.indexOf('\n}\n',start)+2;
 vm.runInContext(source.slice(start,end),ctx);
+// Initial auth/property loading must occupy the same body as the result.
+ctx.propertyId=null;await ctx.renderDashboard();
+assert.match(document.getElementById('dashboardContent').textContent,/dashboard_loading/);
+ctx.propertyId='fixture';await ctx.renderDashboard();
+assert.ok(!document.getElementById('panel-dashboard').textContent.includes('dashboard_loading'));
+assert.equal(document.querySelectorAll('#dashboardContent').length,1);
+console.log('PASS initial loading is replaced by dashboard content without a leftover sibling');
 // This failed with the original dashboard: its final innerHTML wiped the card.
 for(let i=0;i<2;i++) {await ctx.renderDashboard();assert.equal(document.querySelectorAll('#onboardingHostContainer .obx-step').length,5);assert.ok(document.getElementById('dashboardContent'));}
 console.log('PASS full dashboard refresh retains the five checklist steps');
@@ -33,20 +40,22 @@ const attention=document.getElementById('onboardingPropertyAttention');assert.eq
 for(const [focus,panel,edit,field] of [['name','property','property','propName'],['ical_feeds','settings','settings','icalFeedsList'],['welcome_message','property','property','propWelcome'],['notification_channel','chat',undefined,'notifCard']]) {edited=undefined;const button=attention.querySelector('[data-focus="'+focus+'"]');assert.ok(button,focus);button.click();assert.equal(lastPanel,panel);assert.equal(edited,edit);assert.equal(focused,field);w.HostOnboarding.renderPropertyAttention('prop');}
 console.log('PASS property dot explanation lists missing steps and routes into the right editable panels');
 w.propertyData={id:'fixture',name:'Fixture',city:'Ostuni',region:'Puglia',cir_code:'IT048017B4VKMD9QX6',tax_rules:[{rate_eur:2}],alloggiati_autofile_mode:'manual',ical_feeds:[{url:'https://example.com/ical'}],wifi_name:'Fixture',welcome_message_it:'Benvenuti',checkin_instructions_it:'Facsimile'};settings={push_enabled:true};ob={skips:{},test_checkin_done_at:'2026-10-13T00:00:00Z',checklist_dismissed_at:'2026-10-13T00:00:00Z'};
-await w.HostOnboarding.renderChecklist();assert.ok(document.querySelector('.obx-ready-badge'));assert.equal(attention.style.display,'none');assert.equal(document.getElementById('onboardingSidebarDot').style.display,'none');await document.querySelector('.obx-expand').onclick();await w.HostOnboarding.renderChecklist();assert.equal(document.querySelectorAll('#onboardingHostContainer .obx-step').length,5);
-console.log('PASS ready property clears the dot and dismissed checklist can be reopened');
+await w.HostOnboarding.renderChecklist();assert.equal(document.getElementById('onboardingHostContainer').innerHTML,'');assert.equal(attention.style.display,'none');assert.equal(document.getElementById('onboardingSidebarDot').style.display,'none');
+ob.checklist_dismissed_at=null;await ctx.renderDashboard();assert.equal(document.getElementById('onboardingHostContainer').innerHTML,'');
+console.log('PASS ready property removes the entire checklist automatically, including after dashboard refresh');
 const readyProperty={...w.propertyData};
-activeTestBooking={booking_code:'WB-TEST1234'};await w.HostOnboarding.renderChecklist();assert.ok(document.querySelector('#onboardingHostContainer > .obx-card > .obx-test-delete'));assert.equal(document.querySelectorAll('#onboardingHostContainer .obx-step button').length,0);activeTestBooking=null;await w.HostOnboarding.renderChecklist();
+activeTestBooking={booking_code:'WB-TEST1234'};await w.HostOnboarding.renderChecklist();assert.ok(document.querySelector('#onboardingHostContainer > .obx-test-delete'));assert.equal(document.querySelectorAll('#onboardingHostContainer .obx-step').length,0);activeTestBooking=null;await w.HostOnboarding.renderChecklist();assert.equal(document.getElementById('onboardingHostContainer').innerHTML,'');
 console.log('PASS active test cleanup remains separate from completed-step controls');
+w.propertyData={...readyProperty,ical_feeds:[]};await w.HostOnboarding.renderChecklist();
 const autoContent=document.querySelector('#onboardingHostContainer [data-step="content"]').innerHTML;
-assert.equal(document.querySelectorAll('#onboardingHostContainer .obx-step button').length,0);
-assert.equal(document.querySelectorAll('#onboardingHostContainer .obx-step-status').length,5);
-console.log('PASS all automatically completed steps show status only, including test check-in');
+assert.equal(document.querySelectorAll('#onboardingHostContainer .obx-done button').length,0);
+assert.equal(document.querySelectorAll('#onboardingHostContainer .obx-step-status').length,4);
+console.log('PASS completed steps show status only while remaining setup is incomplete');
 for(const [missing,change,field,panel] of [['tax_rules',{tax_rules:[]},'propTaxRate','settings'],['alloggiati',{alloggiati_autofile_mode:'off'},'alloggiatiCard','settings'],['wifi_name',{wifi_name:''},'propWifiName','property'],['checkin_instructions',{checkin_instructions_it:''},'propCheckinInstructions','property']]) {w.propertyData={...readyProperty,...change};await w.HostOnboarding.renderChecklist();w.HostOnboarding.renderPropertyAttention('prop');const b=attention.querySelector('[data-focus="'+missing+'"]');assert.ok(b,missing);b.click();assert.equal(lastPanel,panel);assert.equal(focused,field);}
 w.hostLang='en';w.HostOnboarding.renderPropertyAttention('prop');assert.match(attention.textContent,/Needs attention for this property/);
 w.hostLang='it';w.propertyData=readyProperty;
 console.log('PASS tax, Alloggiati and welcome-field destinations plus English attention copy');
-failBooking=true;await w.HostOnboarding.renderChecklist();assert.ok(document.querySelector('.obx-retry'));assert.match(document.getElementById('onboardingHostContainer').textContent,/Impossibile/);failBooking=false;await document.querySelector('.obx-retry').onclick();assert.equal(document.querySelectorAll('#onboardingHostContainer .obx-step').length,5);
+failBooking=true;await w.HostOnboarding.renderChecklist();assert.ok(document.querySelector('.obx-retry'));assert.match(document.getElementById('onboardingHostContainer').textContent,/Impossibile/);failBooking=false;await document.querySelector('.obx-retry').onclick();assert.equal(document.getElementById('onboardingHostContainer').innerHTML,'');
 console.log('PASS load failure stays visible with a working retry');
 w.propertyData={id:'fixture'};settings={push_enabled:false,email_mode:'off'};ob={skips:{},updated_at:'2026-10-13T00:00:00Z'};
 await w.HostOnboarding.renderChecklist();
@@ -62,8 +71,11 @@ console.log('PASS generic Confirm/Dismiss choices are grouped horizontally; no a
 await card.querySelector('.obx-dismiss').onclick();assert.ok(card.querySelector('.obx-collapsed-badge'));assert.ok(!card.querySelector('.obx-ready-badge'));
 await card.querySelector('.obx-expand').onclick();assert.equal(card.querySelectorAll('.obx-step').length,5);
 console.log('PASS incomplete checklist can be hidden/reopened without claiming readiness');
-w.propertyData={...readyProperty,wifi_name:'',welcome_message_it:''};ob={skips:{},updated_at:'2026-10-13T00:00:00Z'};await w.HostOnboarding.renderChecklist();await card.querySelector('[data-step="content"] [data-choice="done"]').onclick();assert.equal(card.querySelector('[data-step="content"]').innerHTML,autoContent);
+settings={push_enabled:true};w.propertyData={...readyProperty,ical_feeds:[],wifi_name:'',welcome_message_it:''};ob={skips:{},updated_at:'2026-10-13T00:00:00Z'};await w.HostOnboarding.renderChecklist();await card.querySelector('[data-step="content"] [data-choice="done"]').onclick();assert.equal(card.querySelector('[data-step="content"]').innerHTML,autoContent);
 console.log('PASS host-confirmed and automatically completed steps render identically');
+await card.querySelector('[data-step="calendar"] [data-choice="done"]').onclick();assert.equal(card.innerHTML,'');await w.HostOnboarding.renderChecklist();assert.equal(card.innerHTML,'');
+console.log('PASS final host confirmation automatically removes checklist and stays hidden after refresh');
+w.propertyData={...readyProperty,ical_feeds:[]};ob={skips:{}};await w.HostOnboarding.renderChecklist();
 let networkCalls=0;const originalFetch=ctx.fetch;ctx.fetch=async()=>{networkCalls++;return originalFetch();};
 w.hostLang='en';w.HostOnboarding.repaint();assert.match(card.textContent,/Property setup/);assert.equal(networkCalls,0);w.hostLang='it';
 console.log('PASS persisted completed step choices persist separately from property data; language repaint requires no fetch');
@@ -76,6 +88,7 @@ let releaseFetch;ctx.fetch=()=>new Promise(resolve=>{releaseFetch=resolve;});
 ctx.setHostLang('en');
 assert.match(card.textContent,/Property setup/);assert.match(document.getElementById('dashboardContent').textContent,/Updating this view/);
 ctx.fetch=originalFetch;if(releaseFetch)releaseFetch({ok:true,json:async()=>({configured:false})});
-console.log('PASS actual language switch instantly relabels checklist and shows loading before slow requests finish');
+await ctx.renderDashboard();assert.ok(!document.getElementById('dashboardContent').textContent.includes('Updating this view'));assert.ok(!document.getElementById('panel-dashboard').textContent.includes('dashboard_loading'));
+console.log('PASS language switch instantly relabels and clears loading when requests finish');
 w.HostOnboarding.renderPropertyAttention('oggi');assert.equal(attention.style.display,'none');w.propertyId='other';w.HostOnboarding.renderPropertyAttention('prop');assert.equal(attention.style.display,'none');
 console.log('PASS section/property switches hide stale attention state');

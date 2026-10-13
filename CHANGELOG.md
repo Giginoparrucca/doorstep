@@ -31,6 +31,13 @@ rescue path, not a gate.
 | 6 — Admin readiness view | pending | Per-host readiness, "Bloccati" sortable list, aggregate funnel of support clicks per step; `is_admin()` gated |
 | 7 — End-to-end, demo and docs | pending | Fresh test host journey in production; demo fixtures + script + PDF updated; demo gates (live-smoke, rebuild-verify, e2e) still green |
 
+### Hotfix — finished dashboard setup and expired calendar coverage (GPT-6.1, 2026-10-13)
+
+- Ready properties automatically remove the dashboard checklist, without a ready badge or reopen control. Active test deletion remains accessible separately. Both detected readiness and the final host confirmation clear the checklist and stay cleared after refresh.
+- Initial property-loading feedback now uses the replaceable dashboard body; the completed render removes it rather than appending next to the stale message. DOM regression covers initial loading, repeated refresh, final confirmation and language refresh completion.
+- Coverage-loss warnings skip ended stays, including checkout day, using Europe/Rome date boundaries and exclusive iCal DTEND. Future warnings remain intact. A read-only production probe confirmed the reported direct stay is active and present in the live outbound calendar with correct dates/stable UID and no guest name. The linked Airbnb echo was removed on checkout day; no production booking, coverage flag or external calendar was changed. Export presence verifies WelcomeBnB output, not an OTA account's import settings.
+- `onboarding-visibility`, `coverage-lost`, `onboarding-ui`, `onboarding-readiness` and `onboarding-test-isolation` tests pass. Italian guide/PDF updated. Release verification pending.
+
 ### Hotfix — completed checklist steps require no further action (GPT-6.1, 2026-10-13)
 
 - Confirm/Dismiss are rendered only for incomplete steps. Automatic and host-confirmed completion share the same Completed state and have no further checklist buttons, restore controls or provenance labels. Completed test steps no longer offer another check-in; active-test deletion remains separate cleanup beneath the card.

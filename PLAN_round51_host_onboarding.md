@@ -38,7 +38,7 @@ turns the call into an optional rescue path, and nudge emails + an admin
 
 ## Host-choice amendment (13 October 2026)
 
-Daniele requested explicit, reversible checklist controls. A host can confirm a step done, dismiss it, restore automatic checks, and hide an unfinished checklist. These preferences live in `host_onboarding.skips.step_decisions`; their badges distinguish host choices from data-derived completion. They affect checklist readiness/nudges only. Tax readiness accepts a configured base rate (including explicit zero), optional rules, or an explicit `tax_not_applicable` declaration. Empty/missing tax data remains unknown rather than implying a municipal exemption. The follow-up on 13 October removes dedicated tax-applicability buttons: the host chooses setup or the generic Confirm/Dismiss controls. No property-specific exemption is automatically assigned. The final refinement on 13 October shows actions only on incomplete steps. Auto-detected and host-confirmed completion render identically as Completed; completed/dismissed steps have no further checklist controls or provenance annotations. Active test deletion remains a separate cleanup action. This amendment supersedes the original dismiss-after-completion/data-only checklist restriction above.
+Daniele requested explicit, reversible checklist controls. A host can confirm a step done, dismiss it, restore automatic checks, and hide an unfinished checklist. These preferences live in `host_onboarding.skips.step_decisions`; their badges distinguish host choices from data-derived completion. They affect checklist readiness/nudges only. Tax readiness accepts a configured base rate (including explicit zero), optional rules, or an explicit `tax_not_applicable` declaration. Empty/missing tax data remains unknown rather than implying a municipal exemption. The follow-up on 13 October removes dedicated tax-applicability buttons: the host chooses setup or the generic Confirm/Dismiss controls. No property-specific exemption is automatically assigned. The final refinement on 13 October shows actions only on incomplete steps. Auto-detected and host-confirmed completion render identically as Completed; completed/dismissed steps have no further checklist controls or provenance annotations. Active test deletion remains a separate cleanup action. Once property readiness is reached, the dashboard checklist disappears automatically; no ready badge or Show checklist button remains. An unfinished manually hidden checklist can still be reopened. This amendment supersedes the original dismiss-after-completion/data-only checklist restriction above.
 
 ## The five steps
 
@@ -159,8 +159,8 @@ and documents the direct-reservation path.
   bar, "3 di 5", the five steps with done / to-do / skipped states. Each
   to-do step shows what's missing and a primary button that calls
   `showSection(...)` and scrolls/focuses the exact field.
-- Collapses to a slim "Pronta ✓" badge once `ready`; dismissable via
-  **Nascondi** only when `ready` is true (sets `checklist_dismissed_at`).
+- Disappears automatically once `ready`, preserving only active test cleanup.
+  An unfinished checklist can be hidden and reopened.
 - Sidebar: small readiness dot on the **Proprietà** item while any property
   is incomplete. The property list/selector shows "Pronta" or
   "Da completare (3/5)".

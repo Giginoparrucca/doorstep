@@ -34,7 +34,7 @@ rescue path, not a gate.
 ### Hotfix — completed checklist steps require no further action (GPT-6.1, 2026-10-13)
 
 - Confirm/Dismiss are rendered only for incomplete steps. Automatic and host-confirmed completion share the same Completed state and have no further checklist buttons, restore controls or provenance labels. Completed test steps no longer offer another check-in; active-test deletion remains separate cleanup beneath the card.
-- Regression compares the actual DOM of automatic and confirmed completion, checks all five completed steps have no buttons, and verifies completion survives refresh. Preserved horizontal incomplete-step actions and instant language relabelling. Italian guide/PDF updated. Release evidence follows.
+- Regression compares the actual DOM of automatic and confirmed completion, checks all five completed steps have no buttons, and verifies completion survives refresh. Preserved horizontal incomplete-step actions and instant language relabelling. Italian guide/PDF updated. Shipped — PR #143 — GPT-6.1; merged as `8c3de26`. Production deployment `dpl_3ygW1roo9eQ3CwV81dLuwYji3eRH` and demo deployment `dpl_7CdSupWHT85355SMNV3Z5VnjdXyc` are READY. Served production `host-console.html` and `host-onboarding.js` match the tested source byte-for-byte. `onboarding-visibility`, `onboarding-ui`, `onboarding-test-isolation` and `onboarding-readiness` tests pass; all five regenerated PDF pages reviewed. This UI-only follow-up adds no schema, API or database changes.
 
 ### Hotfix — host tax choice and horizontal checklist actions (GPT-6.1, 2026-10-13)
 

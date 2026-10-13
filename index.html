@@ -1594,7 +1594,7 @@ function getUrlParams() {
 // events from this session are flagged is_test=true. A small banner is
 // shown at the top of the screen so the host always knows tracking is
 // off. The flag is sticky for the session (closing the tab clears it).
-const IS_TEST_SESSION = (() => {
+let IS_TEST_SESSION = (() => {
   try {
     const params = new URLSearchParams(window.location.search);
     return params.get('test') === '1';
@@ -1648,7 +1648,7 @@ async function mintGuestToken(force = false) {
       if (raw) {
         const obj = JSON.parse(raw);
         const expMs = new Date(obj.expires_at).getTime();
-        const matches = obj.p === propertyId && obj.s === _guestSessionId && obj.b === (bookingCode || null);
+        const matches = obj.p === propertyId && obj.s === _guestSessionId && obj.b === (bookingCode || null) && obj.is_test === IS_TEST_SESSION;
         if (matches && expMs > Date.now() + 5 * 60 * 1000) {
           _guestToken = obj.token;
           return _guestToken;
@@ -1676,12 +1676,13 @@ async function mintGuestToken(force = false) {
       });
       if (!r.ok) { console.warn('[token] mint failed:', r.status); return null; }
       const body = await r.json();
+      if (body.is_test === true) { IS_TEST_SESSION = true; setupTestModeBanner(); }
       _guestToken = body.token || null;
       try {
         sessionStorage.setItem(_WBNB_TOKEN_KEY, JSON.stringify({
           token: _guestToken,
           expires_at: body.expires_at,
-          p: propertyId, s: _guestSessionId, b: bookingCode || null,
+          p: propertyId, s: _guestSessionId, b: bookingCode || null, is_test: IS_TEST_SESSION,
         }));
       } catch (_) { /* sessionStorage may be blocked; keep in-memory */ }
       return _guestToken;
@@ -5389,7 +5390,7 @@ function setupTestModeBanner() {
   const it = (typeof lang !== 'undefined' && lang === 'it');
   banner.innerHTML = `
     <span style="font-size:0.95rem;">🧪</span>
-    <span><strong>${it ? 'Modalità anteprima' : 'Preview mode'}</strong> · ${it ? 'la tua attività non viene registrata' : 'your activity is not being tracked'}</span>
+    <span><strong>${it ? 'Check-in di prova — nessun dato reale' : 'Test check-in — no real data'}</strong> · ${it ? 'la tua attività non viene registrata' : 'your activity is not being tracked'}</span>
     <button onclick="exitTestMode()" style="margin-left:8px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.22);color:#fff;padding:3px 10px;border-radius:4px;font-size:0.7rem;cursor:pointer;font-family:inherit;">${it ? 'Esci' : 'Exit'}</button>`;
   document.body.insertBefore(banner, document.body.firstChild);
   document.body.classList.add('has-test-banner');

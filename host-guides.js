@@ -909,6 +909,7 @@ const GUIDES = {
     ],
     tip: { it: 'Il numero rosso vicino a «Oggi» nel menu è il conteggio degli urgenti.', en: 'The red number next to “Today” in the menu is the urgent count.' },
     faq: [
+      { q_it: 'Come provo il check-in senza dati reali?', a_it: 'In Avvio struttura, premi «Fai un check-in di prova». Usa dati inventati. La prova non entra negli invii o negli export. Premi «Elimina prova» per cancellarla.', q_en: 'How do I test check-in without real data?', a_en: 'In Property setup, press “Run test check-in”. Use fictional data. The test is excluded from filing and exports. Press “Delete test” to remove it.' },
       { q_it: 'Non vedo un ospite che dovrebbe esserci.', a_it: 'Prova a ricaricare. Se manca ancora, apri «Calendario» in Ospiti per controllare le date.', q_en: 'A guest I expect isn’t showing.', a_en: 'Try reloading. If still missing, open Calendar under Guests to check the dates.' },
       { q_it: 'Come nascondo una scheda?', a_it: 'Premi il cestino in alto a destra della scheda.', q_en: 'How do I hide a card?', a_en: 'Press the trash icon at the top-right of the card.' },
     ],
@@ -1557,7 +1558,7 @@ window.HG = {
   closeGuide,
   checkGuides,
   guides: GUIDES,       // read-only reference for tests
-  version: '45.5',
+  version: '51.4',
 };
 // Alias for the console-side dev command name the spec asks for.
 window.__checkGuides = checkGuides;

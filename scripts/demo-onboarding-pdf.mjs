@@ -11,7 +11,8 @@
 // Dependencies: Playwright is already installed under
 // /opt/node22/lib/node_modules; Chromium is at /opt/pw-browsers.
 import { createRequire } from 'node:module';
-import { readFileSync, writeFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, statSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -152,7 +153,20 @@ const html = `<!doctype html>
 </body>
 </html>`;
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
+const executablePath = process.env.CHROMIUM_EXECUTABLE_PATH || '/opt/pw-browsers/chromium';
+// Keep the same HTML source and documented Node command on runtimes without
+// Chromium. WeasyPrint is optional; production presenter workstations can
+// continue using Chromium. No dependency download occurs inside the script.
+if (!existsSync(executablePath)) {
+  const rendered = spawnSync(process.env.CODEX_PRIMARY_RUNTIME_PYTHON || 'python3', ['-c',
+    'import sys; from weasyprint import HTML; HTML(string=sys.stdin.read()).write_pdf(sys.argv[1])', outPath],
+    { input: html + '<style>@page{size:A4;margin:20mm 18mm;@bottom-right{content:"Pagina " counter(page) " di " counter(pages);font-size:7pt;color:#6b7280}}</style>', encoding: 'utf8' });
+  if (rendered.status !== 0) throw new Error('PDF rendering needs Chromium or Python WeasyPrint: ' + rendered.stderr);
+  const bytes = readFileSync(outPath);
+  console.log(`PDF written: ${outPath}\n  source sha256: ${sourceSha}\n  pdf sha256: ${createHash('sha256').update(bytes).digest('hex')}`);
+  process.exit(0);
+}
+const browser = await chromium.launch({ executablePath, args: ['--no-sandbox'] });
 try {
   const page = await browser.newPage();
   await page.setContent(html, { waitUntil: 'load' });

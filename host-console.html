@@ -2583,6 +2583,12 @@ async function renderDismissedList() {
 }
 let allChats = [];
 let hostLang = 'it';
+// The onboarding module runs in its own script; top-level let/const are
+// lexical bindings, not window properties. Getters follow property switches.
+Object.defineProperties(window, {
+  sb: { get: () => sb }, propertyId: { get: () => propertyId },
+  propertyData: { get: () => propertyData }, hostLang: { get: () => hostLang },
+});
 // Round 38 — sign-up flow removed. Access is by invitation only.
 // The real gate is the Supabase project setting; this const is here so
 // stale references (if any survive) still evaluate rather than throw.
@@ -3351,7 +3357,7 @@ function _gpgActionPrompt(status, eng, topCats, isPreCheckin, hasDocs) {
 async function renderGaGuestBreakdown(events, summaryMap) {
   const el = document.getElementById('gaGuestBreakdown');
   if (!el) return;
-  summaryMap = summaryMap || {}; const cutoff = new Date(); cutoff.setHours(0, 0, 0, 0); cutoff.setDate(cutoff.getDate() - 7); const cutoffYmd = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`; const expiredCodes = new Set(); const { data: expiredReservations, error: expiryError } = await sb.from('ota_reservations').select('booking_code').eq('property_id', propertyId).eq('is_test', false).is('deleted_at', null).lte('checkout_date', cutoffYmd); if (expiryError) console.warn('Action board reservation expiry lookup failed:', expiryError); for (const reservation of expiredReservations || []) expiredCodes.add(reservation.booking_code);
+  summaryMap = summaryMap || {}; const cutoff = new Date(); cutoff.setHours(0, 0, 0, 0); cutoff.setDate(cutoff.getDate() - 7); const cutoffYmd = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`; const expiredCodes = new Set(); const { data: expiredReservations, error: expiryError } = await sb.from('ota_reservations').select('booking_code').eq('property_id', propertyId).eq('is_test', false).is('deleted_at', null).lte('checkout_date', cutoffYmd); if (expiryError) console.warn('Action board reservation expiry lookup failed:', expiryError); for (const reservation of expiredReservations || []) expiredCodes.add(reservation.booking_code).or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false');
   const today = new Date();
 
   // Group events by booking_code (or session_id for anonymous).
@@ -3966,6 +3972,12 @@ const HT = {
     obx_step_calendar_title: 'Connect the calendar', obx_step_calendar_cta: 'Open iCal',
     obx_step_content_title: 'Prepare the welcome content', obx_step_content_cta: 'Open property',
     obx_step_test_title: 'Try as a guest', obx_step_test_cta: 'Run test check-in',
+    obx_test_delete: 'Delete test',
+    obx_test_open: 'Open test',
+    obx_test_hint: 'Use fictional data. Photos are deleted within one hour; the test is deleted after 24 hours.',
+    obx_test_error: 'Could not open the test. Please retry.',
+    obx_test_confirm: 'Delete this test?',
+
     obx_step_notifications_title: 'Turn on notifications', obx_step_notifications_cta: 'Open notifications',
     sidebar_oggi_title:   'Today',      sidebar_oggi_sub:   'What needs your attention right now',
     sidebar_ospiti_title: 'Guests',     sidebar_ospiti_sub: 'Check-ins, calendar, analytics and contacts',
@@ -4512,6 +4524,12 @@ const HT = {
     obx_step_calendar_title: 'Collega il calendario', obx_step_calendar_cta: 'Apri iCal',
     obx_step_content_title: "Prepara l'accoglienza", obx_step_content_cta: 'Apri proprietà',
     obx_step_test_title: 'Prova come ospite', obx_step_test_cta: 'Fai un check-in di prova',
+    obx_test_delete: 'Elimina prova',
+    obx_test_open: 'Apri prova',
+    obx_test_hint: 'Usa dati inventati. Foto eliminate entro un’ora; prova eliminata dopo 24 ore.',
+    obx_test_error: 'Non è stato possibile aprire la prova. Riprova.',
+    obx_test_confirm: 'Eliminare questa prova?',
+
     obx_step_notifications_title: 'Attiva le notifiche', obx_step_notifications_cta: 'Apri notifiche',
     sidebar_oggi_title:   'Oggi',       sidebar_oggi_sub:   'Cosa richiede la tua attenzione adesso',
     sidebar_ospiti_title: 'Ospiti',     sidebar_ospiti_sub: 'Check-in, calendario, analisi e contatti',
@@ -5353,7 +5371,7 @@ function showPanel(id, btn) {
 const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','settings','rules','recos','qrlink'];
 // Bump on every host-guides.js change so browsers never see a stale
 // copy even if their cache is aggressive.
-const _HG_VERSION = '45.5';
+const _HG_VERSION = '51.4';
 let _hgLoadPromise = null;
 function _hgLoad() {
   if (window.HG) return Promise.resolve();
@@ -5567,7 +5585,7 @@ async function renderDashboard() {
     // echo linked to a direct booking doesn't produce a second phantom
     // "Awaiting check-in" tile for the same stay.
     const { data: activeRes } = await sb.from('ota_reservations')
-      .select('id, platform, guest_name, checkin_date, checkout_date, booking_code')
+      .select('id, platform, guest_name, checkin_date, checkout_date, booking_code').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
       .eq('property_id', propertyId)
       .eq('entry_type', 'reservation')
       .eq('status', 'active')
@@ -5810,7 +5828,7 @@ async function renderCoverageLostBanner() {
   let echoes = [];
   try {
     const { data, error } = await sb.from('ota_reservations')
-      .select('id, platform, coverage_lost_at, covered_by_reservation_id')
+      .select('id, platform, coverage_lost_at, covered_by_reservation_id').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
       .eq('property_id', propertyId)
       .is('deleted_at', null)
       .not('covered_by_reservation_id', 'is', null)
@@ -5830,7 +5848,7 @@ async function renderCoverageLostBanner() {
   let directs = [];
   try {
     const { data } = await sb.from('ota_reservations')
-      .select('id, guest_name, checkin_date, checkout_date, status')
+      .select('id, guest_name, checkin_date, checkout_date, status').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
       .in('id', directIds)
       .eq('status', 'active')
       .is('deleted_at', null);
@@ -5916,7 +5934,7 @@ async function renderUpcomingReservationsPanel() {
     // echo linked to a direct booking doesn't show as a second row in
     // "Prossime prenotazioni" — the direct row already represents it.
     const { data, error } = await sb.from('ota_reservations')
-      .select('id, platform, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code, checkin_reopened_at')
+      .select('id, platform, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code, checkin_reopened_at').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
       .eq('property_id', propertyId)
       .eq('entry_type', 'reservation')
       .eq('status', 'active')
@@ -6248,14 +6266,14 @@ async function _showReservationDetail(reservationId) {
   if (isDirect) {
     try {
       const { data } = await sb.from('ota_reservations')
-        .select('id, platform, entry_type, channel, guest_name, guest_count, contact_phone, contact_email, notes, checkin_date, checkout_date, booking_code, keybox_code, link_sent_at, created_by')
+        .select('id, platform, entry_type, channel, guest_name, guest_count, contact_phone, contact_email, notes, checkin_date, checkout_date, booking_code, keybox_code, link_sent_at, created_by').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
         .eq('id', reservationId).maybeSingle();
       if (data) full = { ...r, ...data };
     } catch (_) {}
     // Fetch OTA echoes that point at this direct row.
     try {
       const { data } = await sb.from('ota_reservations')
-        .select('id, platform, checkin_date, checkout_date, status')
+        .select('id, platform, checkin_date, checkout_date, status').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
         .eq('covered_by_reservation_id', reservationId)
         .is('deleted_at', null);
       coveredEchoes = data || [];
@@ -6386,7 +6404,7 @@ async function editDirectReservation(id) {
   const it = hostLang === 'it';
   try {
     const { data, error } = await sb.from('ota_reservations')
-      .select('id, entry_type, channel, guest_name, guest_count, contact_phone, contact_email, notes, checkin_date, checkout_date')
+      .select('id, entry_type, channel, guest_name, guest_count, contact_phone, contact_email, notes, checkin_date, checkout_date').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
       .eq('id', id).maybeSingle();
     if (error || !data) {
       toast(it ? 'Caricamento fallito.' : 'Load failed.');
@@ -6459,7 +6477,7 @@ async function unlinkCoverage(otaId, btn) {
   try {
     // Read status first so we know whether to also revive.
     const { data: cur } = await sb.from('ota_reservations')
-      .select('status').eq('id', otaId).maybeSingle();
+      .select('status').eq('id', otaId).maybeSingle().or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false');
     const patch = { covered_by_reservation_id: null, coverage_lost_at: null };
     if (cur && cur.status === 'cancelled') patch.status = 'active';
     const { error } = await sb.from('ota_reservations').update(patch).eq('id', otaId);
@@ -6526,7 +6544,7 @@ async function _computeReservationOverlap(propId, checkinISO, checkoutISO, exclu
   if (!propId || !checkinISO || !checkoutISO) return [];
   try {
     const q = sb.from('ota_reservations')
-      .select('id, entry_type, guest_name, checkin_date, checkout_date, platform')
+      .select('id, entry_type, guest_name, checkin_date, checkout_date, platform').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
       .eq('property_id', propId)
       .eq('status', 'active')
       .is('deleted_at', null)
@@ -6874,7 +6892,7 @@ async function _renderUpcomingCalendarBody(buildHeader) {
   let rows = [];
   try {
     const { data, error } = await sb.from('ota_reservations')
-      .select('id, platform, entry_type, channel, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code, covered_by_reservation_id')
+      .select('id, platform, entry_type, channel, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code, covered_by_reservation_id').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
       .eq('property_id', propertyId)
       .in('entry_type', ['reservation', 'block'])
       .eq('status', 'active')
@@ -8028,7 +8046,7 @@ async function regenerateRotatingCodesForLengthChange(oldLen, newLen) {
     // echo shouldn't get its own rotating code; the direct row owns
     // the guest link and, transitively, the keybox code.
     const { data, error } = await sb.from('ota_reservations')
-      .select('id, booking_code, checkout_date, keybox_code')
+      .select('id, booking_code, checkout_date, keybox_code').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
       .eq('property_id', propertyId)
       .is('deleted_at', null)
       .is('covered_by_reservation_id', null)
@@ -9946,11 +9964,12 @@ function _numOrNull(v) {
 // (rowMeta[i] carries { idx, checkin_id, name, surname, booking_code }
 //  so the results modal can display which row a portal error refers to.)
 function _prepareAlloggiatiExport(opts = {}) {
+  const exportCheckins = allCheckins.filter(c => c.is_test === false && !c.deleted_at);
   // opts.excludeFiled — drop rows whose alloggiati_status is already
   // 'filed'. Used by sendToAlloggiati() so we don't re-file the same
   // guest twice (the portal rejects duplicates and would abort the
   // whole batch during Test).
-  if (allCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato check-in da esportare!' : 'No check-in data to export!'); return null; }
+  if (exportCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato check-in da esportare!' : 'No check-in data to export!'); return null; }
 
   // Round 42.1 — Alloggiati Web rejects any row whose arrival is in the
   // future. Guests can pre-check-in days ahead of time, so an unfiltered
@@ -9971,8 +9990,8 @@ function _prepareAlloggiatiExport(opts = {}) {
   // second click doesn't try to re-file them (portal rejects
   // duplicates, and the whole batch would abort during Test).
   const isFiled = c => c.alloggiati_status === 'filed';
-  const baseSet = opts.excludeFiled ? allCheckins.filter(c => !isFiled(c)) : allCheckins;
-  const skippedFiledCount = opts.excludeFiled ? (allCheckins.length - baseSet.length) : 0;
+  const baseSet = opts.excludeFiled ? exportCheckins.filter(c => !isFiled(c)) : exportCheckins;
+  const skippedFiledCount = opts.excludeFiled ? (exportCheckins.length - baseSet.length) : 0;
   const recentGuests = baseSet.filter(c => {
     if (!hasArrived(c)) return false;
     const arr = c.arrival_date || c.submitted_at?.split('T')[0] || '';
@@ -10363,9 +10382,10 @@ function exportContactsCSV() {
    CSV EXPORT — spreadsheet for records
 ══════════════════════════════════════ */
 function exportCSV() {
-  if (allCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato check-in da esportare!' : 'No check-in data to export!'); return; }
+  const exportCheckins = allCheckins.filter(c => c.is_test === false && !c.deleted_at);
+  if (exportCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato check-in da esportare!' : 'No check-in data to export!'); return; }
   const header = 'Cognome,Nome,Sesso,DataNascita,LuogoNascita,Cittadinanza,TipoDocumento,NumeroDocumento,TipoAlloggiato,DataArrivo,StatoCode,DocCode';
-  const rows = allCheckins.map(c => {
+  const rows = exportCheckins.map(c => {
     const fields = [
       `"${(c.surname||'').replace(/"/g,'""')}"`,
       `"${(c.name||'').replace(/"/g,'""')}"`,
@@ -10385,18 +10405,19 @@ function exportCSV() {
   // Use BOM for Excel compatibility
   const bom = '\uFEFF';
   downloadFile('checkins_' + new Date().toISOString().slice(0,7) + '.csv', bom + [header, ...rows].join('\n'));
-  track('export_csv', { guests: allCheckins.length });
-  toast(`CSV downloaded — ${allCheckins.length} guests with code mappings`);
+  track('export_csv', { guests: exportCheckins.length });
+  toast(`CSV downloaded — ${exportCheckins.length} guests with code mappings`);
 }
 
 /* ══════════════════════════════════════
    ISTAT C/59 — Monthly statistical summary
 ══════════════════════════════════════ */
 function exportISTAT() {
-  if (allCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato!' : 'No data!'); return; }
+  const exportCheckins = allCheckins.filter(c => c.is_test === false && !c.deleted_at);
+  if (exportCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato!' : 'No data!'); return; }
   const propName = propertyData?.name || 'Property';
   const byNat = {};
-  allCheckins.forEach(c => {
+  exportCheckins.forEach(c => {
     const nat = c.citizenship || 'N/D';
     const isIt = lookupStateCode(nat).trim() === '100000100';
     const key = isIt ? 'Italia' : nat;
@@ -10522,13 +10543,14 @@ function _ross1000Arrivo(c, idswhByGuest) {
 }
 
 function exportRoss1000() {
+  const exportCheckins = allCheckins.filter(c => c.is_test === false && !c.deleted_at);
   if (!propertyData?.ross1000_codice) {
     toast(hostLang === 'it'
       ? '⚠ Inserisci il codice struttura ROSS1000 in Dettagli Proprietà'
       : '⚠ Enter your ROSS1000 structure code in Property Details');
     return;
   }
-  if (allCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato' : 'No data!'); return; }
+  if (exportCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato' : 'No data!'); return; }
 
   // Choose the month: default current month; prompt for override (YYYY-MM)
   const nowMonth = new Date().toISOString().slice(0,7);
@@ -10544,7 +10566,7 @@ function exportRoss1000() {
 
   // Resolve head-of-group references for idcapo (mirror Alloggiati grouping)
   const groups = {};
-  allCheckins.forEach(c => {
+  exportCheckins.forEach(c => {
     const key = c.booking_code || `_arr_${c.arrival_date || 'x'}`;
     (groups[key] = groups[key] || []).push(c);
   });
@@ -10554,7 +10576,7 @@ function exportRoss1000() {
     g.forEach(x => { x._head = head; });
   });
   const idswhByGuest = new Map();
-  allCheckins.forEach(c => idswhByGuest.set(c, _ross1000Idswh(c)));
+  exportCheckins.forEach(c => idswhByGuest.set(c, _ross1000Idswh(c)));
 
   const rooms = propertyData?.rooms_available ?? 1;
   const beds = propertyData?.beds_available ?? '';
@@ -10565,10 +10587,10 @@ function exportRoss1000() {
     const dateStr = `${yy}-${String(mm).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
     const ymd = dateStr.replace(/-/g,'');
     // Arrivals / departures on this exact day
-    const arrivalsToday = allCheckins.filter(c => (c.arrival_date || '').split('T')[0] === dateStr);
-    const departuresToday = allCheckins.filter(c => (c.departure_date || '').split('T')[0] === dateStr);
+    const arrivalsToday = exportCheckins.filter(c => (c.arrival_date || '').split('T')[0] === dateStr);
+    const departuresToday = exportCheckins.filter(c => (c.departure_date || '').split('T')[0] === dateStr);
     // Occupancy: guests whose stay covers this night (arrival <= day < departure)
-    const occupants = allCheckins.filter(c => {
+    const occupants = exportCheckins.filter(c => {
       const a = (c.arrival_date || '').split('T')[0];
       const d = (c.departure_date || '').split('T')[0];
       if (!a) return false;
@@ -10868,7 +10890,7 @@ function _groupSizeFor(c) {
   if (!Array.isArray(allCheckins)) return 1;
   if (c.booking_code) {
     const n = allCheckins.filter(x =>
-      x.property_id === c.property_id && x.booking_code === c.booking_code
+      x.is_test === false && !x.deleted_at && x.property_id === c.property_id && x.booking_code === c.booking_code
     ).length;
     return Math.max(1, n);
   }
@@ -11546,7 +11568,8 @@ function applyTaxDeliberaDraft(payload) {
 }
 
 function exportCityTax() {
-  if (allCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato' : 'No data!'); return; }
+  const exportCheckins = allCheckins.filter(c => c.is_test === false && !c.deleted_at);
+  if (exportCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato' : 'No data!'); return; }
   const cfg = _normalizeTaxCfg(propertyData);
   if (cfg.baseRate == null) {
     toast(hostLang === 'it'
@@ -11574,7 +11597,7 @@ function exportCityTax() {
   let taxableNights = 0, ruleExemptNights = 0, overCapNights = 0;
   let due = 0, anyDocs = false;
 
-  for (const c of allCheckins) {
+  for (const c of exportCheckins) {
     const inQuarter = _nightsInsideQuarter(c, qStartStr, qEndStr);
     if (inQuarter === 0) continue;
     const declared = Array.isArray(c.tax_declared_flags) ? c.tax_declared_flags : [];
@@ -12325,7 +12348,8 @@ function refreshPayTouristLink() {
 }
 
 function exportPayTourist() {
-  if (allCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato check-in da esportare!' : 'No check-in data to export!'); return; }
+  const exportCheckins = allCheckins.filter(c => c.is_test === false && !c.deleted_at);
+  if (exportCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato check-in da esportare!' : 'No check-in data to export!'); return; }
 
   const cirCode = (propertyData?.cir_code || '').trim();
   if (!cirCode) {
@@ -12337,15 +12361,15 @@ function exportPayTourist() {
 
   // 48h default window
   const cutoff48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString().split('T')[0];
-  let toExport = allCheckins.filter(c => {
+  let toExport = exportCheckins.filter(c => {
     const arr = c.arrival_date || c.submitted_at?.split('T')[0] || '';
     return arr >= cutoff48h;
   });
   if (toExport.length === 0) {
     if (!confirm(hostLang === 'it'
-      ? `Nessun ospite nelle ultime 48 ore. Esportare tutti i ${allCheckins.length} ospiti?`
-      : `No guests in the last 48 hours. Export all ${allCheckins.length} guests?`)) return;
-    toExport = allCheckins;
+      ? `Nessun ospite nelle ultime 48 ore. Esportare tutti i ${exportCheckins.length} ospiti?`
+      : `No guests in the last 48 hours. Export all ${exportCheckins.length} guests?`)) return;
+    toExport = exportCheckins;
   }
 
   // Group by stay (booking_code or arrival_date)

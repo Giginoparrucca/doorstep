@@ -272,7 +272,7 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
       const listRes = await pgrestGET(
         `ota_reservations?property_id=eq.${encodeURIComponent(propertyId)}` +
         `&platform=eq.${encodeURIComponent(platform)}` +
-        `&status=eq.active` +
+        `&status=eq.active&is_test=eq.false` +
         `&or=(checkin_date.gte.${todayISO},entry_type.eq.block)` +
         `&select=id,uid,covered_by_reservation_id`,
         apikey, bearer,
@@ -376,7 +376,7 @@ async function mergeBookingRollingUIDs(propertyId, incoming, apikey, bearer, see
         + `property_id=eq.${encodeURIComponent(propertyId)}`
         + `&platform=eq.booking`
         + `&entry_type=eq.reservation`
-        + `&status=eq.active`
+        + `&status=eq.active&is_test=eq.false`
         + `&deleted_at=is.null`
         + `&covered_by_reservation_id=is.null`
         + `&checkout_date=eq.${encodeURIComponent(r.checkout_date)}`
@@ -683,7 +683,7 @@ async function handleOutboundExport(req, res, token) {
     rows = await _outboundSbGetJSON(
       `ota_reservations` +
       `?property_id=eq.${encodeURIComponent(property.id)}` +
-      `&status=eq.active` +
+      `&status=eq.active&is_test=eq.false` +
       `&deleted_at=is.null` +
       `&covered_by_reservation_id=is.null` +
       `&entry_type=in.(reservation,block)` +

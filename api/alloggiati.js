@@ -1,3 +1,4 @@
+import { runTestCleanup } from './send-arrival-reminders.js';
 import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, rejectDemoIntegration, IS_DEMO } from './_environment.js';
 // api/alloggiati.js — Round 44 Phase 0.5
 //
@@ -184,9 +185,10 @@ function _timingSafeStringCompare(a, b) {
 const AUTOFILE_TICK_BUDGET_MS = 45_000; // leave 15s headroom under Vercel's 60s cap
 const AUTOFILE_MAX_PROPS_PER_TICK = 25;  // Hobby safety net; most ticks process 1-3
 
-async function runAutofileTick(res) {
+async function runAutofileTick(res, testCleanup) {
   const started = Date.now();
   const summary = {
+    testCleanup,
     properties_processed: 0,
     properties_skipped_budget: 0,
     rows_filed: 0,
@@ -777,8 +779,8 @@ async function maybeFireDailyAlerts(prop, perTickCounts) {
     try {
       const resv = await pgrestGET(
         `ota_reservations?property_id=eq.${encodeURIComponent(prop.id)}` +
-        `&arrival_date=eq.${todayRome}` +
-        '&select=booking_code&limit=200'
+        `&checkin_date=eq.${todayRome}` +
+        '&is_test=eq.false&deleted_at=is.null&select=booking_code&limit=200'
       );
       const resvRows = resv.ok ? await resv.json() : [];
       if (resvRows.length > 0) {
@@ -789,7 +791,7 @@ async function maybeFireDailyAlerts(prop, perTickCounts) {
           const chk = await pgrestGET(
             `checkins?property_id=eq.${encodeURIComponent(prop.id)}` +
             `&booking_code=in.(${encodeURIComponent(inList)})` +
-            '&deleted_at=is.null&select=booking_code'
+            '&is_test=eq.false&deleted_at=is.null&select=booking_code'
           );
           const seen = new Set(chk.ok ? (await chk.json()).map(r => r.booking_code) : []);
           noCheckin = codes.filter(c => !seen.has(c)).length;
@@ -1038,7 +1040,8 @@ export default async function handler(req, res) {
     if (!want || !got || !_timingSafeStringCompare(want, got)) {
       return res.status(401).json({ error: 'Invalid cron secret' });
     }
-    return await runAutofileTick(res);
+    const cleanup = await runTestCleanup(false);
+    return await runAutofileTick(res, cleanup);
   }
 
   const allowed = applyCors(req, res);
@@ -1376,6 +1379,33 @@ export default async function handler(req, res) {
       checkinIdsFlat.push(...ids);
     }
 
+    // ── Ownership guard on the checkin_ids ───────────────────────
+    // Even though the client only sends what it built, defence in
+    // depth: confirm every checkin_id actually belongs to this
+    // property before we stamp them.
+    try {
+      const idList = Array.from(new Set(checkinIdsFlat));
+      // Cap the OR filter length to keep the URL sane; 200 rows *
+      // guests fits well within PostgREST's limits.
+      const inList = idList.map(x => `"${x}"`).join(',');
+      const ownRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/checkins?id=in.(${encodeURIComponent(inList)})&select=id,property_id,is_test,deleted_at`,
+        { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } },
+      );
+      if (!ownRes.ok) throw new Error(`checkins lookup ${ownRes.status}`);
+      const found = await ownRes.json();
+      if (!Array.isArray(found) || found.length !== idList.length) {
+        return res.status(400).json({ error: 'Some checkin_ids do not exist' });
+      }
+      if (found.some(c => c.is_test !== false || c.deleted_at)) return res.status(400).json({ error: 'Test or deleted check-ins cannot be filed', error_code: 'test_checkin_excluded' });
+      const alien = found.find(c => c.property_id !== propertyId);
+      if (alien) return res.status(403).json({ error: 'A checkin does not belong to this property' });
+    } catch (e) {
+      console.warn('[alloggiati] send: ownership check failed:', e.message);
+      return res.status(500).json({ error: 'Ownership check failed' });
+    }
+
+
     // ── Load and decrypt credentials ─────────────────────────────
     let credRow;
     try {
@@ -1400,31 +1430,6 @@ export default async function handler(req, res) {
         error: 'Stored credentials unreadable — please re-enter them.',
         error_code: 'decrypt_failed',
       });
-    }
-
-    // ── Ownership guard on the checkin_ids ───────────────────────
-    // Even though the client only sends what it built, defence in
-    // depth: confirm every checkin_id actually belongs to this
-    // property before we stamp them.
-    try {
-      const idList = Array.from(new Set(checkinIdsFlat));
-      // Cap the OR filter length to keep the URL sane; 200 rows *
-      // guests fits well within PostgREST's limits.
-      const inList = idList.map(x => `"${x}"`).join(',');
-      const ownRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/checkins?id=in.(${encodeURIComponent(inList)})&select=id,property_id`,
-        { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } },
-      );
-      if (!ownRes.ok) throw new Error(`checkins lookup ${ownRes.status}`);
-      const found = await ownRes.json();
-      if (!Array.isArray(found) || found.length !== idList.length) {
-        return res.status(400).json({ error: 'Some checkin_ids do not exist' });
-      }
-      const alien = found.find(c => c.property_id !== propertyId);
-      if (alien) return res.status(403).json({ error: 'A checkin does not belong to this property' });
-    } catch (e) {
-      console.warn('[alloggiati] send: ownership check failed:', e.message);
-      return res.status(500).json({ error: 'Ownership check failed' });
     }
 
     // ── Mint a fresh token ───────────────────────────────────────

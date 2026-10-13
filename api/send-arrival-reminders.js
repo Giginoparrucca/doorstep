@@ -154,7 +154,7 @@ export default async function handler(req, res) {
   // and B may have already succeeded) — runStoragePurgePass itself
   // never throws out of its body.
   const storagePurge = runStorage
-    ? await runStoragePurgePass(dry)
+    ? await runTestCleanup(dry)
     : { skipped: 'pass filter' };
 
   // One-line summary for the Vercel log. Counts only — never paths
@@ -189,7 +189,7 @@ async function runArrivalPass(p, tomorrow, dry) {
     // direct booking. The direct row is the one the host acts on.
     reservations = await pgrestGET(
       `ota_reservations?property_id=eq.${p.id}` +
-      `&entry_type=eq.reservation&status=eq.active` +
+      `&entry_type=eq.reservation&status=eq.active&is_test=eq.false` +
       `&deleted_at=is.null` +
       `&covered_by_reservation_id=is.null` +
       `&arrival_reminder_sent_at=is.null` +
@@ -401,13 +401,14 @@ function pgrestDELETE(path) {
 //     char cap). After 5 attempts the row is left in place for manual
 //     inspection; it will no longer be picked up (attempts<5 filter).
 // ══════════════════════════════════════════════════════════════════════
-async function runStoragePurgePass(dry) {
+export async function runStoragePurgePass(dry, onlyPaths = null) {
   const out = { queued: 0, deleted: 0, failed: 0, dry: !!dry };
   let queueRows;
   try {
     queueRows = await pgrestGET(
       'storage_purge_queue?bucket=eq.documents' +
       '&attempts=lt.5' +
+      (onlyPaths ? '&path=in.(' + encodeURIComponent(onlyPaths.map(p => JSON.stringify(p)).join(',')) + ')' : '') +
       '&select=id,bucket,path,attempts' +
       '&order=queued_at.asc&limit=1000'
     );
@@ -612,4 +613,20 @@ function renderFilingHTML(property, yesterday, count, lang) {
       </ol>
       <p style="margin:20px 0 0;color:#6B7A90;font-size:12px;">${T.footer}</p>
     </div>`;
+}
+
+// Reused by the existing ten-minute autofile tick. No new cron or API.
+export async function runTestCleanup(dry) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/purge_onboarding_tests`, {
+      method: 'POST', headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_dry_run: !!dry }), signal: AbortSignal.timeout(8000),
+    });
+    if (!r.ok) throw new Error(`test purge ${r.status}`);
+    const tests = await r.json();
+    return { ...(await runStoragePurgePass(dry)), tests };
+  } catch (e) {
+    // Storage remains independent even if a migration or test purge fails.
+    return { ...(await runStoragePurgePass(dry)), test_error: e.message };
+  }
 }

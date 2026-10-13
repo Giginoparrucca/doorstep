@@ -25,6 +25,8 @@ import { rejectInvalidEnvironment, SUPABASE_URL } from './_environment.js';
 //
 // Env: GUEST_TOKEN_SECRET, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL.
 
+import { runStoragePurgePass } from './send-arrival-reminders.js';
+import { mintWalkinCode } from './_booking-code.js';
 import { signGuestToken } from './_guest-token.js';
 import { applyCors } from './_cors.js';
 
@@ -52,6 +54,38 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server not configured' });
   }
 
+  // Host-only direct test reservation on the existing mint dispatcher.
+  if (['test_booking','test_booking_delete'].includes(req.body?.action)) {
+    const auth = req.headers.authorization || '';
+    const bearer = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (!bearer) return res.status(401).json({ error: 'Host session required' });
+    if (req.body.action === 'test_booking_delete') {
+      const prop = encodeURIComponent(req.body.property_id || '');
+      const code = encodeURIComponent(req.body.booking_code || '');
+      const hostHeaders = { apikey: SERVICE_KEY, Authorization: `Bearer ${bearer}` };
+      const exists = await fetch(`${SUPABASE_URL}/rest/v1/ota_reservations?property_id=eq.${prop}&booking_code=eq.${code}&is_test=eq.true&raw=cs.${encodeURIComponent(JSON.stringify({onboarding_test:true}))}&select=id`, { headers: hostHeaders });
+      if (!exists.ok || !(await exists.json()).length) return res.status(404).json({ error: 'Test booking not found' });
+      const photos = await fetch(`${SUPABASE_URL}/rest/v1/checkins?property_id=eq.${prop}&booking_code=eq.${code}&is_test=eq.true&select=id_photo_path,selfie_photo_path`, { headers: hostHeaders });
+      if (!photos.ok) return res.status(503).json({ error: 'Test photos unavailable' });
+      const paths = [...new Set((await photos.json()).flatMap(c => [c.id_photo_path,c.selfie_photo_path]).filter(Boolean))];
+      const del = await fetch(`${SUPABASE_URL}/rest/v1/rpc/delete_onboarding_test_booking`, {
+        method: 'POST', headers: { ...hostHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p_property: req.body.property_id, p_code: req.body.booking_code }),
+      });
+      if (!del.ok || (await del.json()) !== 1) return res.status(400).json({ error: 'Test deletion failed' });
+      // Drain only queue entries for this owned booking, never other hosts.
+      const storage = paths.length ? await runStoragePurgePass(false, paths) : { deleted: 0 };
+      return res.status(200).json({ ok: true, storage });
+    }
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/create_onboarding_test_booking`, {
+      method: 'POST',
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_property: req.body.property_id, p_code: mintWalkinCode(true) }),
+    });
+    if (!r.ok) return res.status(r.status === 401 || r.status === 403 ? 403 : 400).json({ error: 'Test booking unavailable' });
+    const booking = await r.json();
+    return res.status(200).json({ booking });
+  }
   const { property_id, session_id, booking_code, is_test } = req.body || {};
   if (!property_id || typeof property_id !== 'string') {
     return res.status(400).json({ error: 'property_id required' });
@@ -63,7 +97,7 @@ export default async function handler(req, res) {
   // Round 34.4: is_test carried into the token payload so guest-chat and
   // api_usage can tag rows without trusting the request body of a
   // subsequent call. Coerced to a strict boolean.
-  const t = is_test === true;
+  let t = is_test === true;
 
   // Rate-limit BEFORE the DB lookup so a limited-out caller can't use
   // this endpoint as a property-existence oracle either.
@@ -104,6 +138,19 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Property lookup exception' });
   }
 
+  // The booking row is authoritative: removing ?test=1 cannot turn a
+  // test reservation into a real filing, notification or analytics row.
+  if (bc) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/ota_reservations?property_id=eq.${encodeURIComponent(property_id)}&booking_code=eq.${encodeURIComponent(bc)}&deleted_at=is.null&select=is_test&limit=1`, {
+        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+      });
+      if (!r.ok) throw new Error('booking lookup failed');
+      const rows = await r.json();
+      if (bc.startsWith('WB-TEST') && !rows[0]) return res.status(410).json({ error: 'Test booking expired' });
+      if (rows[0]?.is_test === true) t = true;
+    } catch (_) { return res.status(503).json({ error: 'Booking lookup unavailable' }); }
+  }
   const { token, payload } = signGuestToken({ p: property_id, s: session_id, b: bc, t });
 
   // Record this mint against the rate-limit tally. NOTE: recordUsage
@@ -123,6 +170,7 @@ export default async function handler(req, res) {
 
   return res.status(200).json({
     token,
+    is_test: t,
     expires_at: new Date(payload.exp * 1000).toISOString(),
   });
 }

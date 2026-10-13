@@ -21,6 +21,13 @@ at Daniele's request while this round is completed; its table is preserved below
 | 0 — Specification and handoff | shipped — PR #146 — GPT-6.1 | Scope, date window, exclusions, tests, live receipt-only probe and rollback |
 | 1 — Implement, verify and release | in-progress — GPT-6.1 | Collector, dispatcher/scheduler, host copy, demo docs/PDF; local and live gates in specification |
 
+### Round 52 Phase 1 — live receipt gate and owner-read repair (GPT-6.1, 2026-10-13)
+
+- PR #147 merged as `c3d1819`; production `dpl_76gDv91zxVs5URVXnhQU9gDymTdk` and demo `dpl_3ZPZXJQgN8fDPEugqwqsEmnGvmuG` READY. Served host console/guide match tested source; receipt-only unauthorized probe returns 401; hosted demo returns explicit receipt integration denial.
+- Actual scheduled request 126 at 09:20 UTC downloaded two official daily PDFs (7 and 11 October), saved 67,356 / 67,407 bytes as application/pdf, and attached seven / six guest rows: 13 total, zero errors. Subsequent authenticated receipt-only request 127 returned zero pending/downloads/attachments, verifying idempotence. The 178 owner-property rows retain the same non-receipt data hash; all three immutable filing audit entries retain the same hash. Filing states/timestamps and guest data unchanged; no resubmission.
+- The owner-read gate initially failed (0 visible) and exposed the old Round 36 SQL name-binding bug: property subquery used p.name instead of the outer object path. Amended the spec and applied the three-policy-only `migration_round52_receipt_policies.sql` via MCP; tracked production version `20261013092634 round52_receipt_policies`. After correction: owner sees both files, non-owner/anon see zero, private public-URL download denied. Service policy/grants/bucket privacy unchanged. Demo already had the correct scope from Round 50; its migrations/fingerprints remain unchanged and no real receipts exist there.
+- Hosted demo smoke passes. Initial hosted e2e request timed out and is being retried; policy repair publication/final gates pending. Round 51 remains paused with phases 5-7 pending.
+
 ### Round 52 Phase 1 — implementation and local gate (GPT-6.1, 2026-10-13)
 
 - Receipt-only collector derives missing receipts from successful host/autofile audits and matching current filed timestamps. Rome date window, test/deleted/correction/property boundaries, rotating missing-row pages and fair date retries; deterministic private daily PDFs, conditional receipt-only updates and existing-upload preservation. No schema, function or cron added; existing ten-minute tick runs collection even if autofile is off. Cron-secret-only receipt_tick supports operational recovery without Send/Test/claims/notifications.

@@ -1139,6 +1139,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 .photo-upload-zone:hover .photo-upload-overlay { opacity: 1; }
 @media(max-width:720px){#panel-property>.panel-header-actions>div:first-child{flex:0 0 100%!important}#propertySaveBtn{white-space:normal;overflow:visible}}
 .cover-frame-controls{margin-top:16px;display:grid;gap:8px}.cover-frame-controls[hidden]{display:none}.cover-frame-controls input{width:100%;min-width:0}.cover-frame-controls label{font-size:.8rem}.cover-frame-controls output{float:right}.property-leave-actions{display:flex;gap:8px;flex-wrap:wrap}.property-leave-dialog{border:1px solid var(--border);border-radius:14px;padding:24px;max-width:min(520px,calc(100vw - 32px));color:var(--ink);background:var(--white)}.property-leave-dialog::backdrop{background:rgba(6,26,61,.45)}.property-leave-dialog h2{margin-top:0;font-size:1.2rem}.property-leave-dialog p{font-size:.88rem;line-height:1.5}.property-leave-dialog .btn{white-space:normal}
+
+.regional-dialog{width:min(1000px,calc(100vw - 32px));max-height:90vh;overflow:auto;border:1px solid var(--border);border-radius:14px;padding:24px;color:var(--ink);background:var(--white)}.regional-dialog::backdrop{background:rgba(6,26,61,.5)}.regional-dialog-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.regional-dialog h2{font-size:1.2rem}.regional-dialog h3{font-size:1rem;margin-top:20px}.regional-dialog p{font-size:.82rem;line-height:1.5}.regional-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:12px;margin:12px 0;align-items:end}.regional-field{display:grid;gap:5px;font-size:.78rem;min-width:0}.regional-dialog input,.regional-dialog select{min-width:0;width:100%}.regional-dialog input[type=checkbox]{width:auto}.regional-dialog details{border:1px solid var(--border);border-radius:8px;padding:10px;margin:8px 0}.regional-dialog summary{cursor:pointer;font-size:.82rem;font-weight:500}.regional-guests{max-height:45vh;overflow:auto}.regional-table-wrap{overflow-x:auto}.regional-days{min-width:760px;width:100%}.regional-days th{white-space:normal;font-size:.7rem}.regional-days td{padding:5px}.regional-days th:last-child,.regional-days td:last-child{position:static;box-shadow:none;background:transparent}.regional-days th{letter-spacing:0;text-transform:none}.regional-days input,.regional-days select{min-width:90px}.regional-confirm{display:flex;gap:8px;font-size:.84rem;margin:18px 0;align-items:flex-start}.regional-dialog [data-errors]{white-space:pre-line;color:var(--red)}.regional-dialog .btn{white-space:normal}.regional-note{color:var(--ink-soft)}@media(max-width:540px){.regional-dialog{padding:14px}.regional-dialog h2{font-size:1.05rem}}
 </style>
 <style>
 .share-actions,.share-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
@@ -2110,7 +2112,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
              with per-province fallbacks for Toscana). Replaces the two
              hard-coded Veneto / Puglia tiles + the "Other regions"
              disclosure. -->
-        <div id="regionalTile"></div>
+        <div id="regionalTile" data-guide="export-regional"></div>
       </div>
 
       <!-- ─── Axis 3: Tourist Tax · Municipal ─── -->
@@ -2380,6 +2382,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 <script src="/host-share.js?v=55.3"></script>
 <script src="/lib/cover-layout.js?v=57.1"></script>
 <script src="/host-property-editor.js?v=57.1"></script>
+<script src="/lib/regional-exports.js?v=58.1"></script>
+<script src="/host-regional-exports.js?v=58.1"></script>
 <script>
 /* ══════════════════════════════════════
    SUPABASE CONNECTION
@@ -4227,7 +4231,7 @@ const HT = {
     prop_tax_ai_draft: 'Draft from delibera',
     prop_tax_preview_title: 'Live preview',
     export_ross1000_title: '🗺 ROSS1000 statistical file',
-    export_ross1000_desc: 'Generates the monthly <strong>ROSS1000 XML</strong> (arrivals, departures, daily occupancy) for upload in the Veneto flows portal. Requires your ROSS1000 structure code and room/bed capacity in Property Details.',
+    export_ross1000_desc: 'Generates the monthly <strong>ROSS1000 XML</strong> (arrivals, departures, daily occupancy) for upload in your regional ROSS1000 portal. Requires your ROSS1000 structure code and room/bed capacity in Property Details.',
     btn_gen_ross1000: '📥 Generate ROSS1000 XML',
     link_ross1000_portal: 'Open ROSS1000 Veneto',
     export_citytax_title: '🧮 CityTax declaration helper',
@@ -4778,7 +4782,7 @@ const HT = {
     prop_tax_exempt_age: 'Esenti sotto i (anni)',
     prop_tax_exempt_age_hint: 'Gli ospiti sotto questa età sono esenti. Altre esenzioni variano — verifica con la tua delibera.',
     export_ross1000_title: '🗺 File statistico ROSS1000',
-    export_ross1000_desc: 'Genera l\'<strong>XML ROSS1000</strong> mensile (arrivi, partenze, occupazione giornaliera) da caricare sul portale flussi del Veneto. Richiede il codice struttura ROSS1000 e la capacità camere/letti in Dettagli Proprietà.',
+    export_ross1000_desc: 'Genera l\'<strong>XML ROSS1000</strong> mensile (arrivi, partenze, occupazione giornaliera) da caricare sul portale ROSS1000 regionale. Richiede il codice struttura ROSS1000 e la capacità camere/letti in Dettagli Proprietà.',
     btn_gen_ross1000: '📥 Genera XML ROSS1000',
     link_ross1000_portal: 'Apri ROSS1000 Veneto',
     export_citytax_title: '🧮 Assistente dichiarazione CityTax',
@@ -5330,7 +5334,7 @@ async function showPanel(id, btn) {
 const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','settings','rules','recos','qrlink'];
 // Bump on every host-guides.js change so browsers never see a stale
 // copy even if their cache is aggressive.
-const _HG_VERSION = '57.1-property-edit';
+const _HG_VERSION = '58.1-regional-downloads';
 let _hgLoadPromise = null;
 function _hgLoad() {
   if (window.HG) return Promise.resolve();
@@ -10522,13 +10526,11 @@ function exportISTAT() {
 
 /* ══════════════════════════════════════════════════════════════════════
    ROSS1000 — Statistical flow XML  (Round 24)
-   Builds the GIES Turismo5 v2.4 "movimentazione" XML for a chosen month:
-   one <movimento> per day, with <arrivi>/<partenze> derived from each
-   guest's arrival_date / departure_date. Codes (cittadinanza, residenza,
-   nascita, tipoalloggiato) reuse the Polizia tables already used by the
-   Alloggiati exporter. Spec: SPEC_ross1000_citytax.md.
-   This produces a downloadable .xml the host uploads in ROSS1000 (file
-   mode). SOAP transmission is intentionally out of scope.
+   Legacy shared helpers; actual reviewed serializers are in lib/regional-exports.js.
+   Current GIES XML v3 plus regional adapters: docs/REGIONAL_EXPORT_FORMATS.md.
+   Review the selected period and daily availability before downloading.
+   Statistical files use actual residence and region-specific formats.
+   Direct transmission remains outside this file-download release.
 ══════════════════════════════════════════════════════════════════════ */
 
 // Trimmed code lookups (the Alloggiati versions pad to fixed width; XML
@@ -10566,140 +10568,9 @@ function _ymd(isoDate) {
   return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
 }
 
-// Build one <arrivo> block for a guest
-function _ross1000Arrivo(c, idswhByGuest) {
-  const idswh = idswhByGuest.get(c);
-  const tipo = GUEST_TYPE_CODES[c.guest_type] || '16';
-  const isMember = (tipo === '19' || tipo === '20');
-  const sesso = c.sex === 'F' ? 'F' : 'M';
-  const citt = _codeStato(c.citizenship);
-  const birthCountry = c.birth_country || c.citizenship || '';
-  const birthCode = _codeStato(birthCountry);
-  const bornInItaly = (c.birth_province && c.birth_province !== 'EE' && c.birth_province !== '') ||
-                      isItalianCitizenshipCode(birthCode);
-  const statoNascita = bornInItaly ? '100000100' : birthCode;
-  const comuneNascita = bornInItaly ? _codeComune(c.place_of_birth, c.birth_province) : '';
-  // Residence — Round 47.2 captures this as an optional pair on the
-  // check-in form. If the guest provided residence_country, use it;
-  // otherwise fall back to citizenship (reasonable default — a German
-  // citizen's residence is usually Germany). For Italians, residence
-  // place uses the guest-provided comune if any, else the birth comune.
-  const residenceCountryRaw = c.residence_country || '';
-  const statoRes = residenceCountryRaw
-    ? (_codeStato(residenceCountryRaw) || citt || statoNascita || '')
-    : (citt || statoNascita || '');
-  const isItalRes = isItalianCitizenshipCode(statoRes);
-  const residencePlaceRaw = c.residence_place || '';
-  const residencePlaceCode = isItalRes && residencePlaceRaw
-    ? _codeComune(residencePlaceRaw, '')
-    : '';
-  const luogoRes = residencePlaceCode || (isItalRes ? (comuneNascita || '') : '');
-  const fields = [
-    ['idswh', idswh],
-    ['tipoalloggiato', tipo],
-    ['idcapo', isMember ? (idswhByGuest.get(c._head) || '') : ''],
-    ['cognome', _xmlEsc((c.surname || '').substring(0,50))],
-    ['nome', _xmlEsc((c.name || '').substring(0,30))],
-    ['sesso', sesso],
-    ['cittadinanza', citt],
-    ['statoresidenza', statoRes],
-    ['luogoresidenza', luogoRes],
-    ['datanascita', _ymd(c.date_of_birth)],
-    ['statonascita', statoNascita],
-    ['comunenascita', comuneNascita],
-    ['tipoturismo', _xmlEsc(propertyData?.default_tipoturismo || 'Non specificato')],
-    ['mezzotrasporto', _xmlEsc(propertyData?.default_mezzotrasporto || 'Non Specificato')],
-  ];
-  return '        <arrivo>\n' +
-    fields.map(([k,v]) => `          <${k}>${v}</${k}>`).join('\n') +
-    '\n        </arrivo>';
-}
-
 function exportRoss1000() {
-  const exportCheckins = allCheckins.filter(c => c.is_test === false && !c.deleted_at);
-  if (!propertyData?.ross1000_codice) {
-    toast(hostLang === 'it'
-      ? '⚠ Inserisci il codice struttura ROSS1000 in Dettagli Proprietà'
-      : '⚠ Enter your ROSS1000 structure code in Property Details');
-    return;
-  }
-  if (exportCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato' : 'No data!'); return; }
-
-  // Choose the month: default current month; prompt for override (YYYY-MM)
-  const nowMonth = new Date().toISOString().slice(0,7);
-  const month = (prompt(hostLang === 'it'
-    ? 'Mese da esportare (AAAA-MM):'
-    : 'Month to export (YYYY-MM):', nowMonth) || '').trim();
-  if (!/^\d{4}-\d{2}$/.test(month)) {
-    if (month !== '') toast(hostLang === 'it' ? 'Formato mese non valido' : 'Invalid month format');
-    return;
-  }
-  const [yy, mm] = month.split('-').map(Number);
-  const daysInMonth = new Date(yy, mm, 0).getDate();
-
-  // Resolve head-of-group references for idcapo (mirror Alloggiati grouping)
-  const groups = {};
-  exportCheckins.forEach(c => {
-    const key = c.booking_code || `_arr_${c.arrival_date || 'x'}`;
-    (groups[key] = groups[key] || []).push(c);
-  });
-  const mainTypes = ['single', 'head', 'group'];
-  Object.values(groups).forEach(g => {
-    const head = g.find(x => mainTypes.includes(x.guest_type)) || g[0];
-    g.forEach(x => { x._head = head; });
-  });
-  const idswhByGuest = new Map();
-  exportCheckins.forEach(c => idswhByGuest.set(c, _ross1000Idswh(c)));
-
-  const rooms = propertyData?.rooms_available ?? 1;
-  const beds = propertyData?.beds_available ?? '';
-
-  // Build per-day movimenti
-  const movimenti = [];
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dateStr = `${yy}-${String(mm).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    const ymd = dateStr.replace(/-/g,'');
-    // Arrivals / departures on this exact day
-    const arrivalsToday = exportCheckins.filter(c => (c.arrival_date || '').split('T')[0] === dateStr);
-    const departuresToday = exportCheckins.filter(c => (c.departure_date || '').split('T')[0] === dateStr);
-    // Occupancy: guests whose stay covers this night (arrival <= day < departure)
-    const occupants = exportCheckins.filter(c => {
-      const a = (c.arrival_date || '').split('T')[0];
-      const d = (c.departure_date || '').split('T')[0];
-      if (!a) return false;
-      return a <= dateStr && (!d || dateStr < d);
-    });
-    const camereOccupate = occupants.length > 0 ? Math.min(occupants.length, rooms || occupants.length) : 0;
-
-    let body = `    <movimento>\n      <data>${ymd}</data>\n      <struttura>\n`
-      + `        <apertura>SI</apertura>\n`
-      + `        <camereoccupate>${camereOccupate}</camereoccupate>\n`
-      + `        <cameredisponibili>${rooms || 0}</cameredisponibili>\n`
-      + `        <lettidisponibili>${beds || 0}</lettidisponibili>\n`
-      + `      </struttura>\n`;
-
-    if (arrivalsToday.length) {
-      // head first so idcapo refs resolve
-      arrivalsToday.sort((a,b) => (mainTypes.includes(a.guest_type)?0:1) - (mainTypes.includes(b.guest_type)?0:1));
-      body += '      <arrivi>\n' + arrivalsToday.map(c => _ross1000Arrivo(c, idswhByGuest)).join('\n') + '\n      </arrivi>\n';
-    }
-    if (departuresToday.length) {
-      body += '      <partenze>\n' + departuresToday.map(c =>
-        `        <partenza>\n          <idswh>${idswhByGuest.get(c)}</idswh>\n          <tipoalloggiato>${GUEST_TYPE_CODES[c.guest_type] || '16'}</tipoalloggiato>\n          <arrivo>${_ymd(c.arrival_date)}</arrivo>\n        </partenza>`
-      ).join('\n') + '\n      </partenze>\n';
-    }
-    body += '    </movimento>';
-    movimenti.push(body);
-  }
-
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<movimenti>\n`
-    + `  <codice>${_xmlEsc(propertyData.ross1000_codice)}</codice>\n`
-    + `  <prodotto>WelcomeBnB</prodotto>\n`
-    + movimenti.join('\n') + '\n</movimenti>\n';
-
-  downloadFile(`ross1000_${month}.xml`, xml);
-  track('export_ross1000', { month });
-  toast(hostLang === 'it' ? 'File ROSS1000 generato!' : 'ROSS1000 file generated!');
+  // Compatibility for older guide/deep-link callers; use the reviewed regional flow.
+  exportRegionalFile();
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -11918,39 +11789,8 @@ function comuneCodeFromCity(city) {
 // the other 7 provinces fall back to a provincial-system note.
 // Alto Adige has no single host-facing portal (ASTAT flows via
 // municipality / tourist association).
-// `export: 'ross1000'` enables the Veneto XML export button; today it's
-// Veneto-only because that's what it was tested against. Many other
-// ROSS1000 regions share the GIES tracciato — likely follow-up.
-const REGION_COMPLIANCE = {
-  'Abruzzo':        { system: 'ROSS1000',               portal: 'https://app.regione.abruzzo.it/Turismo5/' },
-  'Basilicata':     { system: 'ROSS1000 (APT Basilicata)', portal: 'https://sist-aptbasilicata.turitweb.it/' },
-  'Calabria':       { system: 'ROSS1000 (SIRDAT)',      portal: 'https://sirdat.regione.calabria.it/' },
-  'Campania':       { system: 'Sinfonia Turismo SMART', portal: 'https://turismo.regione.campania.it/turismoweb/fe-portale-turismo/home' },
-  'Emilia-Romagna': { system: 'ROSS1000',               portal: 'https://datiturismo.regione.emilia-romagna.it/' },
-  'Friuli-Venezia Giulia': { system: 'WebTur',          portal: 'https://servizistatistici.regione.fvg.it/webtur/' },
-  'Lazio':          { system: 'ROSS1000',               portal: 'https://lazioturismo.ross1000.it/' },
-  'Liguria':        { system: 'ROSS1000',               portal: 'https://ross1000-spid.regione.liguria.it/' },
-  'Lombardia':      { system: 'ROSS1000',               portal: 'https://www.flussituristici.servizirl.it/Turismo5/app/' },
-  'Marche':         { system: 'Istrice (ROSS1000)',     portal: 'https://istrice-ross1000.turismo.marche.it/' },
-  'Molise':         { system: 'ROSS1000',               portal: 'https://moliseturismo.ross1000.it/' },
-  'Piemonte':       { system: 'Piemonte Dati Turismo (ROSS1000)', portal: 'https://piemontedatiturismo.regione.piemonte.it/' },
-  'Puglia':         { system: 'SPOT Easy (Puglia DMS)', portal: 'https://dms.puglia.it/', export: 'alloggiati_txt', verified: true },
-  'Sardegna':       { system: 'SIRED (ROSS1000)',       portal: 'https://sardegnaturismo.ross1000.it/' },
-  'Sicilia':        { system: 'Osservatorio Turistico (Turist@t)', portal: 'https://osservatorioturistico.regione.sicilia.it/' },
-  'Toscana': {
-    byProvince: {
-      '048': { system: 'ROSS1000', portal: 'https://toscanaturismo.ross1000.it/' }, // Firenze
-      '100': { system: 'ROSS1000', portal: 'https://toscanaturismo.ross1000.it/' }, // Prato
-      '047': { system: 'ROSS1000', portal: 'https://toscanaturismo.ross1000.it/' }, // Pistoia
-    },
-    fallback: { system: null, portal: null, note: 'toscana_provincial' },
-  },
-  'Trentino':       { system: 'Istat Alloggi (DTU)',    portal: 'https://www.alloggituristici.provincia.tn.it/' },
-  'Alto Adige':     { system: null, portal: null, note: 'alto_adige' },
-  'Umbria':         { system: 'Turismatica',            portal: 'https://turismatica.regione.umbria.it/ntojsf/' },
-  "Valle d'Aosta":  { system: 'Locazioni Turistiche VdA', portal: 'https://locazionituristiche.regione.vda.it/' },
-  'Veneto':         { system: 'ROSS1000',               portal: 'https://flussituristici.regione.veneto.it/', export: 'ross1000', verified: true },
-};
+// RegionalExports owns source-backed routing and reviewed download adapters.
+const REGION_COMPLIANCE = RegionalExports.regions;
 function regionComplianceFor(region, city) {
   const r = REGION_COMPLIANCE[region];
   if (!r) return null;
@@ -12025,85 +11865,20 @@ function _onRegionManualChange() {
 // renderExportChecklist whenever the Export panel is open. If the
 // region isn't set, the whole tile stays hidden — the checklist at
 // the top already surfaces the "Property region not set" prompt.
+let _regionalExportController = null;
+function regionalExportController() {
+  if (!_regionalExportController) _regionalExportController = HostRegionalExports.create({
+    root: document.getElementById('regionalTile'),
+    context: () => ({propertyId, property:propertyData, lang:hostLang, sb}),
+    comuneCode: city => comuneCodeFromCity(city), allog: window.AllogRecords,
+  });
+  return _regionalExportController;
+}
 function renderRegionalTile() {
-  const host = document.getElementById('regionalTile');
-  if (!host) return;
-  const it = hostLang === 'it';
-  const region = (propertyData?.region || '').trim();
-  if (!region) { host.innerHTML = ''; return; }
-  const cfg = regionComplianceFor(region, propertyData?.city);
-  // Veneto — keep the ROSS1000 XML button + Veneto portal exactly as before.
-  if (cfg && cfg.export === 'ross1000') {
-    host.innerHTML = `
-      <div class="export-tile-h">
-        <div class="tile-body">
-          <h3>${_htmlEsc(it ? '🗺 File statistico ROSS1000' : '🗺 ROSS1000 statistical file')}</h3>
-          <p>${h('export_ross1000_desc')}</p>
-        </div>
-        <div class="tile-actions">
-          <button class="btn btn-primary" onclick="exportRoss1000()">${_htmlEsc(h('btn_gen_ross1000'))}</button>
-          <a href="${_normalizeHostPortalUrl(cfg.portal)}" target="_blank" rel="noopener" class="export-portal-link">
-            🔗 <span>${_htmlEsc(it ? 'Apri ROSS1000 Veneto' : 'Open ROSS1000 Veneto')}</span> ↗
-          </a>
-        </div>
-      </div>`;
-    return;
-  }
-  // Puglia — SPOT Easy / DMS, same tile content as before.
-  if (cfg && cfg.export === 'alloggiati_txt') {
-    host.innerHTML = `
-      <div class="export-tile-h">
-        <div class="tile-body">
-          <h3>${_htmlEsc(h('export_puglia_dms_title'))}</h3>
-          <p>${h('export_puglia_dms_desc')}</p>
-        </div>
-        <div class="tile-actions">
-          <a href="${_normalizeHostPortalUrl(cfg.portal)}" target="_blank" rel="noopener" class="export-portal-link">
-            🔗 <span>${_htmlEsc(h('link_dms'))}</span> ↗
-          </a>
-        </div>
-      </div>`;
-    return;
-  }
-  // Standard system + portal — the general case for every other region.
-  if (cfg && cfg.system && cfg.portal) {
-    const title = h('export_region_tile_title').replace('{system}', _htmlEsc(cfg.system)).replace('{region}', _htmlEsc(region));
-    const desc  = h('export_region_generic_desc').replace('{system}', _htmlEsc(cfg.system));
-    const openLabel = h('link_region_open').replace('{system}', _htmlEsc(cfg.system));
-    const unverified = cfg.verified ? '' :
-      `<div class="form-hint" style="margin-top:4px;font-size:0.7rem;">${_htmlEsc(h('export_region_unverified'))}</div>`;
-    host.innerHTML = `
-      <div class="export-tile-h">
-        <div class="tile-body">
-          <h3>${title}</h3>
-          <p>${desc}</p>
-          ${unverified}
-        </div>
-        <div class="tile-actions">
-          <a href="${_normalizeHostPortalUrl(cfg.portal)}" target="_blank" rel="noopener" class="export-portal-link">
-            🔗 <span>${_htmlEsc(openLabel)}</span> ↗
-          </a>
-        </div>
-      </div>`;
-    return;
-  }
-  // Note-only case: Toscana outside FI/PO/PT, Alto Adige, and the
-  // defensive fallback for a region in IT_REGIONS but missing from
-  // REGION_COMPLIANCE (shouldn't happen post-migration — defensive).
-  const noteKey = cfg?.note === 'alto_adige' ? 'export_region_note_alto_adige'
-                 : cfg?.note === 'toscana_provincial' ? 'export_region_note_toscana_provincial'
-                 : null;
-  const title = h('export_region_unknown_tile_title').replace('{region}', _htmlEsc(region));
-  const bodyText = noteKey ? h(noteKey)
-                 : (it ? 'Non abbiamo ancora il portale per questa regione — chiedi al tuo Comune e aggiungi il link col pulsante ✎.'
-                        : 'We don\'t have the portal for this region yet — ask your Comune and add the link with the ✎ button.');
-  host.innerHTML = `
-    <div class="export-tile-h">
-      <div class="tile-body">
-        <h3>${title}</h3>
-        <p>${_htmlEsc(bodyText)}</p>
-      </div>
-    </div>`;
+  regionalExportController().render();
+}
+function exportRegionalFile() {
+  regionalExportController().open();
 }
 
 function renderExportChecklist() {
@@ -14779,6 +14554,7 @@ async function switchProperty(propId) {
 
   if (_propertySavePending || !(await propertyEditor.leave({save: savePropertyEdit, discard: cancelPropertyEdit}))) return;
 
+  if (_regionalExportController) _regionalExportController.close();
   propertyId = propId;
   propertyData = target;
   localStorage.setItem('wbnb_host_selected_property', propId);

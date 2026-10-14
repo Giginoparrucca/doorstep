@@ -23,6 +23,7 @@ try {for(const width of [390,1280])for(const lang of ['it','en']){
  const declaration=html.slice(html.indexOf('const propertyEditor ='),html.indexOf('function startPropertyEdit('));
  const funcs=['h','_i18nHydrateField','_i18nRenderPill','_i18nSetLang','_i18nCollect','_numOrNull','fillPropertyForm','_setPropertyEditControls','startPropertyEdit','cancelPropertyEdit','savePropertyEdit','saveProperty','showPanel','switchProperty','handleCoverUpload','chooseCoverPhoto'].map(fn).join('\n');
  await page.addScriptTag({content:`
+ var _regionalExportController=null;
  var hostLang=${JSON.stringify(lang)},propertyId='p1',propertyData={id:'p1',name:'Fictional farmhouse',city:'Roma',region:'Lazio',property_type:'villa',host_names:'Sample host',hero_image_url:'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600"><rect width="400" height="600" fill="#9d572e"/><rect x="400" width="400" height="600" fill="#83a880"/><rect x="800" width="400" height="600" fill="#6f94b5"/></svg>'),hero_image_layout:{zoom:1.2,x:40,y:60},welcome_message_it:'Benvenuti',welcome_message_en:'Welcome'},allProperties=[],propertyEditMode=false,_taxRulesDraft=[],_taxDeclaredDraft=[],IS_ADMIN_VIEW=false,_adminEditEnabled=false;
  allProperties=[propertyData,{id:'p2',name:'Second fixture',property_type:'apartment'}];
  window.writes=[];window.uploads=[];window.failSave=false;window.failUpload=false;window.zeroRows=false;window.saveDelay=0;window.notices=[];

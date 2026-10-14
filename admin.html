@@ -516,18 +516,35 @@ function toggleShowHidden(checked) {
 async function viewAsHost(propertyId) {
   if (!propertyId) return;
   try {
-    const { data: { user } } = await sb.auth.getUser();
-    await sb.from('admin_impersonation_log').insert({
-      admin_id: user?.id,
-      admin_email: user?.email || null,
+    const { data, error } = await sb.auth.getUser();
+    const user = data?.user;
+    if (error || !user) {
+      showLoginError('Your admin session could not be verified. Sign in again to continue.');
+      document.getElementById('loginOverlay').classList.remove('hidden');
+      return;
+    }
+    if (!await isAdmin(user.email)) {
+      adminToast('Admin access is required to open another host’s console.', 'error');
+      return;
+    }
+    const { error: logError } = await sb.from('admin_impersonation_log').insert({
+      admin_id: user.id,
+      admin_email: user.email || null,
       property_id: propertyId,
       action: 'view',
     });
+    // Audit failure must be visible without losing support access.
+    if (logError) console.warn('Impersonation log failed:', logError.message);
+    // Stay in the authenticated surface. New windows can open in a separate
+    // browser/profile in embedded browsers and cannot reuse this session.
+    const target = new URL('/host-console.html', window.location.origin);
+    target.searchParams.set('p', propertyId);
+    target.searchParams.set('admin', '1');
+    window.location.assign(target.href);
   } catch (e) {
-    // Logging failure shouldn't block support work, but surface it.
-    console.warn('Impersonation log failed:', e);
+    console.warn('Admin support navigation failed:', e);
+    adminToast('Could not open the host console. Please try again.', 'error');
   }
-  window.open(`host-console.html?p=${encodeURIComponent(propertyId)}&admin=1`, '_blank');
 }
 
 async function markTest(table, id) {

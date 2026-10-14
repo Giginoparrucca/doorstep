@@ -20,7 +20,13 @@ Round 51 remains paused. Existing guest links and booking identities stay stable
 | 0 — Specification | shipped — PR #152 — GPT-6.1 | Scope, phase gates, release/rollback |
 | 1 — Booking-based sharing | shipped (production) — PR #153 — GPT-6.1 | Reservation selector, shared composer, DOM/isolation/regression and live-source gates |
 | 2 — Status-aware messages | shipped (production) — PR #154 — GPT-6.1 | Status model, private defaults/RLS, WhatsApp and draft persistence gates |
-| 3 — Printable property QR | in-progress — GPT-6.1 | Print/download QR, integrated regressions, guide/PDF and live verification |
+| 3 — Printable property QR | shipped (production) — PR #155 — GPT-6.1 | Print/download QR, integrated regressions, guide/PDF and live verification |
+
+### Round 55 — completed production release (GPT-6.1, 2026-10-14)
+
+- Phase 0 PR #152, Phase 1 PR #153, Phase 2 PR #154 and Phase 3 PR #155 are merged. Final implementation commit `8170efbcb27aa077e05591ded78981a4e5cfafc8`; all implementation and document files on freshly fetched main match the tested local tree. Each implementation phase passed its tests and live-source gate before the next began.
+- Final production host-console.html, host-share.js and host-guides.js are byte-identical to tested source; public config has `appOrigin=https://app.welcomebnb.it`. Vercel status success. Hosted Data API resolves the new preference table and denies anon access with 42501; hosted reminder handler imports and rejects unauthenticated requests. Ownership/RLS fixtures were rolled back. No guest message or production booking/check-in mutation was used for release testing.
+- Round 55 is complete on app.welcomebnb.it: existing booking/group sharing, status-aware reviewed messages and private generic defaults, WhatsApp compose and printable/downloadable permanent house QR. Link rotation is intentionally excluded; existing guest codes remain stable. Separate demo source/schema deployment was not performed or claimed. Round 51 remains paused.
 
 ### Round 55 Phase 3 — implementation and integrated gate (GPT-6.1, 2026-10-14)
 

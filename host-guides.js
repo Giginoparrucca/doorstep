@@ -864,6 +864,8 @@ const GUIDES = {
     tip: { it: 'Collega Airbnb o Booking da «Dettagli Proprietà»: le prenotazioni arrivano qui da sole.', en: 'Link Airbnb or Booking from Property Details: bookings arrive here automatically.' },
     faq: [
       { q_it: 'Perché vedo un codice invece del nome?', a_it: 'Da Airbnb e Booking arrivano solo le date. Il nome compare quando l’ospite fa il check-in.', q_en: 'Why do I see a code instead of a name?', a_en: 'Airbnb and Booking only send dates. The name appears once the guest checks in.' },
+      { q_it: 'Perché un blocco OTA non compare sopra una prenotazione diretta?', a_it: 'Le notti già occupate dalla prenotazione diretta compaiono una volta sola. Le eventuali notti extra restano visibili. I dati originali del blocco sono conservati; se cambi o annulli la prenotazione, le notti ancora bloccate dall’OTA riappaiono.', q_en: 'Why is an OTA block not shown over a direct booking?', a_en: 'Nights already occupied by the direct booking appear once. Any extra blocked nights stay visible. Original block data is retained; changing or cancelling the booking reveals nights still blocked by the OTA.' },
+      { q_it: 'Quali date vengono esportate agli OTA?', a_it: 'Prenotazioni dirette, blocchi creati qui e prenotazioni OTA. I blocchi anonimi importati restano nel calendario, ma non vengono ritrasmessi: possono essere regole dell’OTA o copie di un’importazione. Per bloccare una data su tutti i canali, usa «Blocca date» qui.', q_en: 'Which dates are exported to OTAs?', a_en: 'Direct bookings, blocks created here and OTA reservations. Anonymous imported blocks stay on the calendar but are not relayed: they may be OTA rules or copies of an import. To block a date across all channels, use “Block dates” here.' },
       { q_it: 'Manca una prenotazione.', a_it: 'In «Dettagli Proprietà», nella sezione «Sincronizzazione calendario (iCal)», premi «🔄 Sincronizza ora».', q_en: 'A booking is missing.', a_en: 'In Property Details, under Calendar sync (iCal), press “🔄 Sync now”.' },
       { q_it: 'Se aggiungo una prenotazione diretta, viene bloccata su Airbnb?', a_it: 'Sì, se hai configurato «Esporta il calendario ai tuoi OTA» nei Dettagli Proprietà. Airbnb, Booking e Vrbo controllano il tuo calendario ogni poche ore e bloccano le date da soli.', q_en: 'If I add a direct booking, does it block Airbnb?', a_en: 'Yes, if you\'ve set up "Export calendar to your OTAs" in Property Details. Airbnb, Booking and Vrbo poll your calendar every few hours and block the dates on their own.' },
       { q_it: 'Che differenza c’è tra «Nuova prenotazione» e «Blocca date»?', a_it: '«Nuova prenotazione» è per un ospite vero: chiede nome, canale, contatti, note. «Blocca date» è per rendere non prenotabili delle date (soggiorno personale, manutenzione): serve solo un motivo.', q_en: 'What’s the difference between “New booking” and “Block dates”?', a_en: '“New booking” is for a real guest: name, channel, contacts, notes. “Block dates” makes dates unbookable (own stay, maintenance): just a reason.' },
@@ -1559,7 +1561,7 @@ window.HG = {
   closeGuide,
   checkGuides,
   guides: GUIDES,       // read-only reference for tests
-  version: '52.1',
+  version: '53.1',
 };
 // Alias for the console-side dev command name the spec asks for.
 window.__checkGuides = checkGuides;

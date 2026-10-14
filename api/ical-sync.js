@@ -1,4 +1,6 @@
 import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, rejectDemoIntegration } from './_environment.js';
+import { createRequire } from 'node:module';
+const CalendarRoundtrip = createRequire(import.meta.url)('../lib/calendar-roundtrip.js');
 // api/ical-sync.js — Round 26 iCal calendar sync (with Round 32.5 cron mode).
 //
 // Two modes:
@@ -112,8 +114,12 @@ async function handleUserSync(req, res, jwt) {
     });
   }
 
-  const result = await syncOnePropertyFeeds(property_id, feeds, SUPABASE_ANON_KEY, jwt);
-  return res.status(200).json(result);
+  try {
+    const result = await syncOnePropertyFeeds(property_id, feeds, SUPABASE_ANON_KEY, jwt);
+    return res.status(200).json(result);
+  } catch (_) {
+    return res.status(503).json({ error: 'Calendar sync unavailable; existing entries preserved' });
+  }
 }
 
 // ── CRON mode: iterate every property with feeds, service_role auth ────
@@ -169,15 +175,49 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
   const perFeed = [];
   const errors = [];
   const seenByPlatform = {}; // platform -> Set(uid)
+  const failedPlatforms = new Set();
+  // Load all local sources and previous imported rows in bounded pages. A
+  // failed lookup must not guess provenance or run a cancellation sweep.
+  const existing = await loadCalendarRows(propertyId, apikey, bearer);
 
   for (const feed of feeds) {
     const platform = normalizePlatform(feed?.platform);
     const url = typeof feed?.url === 'string' ? feed.url.trim() : '';
-    if (!url) { errors.push({ platform, url, error: 'Empty URL' }); continue; }
+    if (!url) { failedPlatforms.add(platform); errors.push({ platform, url, error: 'Empty URL' }); continue; }
     try {
       const text = await fetchWithTimeout(url, FETCH_TIMEOUT_MS);
+      if (!/^BEGIN:VCALENDAR\r?$/m.test(text) || !/^END:VCALENDAR\r?$/m.test(text)) {
+        throw new Error('Invalid or incomplete iCal feed');
+      }
       const events = parseICS(text);
+      const eventCount = (text.match(/^BEGIN:VEVENT\r?$/gm) || []).length;
+      if (events.length !== eventCount || events.some(e => !CalendarRoundtrip.validRange({
+        checkin_date: icsDateToISO(e.DTSTART), checkout_date: icsDateToISO(e.DTEND),
+      }))) throw new Error('Invalid or incomplete calendar event');
       let rows = events.map(e => vEventToRow(e, propertyId, platform));
+      rows = rows.map(row => {
+        const previous = existing.find(r => r.platform === platform && r.uid === row.uid);
+        if (previous?.raw?.welcomebnb_echo_ignored) {
+          return { ...row, raw: { ...row.raw, welcomebnb_echo_ignored: true } };
+        }
+        // Never overwrite a host-confirmed link or take away a guest link.
+        if (previous?.covered_by_reservation_id && !previous.raw?.welcomebnb_auto_echo) {
+          return { ...row, coverage_lost_at: null };
+        }
+        const origin = CalendarRoundtrip.identifyOrigin(row, existing);
+        const originId = origin?.id || previous?.raw?.welcomebnb_origin_source;
+        if (originId) row = { ...row, raw: { ...row.raw, welcomebnb_origin_source: originId } };
+        const source = CalendarRoundtrip.matchOrigin(row, existing);
+        if (source && !previous?.booking_code) {
+          return { ...row, entry_type: 'block', covered_by_reservation_id: source.id, booking_code: null,
+            coverage_lost_at: null, raw: { ...row.raw, welcomebnb_auto_echo: true } };
+        }
+        if (previous?.raw?.welcomebnb_auto_echo) {
+          return { ...row, entry_type: 'block', covered_by_reservation_id: null, coverage_lost_at: null };
+        }
+        if (originId && !previous?.booking_code) return { ...row, entry_type: 'block' };
+        return row;
+      });
 
       // Round 47.1 — drop oversized Airbnb blocks before the upsert.
       // The sweep below will cancel any already-stored row with that
@@ -198,7 +238,7 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
         const todayISO = new Date().toISOString().slice(0, 10);
         let dropLong = 0, drop1night = 0;
         rows = rows.filter(r => {
-          if (r.entry_type !== 'block') return true;
+          if (r.entry_type !== 'block' || r.covered_by_reservation_id || r.coverage_lost_at === null) return true;
           if (!r.checkin_date || !r.checkout_date) return true;
           const days = Math.round((Date.parse(r.checkout_date) - Date.parse(r.checkin_date)) / 86400000);
           if (days > AIRBNB_MAX_BLOCK_NIGHTS) { dropLong++; return false; }
@@ -237,13 +277,23 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
       perFeed.push({ platform, url, parsed: rows.length });
       if (!seenByPlatform[platform]) seenByPlatform[platform] = new Set();
       rows.forEach(r => seenByPlatform[platform].add(r.uid));
-      if (rows.length > 0) {
-        const upsertRes = await pgrestUPSERT('ota_reservations', rows, apikey, bearer);
+      // PostgREST bulk rows need identical keys. Preserve omitted host-owned
+      // fields on ordinary rows rather than nulling them to match echo rows.
+      const groups = new Map();
+      for (const row of rows) {
+        const key = Object.keys(row).sort().join(',');
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(row);
+      }
+      for (const group of groups.values()) {
+        const upsertRes = await pgrestUPSERT('ota_reservations', group, apikey, bearer);
         if (!upsertRes.ok) {
+          failedPlatforms.add(platform);
           errors.push({ platform, url, error: 'Upsert failed', detail: await upsertRes.text() });
         }
       }
     } catch (e) {
+      failedPlatforms.add(platform);
       errors.push({ platform, url, error: String(e && e.message || e) });
     }
   }
@@ -258,6 +308,7 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
   const nowISO = new Date().toISOString();
   let cancelled = 0;
   for (const [platform, uids] of Object.entries(seenByPlatform)) {
+    if (failedPlatforms.has(platform)) continue;
     try {
       // Round 47.1 — the sweep now covers:
       //   • reservations with checkin_date >= today  (unchanged)
@@ -273,6 +324,7 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
         `ota_reservations?property_id=eq.${encodeURIComponent(propertyId)}` +
         `&platform=eq.${encodeURIComponent(platform)}` +
         `&status=eq.active&is_test=eq.false` +
+        `&deleted_at=is.null` +
         `&or=(checkin_date.gte.${todayISO},entry_type.eq.block)` +
         `&select=id,uid,covered_by_reservation_id`,
         apikey, bearer,
@@ -323,6 +375,22 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
 
   const synced = perFeed.reduce((a, f) => a + f.parsed, 0);
   return { synced, cancelled, per_feed: perFeed, errors };
+}
+
+async function loadCalendarRows(propertyId, apikey, bearer) {
+  const rows = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const res = await pgrestGET(`ota_reservations?property_id=eq.${encodeURIComponent(propertyId)}` +
+      '&is_test=eq.false' +
+      '&select=id,property_id,platform,uid,entry_type,status,checkin_date,checkout_date,covered_by_reservation_id,booking_code,raw,is_test,deleted_at,updated_at' +
+      `&order=id.asc&limit=${pageSize}&offset=${offset}`, apikey, bearer);
+    if (!res.ok) throw new Error('Calendar provenance lookup failed');
+    const page = await res.json();
+    if (!Array.isArray(page)) throw new Error('Invalid calendar provenance response');
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
 }
 
 // Round 38.3 · Booking.com sync repair.
@@ -400,10 +468,11 @@ async function mergeBookingRollingUIDs(propertyId, incoming, apikey, bearer, see
       updated_at: new Date().toISOString(),
     };
     try {
-      await pgrestPATCH(
+      const merged = await pgrestPATCH(
         `ota_reservations?id=eq.${encodeURIComponent(target.id)}`,
         patchBody, apikey, bearer,
       );
+      if (!merged.ok) throw new Error('Booking UID merge failed');
       // The row now carries r.uid, so the cancel sweep will see it as
       // still present in the feed.
       seenByPlatform.booking.add(r.uid);
@@ -510,6 +579,7 @@ function parseICS(text) {
     else if (key === 'DTSTART') current.DTSTART = { value, params };
     else if (key === 'DTEND')   current.DTEND   = { value, params };
     else if (key === 'STATUS')  current.STATUS  = value;
+    else if (key === 'X-WELCOMEBNB-UID') current.ORIGIN_UID = unescapeICSText(value);
   }
   return events;
 }
@@ -578,7 +648,8 @@ function vEventToRow(ev, propertyId, platform) {
     checkout_date,
     reservation_url,
     phone_last4,
-    raw: { summary, description, dtstart: ev.DTSTART?.value, dtend: ev.DTEND?.value },
+    raw: { summary, description, dtstart: ev.DTSTART?.value, dtend: ev.DTEND?.value,
+      origin_uid: ev.ORIGIN_UID || /^WelcomeBnB calendar event: ([^\r\n]+)$/m.exec(description)?.[1] || null },
   };
 }
 
@@ -590,7 +661,7 @@ function normalizePlatform(p) {
 
 // Named exports for local testing. Vercel serverless functions only use the
 // default export; these are inert at runtime and only touched by tests.
-export { parseICS, vEventToRow, icsDateToISO, normalizePlatform };
+export { parseICS, vEventToRow, icsDateToISO, normalizePlatform, syncOnePropertyFeeds };
 
 /* ══════════════════════════════════════════════════════════════════════
    Round 45 Step 4.5 — OUTBOUND iCal EXPORT
@@ -680,18 +751,10 @@ async function handleOutboundExport(req, res, token) {
 
   let rows;
   try {
-    rows = await _outboundSbGetJSON(
-      `ota_reservations` +
-      `?property_id=eq.${encodeURIComponent(property.id)}` +
-      `&status=eq.active&is_test=eq.false` +
-      `&deleted_at=is.null` +
-      `&covered_by_reservation_id=is.null` +
-      `&entry_type=in.(reservation,block)` +
-      `&checkout_date=gte.${pastISO}` +
-      `&checkin_date=lte.${futureISO}` +
-      `&select=id,uid,entry_type,checkin_date,checkout_date,updated_at` +
-      `&order=checkin_date.asc`
-    );
+    // Include historical local sources for identity only. Otherwise a return
+    // from a cancelled/deleted source could be mistaken for a new reservation
+    // and pin its old dates forever. Paging also avoids PostgREST's row cap.
+    rows = await loadCalendarRows(property.id, SERVICE_KEY, SERVICE_KEY);
   } catch (e) {
     console.error('[ical-export] rows lookup failed:', e.message);
     return res.status(500).send('Server error');
@@ -712,7 +775,10 @@ async function handleOutboundExport(req, res, token) {
   lines.push(_outboundFoldLine(`NAME:${_outboundIcsEscape(nameForHeader)}`));
   lines.push(`X-WR-TIMEZONE:${_outboundIcsEscape(property.timezone || 'Europe/Rome')}`);
 
-  for (const r of (rows || [])) {
+  const published = CalendarRoundtrip.exportRows(rows || [])
+    .filter(r => r.checkout_date >= pastISO && r.checkin_date <= futureISO)
+    .sort((a, b) => a.checkin_date.localeCompare(b.checkin_date));
+  for (const r of published) {
     const start = _outboundISODate(r.checkin_date);
     const end   = _outboundISODate(r.checkout_date);
     if (!start || !end) continue;
@@ -723,11 +789,13 @@ async function handleOutboundExport(req, res, token) {
     // we're already covering. The @welcomebnb.vercel.app suffix is a
     // UID component, not a URL — nothing dereferences it — so the
     // domain move does not require touching it.
-    const uid = `${(r.uid || r.id).replace(/[<>\s]/g, '_')}@welcomebnb.vercel.app`;
+    const uid = CalendarRoundtrip.outboundUid(r);
     const summary = _outboundSummaryFor(r, hostLang);
     const lastMod = r.updated_at ? _outboundISOStamp(new Date(r.updated_at)) : dtstamp;
     lines.push('BEGIN:VEVENT');
     lines.push(_outboundFoldLine(`UID:${_outboundIcsEscape(uid)}`));
+    lines.push(_outboundFoldLine(`X-WELCOMEBNB-UID:${_outboundIcsEscape(uid)}`));
+    lines.push(_outboundFoldLine(`DESCRIPTION:WelcomeBnB calendar event: ${_outboundIcsEscape(uid)}`));
     lines.push(`DTSTAMP:${dtstamp}`);
     lines.push(`LAST-MODIFIED:${lastMod}`);
     lines.push(`DTSTART;VALUE=DATE:${start}`);

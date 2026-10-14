@@ -12627,6 +12627,16 @@ function generateBookingCode() {
   track('generate_booking', { code: bookingCode });
 }
 
+// Saved codes may predate a domain move. Preserve their original property and
+// booking query rather than rebuilding them with the currently selected property.
+function currentSavedGuestLink(link) {
+  try {
+    const saved = new URL(link);
+    if (!['/', '/index.html'].includes(saved.pathname)) return '';
+    return APP_ORIGIN + saved.pathname + saved.search + saved.hash;
+  } catch (_) { return ''; }
+}
+
 function renderPastCodes() {
   const stored = JSON.parse(localStorage.getItem('wbnb_booking_codes') || '[]');
   if (stored.length === 0) { document.getElementById('pastBookingCodes').style.display = 'none'; return; }
@@ -12635,10 +12645,10 @@ function renderPastCodes() {
   document.getElementById('pastCodesTable').innerHTML = stored.slice(0, 10).map(s => `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--bg);border-radius:6px;margin-bottom:4px;font-size:0.68rem;">
       <div>
-        <code style="font-weight:600;color:var(--warm);letter-spacing:0.05em;">${s.code}</code>
-        <span style="color:var(--ink-soft);margin-left:8px;">${s.created}</span>
+        <code style="font-weight:600;color:var(--warm);letter-spacing:0.05em;">${safe(s.code)}</code>
+        <span style="color:var(--ink-soft);margin-left:8px;">${safe(s.created)}</span>
       </div>
-      <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard?.writeText('${s.link}');toast(hostLang==='it'?'Copiato!':'Copied!')" style="padding:2px 8px;font-size:0.55rem;">📋</button>
+      <button class="btn btn-secondary btn-sm" data-guest-link="${safe(currentSavedGuestLink(s.link))}" onclick="copyReservationLink(this.dataset.guestLink, this)" ${currentSavedGuestLink(s.link) ? '' : 'disabled'} style="padding:2px 8px;font-size:0.55rem;">📋</button>
     </div>
   `).join('');
 }

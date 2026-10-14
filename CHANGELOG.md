@@ -9,6 +9,40 @@ Newest entries at the top of each section.
 
 ### Current round — in-flight
 
+**Round 54 — Canonical guest app links**
+
+Specification: production guest links always use `https://app.welcomebnb.it`,
+including copied booking links, QR codes, templates, reminders and admin links.
+Saved links retain booking/property parameters when their origin is refreshed.
+Demo links remain in the isolated demo environment; legacy links remain valid.
+Test gate: real copy/render/QR functions with stale saved links, production
+configuration with stale overrides, demo/CORS/environment regression, then
+main release and byte-for-byte served-source/config checks.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 1 — Implement, test and release | in-progress — GPT-6.1 | Canonical configuration, saved-link repair, guest-link and environment gates |
+
+### Round 54 — publication authorization (2026-10-14)
+
+Daniele explicitly authorized publishing Round 54 source, tests and CHANGELOG
+to public `Giginoparrucca/doorstep`, merging to main and deploying
+`app.welcomebnb.it`. He also authorized publishing any future code he requests
+on this project. Together with his standing “always push to main” instruction,
+requested changes may be published after their verification gates pass without
+asking for routine publication approval again. This does not authorize unrelated
+changes or publication of secrets or guest data.
+
+### Round 54 Phase 1 — implementation and local gate (GPT-6.1, 2026-10-14)
+
+- Live public configuration confirmed `appOrigin=https://welcomebnb.vercel.app` despite the canonical source default. Production configuration now always resolves to `https://app.welcomebnb.it`, including browser links and server arrival reminders. Demo retains its independent required origin and existing isolation guards. Legacy origin remains in the CORS allowlist for already-issued links; calendar UIDs remain stable.
+- Recent booking codes rebuild only the saved URL origin at render/copy time, preserving original booking/property parameters and hash even when a different property is selected. Malformed/non-guest paths have no copy action. Uses escaped data attributes and the existing copy feedback. Admin guest-app links now use the same configured origin.
+- PASS `guest-links`, `environment`, `deployment-config`, `calendar-roundtrip`, `onboarding-ui`: real saved/new copy, template, QR and preview functions in production/demo and IT/EN, stale origin overrides, inline syntax, existing demo/CORS/handler guards and calendar DOM. No data or database migration.
+- Publication blocked: automatic approval review rejected the full CHANGELOG and admin source uploads to the public repository, citing absent explicit payload/destination authorization for this Round. The standing push instruction and Round 53 authorization are visible, but the review did not accept this Round 54 publication. Three unreferenced implementation/test blobs were accepted; no implementation tree, ref, PR, merge or deployment was published. Next required owner action: explicit authorization to publish full Round 54 source/tests/CHANGELOG to public Giginoparrucca/doorstep, merge to main and deploy app.welcomebnb.it.
+- Vercel settings API returns scope 403; no Vercel CLI is installed. No environment write attempted. Canonical source fix removes dependency on the stale setting. Publishing and served-source/config verification pending.
+
+### Previous round — preserved completed status
+
 **Round 53 — Safe calendar round trips**
 
 Scope: suppress identifiable direct

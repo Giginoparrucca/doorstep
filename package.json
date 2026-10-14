@@ -6,6 +6,8 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
-    "linkedom": "^0.18.13"
+    "jsqr": "1.4.0",
+    "linkedom": "^0.18.13",
+    "qrcode-generator": "1.4.4"
   }
 }

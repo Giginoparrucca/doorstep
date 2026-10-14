@@ -19,8 +19,23 @@ Round 51 remains paused. Existing guest links and booking identities stay stable
 |---|---|---|
 | 0 — Specification | shipped — PR #152 — GPT-6.1 | Scope, phase gates, release/rollback |
 | 1 — Booking-based sharing | shipped (production) — PR #153 — GPT-6.1 | Reservation selector, shared composer, DOM/isolation/regression and live-source gates |
-| 2 — Status-aware messages | in-progress — GPT-6.1 | Status model, private defaults/RLS, WhatsApp and draft persistence gates |
-| 3 — Printable property QR | pending | Print/download QR, integrated regressions, guide/PDF and live verification |
+| 2 — Status-aware messages | shipped (production) — PR #154 — GPT-6.1 | Status model, private defaults/RLS, WhatsApp and draft persistence gates |
+| 3 — Printable property QR | in-progress — GPT-6.1 | Print/download QR, integrated regressions, guide/PDF and live verification |
+
+### Round 55 Phase 3 — implementation and integrated gate (GPT-6.1, 2026-10-14)
+
+- Consolidated permanent house QR into one card: print clean bilingual A4 sheet, download SVG and copy canonical property link. Guest selection never changes its payload. Print preview retains explicit print/close controls, automatically opens the print dialog and contains only property name, QR, bilingual guest-app invitation and fallback URL. No booking/test parameters, lockbox or guest details. Blocked popups, clipboard/QR/download failures have honest feedback; old property controls cannot act after switching.
+- QR uses the same pinned qrcode-generator 1.4.4 as the app CDN, added as a dev-only test dependency; independent jsQR decoder is dev-only too. Actual browser tests verify the decoded payload, native SVG download, real popup/print DOM, blocked popup feedback, selected-booking invariance and mobile wrapping. Independently decoded the rendered one-page A4 PDF back to the canonical property URL. Malicious property names are escaped; production/demo origins and property switches pass.
+- PASS combined `host-share`, `house-qr`, `guest-links`, `share-reminder`, `environment`, `calendar-roundtrip`, `onboarding-ui`, `onboarding-visibility`, `group-receipts`, `demo-ux`, `deployment-config`; real Chromium IT/EN at 390px and 1280px. Final browser screenshots and print sheet reviewed; no overflow or script errors. Updated bilingual guide/cache and Italian presenter script/PDF. Final five-page PDF visually reviewed: source SHA256 `c001f5c5d76c38021c96c85785fcf390d589b22509ace8880e3ea548ee3dfe9f`, PDF `c2054ceddac4971588836a91943803b30548523cd3de6aa4458b69bfb31f9593`.
+- No guest message was sent; no existing booking/check-in identity changed. Phase 3 source publication/production verification pending. Separate demo source/schema release remains outside this production delivery; local demo isolation and origin regressions pass.
+
+### Round 55 Phase 2 — verified release (GPT-6.1, 2026-10-14)
+
+PR #154 merged as `bb0d851bf3a95a112936a479d7690b8168d72c5d`.
+Production host-console.html, host-share.js and host-guides.js match tested source
+exactly; canonical production configuration and Vercel success confirmed.
+Production preference migration/RLS and rolled-back ownership probes passed
+before release. Phase 2 acceptance gate complete before Phase 3.
 
 ### Round 55 Phase 2 — local and database gates (GPT-6.1, 2026-10-14)
 

@@ -1141,6 +1141,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 <style>
 .share-actions,.share-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
 .share-controls select{flex:1;min-width:180px}.share-actions .btn{text-decoration:none}
+.house-qr-layout{display:flex;align-items:center;gap:24px;flex-wrap:wrap}.house-qr-image{width:160px;flex:none;background:white}.house-qr-image svg{display:block;width:100%;height:auto}@media(max-width:540px){.house-qr-layout{flex-direction:column;align-items:stretch}.house-qr-image{align-self:center}}
 #hostShareRoot select{width:100%;max-width:100%}#hostShareRoot .form-card{min-width:0}
 </style>
 </head>
@@ -2175,20 +2176,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     <!-- ════════════ QR CODE & LINK ════════════ -->
     <div class="panel" id="panel-qrlink">
       <div id="hostShareRoot"></div>
-      <div class="qr-preview" style="margin-top:16px">
-        <div class="qr-box" id="qrCanvas" aria-label="Property QR code"></div>
-        <div class="qr-info"><h3 data-h="qr_apartment_title">House QR code</h3><p data-h="qr_apartment_desc"></p></div>
-      </div>
-
-      <!-- Apartment QR — generic property link for printing -->
-      <div class="form-card" style="margin-top:16px;" data-guide="qr-apartment">
-        <div class="form-card-title" data-h="qr_apartment_title">🏠 QR Code for Apartment</div>
-        <div class="form-card-desc" data-h="qr_apartment_desc">Print this QR code and place it in your property. Guests who scan it can browse property info, house rules, and recommendations — and look up their check-in with surname + arrival date.</div>
-        <div style="display:flex;align-items:center;gap:12px;">
-          <div class="qr-link" id="apartmentLink" style="font-size:0.72rem;flex:1;word-break:break-all;">—</div>
-          <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard?.writeText(document.getElementById('apartmentLink').textContent);toast(h('toast_link_copied'));" style="white-space:nowrap;">📋</button>
-        </div>
-      </div>
+      <div id="houseShareRoot" style="margin-top:16px"></div>
 
       <!-- Round 19.5 — Preview as guest -->
       <div class="form-card" style="margin-top:16px;background:rgba(232,184,75,0.06);border:1px dashed rgba(232,184,75,0.4);">
@@ -2384,7 +2372,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 <script src="/lib/onboarding-readiness.js"></script>
 <script src="/lib/calendar-roundtrip.js"></script>
 <script src="/host-onboarding.js"></script>
-<script src="/host-share.js?v=55.2"></script>
+<script src="/host-share.js?v=55.3"></script>
 <script>
 /* ══════════════════════════════════════
    SUPABASE CONNECTION
@@ -5063,6 +5051,7 @@ function setHostLang(l) {
   const dashboardBody = document.getElementById('dashboardContent');
   if (dashboardBody && propertyId) dashboardBody.innerHTML = '<div role="status" aria-live="polite" style="padding:24px;text-align:center;">' + h('lang_refreshing') + '</div>';
   if (typeof _hostShareController !== 'undefined' && _hostShareController) _hostShareController.repaint();
+  if (typeof _houseShareController !== 'undefined' && _houseShareController) _houseShareController.render();
   // Re-render dynamic content
   renderDashboard();
   renderCheckins();
@@ -5350,7 +5339,7 @@ function showPanel(id, btn) {
 const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','settings','rules','recos','qrlink'];
 // Bump on every host-guides.js change so browsers never see a stale
 // copy even if their cache is aggressive.
-const _HG_VERSION = '55.2-status-messages';
+const _HG_VERSION = '55.3-house-qr';
 let _hgLoadPromise = null;
 function _hgLoad() {
   if (window.HG) return Promise.resolve();
@@ -7141,7 +7130,7 @@ async function _renderUpcomingCalendarBody(buildHeader) {
 // Round 30.2 — ensure every reservation carries a stable booking_code so
 // the host can hand the guest a pre-filled link (?b=CODE&p=PROPERTY).
 // Matches the existing PROPINIT-XXXXXX convention used by
-// generateBookingCode() in the QR panel. Missing codes are PATCHed back
+// the persisted reservation link flow. Missing codes are PATCHed back
 // so subsequent renders / iCal syncs keep the same value — never
 // regenerated, or the link the host already shared would break.
 async function ensureReservationBookingCodes(rows) {
@@ -11140,6 +11129,7 @@ function buildHostPrivacyDownloadHTML(prop) {
 <style>
 .share-actions,.share-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
 .share-controls select{flex:1;min-width:180px}.share-actions .btn{text-decoration:none}
+.house-qr-layout{display:flex;align-items:center;gap:24px;flex-wrap:wrap}.house-qr-image{width:160px;flex:none;background:white}.house-qr-image svg{display:block;width:100%;height:auto}@media(max-width:540px){.house-qr-layout{flex-direction:column;align-items:stretch}.house-qr-image{align-self:center}}
 #hostShareRoot select{width:100%;max-width:100%}#hostShareRoot .form-card{min-width:0}
 </style>
 </head><body><h1>Informativa privacy &middot; Privacy notice</h1><p style="color:#6B7A90;font-size:12px;">${propName}</p>${it}${en}<p class="footer">Generato da WelcomeBnB per conto del titolare del trattamento. Copia fornita all'ospite ai sensi dell'art. 13 GDPR. &middot; Generated by WelcomeBnB on behalf of the data controller.</p></body></html>`;
@@ -12556,6 +12546,7 @@ function toast(msg) {
 }
 
 let _hostShareController = null;
+let _houseShareController = null;
 let _shareRequestedCode = null;
 function hostShareController() {
   if (!_hostShareController) _hostShareController = window.HostShare.create({
@@ -12573,11 +12564,11 @@ function openBookingShare(code) {
 function initQRPanel() {
   const code = _shareRequestedCode; _shareRequestedCode = null;
   hostShareController().load(code);
-  if (propertyId) {
-    const aptLink = `${APP_ORIGIN}/?p=${encodeURIComponent(propertyId)}`;
-    document.getElementById('apartmentLink').textContent = aptLink;
-    renderQR(aptLink);
-  }
+  if (!_houseShareController) _houseShareController = window.HostShare.createHouse({
+    root: document.getElementById('houseShareRoot'),
+    context: () => ({ propertyId, property: propertyData, lang: hostLang, origin: APP_ORIGIN }),
+  });
+  _houseShareController.render();
 }
 
 // Round 19.5 — Open the guest app in a new tab with ?test=1 so the
@@ -12590,22 +12581,7 @@ function openPreviewAsGuest() {
   track('preview_as_guest', {});
 }
 
-function renderQR(url) {
-  try {
-    const qr = qrcode(0, 'M');
-    qr.addData(url);
-    qr.make();
-    const canvas = document.getElementById('qrCanvas');
-    canvas.innerHTML = qr.createSvgTag({ cellSize: 3, margin: 4, scalable: true });
-    // Style the SVG
-    const svg = canvas.querySelector('svg');
-    if (svg) {
-      svg.style.width = '100%';
-      svg.style.height = '100%';
-      svg.style.borderRadius = '6px';
-    }
-  } catch (e) { console.warn('QR error:', e); }
-}
+
 
 /* ══════════════════════════════════════
    Round 42 — Avvisi card (Web Push / Telegram / Email)

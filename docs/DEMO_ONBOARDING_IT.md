@@ -1,6 +1,6 @@
 # Scaletta demo WelcomeBnB — onboarding di un nuovo host
 
-Round 50 / Round 51 Fase 4 · Revisione del 13 ottobre 2026.
+Round 50 / Round 51 Fase 4 / Round 55 · Revisione del 14 ottobre 2026.
 Durata indicativa: 15 minuti, più 5 minuti per le domande.
 L'ambiente e i controlli descritti devono essere realizzati prima di usare questa
 scaletta. Aggiornare i nomi dei pulsanti dopo il collaudo; non presentare una
@@ -45,14 +45,24 @@ Useremo una casa e delle prenotazioni fittizie, così possiamo provare tutto ins
 
 **Chiedere:** «Qual è la parte che oggi ti fa perdere più tempo: check-in,
 messaggi, informazioni sulla casa o gestione degli adempimenti?»
-
 Usare la risposta per dedicare più tempo a quel passaggio, senza saltare la
 distinzione tra simulazione e operatività reale.
 
 ## 1:00–3:00 — Il link ospite e le informazioni della casa
 
-**Fare:** dalla prenotazione `DEMO-NUOVO`, aprire o mostrare il QR/link ospite.
-Sul telefono aprire la pagina della casa e passare tra le sezioni.
+**Fare:** dalla prenotazione `DEMO-NUOVO`, premere **Condividi**. In **Condividi**
+la prenotazione è già selezionata: controllare lo stato di registrazione, scegliere
+italiano o inglese e rivedere il messaggio. **Copia messaggio** lo prepara per la
+chat OTA; **Apri WhatsApp** apre la composizione, senza inviare nulla.
+Il link resta quello della prenotazione, non si genera un codice separato.
+Sul telefono aprire il link ospite e passare tra le sezioni della casa.
+
+**Mostrare in Condividi:** il **QR code della casa** è permanente e non contiene
+il codice di una prenotazione. **Stampa QR code** apre un foglio pulito bilingue;
+si può stampare o salvare in PDF dal dialogo di stampa. **Scarica QR (SVG)** serve
+per inserirlo in un cartello. Cambiare prenotazione non cambia il QR della casa.
+Le bozze dei messaggi agli ospiti restano separate dai modelli generici opzionali
+della proprietà. I dati di registrazione restano soggetti ai controlli esistenti.
 
 **Dire:** «L'ospite apre questo link dal telefono. Qui trova le informazioni
 della casa, le istruzioni di arrivo e partenza, le regole e i tuoi consigli.»

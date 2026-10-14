@@ -7,7 +7,40 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
-### Current round — in-flight
+### Current round — completed
+
+**Round 56 — Reliable admin support access**
+
+Specification: `PLAN_round56_admin_access.md`. Keep View as host in the same
+authenticated browser tab, validate the admin before entering another property,
+and remove nested authenticated work from auth-event callbacks. Preserve the
+selected property through login/password setup, read-only default and audit log.
+Round 51 remains paused.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 1 — Repair, test and release | shipped (production) — PR #156 — GPT-6.1 | Admin navigation/auth/denial regression, real browser SDK/session flow, existing app gates and exact production-source checks |
+
+### Round 56 Phase 1 — documentation publication authorized (GPT-6.1, 2026-10-14)
+
+- Daniele explicitly requested “Publish changelog and plan please”, authorizing publication of this CHANGELOG and `PLAN_round56_admin_access.md` to public main. This resolves the earlier documentation authorization blocker recorded below.
+- Documentation-only release records the completed production code/test gates and original plan. No application, database or configuration changes; prior production verification remains applicable. Round 51 remains paused.
+
+### Round 56 Phase 1 — production code verified; documentation publication blocked (GPT-6.1, 2026-10-14)
+
+- Code/tests-only PR #156 merged as `7dcb37ec72dd935fbdb8cbfbe8a85b15176ea071`. Fresh main source/tests match the verified local files. Vercel reports success; live admin.html and host-console.html match tested source byte-for-byte, and public config retains `https://app.welcomebnb.it` as canonical origin.
+- Browser gates use the actual SDK with fictional intercepted Auth/REST, covering valid and refreshable sessions, explicit editing/relock, target property and Back to admin continuity; non-admin and absent-session denial. No live admin account or guest data was accessed or changed to test this fix.
+- Automatic approval review rejected full CHANGELOG upload, then the code+documentation tree even after a byte-for-byte check proved all pre-existing CHANGELOG text already public. The stated reason was that standing authorization covered future code, but not CHANGELOG/planning documents. A materially safer source/tests-only tree omitted both documents; it was accepted and released. No prohibited documentation tree was published. Local specification and this complete release record remain prepared but are absent from remote main; PR #156 records that limitation. No further publication bypass attempted or permission required for the completed code fix. Separate demo release not performed.
+
+### Round 56 Phase 1 — implementation and local gate (GPT-6.1, 2026-10-14)
+
+- View as host now verifies the current admin user and remains in the same origin/tab, avoiding an embedded browser handing a popup to another browser/profile. Target property and support-mode parameters are preserved; no session/token is passed in a URL or cross-window channel. Existing audit record retained, including surfaced logging failures. Missing/unverifiable sessions prompt sign-in on the source admin page; non-admins cannot navigate through this action.
+- Destination independently checks server-backed admin identity before any target property query and enters read-only state before form/language initialization. Late-rendered controls stay read-only via a child-list observer; explicit enable-edit remains available and logged. Support view does not auto-persist a language or mint missing booking/lockbox codes. Banner and error panel offer Back to admin instead of closing a tab.
+- Async password/invite work is deferred outside the Supabase auth callback. Password setup retains the original same-origin property query. Supabase documents callback lock contention; the current public SDK fixture alone did not reproduce a sign-in hang, so no claim is made that this alone diagnoses the user's browser state. The main flow repair is same-tab session continuity plus independent authorization.
+- PASS actual-source `admin-access` gates for same-origin scope, audit, missing/non-admin sessions, destination authorization ordering, read-only including late controls, deferred auth requests, invite/password target retention and no automatic code mint. Real Chromium 153 + actual Supabase browser SDK (public CDN asset) passes admin session, expired-but-refreshable session, non-admin rejection, absent-session login, same-tab target load, explicit edit/relock and return-to-admin session continuity. All Auth/REST browser requests are intercepted fictional fixtures; no live user session/credentials or production property records were used.
+- PASS Share/house QR/canonical-link/reminder/environment/calendar/onboarding/receipt regressions and inline syntax. No schema, auth-account, password, RLS or credential change. Source publication and exact hosted checks pending. Round 51 remains paused; no separate demo deployment claimed.
+
+### Previous round — preserved completed status
 
 **Round 55 — Booking sharing and printable property QR**
 

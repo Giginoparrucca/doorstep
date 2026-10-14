@@ -9,6 +9,38 @@ Newest entries at the top of each section.
 
 ### Current round — completed
 
+**Round 57 — Safer property editing and cover framing**
+
+Specification: `PLAN_round57_property_editing.md`. Prompt before leaving unsaved
+Property Details, add Agriturismo, and let hosts zoom/position the original cover.
+Round 51 remains paused.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 1 — Implement, test and release | shipped (production) — PR #157 — GPT-6.1 | Form/browser/database/regression gates pass; production source matches tested files |
+
+### Round 57 Phase 1 — changelog publication retry authorized (GPT-6.1, 2026-10-14)
+
+- Daniele explicitly requested “Try again to upload changelog”, authorizing this full prepared CHANGELOG publication to public main. The earlier upload failure below is historical; the code, tests, guide, migration and completed plan are already published and production-verified.
+- Documentation-only update; no application, database or configuration changes. Round 51 remains paused.
+
+### Round 57 Phase 1 — verified production release (GPT-6.1, 2026-10-14)
+
+- PR #157 merged as `38a04098372f49bedf122cb18480a7eaa671cb41`. Fresh main source, tests, guide, migration and plan match the verified local files. Vercel reports success. Live host-console.html, host-property-editor.js, lib/cover-layout.js, host-guides.js and index.html are byte-identical to tested source; public config retains `https://app.welcomebnb.it`.
+- Full CHANGELOG blob upload failed while every source/test/guide/plan/migration upload succeeded; the exception reason was not preserved in the batched output. No retry of that payload was attempted. A reduced tree retained remote CHANGELOG unchanged and published the accepted files. PR #157 discloses this limitation; this complete release record remains local. Round 57 functionality is live; separate demo rollout not performed. Round 51 remains paused.
+
+### Round 57 Phase 1 — implementation and verification (GPT-6.1, 2026-10-14)
+
+- Property Details snapshots actual field values, including both text languages and programmatic edits. Switching console tabs/sections or properties, adding a property and manual sign-out offers Save and continue / Discard changes / Keep editing. Unchanged or reverted edits do not prompt. Save exceptions, storage failures and zero-row updates keep the draft on the original property. Repeated navigation and saves are guarded. Native reload/close warning added; automatic idle sign-out still clears drafts and reloads.
+- Replaced two existing duplicate-ID Property Type selectors with one union of all existing options, plus Agriturismo. Previously stored custom/legacy values are preserved. Mobile Save label wraps; edit-mode hint now reflects editing.
+- Cover replacement is a local draft until Save Property Details. Accessible zoom and horizontal/vertical sliders, Center and Reset show live framing while retaining the original file. Cancel restores the saved photo/frame; property without a photo clears old preview. JPG/PNG/WebP up to 10 MB, actual image decode validation, error feedback, stale-decode guards and object-URL cleanup. Successful uploads are reused on database retry; an upload followed by a failed database save can leave an unreferenced Storage object if subsequently discarded. No existing image is deleted.
+- Added nullable bounded `properties.hero_image_layout` in tracked migration `20261014145714_round57_cover_layout.sql`, applied to production. Defaults preserve centered existing photos. Shared framing renderer feeds both guest image-refresh paths; the guest gateway exposes only framing alongside the existing image URL. Original privacy/check-in gates retained. No RLS/grant, account or guest-record changes.
+- PASS real Chromium 153 at 390/1280px, IT/EN: actual form/router/save/restore functions, all prompt actions and Escape, duplicate navigation, translated draft retention, zero-row/failed saves, property switching, keyboard framing, invalid files/decode, upload failure, draft cancel/restore, storage/database retry, save concurrency, admin denial, unload warning and mobile overflow. Actual guest hero CSS covers every edge at min/max zoom and positioning extremes. Screenshots visually reviewed. Transport and images are fictional fixtures; no live account or guest records used.
+- PASS framing defaults/bounds plus actual gateway projection/private gates; admin-access, guest-checkin, canonical-links, Share, house-QR, reminders, environment, deployment config, calendar-roundtrip, onboarding UI/visibility and receipts. Inline scripts compile. Production rolled-back fictional-property SQL passes owner update, Agriturismo, frame bounds/missing keys/null default and cross-owner/anon write denial; fixture absence and existing RLS confirmed. Security advisor contains only pre-existing function/password findings; no new framing finding.
+- Main publication and exact served-source verification pending. Separate demo source/schema deployment is not part of this production release; migrate the demo database before deploying this new editor there. Round 51 remains paused.
+
+### Previous round — preserved completed status
+
 **Round 56 — Reliable admin support access**
 
 Specification: `PLAN_round56_admin_access.md`. Keep View as host in the same

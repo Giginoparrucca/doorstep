@@ -17,7 +17,14 @@ nights or genuine OTA reservations. Round 51 remains paused.
 
 | Phase | Status | Where / test gate |
 |---|---|---|
-| 1 — Implement, test and release | in-progress — GPT-6.1 | Identity + shared occupancy projection; sync/export and actual DOM gates; read-only production evidence |
+| 1 — Implement, test and release | shipped (production) — PR #150 — GPT-6.1 | Identity + shared occupancy projection; sync/export and actual DOM gates; served-source/API checks and redacted production aggregate |
+
+### Round 53 Phase 1 — verified production release (GPT-6.1, 2026-10-14)
+
+- PR #150 merged to main as `f3c76fe6c94a57bdaeb5b3d0649cd0467e3abed0`. Uploaded Git tree matches the tested local tree exactly; fresh fetch confirms every implementation/guide/PDF file on main matches the tested files. The actual round-trip handler/DOM regression passes again against these source files.
+- Production deployment `dpl_2JVfKangmWXnBb8JhTHpE6KVE4HW` is READY for the correct main commit, with app.welcomebnb.it assigned. Served host-console.html, host-guides.js and lib/calendar-roundtrip.js are byte-identical to tested source. Hosted API imports successfully and returns 401 for missing auth and 404 for an unknown export token, without exposing records.
+- Redacted read-only production verification confirms one intact original direct stay and zero active reported Airbnb blocks. The agent did not change booking dates, links or external calendars; the earlier extra block has ceased to be active through normal source/sync lifecycle. Pre-release production-snapshot projection and real-handler tests cover preserved residual nights and cancellation recovery.
+- Automatic review rejected optional calendar-token extraction and private raw-row probes; these were abandoned in favour of the successful redacted aggregate and served-source/API checks. No valid-token production feed-content probe is claimed. No migration, credential change or production-data write was needed. Separate demo deployment was not requested or performed. Round 51 remains paused.
 
 ### Round 53 Phase 1 — implementation and local gate (GPT-6.1, 2026-10-14)
 

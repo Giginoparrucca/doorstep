@@ -19,3 +19,6 @@ node_modules/
 # without a committed lockfile (web-push is the only runtime dep). A local
 # `npm install` run for script tests should not surface a dirty tree.
 package-lock.json
+
+# Local Supabase CLI cache.
+supabase/.temp/

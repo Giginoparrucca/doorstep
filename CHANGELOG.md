@@ -18,9 +18,23 @@ Round 51 remains paused. Existing guest links and booking identities stay stable
 | Phase | Status | Where / test gate |
 |---|---|---|
 | 0 — Specification | shipped — PR #152 — GPT-6.1 | Scope, phase gates, release/rollback |
-| 1 — Booking-based sharing | in-progress — GPT-6.1 | Reservation selector, shared composer, DOM/isolation/regression and live-source gates |
-| 2 — Status-aware messages | pending | Status model, private defaults/RLS, WhatsApp and draft persistence gates |
+| 1 — Booking-based sharing | shipped (production) — PR #153 — GPT-6.1 | Reservation selector, shared composer, DOM/isolation/regression and live-source gates |
+| 2 — Status-aware messages | in-progress — GPT-6.1 | Status model, private defaults/RLS, WhatsApp and draft persistence gates |
 | 3 — Printable property QR | pending | Print/download QR, integrated regressions, guide/PDF and live verification |
+
+### Round 55 Phase 2 — local and database gates (GPT-6.1, 2026-10-14)
+
+- IT/EN messages use selected booking/property/date/link and actual submitted registration counts. Known incomplete groups and reopened check-ins prompt completion; unknown OTA group sizes show Registration received without claiming completion. Independent message language, in-memory guest drafts, explicit reset and WhatsApp compose only (no send/delivery claim).
+- Generic property defaults are edited separately from guest drafts. Validated placeholders and fixed-booking-link rejection; one preference key per row prevents unrelated language/status defaults overwriting each other. Owner-only `host_share_preferences` table created by tracked migration `supabase/migrations/20261014092200_round55_share_preferences.sql`; no guest records altered. RLS/grants verified on production: owner CRUD succeeds; cross-owner CRUD denied; anon CRUD denied. All fixture preference writes rolled back; empty table confirmed before release. Security advisor has no finding on the new table; existing unrelated findings remain.
+- Existing host arrival digest retains canonical guest links and adds Prepare message into the owned property's selected-booking composer. No guest contact guessed and no automatic guest message. Preference load/save failures retain built-in messages and host drafts with explicit feedback.
+- PASS `host-share`, `share-reminder`, `guest-links`, `environment`, `calendar-roundtrip`, `onboarding-ui`, `onboarding-visibility`. Real Chromium 153 browser test passes 390px/1280px IT/EN for message copies, WhatsApp encoding, booking draft separation, generic defaults, reset and overflow; screenshots reviewed. Chromium was obtained from a scratch-only packaged runtime after browser-download failure; no runtime dependency added to the app. Production schema gate complete; source publication/live verification pending. Separate demo database/source deployment not performed.
+
+### Round 55 Phase 1 — verified release (GPT-6.1, 2026-10-14)
+
+PR #153 merged as `151c3b4bd9a1535225017451511c213a41b72106`.
+Vercel reports success. Production host-console.html, host-share.js and
+host-guides.js match tested source byte-for-byte; app-config.js has the canonical
+production origin. Phase 1 acceptance gate passed before starting Phase 2.
 
 ### Round 55 Phase 1 — local gate (GPT-6.1, 2026-10-14)
 

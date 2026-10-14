@@ -29,3 +29,7 @@ scripts/*test*.mjs
 demo/
 scripts/demo-schema.mjs
 scripts/demo-schema-parse.test.py
+
+# Round 55 tracked database migrations are never served.
+supabase/
+scripts/share-preferences-rls.sql

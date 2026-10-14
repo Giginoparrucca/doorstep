@@ -1138,6 +1138,11 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 }
 .photo-upload-zone:hover .photo-upload-overlay { opacity: 1; }
 </style>
+<style>
+.share-actions,.share-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
+.share-controls select{flex:1;min-width:180px}.share-actions .btn{text-decoration:none}
+#hostShareRoot select{width:100%;max-width:100%}#hostShareRoot .form-card{min-width:0}
+</style>
 </head>
 <body>
 
@@ -2169,32 +2174,10 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
     <!-- ════════════ QR CODE & LINK ════════════ -->
     <div class="panel" id="panel-qrlink">
-      <div class="qr-preview">
-        <div class="qr-box" id="qrCanvas">
-          <div style="text-align:center;">
-            <div style="font-size:2rem;margin-bottom:6px;">📱</div>
-            <div>QR Preview</div>
-            <div style="font-size:0.55rem;color:var(--ink-soft);margin-top:2px;">Scan to open<br>guest portal</div>
-          </div>
-        </div>
-        <div class="qr-info">
-          <h3 id="qrGenTitle">Guest App Link</h3>
-          <p id="qrGenDesc">Each booking gets a unique link. Generate a new code for each guest/group, then share before arrival.</p>
-          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
-            <button class="btn btn-primary btn-sm" onclick="generateBookingCode()" id="genBookingBtn" data-guide="qr-gen-booking">🔑 Generate New Booking Link</button>
-          </div>
-          <div id="bookingLinkSection" style="display:none;">
-            <div style="font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px;" id="bookingCodeLabel">Booking Code</div>
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-              <code style="background:var(--bg);padding:6px 12px;border-radius:6px;font-size:0.9rem;font-weight:600;color:var(--warm);letter-spacing:0.1em;" id="bookingCodeDisplay">—</code>
-              <button class="btn btn-secondary btn-sm" onclick="copyLink()" style="white-space:nowrap;" data-h="btn_copy_link" data-guide="qr-copy-link">📋 Copy Link</button>
-            </div>
-            <div class="qr-link" id="guestLink" style="font-size:0.65rem;word-break:break-all;"></div>
-          </div>
-          <div style="margin-top:8px;font-size:0.6rem;color:var(--ink-soft);line-height:1.5;" id="qrReturningHint">
-            💡 Returning guests who use the same link will see their check-in status and details automatically.
-          </div>
-        </div>
+      <div id="hostShareRoot"></div>
+      <div class="qr-preview" style="margin-top:16px">
+        <div class="qr-box" id="qrCanvas" aria-label="Property QR code"></div>
+        <div class="qr-info"><h3 data-h="qr_apartment_title">House QR code</h3><p data-h="qr_apartment_desc"></p></div>
       </div>
 
       <!-- Apartment QR — generic property link for printing -->
@@ -2214,26 +2197,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <button class="btn btn-secondary btn-sm" onclick="openPreviewAsGuest()" data-h="qr_preview_btn" data-guide="qr-preview">🧪 Open in test mode</button>
       </div>
 
-      <div id="pastBookingCodes" style="margin-top:16px;display:none;">
-        <div style="font-size:0.5rem;letter-spacing:0.15em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;" id="recentCodesTitle">Recent Booking Codes</div>
-        <div id="pastCodesTable"></div>
-      </div>
 
-      <div class="form-card" style="margin-top:20px;">
-        <div class="form-card-title" id="templateTitle">Pre-Arrival Message Template</div>
-        <div class="form-card-desc" id="templateDesc">Generate a booking link above, then copy this message to send to your guests.</div>
-        <textarea class="form-textarea" style="min-height:120px;" id="preArrivalTemplate">Hi {guest_name}! 🌞
-
-Welcome! Before you arrive, please complete your online check-in here:
-👉 {guest_link}
-
-It takes about 2 minutes and is required by Italian law. You'll also find WiFi details, house rules, and our personal recommendations.
-
-See you soon!</textarea>
-        <div style="margin-top:12px;">
-          <button class="btn btn-secondary btn-sm" onclick="copyTemplate()" data-h="btn_copy_template" data-guide="qr-copy-template">📋 Copy Template</button>
-        </div>
-      </div>
     </div>
 
     <!-- ════════════ GUEST ANALYTICS ════════════ -->
@@ -2420,6 +2384,7 @@ See you soon!</textarea>
 <script src="/lib/onboarding-readiness.js"></script>
 <script src="/lib/calendar-roundtrip.js"></script>
 <script src="/host-onboarding.js"></script>
+<script src="/host-share.js?v=55.1"></script>
 <script>
 /* ══════════════════════════════════════
    SUPABASE CONNECTION
@@ -5097,6 +5062,7 @@ function setHostLang(l) {
   if (window.HostOnboarding) window.HostOnboarding.repaint();
   const dashboardBody = document.getElementById('dashboardContent');
   if (dashboardBody && propertyId) dashboardBody.innerHTML = '<div role="status" aria-live="polite" style="padding:24px;text-align:center;">' + h('lang_refreshing') + '</div>';
+  if (typeof _hostShareController !== 'undefined' && _hostShareController) _hostShareController.repaint();
   // Re-render dynamic content
   renderDashboard();
   renderCheckins();
@@ -5384,7 +5350,7 @@ function showPanel(id, btn) {
 const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','settings','rules','recos','qrlink'];
 // Bump on every host-guides.js change so browsers never see a stale
 // copy even if their cache is aggressive.
-const _HG_VERSION = '53.1-calendar-roundtrips';
+const _HG_VERSION = '55.1-booking-share';
 let _hgLoadPromise = null;
 function _hgLoad() {
   if (window.HG) return Promise.resolve();
@@ -5748,6 +5714,7 @@ async function renderDashboard() {
                 style="position:absolute;top:8px;right:8px;background:transparent;border:none;cursor:pointer;color:var(--ink-soft);font-size:0.78rem;line-height:1;padding:6px 8px;border-radius:6px;transition:all 0.15s;"
                 onmouseover="this.style.background='rgba(224,90,90,0.08)';this.style.color='#c84545'"
                 onmouseout="this.style.background='transparent';this.style.color='var(--ink-soft)'">🗑</button>
+        <button class="btn btn-secondary btn-sm" style="margin-top:8px" data-share-code="${encodeURIComponent(r.code)}" onclick="openBookingShare(decodeURIComponent(this.dataset.shareCode))">${safe(hostLang === 'it' ? 'Condividi' : 'Share')}</button>
         ${dateRow}
         ${statRow ? `<div style="font-size:0.78rem;color:var(--ink-soft);margin-top:3px;">${statRow}</div>` : ''}
         ${recoLine}
@@ -6247,6 +6214,7 @@ function _renderReservationCard(r, todayISO) {
               style="padding:4px 10px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:0.72rem;cursor:pointer;color:var(--ink);font-family:inherit;">🔗 ${safe(hostLang === 'it' ? 'Copia' : 'Copy')}</button>
       <a href="${safe(guestLink)}" target="_blank" rel="noopener" title="${safe(hostLang === 'it' ? 'Apri come ospite' : 'Open as guest')}"
          style="padding:4px 10px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:0.72rem;color:var(--ink);text-decoration:none;">↗ ${safe(hostLang === 'it' ? 'Apri' : 'Open')}</a>
+      <button type="button" class="btn btn-secondary btn-sm" data-share-code="${encodeURIComponent(r.booking_code)}" onclick="openBookingShare(decodeURIComponent(this.dataset.shareCode))">${safe(hostLang === 'it' ? 'Condividi' : 'Share')}</button>
       ${reopenBtn}${reopenedNote}
     </div>` : '';
   const html = `
@@ -11169,6 +11137,11 @@ function buildHostPrivacyDownloadHTML(prop) {
   const propName = _hostPrivacyEsc(prop?.name || 'Property');
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Informativa privacy · ${propName}</title>
 <style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#061A3D;max-width:760px;margin:0 auto;padding:32px 24px;line-height:1.55;}h1{font-family:'Playfair Display',Georgia,serif;font-size:22px;margin:0 0 10px;}h3{font-size:16px;margin:0 0 4px;font-weight:600;}h4{font-size:14px;margin:14px 0 4px;font-weight:600;}p{margin:0 0 10px;font-size:13px;}a{color:#005BFF;}section{margin-bottom:26px;padding-bottom:22px;border-bottom:1px solid #e5e7eb;}section:last-of-type{border-bottom:0;}.footer{margin-top:24px;color:#6B7A90;font-size:11px;}</style>
+<style>
+.share-actions,.share-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
+.share-controls select{flex:1;min-width:180px}.share-actions .btn{text-decoration:none}
+#hostShareRoot select{width:100%;max-width:100%}#hostShareRoot .form-card{min-width:0}
+</style>
 </head><body><h1>Informativa privacy &middot; Privacy notice</h1><p style="color:#6B7A90;font-size:12px;">${propName}</p>${it}${en}<p class="footer">Generato da WelcomeBnB per conto del titolare del trattamento. Copia fornita all'ospite ai sensi dell'art. 13 GDPR. &middot; Generated by WelcomeBnB on behalf of the data controller.</p></body></html>`;
 }
 
@@ -12582,83 +12555,26 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 
-function copyLink() {
-  navigator.clipboard?.writeText(document.getElementById('guestLink').textContent);
-  toast(hostLang === 'it' ? 'Link copiato negli appunti!' : 'Link copied to clipboard!');
+let _hostShareController = null;
+let _shareRequestedCode = null;
+function hostShareController() {
+  if (!_hostShareController) _hostShareController = window.HostShare.create({
+    root: document.getElementById('hostShareRoot'),
+    context: () => ({ propertyId, property: propertyData, lang: hostLang, origin: APP_ORIGIN, mode: APP_CONFIG.mode, sb }),
+    ensureCodes: rows => ensureReservationBookingCodes(rows),
+  });
+  return _hostShareController;
 }
-
-function copyTemplate() {
-  const txt = document.getElementById('preArrivalTemplate').value;
-  navigator.clipboard?.writeText(txt);
-  toast(hostLang === 'it' ? 'Testo copiato!' : 'Template copied!');
+function openBookingShare(code) {
+  _shareRequestedCode = code;
+  document.getElementById('reservationDetailModal')?.remove();
+  showPanel('qrlink');
 }
-
-/* ══════════════════════════════════════
-   BOOKING CODE GENERATOR
-══════════════════════════════════════ */
-function generateBookingCode() {
-  // Generate a short, human-friendly code: PROPINIT-XXXXXX
-  const propName = (propertyData?.name || 'DS').replace(/[^A-Za-z]/g, '').substring(0, 3).toUpperCase();
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // No 0/O/1/I confusion
-  let code = '';
-  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
-  const bookingCode = `${propName}-${code}`;
-
-  // Update UI
-  document.getElementById('bookingCodeDisplay').textContent = bookingCode;
-  const baseUrl = APP_ORIGIN;
-  const fullLink = `${baseUrl}/?b=${bookingCode}&p=${propertyId}`;
-  document.getElementById('guestLink').textContent = fullLink;
-  document.getElementById('bookingLinkSection').style.display = 'block';
-
-  // Update template with the link
-  const tpl = document.getElementById('preArrivalTemplate');
-  tpl.value = tpl.value.replace(/👉 .*/m, `👉 ${fullLink}`).replace(/\{guest_link\}/g, fullLink);
-
-  // Save to recent codes (localStorage)
-  const stored = JSON.parse(localStorage.getItem('wbnb_booking_codes') || '[]');
-  stored.unshift({ code: bookingCode, link: fullLink, created: new Date().toISOString().split('T')[0] });
-  if (stored.length > 20) stored.length = 20;
-  localStorage.setItem('wbnb_booking_codes', JSON.stringify(stored));
-
-  renderPastCodes();
-  renderQR(fullLink);
-  toast(`Booking code generated: ${bookingCode}`);
-  track('generate_booking', { code: bookingCode });
-}
-
-// Saved codes may predate a domain move. Preserve their original property and
-// booking query rather than rebuilding them with the currently selected property.
-function currentSavedGuestLink(link) {
-  try {
-    const saved = new URL(link);
-    if (!['/', '/index.html'].includes(saved.pathname)) return '';
-    return APP_ORIGIN + saved.pathname + saved.search + saved.hash;
-  } catch (_) { return ''; }
-}
-
-function renderPastCodes() {
-  const stored = JSON.parse(localStorage.getItem('wbnb_booking_codes') || '[]');
-  if (stored.length === 0) { document.getElementById('pastBookingCodes').style.display = 'none'; return; }
-
-  document.getElementById('pastBookingCodes').style.display = 'block';
-  document.getElementById('pastCodesTable').innerHTML = stored.slice(0, 10).map(s => `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--bg);border-radius:6px;margin-bottom:4px;font-size:0.68rem;">
-      <div>
-        <code style="font-weight:600;color:var(--warm);letter-spacing:0.05em;">${safe(s.code)}</code>
-        <span style="color:var(--ink-soft);margin-left:8px;">${safe(s.created)}</span>
-      </div>
-      <button class="btn btn-secondary btn-sm" data-guest-link="${safe(currentSavedGuestLink(s.link))}" onclick="copyReservationLink(this.dataset.guestLink, this)" ${currentSavedGuestLink(s.link) ? '' : 'disabled'} style="padding:2px 8px;font-size:0.55rem;">📋</button>
-    </div>
-  `).join('');
-}
-
-// Load past codes on panel open
 function initQRPanel() {
-  renderPastCodes();
-  // Set apartment QR link and render QR
+  const code = _shareRequestedCode; _shareRequestedCode = null;
+  hostShareController().load(code);
   if (propertyId) {
-    const aptLink = `${APP_ORIGIN}/?p=${propertyId}`;
+    const aptLink = `${APP_ORIGIN}/?p=${encodeURIComponent(propertyId)}`;
     document.getElementById('apartmentLink').textContent = aptLink;
     renderQR(aptLink);
   }
@@ -15005,6 +14921,7 @@ function _setTabDot(id, on) {
 }
 
 async function loadPropertyData() {
+  if (_hostShareController && document.getElementById("panel-qrlink")?.classList.contains("active")) initQRPanel();
   if (!propertyId) return;
   // Reset per-property in-memory state so nothing leaks across a switch
   rulesData = []; recoData = []; allCheckins = []; allChats = [];

@@ -21,7 +21,13 @@ main release and byte-for-byte served-source/config checks.
 
 | Phase | Status | Where / test gate |
 |---|---|---|
-| 1 — Implement, test and release | in-progress — GPT-6.1 | Canonical configuration, saved-link repair, guest-link and environment gates |
+| 1 — Implement, test and release | shipped (production) — PR #151 — GPT-6.1 | Canonical configuration, saved-link repair, guest-link/environment gates and exact live-source/config verification |
+
+### Round 54 Phase 1 — verified production release (GPT-6.1, 2026-10-14)
+
+- PR #151 merged to main as `64302fca04169a0174a35623a7d296b6fc446cd4`. Uploaded tree `e858432064551512c3e7afcb89459c5b6c393aee` matches the tested local tree exactly. GitHub reports the Vercel deployment successful.
+- Live `https://app.welcomebnb.it/app-config.js` now reports production mode and `appOrigin=https://app.welcomebnb.it`. Served host-console.html, admin.html and lib/environment.mjs match the tested source byte-for-byte. Guest-link and environment gates passed again before publication; deployment status is supplementary to those tests and served-source checks.
+- Existing booking/property parameters are preserved. Legacy issued URLs remain supported. No guest-data, database, secret or Vercel-setting write. Separate demo deployment was not performed; demo isolation is covered by local regression gates.
 
 ### Round 54 — publication authorization (2026-10-14)
 

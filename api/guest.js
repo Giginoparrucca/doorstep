@@ -363,7 +363,7 @@ async function recordUsage(row) {
 // in this allowlist is dropped before the response leaves the server.
 // Keep in sync with index.html's propData.* reads (survey date 2026-10-05).
 const PROPERTY_PUBLIC_FIELDS = [
-  'id', 'name', 'city', 'region', 'address', 'zip', 'hero_image_url',
+  'id', 'name', 'city', 'region', 'address', 'zip', 'hero_image_url', 'hero_image_layout',
   'maps_link', 'welcome_message',
   'host_names', 'host_phone',
   'checkin_time', 'checkout_time',

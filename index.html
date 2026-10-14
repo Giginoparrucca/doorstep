@@ -1524,6 +1524,7 @@ function icon(name, cls) {
 
 <script src="/app-config.js"></script>
 <script src="/app-bootstrap.js"></script>
+<script src="/lib/cover-layout.js?v=57.1"></script>
 <script>
 // Round 50 Phase 5 — persistent demo banner. Appears on top of every
 // guest page when APP_ENV=demo (window.WELCOME_BNB_CONFIG.mode). Fixed
@@ -2540,6 +2541,7 @@ async function lookupCheckin() {
       if (el('heroTitle')) el('heroTitle').innerHTML = `Welcome to<br><em>${propData.name || 'Your Stay'}</em>`;
       if (el('heroBadge')) el('heroBadge').textContent = `${propData.city || ''}, ${propData.region || ''}`;
       if (el('heroImg') && propData.hero_image_url) el('heroImg').src = propData.hero_image_url;
+      CoverLayout.apply(el('heroImg'), propData.hero_image_layout);
     }
 
     // Load the full guest list for this booking via the gateway.
@@ -4945,6 +4947,7 @@ async function init() {
       if (el('heroTitle')) el('heroTitle').innerHTML = `Welcome to<br><em>${d.name || 'Your Stay'}</em>`;
       if (el('heroBadge')) el('heroBadge').textContent = `${d.city || 'City'}, ${d.region || 'Region'}`;
       if (el('heroImg') && d.hero_image_url) el('heroImg').src = d.hero_image_url;
+      CoverLayout.apply(el('heroImg'), d.hero_image_layout);
       if (el('wifiName')) el('wifiName').textContent = d.wifi_name || '—';
       if (el('wifiPass')) el('wifiPass').textContent = `Password: ${d.wifi_password || '—'}`;
       if (el('propAddress')) el('propAddress').textContent = d.address || '—';

@@ -965,8 +965,8 @@ const GUIDES = {
     when: { it: 'All’inizio, e quando qualcosa cambia.', en: 'At the start, and whenever something changes.' },
     steps: [
       { it: 'Premi «✏️ Modifica» per iniziare.', en: 'Press “✏️ Edit” to start.', target: 'prop-edit', art: 'pr1' },
-      { it: 'Compila foto, informazioni base e orari di check-in.', en: 'Fill in photos, basic info and check-in times.', target: 'prop-basic', art: 'pr2' },
-      { it: 'Premi «💾 Salva Dettagli Proprietà».', en: 'Press “💾 Save Property Details”.', target: 'prop-save', art: 'pr3', emptyHint: { it: 'Compare dopo aver premuto «Modifica».', en: 'Appears after you press “Edit”.' } },
+      { it: 'Compila informazioni base e orari. Scegli una foto di copertina, poi regola zoom e posizione.', en: 'Fill in basic info and check-in times. Choose a cover photo, then adjust zoom and position.', target: 'prop-basic', art: 'pr2' },
+      { it: 'Premi «💾 Salva Dettagli Proprietà». Se cambi scheda prima di salvare, scegli Salva e continua, Scarta modifiche o Continua a modificare.', en: 'Press “💾 Save Property Details”. If you leave before saving, choose Save and continue, Discard changes or Keep editing.', target: 'prop-save', art: 'pr3', emptyHint: { it: 'Compare dopo aver premuto «Modifica».', en: 'Appears after you press “Edit”.' } },
       { it: 'Premi «🧪 Anteprima come ospite» per controllare il risultato.', en: 'Press “🧪 Preview as guest” to check the result.', target: 'prop-preview', art: 'pr4' },
     ],
     tip: { it: 'Il codice CIN serve per i file della Polizia e delle statistiche. Inseriscilo subito.', en: 'The CIN code is required for the Police and statistics files. Add it right away.' },

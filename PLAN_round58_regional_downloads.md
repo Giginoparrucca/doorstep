@@ -32,3 +32,22 @@ Share/links/environment/guest/receipt regressions and inline compilation. Publis
 source, tests, source matrix, guide, plan and CHANGELOG; merge main and verify
 exact hosted files/canonical configuration and deployment success. Revert source
 to roll back; no automation is introduced.
+
+## Delivery — 14 October 2026
+
+Phase 1 application scope shipped in PR #158, merged to main as
+`6d28b60ef910f82f9a726b763560eeafb33243d3`. Vercel production succeeded;
+host console, both regional modules and the guide match tested source byte for
+byte. The canonical app origin remains https://app.welcomebnb.it.
+
+All documented serializer, independent file/ZIP, mobile/desktop IT/EN browser,
+property editor and affected regression gates passed with fictional fixtures.
+Native format coverage remains partial as specified in the regional matrix;
+reference-only downloads explicitly identify their limitations. No portal
+import/submission or provider accreditation is claimed.
+
+Documentation publication is partial: automatic approval review rejected the
+full CHANGELOG payload. Its published content is unchanged. The source register,
+plan, guide, tests and implementation are published; the complete release record
+is retained locally. Remaining native formats require authority specifications
+or a separate provider/API integration. Round 51 remains paused.

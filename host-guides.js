@@ -816,6 +816,7 @@ const GUIDES = {
     steps: [
       { it: 'Trova il riquadro dell’obbligo che ti serve.', en: 'Find the card for the obligation you need.', target: 'export-axis-police', art: 'ex1' },
       { it: 'Premi «📥 Genera File Ospiti (.txt)»: il file si scarica.', en: 'Press “📥 Generate Guest File (.txt)”: the file downloads.', target: 'export-alloggiati-btn', art: 'ex2' },
+      { it: 'Per le statistiche usa il pulsante della tua Regione: scegli il periodo e verifica ospiti, residenza, apertura e unità occupate. Estrai gli ZIP prima del caricamento. I CSV di riferimento non sono file di importazione.', en: 'For statistics, use your Region’s button: choose dates and review guests, residence, opening and occupied units. Extract ZIPs before upload. Reference CSVs are not import files.', target: 'export-regional', art: 'ex1' },
       { it: 'Premi «Apri Alloggiati Web» accanto e carica il file.', en: 'Press “Open Alloggiati Web” next to it and upload the file.', target: 'export-alloggiati-link', art: 'ex3' },
     ],
     warn: { it: 'Ogni portale ha una scadenza. Se la salti, puoi ricevere una sanzione.', en: 'Each portal has its deadline. Missing it can lead to a fine.' },

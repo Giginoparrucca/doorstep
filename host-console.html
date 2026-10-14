@@ -1137,6 +1137,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   color: #fff; font-size: 0.78rem; font-weight: 500;
 }
 .photo-upload-zone:hover .photo-upload-overlay { opacity: 1; }
+@media(max-width:720px){#panel-property>.panel-header-actions>div:first-child{flex:0 0 100%!important}#propertySaveBtn{white-space:normal;overflow:visible}}
+.cover-frame-controls{margin-top:16px;display:grid;gap:8px}.cover-frame-controls[hidden]{display:none}.cover-frame-controls input{width:100%;min-width:0}.cover-frame-controls label{font-size:.8rem}.cover-frame-controls output{float:right}.property-leave-actions{display:flex;gap:8px;flex-wrap:wrap}.property-leave-dialog{border:1px solid var(--border);border-radius:14px;padding:24px;max-width:min(520px,calc(100vw - 32px));color:var(--ink);background:var(--white)}.property-leave-dialog::backdrop{background:rgba(6,26,61,.45)}.property-leave-dialog h2{margin-top:0;font-size:1.2rem}.property-leave-dialog p{font-size:.88rem;line-height:1.5}.property-leave-dialog .btn{white-space:normal}
 </style>
 <style>
 .share-actions,.share-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
@@ -1398,16 +1400,27 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       <div class="form-card">
         <div class="form-card-title" data-h="prop_cover">Cover Photo</div>
         <div class="form-card-desc" data-h="prop_cover_desc">This photo appears as the hero image on the guest welcome screen.</div>
-        <div class="photo-upload-zone" id="coverPhotoZone" onclick="document.getElementById('coverPhotoInput').click()">
-          <img id="coverPhotoPreview" src="" style="display:none">
+        <div class="photo-upload-zone" id="coverPhotoZone" role="button" tabindex="-1" aria-label="Choose cover photo" onclick="chooseCoverPhoto()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();chooseCoverPhoto();}">
+          <img id="coverPhotoPreview" src="" alt="" style="display:none">
           <div class="photo-placeholder" id="coverPhotoPlaceholder">
             <div class="ph-icon">📸</div>
             <div class="ph-text" data-h="prop_cover_click">Click to upload cover photo</div>
-            <div class="ph-text" style="font-size:0.6rem;color:rgba(122,90,72,0.4)">JPG / PNG · 1200×600px</div>
+            <div class="ph-text" style="font-size:0.6rem;color:rgba(122,90,72,0.4)">JPG / PNG / WebP · max 10 MB</div>
           </div>
           <div class="photo-upload-overlay">📸</div>
         </div>
-        <input type="file" id="coverPhotoInput" accept="image/*" style="display:none" onchange="handleCoverUpload(this)">
+        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px" onclick="chooseCoverPhoto()" data-h="cover_choose">Choose photo</button>
+        <div id="coverFrameControls" class="cover-frame-controls" hidden>
+          <label for="coverFrame-zoom"><span data-h="cover_zoom">Zoom</span> <output id="coverZoomValue">100%</output></label>
+          <input id="coverFrame-zoom" data-cover-frame="zoom" type="range" min="1" max="3" step="0.01" value="1">
+          <label for="coverFrame-x" data-h="cover_horizontal">Horizontal position</label>
+          <input id="coverFrame-x" data-cover-frame="x" type="range" min="0" max="100" step="1" value="50">
+          <label for="coverFrame-y" data-h="cover_vertical">Vertical position</label>
+          <input id="coverFrame-y" data-cover-frame="y" type="range" min="0" max="100" step="1" value="50">
+          <div class="property-leave-actions"><button type="button" id="coverFrameCenter" class="btn btn-secondary btn-sm" data-h="cover_center">Center photo</button><button type="button" id="coverFrameReset" class="btn btn-secondary btn-sm" data-h="cover_reset">Reset framing</button></div>
+          <p data-h="cover_hint" style="font-size:0.78rem;color:var(--ink-soft)">Adjust the framing, then save. The crop adapts to the guest’s screen.</p>
+        </div>
+        <input type="file" id="coverPhotoInput" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="handleCoverUpload(this)">
         <div style="margin-top:8px;font-size:0.6rem;color:var(--ink-soft)" id="coverPhotoStatus"></div>
       </div>
 
@@ -1428,6 +1441,10 @@ tr:hover td { background: rgba(250,246,240,0.6); }
               <option value="room" data-h="prop_type_room">Room</option>
               <option value="trullo" data-h="prop_type_trullo">Trullo</option>
               <option value="masseria" data-h="prop_type_masseria">Masseria</option>
+              <option value="agriturismo" data-h="prop_type_agriturismo">Agriturismo</option>
+              <option value="bnb">B&amp;B</option>
+              <option value="studio" data-h="prop_type_studio">Studio</option>
+              <option value="other" data-h="prop_type_other">Other</option>
             </select>
           </div>
           <div class="form-group">
@@ -1481,19 +1498,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <input class="form-input" placeholder="e.g., bari  (or bari.paytourist.com)" id="paytouristUrl" oninput="refreshPayTouristLink()">
             <div class="form-hint" data-h="prop_paytourist_hint">Your municipality's PayTourist subdomain. Leave empty if your comune doesn't use PayTourist.</div>
           </div>
-          <div class="form-group">
-            <label class="form-label" data-h="prop_type">Property type</label>
-            <select class="form-select" id="propType">
-              <option value="apartment">Apartment</option>
-              <option value="villa">Villa</option>
-              <option value="bnb">B&amp;B</option>
-              <option value="trullo">Trullo</option>
-              <option value="studio">Studio</option>
-              <option value="room">Single room</option>
-              <option value="other">Other</option>
-            </select>
-            <div class="form-hint" data-h="prop_type_hint">Helps with platform analytics and audience-aware suggestions.</div>
-          </div>
+
         </div>
       </div>
 
@@ -2373,6 +2378,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 <script src="/lib/calendar-roundtrip.js"></script>
 <script src="/host-onboarding.js"></script>
 <script src="/host-share.js?v=55.3"></script>
+<script src="/lib/cover-layout.js?v=57.1"></script>
+<script src="/host-property-editor.js?v=57.1"></script>
 <script>
 /* ══════════════════════════════════════
    SUPABASE CONNECTION
@@ -3704,6 +3711,7 @@ async function handleAuth() {
 
 // Sign out function
 async function signOut() {
+  if (_propertySavePending || !(await propertyEditor.leave({save: savePropertyEdit, discard: cancelPropertyEdit}))) return;
   await sb.auth.signOut();
   document.getElementById('loginOverlay').classList.remove('hidden');
 }
@@ -3749,6 +3757,8 @@ async function _sessionCheckIdle() {
   } catch (_) { return; }
   try { localStorage.setItem(SESSION_EXPIRED_KEY, '1'); } catch (_) {}
   try { await sb.auth.signOut(); } catch (_) {}
+  // Expired sessions must still reload; an unsaved draft cannot block sign-out.
+  propertyEditor.reset(propertyData);
   // Reload to clear every module's in-memory state (allCheckins,
   // propertyData, cached DOM, chat subscriptions). Cheaper and safer
   // than hunting them down individually.
@@ -3851,45 +3861,12 @@ async function firstTimeSetup() {
 /* ══════════════════════════════════════
    COVER PHOTO UPLOAD
 ══════════════════════════════════════ */
-async function handleCoverUpload(input) {
-  if (!input.files.length) return;
-  const file = input.files[0];
-  const status = document.getElementById('coverPhotoStatus');
-
-  status.textContent = 'Uploading…';
-  status.style.color = 'var(--warm)';
-
-  try {
-    const ext = file.name.split('.').pop();
-    const path = `covers/${propertyId || 'default'}_${Date.now()}.${ext}`;
-    const { data, error } = await sb.storage.from('property-images').upload(path, file, { upsert: true });
-
-    if (error) { status.textContent = 'Upload failed: ' + error.message; status.style.color = 'var(--red)'; return; }
-
-    // Get public URL
-    const { data: urlData } = sb.storage.from('property-images').getPublicUrl(path);
-    const publicUrl = urlData.publicUrl;
-
-    // Update property record
-    if (propertyId) {
-      await sb.from('properties').update({ hero_image_url: publicUrl }).eq('id', propertyId);
-    }
-
-    // Update preview
-    const preview = document.getElementById('coverPhotoPreview');
-    preview.src = publicUrl;
-    preview.style.display = 'block';
-    document.getElementById('coverPhotoPlaceholder').style.display = 'none';
-    document.getElementById('coverPhotoZone').classList.add('has-photo');
-
-    status.textContent = '✓ Photo uploaded and saved!';
-    status.style.color = 'var(--green)';
-    toast(hostLang === 'it' ? 'Foto di copertina aggiornata!' : 'Cover photo updated!');
-  } catch (e) {
-    status.textContent = 'Upload error. Try again.';
-    status.style.color = 'var(--red)';
-    console.error(e);
-  }
+function chooseCoverPhoto() {
+  if (!propertyEditMode || _propertySavePending || (typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled)) return;
+  document.getElementById('coverPhotoInput').click();
+}
+function handleCoverUpload(input) {
+  return propertyEditor.stage(input);
 }
 
 /* ══════════════════════════════════════
@@ -3897,6 +3874,7 @@ async function handleCoverUpload(input) {
 ══════════════════════════════════════ */
 const HT = {
   en: {
+    prop_editing_hint:'Editing', prop_type_studio:'Studio', prop_type_other:'Other', cover_choose:'Choose photo', cover_zoom:'Zoom', cover_horizontal:'Horizontal position', cover_vertical:'Vertical position', cover_center:'Center photo', cover_reset:'Reset framing', cover_hint:'Adjust the framing, then save. The crop adapts to the guest’s screen.',
     // Sidebar
     sidebar_overview: 'Overview', sidebar_property_sec: 'Property', sidebar_guests_sec: 'Guests', sidebar_share_sec: 'Share',
     // Login
@@ -4274,7 +4252,7 @@ const HT = {
     prop_cover: 'Cover Photo', prop_cover_desc: 'This photo appears as the hero image on the guest welcome screen.',
     prop_cover_click: 'Click to upload cover photo',
     prop_type_apt: 'Apartment', prop_type_house: 'House', prop_type_villa: 'Villa', prop_type_room: 'Room',
-    prop_type_trullo: 'Trullo', prop_type_masseria: 'Masseria',
+    prop_type_trullo: 'Trullo', prop_type_masseria: 'Masseria', prop_type_agriturismo: 'Agriturismo',
     access_keybox: 'Self check-in · Keybox', access_person: 'In person handover', access_smart: 'Smart lock',
     // Rules
     rules_info: 'ℹ️ These rules appear in the guest app\'s "Rules" tab. Pick from common rules below, or add your own custom rules.',
@@ -4456,6 +4434,7 @@ const HT = {
     recos_info: 'These appear in the guest app\'s "Explore" tab. Add your favorite restaurants, bars, sights, beaches, and shops. Include an address for the Google Maps link.',
   },
   it: {
+    prop_editing_hint:'Modifica in corso', prop_type_studio:'Monolocale', prop_type_other:'Altro', cover_choose:'Scegli foto', cover_zoom:'Zoom', cover_horizontal:'Posizione orizzontale', cover_vertical:'Posizione verticale', cover_center:'Centra foto', cover_reset:'Ripristina inquadratura', cover_hint:'Regola l’inquadratura, poi salva. Il ritaglio si adatta allo schermo dell’ospite.',
     sidebar_overview: 'Panoramica', sidebar_property_sec: 'Proprietà', sidebar_guests_sec: 'Ospiti', sidebar_share_sec: 'Condividi',
     // Login
     login_badge: 'Console Host',
@@ -4823,7 +4802,7 @@ const HT = {
     prop_cover: 'Foto Copertina', prop_cover_desc: 'Questa foto appare come immagine principale nella schermata di benvenuto.',
     prop_cover_click: 'Clicca per caricare la foto',
     prop_type_apt: 'Appartamento', prop_type_house: 'Casa', prop_type_villa: 'Villa', prop_type_room: 'Stanza',
-    prop_type_trullo: 'Trullo', prop_type_masseria: 'Masseria',
+    prop_type_trullo: 'Trullo', prop_type_masseria: 'Masseria', prop_type_agriturismo: 'Agriturismo',
     access_keybox: 'Self check-in · Lockbox', access_person: 'Consegna di persona', access_smart: 'Serratura smart',
     rules_info: 'ℹ️ Queste regole appaiono nella scheda "Regole" dell\'app ospiti. Scegli dalle regole comuni o aggiungine di personalizzate.',
     rules_preset_label: 'Aggiungi regole comuni',
@@ -5267,7 +5246,11 @@ function _renderSectionTabs(sectionId, activePanelId) {
   paintTabBadges();
 }
 
-function showPanel(id, btn) {
+async function showPanel(id, btn) {
+  if (!document.getElementById('panel-' + id)) return;
+  const alreadyActive = document.getElementById('panel-' + id).classList.contains('active');
+  if (alreadyActive && propertyEditMode) return;
+  if (!alreadyActive && (_propertySavePending || !(await propertyEditor.leave({save: savePropertyEdit, discard: cancelPropertyEdit})))) return;
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   const target = document.getElementById('panel-' + id);
   if (!target) { console.warn('showPanel: unknown panel', id); return; }
@@ -5347,7 +5330,7 @@ function showPanel(id, btn) {
 const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','settings','rules','recos','qrlink'];
 // Bump on every host-guides.js change so browsers never see a stale
 // copy even if their cache is aggressive.
-const _HG_VERSION = '55.3-house-qr';
+const _HG_VERSION = '57.1-property-edit';
 let _hgLoadPromise = null;
 function _hgLoad() {
   if (window.HG) return Promise.resolve();
@@ -8059,7 +8042,10 @@ async function saveProperty() {
     reminder_email: (document.getElementById('propReminderEmail')?.value || '').trim() || null,
     timezone: document.getElementById('propTimezone')?.value || 'Europe/Rome',
   };
-  const { error } = await sb.from('properties').update(update).eq('id', propertyId);
+  if (typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled) return false;
+  Object.assign(update, await propertyEditor.prepareCover(sb, propertyId));
+  const { data: saved, error } = await sb.from('properties').update(update).eq('id', propertyId).select('id').maybeSingle();
+  if (!error && !saved) { toast(hostLang === 'it' ? 'Salvataggio non consentito.' : 'Save not permitted.'); return false; }
   if (error) { console.error('Save error:', error); toast('Error: ' + error.message); return false; }
   propertyData = { ...propertyData, ...update };
   // Round 21: keep allProperties + switcher in sync after a save (name/city
@@ -8760,12 +8746,17 @@ let propertyEditMode = false;
 function _setPropertyEditControls(editing) {
   const panel = document.getElementById('panel-property');
   if (panel) panel.setAttribute('data-edit-mode', editing ? 'edit' : 'view');
+  const modeHint = panel?.querySelector('[data-h="prop_header_hint"], [data-h="prop_editing_hint"]');
+  if (modeHint) { modeHint.dataset.h = editing ? 'prop_editing_hint' : 'prop_header_hint'; modeHint.textContent = h(modeHint.dataset.h); }
   const fs = document.getElementById('propertyFormBody');
   if (fs) fs.disabled = !editing;
   // The cover-photo upload zone is a plain <div onclick=…>, so a disabled
   // fieldset doesn't gate its click; gate pointer events explicitly.
   const zone = document.getElementById('coverPhotoZone');
   if (zone) {
+    zone.tabIndex = editing ? 0 : -1;
+    zone.setAttribute('aria-disabled', String(!editing));
+    zone.setAttribute('aria-label', h('cover_choose'));
     zone.style.pointerEvents = editing ? '' : 'none';
     zone.style.opacity = editing ? '' : '0.85';
   }
@@ -8778,7 +8769,14 @@ function _setPropertyEditControls(editing) {
   if (cancelBtn) cancelBtn.style.display = editing ? '' : 'none';
   if (hint)      hint.style.display      = editing ? 'none' : '';
 }
+const propertyEditor = HostPropertyEditor.create({
+  root: document.getElementById('propertyFormBody'), lang: () => hostLang,
+  canEdit: () => !(typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled),
+});
+let _propertySavePending = null;
 function startPropertyEdit() {
+  if (_propertySavePending || (typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled)) return;
+  propertyEditor.begin();
   propertyEditMode = true;
   _setPropertyEditControls(true);
   // Round 25: an admin viewer without _adminEditEnabled must stay locked
@@ -8788,6 +8786,7 @@ function startPropertyEdit() {
   }
 }
 function cancelPropertyEdit() {
+  if (_propertySavePending) return;
   propertyEditMode = false;
   if (propertyData) {
     try { fillPropertyForm(propertyData); } catch (e) { console.warn('cancelPropertyEdit refill failed:', e); }
@@ -8795,12 +8794,29 @@ function cancelPropertyEdit() {
   _setPropertyEditControls(false);
 }
 async function savePropertyEdit() {
-  const ok = await saveProperty();
-  // saveProperty returns falsy / throws on failure — stay in edit mode so
-  // the host can retry after fixing whatever the toast complained about.
-  if (ok === false) return;
-  propertyEditMode = false;
-  _setPropertyEditControls(false);
+  if (_propertySavePending) return _propertySavePending;
+  if (typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled) return false;
+  const buttons = ['propertySaveBtn','propertyCancelBtn'];
+  document.getElementById('propertyFormBody').disabled = true;
+  buttons.forEach(id => {document.getElementById(id).disabled = true;});
+  _propertySavePending = (async () => {
+    try {
+      const ok = await saveProperty();
+      if (ok !== true) return false;
+      propertyEditMode = false;
+      propertyEditor.reset(propertyData);
+      _setPropertyEditControls(false);
+      return true;
+    } catch (error) {
+      toast((hostLang === 'it' ? 'Salvataggio fallito: ' : 'Save failed: ') + error.message);
+      return false;
+    } finally {
+      buttons.forEach(id => {document.getElementById(id).disabled = false;});
+      if (propertyEditMode) _setPropertyEditControls(true);
+      _propertySavePending = null;
+    }
+  })();
+  return _propertySavePending;
 }
 
 // Round 45 hotfix — Impostazioni gets the same view→edit lifecycle as
@@ -14761,6 +14777,8 @@ async function switchProperty(propId) {
   const target = allProperties.find(p => p.id === propId);
   if (!target) return;
 
+  if (_propertySavePending || !(await propertyEditor.leave({save: savePropertyEdit, discard: cancelPropertyEdit}))) return;
+
   propertyId = propId;
   propertyData = target;
   localStorage.setItem('wbnb_host_selected_property', propId);
@@ -14785,6 +14803,7 @@ async function switchProperty(propId) {
 
 // Round 21: create a new property owned by the current host and switch to it
 async function addProperty() {
+  if (_propertySavePending || !(await propertyEditor.leave({save: savePropertyEdit, discard: cancelPropertyEdit}))) return;
   document.getElementById('propSwitcher')?.classList.remove('open');
   const name = prompt(h('switcher_add_prompt') || 'Name for the new property:');
   if (name === null) return; // cancelled
@@ -14975,7 +14994,15 @@ function fillPropertyForm(data) {
     const hint = document.getElementById('propRegionAutoHint');
     if (hint) hint.style.display = (choice && !IT_REGIONS.includes(stored)) ? '' : 'none';
   }
-  if (el('propType') && data.property_type) el('propType').value = data.property_type;
+  if (el('propType')) {
+    const select = el('propType');
+    select.querySelectorAll('[data-stored-type]').forEach(option => option.remove());
+    if (data.property_type && ![...select.options].some(option => option.value === data.property_type)) {
+      const option = document.createElement('option'); option.value = data.property_type;
+      option.textContent = data.property_type; option.dataset.storedType = 'true'; select.appendChild(option);
+    }
+    select.value = data.property_type || 'apartment';
+  }
   if (el('cirCode')) el('cirCode').value = data.cir_code || '';
   if (el('paytouristUrl')) el('paytouristUrl').value = data.paytourist_url || '';
   // Round 18.4: build the PayTourist portal link from the property's
@@ -15042,15 +15069,7 @@ function fillPropertyForm(data) {
   if (typeof loadAlloggiatiCard === 'function') loadAlloggiatiCard();
   if (el('propReminderEmail')) el('propReminderEmail').value = data.reminder_email || '';
   if (el('propTimezone')) el('propTimezone').value = data.timezone || 'Europe/Rome';
-  if (data.hero_image_url) {
-    const preview = el('coverPhotoPreview');
-    if (preview) {
-      preview.src = data.hero_image_url;
-      preview.style.display = 'block';
-      el('coverPhotoPlaceholder').style.display = 'none';
-      el('coverPhotoZone').classList.add('has-photo');
-    }
-  }
+  propertyEditor.reset(data);
   if (data.host_names) {
     el('sidebarUserName').textContent = data.host_names;
     el('sidebarAvatar').textContent = data.host_names.charAt(0);

@@ -23,7 +23,7 @@ let chromium;
 try {
   chromium = require('playwright').chromium;
 } catch (_) {
-  const g = createRequire('/opt/node22/lib/node_modules/.pathstub.js');
+  const g = createRequire((process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES || '/opt/node22/lib/node_modules') + '/.pathstub.js');
   try { chromium = g('playwright').chromium; }
   catch { chromium = require('/opt/node22/lib/node_modules/playwright').chromium; }
 }
@@ -117,14 +117,14 @@ const html = `<!doctype html>
   <title>Onboarding WelcomeBnB — scaletta italiana</title>
   <style>
     @page { size: A4; margin: 20mm 18mm; }
-    html, body { font: 10.5pt/1.45 "DejaVu Sans", "Noto Sans", "Helvetica Neue", Arial, sans-serif; color: #1a1a1a; }
+    html, body { font: 10.2pt/1.4 "DejaVu Sans", "Noto Sans", "Helvetica Neue", Arial, sans-serif; color: #1a1a1a; }
     body { padding: 0; margin: 0; }
     header.doc { border-bottom: 1px solid #d1d5db; padding-bottom: 6px; margin-bottom: 14px; font-size: 9pt; color: #4b5563; }
     header.doc strong { color: #111827; }
     h1 { font-size: 20pt; margin: 0 0 4pt; letter-spacing: -0.01em; }
-    h2 { font-size: 13pt; margin: 16pt 0 6pt; color: #111827; break-after: avoid-page; page-break-after: avoid; }
+    h2 { font-size: 13pt; margin: 14pt 0 6pt; color: #111827; break-after: avoid-page; page-break-after: avoid; }
     h3 { font-size: 11pt; margin: 12pt 0 4pt; color: #111827; }
-    p { margin: 0 0 7pt; }
+    p { margin: 0 0 7pt; break-inside: avoid-page; }
     strong { color: #111827; }
     blockquote { margin: 7pt 0; padding: 7pt 10pt; background: #f8fafc; border-left: 3px solid #94a3b8; color: #334155; font-style: italic; }
     ul { margin: 2pt 0 7pt; padding-left: 18pt; }

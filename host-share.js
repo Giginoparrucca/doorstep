@@ -82,6 +82,7 @@ function create(adapter) {
    <div class="share-controls"><select class="form-select" aria-label="${escape(L.booking)}" data-share-scope><option value="upcoming">${escape(L.upcoming)}</option><option value="all">${escape(L.all)}</option></select><button class="btn btn-secondary btn-sm" data-share-refresh>${escape(L.refresh)}</button></div>
    ${state.requestedMissing?`<p role="alert">${escape(L.missing)}</p>`:''}
    ${list.length?`<label class="form-label" for="shareBooking">${escape(L.booking)}</label><select id="shareBooking" class="form-select" data-guide="qr-select-booking">${list.map(r=>`<option value="${escape(r.id)}">${escape(r.guest_name||L.guest)} · ${escape(r.checkin_date||'—')} → ${escape(r.checkout_date||'—')}</option>`).join('')}</select>`:`<p>${escape(L.empty)}</p><p class="form-card-desc">${escape(L.emptyHint)}</p>`}
+   ${row?`<p style="font-size:.8rem;color:var(--ink-soft);margin-top:8px">${escape(row.checkin_date||L.unknown)} → ${escape(row.checkout_date||L.unknown)}</p>`:''}
    ${row&&url?`<div class="share-actions"><button class="btn btn-secondary btn-sm" data-share-link>${escape(L.link)}</button><a class="btn btn-secondary btn-sm" href="${escape(url)}" target="_blank" rel="noopener">${escape(L.open)}</a></div><p style="font-size:.8rem" data-share-status>${escape(L.status)}: ${escape(L[kind(row)])}</p><label class="form-label" for="shareLanguage">${escape(L.language)}</label><select class="form-select" id="shareLanguage"><option value="it">Italiano</option><option value="en">English</option></select><label class="form-label" for="shareMessage">${escape(L.message)}</label><textarea id="shareMessage" class="form-textarea" style="min-height:200px" data-guide="qr-message"></textarea><div class="share-actions"><button class="btn btn-primary" data-share-copy data-guide="qr-copy-template">${escape(L.copy)}</button><button class="btn btn-secondary" data-share-whatsapp>${escape(L.whatsapp)}</button><button class="btn btn-secondary" data-share-reset>${escape(L.reset)}</button></div>
     <details data-share-defaults><summary style="cursor:pointer;font-size:.85rem">${escape(L.defaults)}</summary><p class="form-card-desc">${escape(L.defaultHint)}</p><label class="form-label" for="shareDefaultKind">${escape(L.status)}</label><select class="form-select" id="shareDefaultKind">${['start','partial','received','complete'].map(k=>`<option value="${k}">${escape(L[k])}</option>`).join('')}</select><textarea id="shareDefaultTemplate" class="form-textarea" style="min-height:180px;margin-top:10px" maxlength="4000"></textarea><button class="btn btn-secondary btn-sm" data-share-save-default>${escape(L.save)}</button></details>`:row?`<p role="alert">${escape(L.missing)}</p>`:''}
    ${state.prefError?`<p role="alert" class="form-card-desc">${escape(L.prefError)}</p>`:''}
@@ -131,5 +132,36 @@ function create(adapter) {
  }
  return {load,repaint:render,getState:()=>state};
 }
-W.HostShare={create,bookings,guestUrl,escape,registration,messages,validTemplate};
+const houseLabels={
+ en:{title:'House QR code',intro:'Print this permanent QR and leave it in the house. It opens the property’s guest app for every stay.',print:'Print QR code',download:'Download QR (SVG)',copy:'Copy property link',error:'Could not create the QR code. Refresh and try again.',blocked:'The print window was blocked. Allow pop-ups for this site and try again.',copyFail:'Could not copy. Select and copy the link manually.',copied:'Copied!',downloadFail:'Could not download the QR. Try printing it instead.'},
+ it:{title:'QR code della casa',intro:'Stampa questo QR permanente e lascialo in casa. Apre l’app della proprietà per tutti i soggiorni.',print:'Stampa QR code',download:'Scarica QR (SVG)',copy:'Copia link della proprietà',error:'Impossibile creare il QR code. Aggiorna e riprova.',blocked:'La finestra di stampa è stata bloccata. Consenti i pop-up per questo sito e riprova.',copyFail:'Copia non riuscita. Seleziona e copia il link manualmente.',copied:'Copiato!',downloadFail:'Download del QR non riuscito. Prova a stamparlo.'}
+};
+function propertyUrl(origin,property) {return origin+'/?p='+encodeURIComponent(property);}
+function qrSvg(url) {
+ const qr=W.qrcode(0,'M');qr.addData(url);qr.make();
+ return qr.createSvgTag({cellSize:4,margin:16,scalable:true});
+}
+function printDocument(name,url,svg) {
+ return `<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(name)} · Guest app QR</title><style>
+ @page{size:A4;margin:18mm}*{box-sizing:border-box}body{margin:0;color:#14263b;background:#f4f6f8;font:16px/1.5 Arial,sans-serif}.tools{display:flex;justify-content:center;gap:12px;padding:16px}.tools button{font:inherit;padding:10px 20px;cursor:pointer;border:1px solid #c5ced7;border-radius:8px;background:white}main{background:white;max-width:170mm;margin:10px auto;padding:20mm 12mm;text-align:center;border:1px solid #dce2e8;border-radius:16px}.brand{font-size:12px;letter-spacing:3px;text-transform:uppercase;color:#536779}h1{font-size:28px;line-height:1.2;overflow-wrap:anywhere;margin:12px 0 25px}.qr{width:92mm;max-width:100%;margin:0 auto 22px}.qr svg{display:block;width:100%;height:auto}h2{font-size:23px;margin:12px 0 4px}p{margin:5px 0}.en{color:#536779}.url{display:block;font-size:11px;overflow-wrap:anywhere;color:#334b60;margin-top:24px}.brand-bottom{font-size:12px;color:#536779;margin-top:20px}
+ @media print{body{background:white}.tools{display:none}main{border:0;margin:0 auto;padding:12mm 6mm;break-inside:avoid;border-radius:0}.qr{width:92mm}a{color:inherit;text-decoration:none}}
+ </style></head><body><div class="tools"><button id="printHouseQr">Stampa / Print</button><button id="closeHouseQr">Chiudi / Close</button></div><main><div class="brand">WelcomeBnB · Guest app</div><h1>${escape(name)}</h1><div class="qr">${svg}</div><h2>Benvenuti a casa</h2><p>Inquadra il QR per aprire l’app ospiti.</p><p>Informazioni della casa, consigli e assistenza.</p><h2 class="en">Welcome to your stay</h2><p class="en">Scan the QR to open your guest app.</p><p class="en">House information, local tips and assistance.</p><a class="url" href="${escape(url)}">${escape(url)}</a><p class="brand-bottom">welcomebnb.it</p></main></body></html>`;
+}
+function createHouse(adapter) {
+ const root=adapter.root,context=adapter.context;
+ function render() {
+  const c=context(),L=houseLabels[c.lang==='it'?'it':'en'];
+  if(!c.propertyId){root.innerHTML='';return;}
+  const prop=c.propertyId,url=propertyUrl(c.origin,prop);
+  let svg='';try{svg=qrSvg(url);}catch(_){}
+  const valid=()=>context().propertyId===prop;
+  root.innerHTML=`<div class="form-card" data-guide="qr-apartment"><div class="house-qr-layout"><div class="house-qr-image" aria-label="${escape(L.title)}">${svg}</div><div style="flex:1;min-width:0"><h3 style="margin:0 0 8px">${escape(L.title)}</h3><p class="form-card-desc">${escape(L.intro)}</p><a data-house-url href="${escape(url)}" target="_blank" rel="noopener" style="font-size:.8rem;overflow-wrap:anywhere">${escape(url)}</a><div class="share-actions"><button class="btn btn-primary" data-house-print data-guide="qr-print" ${svg?'':'disabled'}>${escape(L.print)}</button><button class="btn btn-secondary btn-sm" data-house-download ${svg?'':'disabled'}>${escape(L.download)}</button><button class="btn btn-secondary btn-sm" data-house-copy>${escape(L.copy)}</button></div><p role="status" aria-live="polite" data-house-feedback style="font-size:.8rem">${svg?'':escape(L.error)}</p></div></div></div>`;
+  const feedback=text=>{if(valid())root.querySelector('[data-house-feedback]').textContent=text;};
+  root.querySelector('[data-house-copy]').onclick=async()=>{if(!valid())return;try{await W.navigator.clipboard.writeText(url);feedback(L.copied);}catch(_){feedback(L.copyFail);}};
+  root.querySelector('[data-house-download]').onclick=()=>{if(!valid()||!svg)return;try{const blob=new W.Blob(['<?xml version="1.0" encoding="UTF-8"?>\n'+svg],{type:'image/svg+xml'}),href=W.URL.createObjectURL(blob);const a=root.ownerDocument.createElement('a');a.href=href;a.download='welcomebnb-house-qr.svg';root.appendChild(a);a.click();a.remove();W.setTimeout(()=>W.URL.revokeObjectURL(href),1000);}catch(_){feedback(L.downloadFail);}};
+  root.querySelector('[data-house-print]').onclick=()=>{if(!valid()||!svg)return;try{const tab=W.open('','_blank');if(!tab){feedback(L.blocked);return;}feedback('');tab.opener=null;tab.document.open();tab.document.write(printDocument(c.property?.name||'WelcomeBnB',url,svg));tab.document.close();tab.document.getElementById('printHouseQr').onclick=()=>tab.print();tab.document.getElementById('closeHouseQr').onclick=()=>tab.close();tab.focus();const ready=tab.document.fonts?.ready||Promise.resolve();ready.then(()=>{try{tab.print();}catch(_){}});}catch(_){feedback(L.blocked);}};
+ }
+ return {render};
+}
+W.HostShare={create,bookings,guestUrl,escape,registration,messages,validTemplate,createHouse,propertyUrl,qrSvg,printDocument};
 })(window);

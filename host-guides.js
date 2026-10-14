@@ -1030,7 +1030,7 @@ const GUIDES = {
       { it: 'Scegli la prenotazione da condividere.', en: 'Choose the booking to share.', target: 'qr-select-booking', art: 'qr1' },
       { it: 'Scegli la lingua, controlla il messaggio in base alla registrazione e premi «Copia messaggio» o «Apri WhatsApp».', en: 'Choose the message language, review the registration-aware text and press “Copy message” or “Open WhatsApp”.', target: 'qr-copy-template', art: 'qr2' },
       { it: 'Incolla nella chat di Airbnb o Booking e invia.', en: 'Paste it in your Airbnb or Booking chat and send.', target: 'qr-copy-template', art: 'qr3' },
-      { it: 'Stampa il QR della casa e mettilo vicino alla porta.', en: 'Print the property QR and place it near the door.', target: 'qr-apartment', art: 'qr4' },
+      { it: 'Premi «Stampa QR code» e lascia il QR permanente in casa.', en: 'Press “Print QR code” and leave the permanent property QR in the house.', target: 'qr-print', art: 'qr4' },
     ],
     tip: { it: 'Premi «🧪 Apri in modalità test» per vedere l’app come un ospite.', en: 'Press “🧪 Open in test mode” to see the app as a guest would.' },
     faq: [

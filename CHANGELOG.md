@@ -7,7 +7,33 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
-### Current round — completed
+### Current round — in-flight
+
+**Round 58 — Regional statistical downloads**
+
+Specification: `PLAN_round58_regional_downloads.md`. Research each region's
+current official import format; provide validated downloads for the applicable
+portal, including Lombardia ROSS1000. No automatic submissions. Round 51 paused.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 1 — Research, implement and release | shipped (production) — PR #158 — GPT-6.1 | Official-source regional matrix, format fixtures, scoped/paginated data, daily review, browser downloads and regression/main/live gates |
+
+### Round 58 Phase 1 — changelog publication authorized (GPT-6.1, 2026-10-14)
+
+- Daniele explicitly requested “Publish changelog”, authorizing publication of the prepared full Round 58 CHANGELOG to public `Giginoparrucca/doorstep` main. The prior automatic-review rejection below is historical; this request authorizes the retry for that specific documentation payload and destination.
+- Documentation-only publication, including release verification, tests, source references and partial native-format coverage. Application code and production deployment are already verified. Round 51 remains paused.
+
+### Round 58 Phase 1 — implementation and verification (GPT-6.1, 2026-10-14)
+
+- Added source-backed download actions for all regional tiles. Lombardia and the other 11 whole-region GIES users, plus Firenze/Prato/Pistoia, use current ROSS1000 XML v3 (18 March 2026). Added Umbria daily C59 fixed-column ASCII TXT, Puglia SPOT Easy PS TXT and Trentino licensed-STU daily TXT with its own IDOBJ filenames/provenance codes. Multiple daily files download as a verified ZIP. Trentino import remains subject to APT/PMS approval; no provider accreditation is claimed.
+- Native import coverage is **partial**. Campania, WebTur/Friuli-Venezia Giulia, Sicilia, Alto Adige, Valle d'Aosta, non-ROSS Toscana, Puglia SPOT Online/Completo and Trentino DTU receive an explicitly labelled manual-entry reference CSV. No public usable file specification was verified for these paths, or the documented interface requires an API/PMS integration. Both UI and file distinguish reference data from an import. `docs/REGIONAL_EXPORT_FORMATS.md` records all regional routes, exact formats, primary sources and remaining barriers. No automatic submissions.
+- Replaced Veneto-only export with a bilingual review dialog: selected past period, scoped/paginated submitted non-test/nondeleted guests, carry-over stays, draft exclusions, missing/incomplete check-in notice, source-preserving correction fields, explicit daily opening/capacity/occupied-unit review and confirmation. Residence is never inferred from citizenship or birthplace; ambiguous Italian municipalities require a province/code. Stable existing Veneto IDs, group-head validation, no guest-derived room guesses, no silent open days, invalid-date/capacity rejection, read failures/retry and stale-property cancellation. XML/aggregate reports omit names/documents; PS includes the portal-required identity fields. No guest/status/database writes or new credentials.
+- PASS serializer/routing suite: 21 regions/provinces, XML independently parsed, exact Umbria columns, Trentino headers/filenames/asterisk country codes, Chieti versus Switzerland, strict PS 168-character layout and byte match for normal valid national records, explicit reference CSV, independent Python ZIP decode, leap/boundary dates, carryovers/groups, scope isolation and validation. PASS actual Chromium downloads at 390/1280px in IT/EN: XML, TXT/ZIP, PS, reference CSV, in-dialog corrections, read failures/retry, second-page record, property changes and responsive dialog. Screenshots reviewed; all transport/data fictional.
+- PASS property-editor Chromium regression (IT/EN, mobile/desktop), guest-checkin, environment, calendar roundtrip, house QR, Share reminders, group receipts, deployment configuration, canonical links/inline script compilation, admin access, Share and onboarding readiness/UI/visibility. Guide updated for actual review/download process. No schema or demo fixture behavior changed; Round 51 stays paused.
+- PR #158 merged main as `6d28b60ef910f82f9a726b763560eeafb33243d3`. Vercel production success; all nine published files match local source and served host-console, both regional modules and guide are byte-identical. Canonical app origin verified. Automatic approval review rejected publishing the full CHANGELOG, citing operational details and insufficient specific public-payload authorization. No retry or indirect publication of that rejected payload; published CHANGELOG remains unchanged. Application/source matrix/plan/guide/tests are live/published, but CHANGELOG delivery is blocked. Remaining native formats require current authority specifications or a separate approved API/provider integration.
+
+### Previous round — preserved completed status
 
 **Round 57 — Safer property editing and cover framing**
 

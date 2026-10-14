@@ -46,8 +46,9 @@ Native format coverage remains partial as specified in the regional matrix;
 reference-only downloads explicitly identify their limitations. No portal
 import/submission or provider accreditation is claimed.
 
-Documentation publication is partial: automatic approval review rejected the
-full CHANGELOG payload. Its published content is unchanged. The source register,
-plan, guide, tests and implementation are published; the complete release record
-is retained locally. Remaining native formats require authority specifications
+The initial full CHANGELOG upload was rejected by automatic approval review.
+Daniele subsequently explicitly requested “Publish changelog”, authorizing the
+prepared Round 58 CHANGELOG publication to public main. This documentation-only
+follow-up includes the complete release record; application/source register,
+plan, guide and tests were already published. Remaining native formats require authority specifications
 or a separate provider/API integration. Round 51 remains paused.

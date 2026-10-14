@@ -9,6 +9,21 @@ Newest entries at the top of each section.
 
 ### Current round — in-flight
 
+**Round 55 — Booking sharing and printable property QR**
+
+Specification: `PLAN_round55_share.md`. Booking-linked sharing, status-aware
+messages and private property defaults, then a printable permanent house QR.
+Round 51 remains paused. Existing guest links and booking identities stay stable.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 0 — Specification | in-progress — GPT-6.1 | Scope, phase gates, release/rollback |
+| 1 — Booking-based sharing | pending | Reservation selector, shared composer, DOM/isolation/regression and live-source gates |
+| 2 — Status-aware messages | pending | Status model, private defaults/RLS, WhatsApp and draft persistence gates |
+| 3 — Printable property QR | pending | Print/download QR, integrated regressions, guide/PDF and live verification |
+
+### Previous round — preserved completed status
+
 **Round 54 — Canonical guest app links**
 
 Specification: production guest links always use `https://app.welcomebnb.it`,

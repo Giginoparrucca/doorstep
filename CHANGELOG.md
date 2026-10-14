@@ -9,6 +9,31 @@ Newest entries at the top of each section.
 
 ### Current round — in-flight
 
+**Round 53 — Safe calendar round trips**
+
+Scope: suppress identifiable direct
+booking echoes and consolidate anonymous block occupancy without hiding extra
+nights or genuine OTA reservations. Round 51 remains paused.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 1 — Implement, test and release | in-progress — GPT-6.1 | Identity + shared occupancy projection; sync/export and actual DOM gates; read-only production evidence |
+
+### Round 53 Phase 1 — implementation and local gate (GPT-6.1, 2026-10-14)
+
+- Shared pure `lib/calendar-roundtrip.js` recognises original outbound UIDs or retained origin metadata, scoped to the property and non-test source. Exact identity plus identical dates links a return automatically; existing guest codes and host-confirmed links remain protected. Raw evidence is retained and host unlink persists an opt-out. Reappearance clears coverage-loss metadata. Read-time validation reveals availability when an automatically linked source changes, is cancelled or disappears.
+- Calendar bars, mobile day taps and direct-edit overlap checks consolidate only the nights of imported blocks already occupied by active local entries. Original row dates and details remain intact; residual nights stay visible; genuine OTA reservations are never inferred away by dates. The reported live rows project to the original 10–13 October direct booking and one residual 13–14 October block, with zero production data changes.
+- Outbound publishing retains original stable UIDs and adds non-secret origin metadata. Direct bookings, local blocks and genuine OTA reservations are published; imported anonymous closures and proven returns are never relayed, including stale returns from cancelled/deleted sources. This prevents self-sustaining closure loops. Sources are paged in both sync and export so the default row cap cannot hide identity. No schema, RLS, cron or credential change.
+- Failed/truncated feeds or upserts suppress the entire platform's cancellation sweep, including multiple feeds for the same platform. Known one-night echoes bypass the Airbnb noise filter. Booking UID-merge HTTP failures now fall back to importing the event rather than silently dropping it.
+- `calendar-roundtrip` executes the real sync/export handlers and calendar DOM in IT/EN: native/rewritten/description/opaque returns, repeat sync, original links, host override, cancellations/deletions, dates/extra nights, cross-property/test isolation, failure/pagination and occupied-night invariance through DST/month/year boundaries pass. Environment/demo guards, coverage-loss, deployment configuration, six actual exporter test exclusions/inline syntax, onboarding DOM/UI, group receipt and demo UX regressions pass.
+- Bilingual calendar FAQs/cache version and Italian presenter guide updated; regenerated five-page PDF, all pages visually reviewed. Source SHA-256 `69776d82443c270eb12deb464a6172f916be87f13d1112148a8332d2feefb47c`; PDF `b967ce7235b5dbebaff9a91a55550d1a6daf008b9e35cbc1cf131b7d4f235c2a`. Release and hosted checks pending; no production shipment claimed yet.
+- Publication blocker: shell push lacks GitHub credentials. The connected GitHub API verifies this public repository and the caller's admin/push permissions, and accepted a branch plus two small content objects; no implementation tree/ref was published. Automatic approval review rejected full CHANGELOG and API-source uploads. Repository ownership, unchanged historical metadata and the retrieved user instruction “Push to main all changes after verification and testing” did not satisfy its requirement for explicit end-user publication approval. No bypass, merge, production/demo deployment or calendar mutation was performed. Implementation is committed locally and packaged as an exact binary-capable patch. Next owner action: explicitly authorize publication of the tested Round 53 code, CHANGELOG and guides to this public repository, merge to main and production release; then GPT uploads the reviewed tree, creates/merges a PR and verifies the hosted calendar/feed and unchanged source records. Round 51 remains paused.
+- Publication authorization resolved on 14 October: Daniele replied “Yes, always push to main” to the explicit public-repository/code/CHANGELOG/guide/merge/deploy request. This is the standing release instruction for future requested, verified changes. The agent continues publication and hosted verification; no further routine release approval is required. Automatic review rejected additional instruction-file and planning-file publication; these optional payloads are omitted, retaining the existing AGENTS.md verbatim and keeping the plan local. The approved code, tests, CHANGELOG and guides contain the implementation and validation record.
+- Publication remains blocked after Daniele's further “Please merge to main” instruction. Automatic review again rejected the actual API-source upload, stating that push/merge authorization does not explicitly authorize the full source payload's disclosure to this public repository. No implementation tree/ref, merge or deployment has been published. The next required action is a direct end-user statement explicitly authorizing full Round 53 source publication to public Giginoparrucca/doorstep, followed by merge and deployment. Tests and prepared source remain unchanged; no repeated workaround or bypass attempted.
+- Source-publication approval resolved: Daniele explicitly authorized “publishing the full Round 53 source code, CHANGELOG and guides to my public GitHub repository Giginoparrucca/doorstep, merging to main and deploying app.welcomebnb.it.” The API-source upload now succeeds with the tested local blob SHA. Publication and production verification continue under this authorization.
+
+### Round 52 — preserved completed status
+
 **Round 52 — Automatic Alloggiati receipt retrieval**
 
 Specification: `PLAN_round52_alloggiati_receipts.md`. Uses the existing

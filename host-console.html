@@ -2418,6 +2418,7 @@ See you soon!</textarea>
 <script src="/lib/alloggiati-records.js"></script>
 <!-- Round 51 Phase 1-3 — pure readiness module + checklist/widget UI. -->
 <script src="/lib/onboarding-readiness.js"></script>
+<script src="/lib/calendar-roundtrip.js"></script>
 <script src="/host-onboarding.js"></script>
 <script>
 /* ══════════════════════════════════════
@@ -2772,7 +2773,7 @@ async function _upcomingCalSelectDay(iso) {
   // becomes a shortcut that opens the FIRST booking that day directly.
   // Days with no bookings are a no-op — nothing to select for.
   _upcomingCalSelectedDay = iso;
-  const hits = Object.values(_upcomingRowsById || {})
+  const hits = CalendarRoundtrip.projectRows(Object.values(_upcomingRowsById || {}))
     .filter(r => r && r.checkin_date && r.checkout_date
       && r.checkin_date <= iso && r.checkout_date > iso)
     .sort((a, b) => (a.checkin_date < b.checkin_date ? -1 : a.checkin_date > b.checkin_date ? 1 : 0));
@@ -5383,7 +5384,7 @@ function showPanel(id, btn) {
 const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','settings','rules','recos','qrlink'];
 // Bump on every host-guides.js change so browsers never see a stale
 // copy even if their cache is aggressive.
-const _HG_VERSION = '52.1-group-receipts';
+const _HG_VERSION = '53.1-calendar-roundtrips';
 let _hgLoadPromise = null;
 function _hgLoad() {
   if (window.HG) return Promise.resolve();
@@ -6501,8 +6502,9 @@ async function unlinkCoverage(otaId, btn) {
   try {
     // Read status first so we know whether to also revive.
     const { data: cur } = await sb.from('ota_reservations')
-      .select('status').eq('id', otaId).maybeSingle().or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false');
+      .select('status,raw').eq('id', otaId).maybeSingle().or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false');
     const patch = { covered_by_reservation_id: null, coverage_lost_at: null };
+    if (cur?.raw?.welcomebnb_auto_echo) patch.raw = { ...cur.raw, welcomebnb_auto_echo: false, welcomebnb_echo_ignored: true };
     if (cur && cur.status === 'cancelled') patch.status = 'active';
     const { error } = await sb.from('ota_reservations').update(patch).eq('id', otaId);
     if (error) {
@@ -6568,7 +6570,7 @@ async function _computeReservationOverlap(propId, checkinISO, checkoutISO, exclu
   if (!propId || !checkinISO || !checkoutISO) return [];
   try {
     const q = sb.from('ota_reservations')
-      .select('id, entry_type, guest_name, checkin_date, checkout_date, platform').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
+      .select('id, property_id, uid, entry_type, guest_name, checkin_date, checkout_date, platform, covered_by_reservation_id, raw, status, is_test').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
       .eq('property_id', propId)
       .eq('status', 'active')
       .is('deleted_at', null)
@@ -6576,7 +6578,8 @@ async function _computeReservationOverlap(propId, checkinISO, checkoutISO, exclu
       .gt('checkout_date', checkinISO);  // existing ends after our start
     const { data, error } = await q;
     if (error) { console.warn('[direct] overlap query failed:', error.message); return []; }
-    return (data || []).filter(r => r.id !== excludeId);
+    return CalendarRoundtrip.projectRows(data || []).filter(r => r.id !== excludeId &&
+      r.checkin_date < checkoutISO && r.checkout_date > checkinISO);
   } catch (e) {
     console.warn('[direct] overlap exception:', e);
     return [];
@@ -6916,12 +6919,11 @@ async function _renderUpcomingCalendarBody(buildHeader) {
   let rows = [];
   try {
     const { data, error } = await sb.from('ota_reservations')
-      .select('id, platform, entry_type, channel, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code, covered_by_reservation_id').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
+      .select('id, property_id, platform, entry_type, channel, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code, covered_by_reservation_id, raw, status, is_test').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
       .eq('property_id', propertyId)
       .in('entry_type', ['reservation', 'block'])
       .eq('status', 'active')
       .is('deleted_at', null)
-      .is('covered_by_reservation_id', null)
       .lte('checkin_date',  monthEndISO)
       .gte('checkout_date', monthStartISO)
       .order('checkin_date', { ascending: true });
@@ -6947,7 +6949,9 @@ async function _renderUpcomingCalendarBody(buildHeader) {
   // The existing 'in' / 'wait' tones stay for OTA reservations.
   const dated = (allCheckins || []).filter(c => c.arrival_date);
   const isHeadType = t => t === 'single' || t === 'head' || t === 'group';
-  const enriched = rows.map(r => {
+  // Same pure projection as the exporter. Imported blocks retain original
+  // dates in storage/details; only redundant occupied nights disappear.
+  const enriched = CalendarRoundtrip.projectRows(rows).map(r => {
     const isBlock  = r.entry_type === 'block';
     const isDirect = r.platform === 'direct';
     let name = null, checkedIn = false;
@@ -7006,11 +7010,11 @@ async function _renderUpcomingCalendarBody(buildHeader) {
   );
   if (directRes.length > 0) {
     for (const e of enriched) {
-      if (e.isDirect) continue;                       // only OTA rows.
+      if (e.isDirect || (e.isBlock && !e.r.raw?.welcomebnb_echo_ignored)) continue;
       if (e.r.covered_by_reservation_id) continue;    // already linked.
       const overlap = directRes.find(d =>
-        d.r.checkin_date  <  e.r.checkout_date &&
-        d.r.checkout_date >  e.r.checkin_date
+        d.r.checkin_date === e.r.checkin_date &&
+        d.r.checkout_date === e.r.checkout_date
       );
       if (overlap) {
         e.coverCandidateFor = overlap.r.id;

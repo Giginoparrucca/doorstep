@@ -64,6 +64,15 @@ Se il codice di accesso è subordinato al check-in, mostrarlo al passaggio succe
 
 Risultato atteso: il nuovo host riconosce dove inserire le risposte che oggi ripete.
 
+Nel **Calendario**, le notti di una prenotazione diretta compaiono una volta sola,
+anche se l’OTA le restituisce come blocco. Le notti extra restano visibili; i dati
+originali del blocco sono conservati. Se cambi o annulli la prenotazione, le notti
+ancora bloccate dall’OTA riappaiono. Nell’ambiente demo la sincronizzazione esterna
+resta disattivata.
+Il calendario in uscita pubblica prenotazioni dirette, blocchi creati qui e
+prenotazioni OTA. Non ritrasmette i blocchi anonimi importati né le copie
+riconosciute dei propri eventi: così non mantiene bloccate date già liberate.
+
 ## Prova autonoma dalla checklist (Round 51 Fase 4)
 
 La funzione è verificata con accesso host autenticato, isolamento tra proprietari

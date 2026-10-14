@@ -7,15 +7,16 @@ const fixture=(extra={})=>({id:'r1',property_id:'p1',booking_code:'CODE&1',guest
 function harness(lang='en',origin='https://app.welcomebnb.it') {
  const {window,document}=parseHTML('<html><body><div id="root"></div></body></html>');
  Object.defineProperty(window.HTMLSelectElement.prototype,'value',{configurable:true,get(){return this.querySelector('option[selected]')?.value||this.querySelector('option')?.value||'';},set(v){for(const o of this.querySelectorAll('option')){if(o.value===v)o.setAttribute('selected','');else o.removeAttribute('selected');}}});
- const copy=[],queries=[],assigned=[];let fail=false,copyFail=false,pause=null;
- const db={ota_reservations:[fixture()],checkins:[]};
+ const copy=[],queries=[],assigned=[],opened=[];let fail=false,copyFail=false,pause=null;
+ const db={ota_reservations:[fixture()],checkins:[],host_share_preferences:[]};
  const context={propertyId:'p1',property:{name:'Test House',timezone:'Europe/Rome'},lang,origin,mode:'production'};
  const sb={from(table){let prop;const q={select(){return q;},eq(k,v){if(k==='property_id')prop=v;return q;},order(){return q;},async range(from,to){queries.push({table,prop,from,to});if(pause)await pause;if(fail)return {error:Error('fixture failure')};return {data:db[table].filter(r=>r.property_id===prop).slice(from,to+1)};}};return q;}};
- context.sb=sb;const moduleWindow={navigator:{clipboard:{writeText:async value=>{if(copyFail)throw Error('denied');copy.push(value);}}}};
+ const originalFrom=sb.from;sb.from=function(table){if(table!=='host_share_preferences')return originalFrom(table);let prop,payload;const q={select(){return q;},eq(k,v){prop=v;return q;},upsert(v){payload=v;prop=v.property_id;return q;},then(resolve,reject){if(payload){const ix=db.host_share_preferences.findIndex(r=>r.property_id===prop&&r.preference_key===payload.preference_key);if(ix>=0)db.host_share_preferences[ix]=payload;else db.host_share_preferences.push(payload);}return Promise.resolve(fail?{error:Error('fixture')}:{data:db.host_share_preferences.filter(r=>r.property_id===prop)}).then(resolve,reject);}};return q;};
+ context.sb=sb;const moduleWindow={open:(...args)=>{opened.push(args);return {};},navigator:{clipboard:{writeText:async value=>{if(copyFail)throw Error('denied');copy.push(value);}}}};
  vm.runInContext(script,vm.createContext({window:moduleWindow,console,URL,Intl,Date,Map,Set}));
  const root=document.getElementById('root');
  const controller=moduleWindow.HostShare.create({root,context:()=>context,ensureCodes:async rows=>{assigned.push(...rows.map(r=>r.id));for(const r of rows)r.booking_code='ASSIGNED-'+r.id;}});
- return {window:moduleWindow,document,root,controller,db,context,copy,queries,assigned,setFail:v=>fail=v,setCopyFail:v=>copyFail=v,setPause:v=>pause=v};
+ return {window:moduleWindow,document,root,controller,db,context,copy,queries,assigned,opened,setFail:v=>fail=v,setCopyFail:v=>copyFail=v,setPause:v=>pause=v};
 }
 for(const lang of ['en','it'])for(const origin of ['https://app.welcomebnb.it','https://demo.welcomebnb.it']) {
  const h=harness(lang,origin);await h.controller.load();
@@ -26,7 +27,8 @@ for(const lang of ['en','it'])for(const origin of ['https://app.welcomebnb.it','
  const text=h.root.querySelector('textarea');assert.ok(!/\{guest_/.test(text.value));text.value='My edited message';text.oninput();await h.root.querySelector('[data-share-copy]').onclick();assert.equal(h.copy.at(-1),'My edited message');
  await h.controller.load();assert.equal(h.root.querySelector('textarea').value,'My edited message');
  h.setCopyFail(true);await h.root.querySelector('[data-share-link]').onclick();assert.match(h.root.querySelector('[data-share-feedback]').textContent,lang==='it'?/non riuscita/:/Could not copy/);
- h.context.lang=lang==='it'?'en':'it';h.controller.repaint();assert.notEqual(h.root.querySelector('textarea').value,'My edited message');
+ h.context.lang=lang==='it'?'en':'it';h.controller.repaint();assert.equal(h.root.querySelector('textarea').value,'My edited message','UI language does not replace guest draft');
+ const language=h.root.querySelector('#shareLanguage');language.value=lang==='it'?'en':'it';language.onchange();assert.notEqual(h.root.querySelector('textarea').value,'My edited message');
  h.context.propertyId='p2';h.controller.repaint();assert.equal(h.root.innerHTML,'');
  console.log('PASS '+lang+' '+origin+': actual selection/copy/message edits/refresh/language and property invalidation');
 }
@@ -44,3 +46,22 @@ const demo=harness();demo.context.mode='demo';demo.db.ota_reservations=[fixture(
 const source=fs.readFileSync(new URL('../host-console.html',import.meta.url),'utf8');assert.ok(!source.includes('function generateBookingCode('));assert.ok(!source.includes('id="pastBookingCodes"'));assert.equal((source.match(/onclick="openBookingShare\(decodeURIComponent\(this.dataset.shareCode\)\)"/g)||[]).length,2);
 for(const m of source.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))if(m[1].trim())new vm.Script(m[1]);
 console.log('PASS exclusions, check-in-only booking, stable missing-code path, explicit past selection, missing selection, pagination, errors/retry, empty, races, demo and entry-point/inline gates');
+// Phase 2: registration is never inferred from dates or another property.
+const m=harness();const R=m.window.HostShare;const base=fixture({guest_count:3});
+const guest=(id,extra={})=>({id,property_id:'p1',booking_code:base.booking_code,submitted_at:'2026-10-01T12:00:00Z',...extra});
+assert.equal(R.registration(base,[],'production'),'start');
+assert.equal(R.registration(base,[guest('a')],'production'),'partial');
+assert.equal(R.registration(base,[guest('a'),guest('b'),guest('c')],'production'),'complete');
+assert.equal(R.registration({...base,guest_count:null},[guest('a')],'production'),'received');
+assert.equal(R.registration(base,[guest('a',{property_id:'p2'}),guest('b',{deleted_at:'x'}),guest('c',{is_test:true})],'production'),'start');
+assert.equal(R.registration({...base,guest_count:1,checkin_reopened_at:'2026-10-02T12:00:00Z'},[guest('a')],'production'),'partial');
+for(const l of ['en','it'])for(const kind of ['start','partial','received','complete'])assert.ok(R.validTemplate(R.messages[l][kind]));
+for(const bad of ['No link','{guest_link} {unknown}','https://old/?b=old {guest_link}','x'.repeat(4001)+'{guest_link}'])assert.equal(R.validTemplate(bad),false);
+m.db.ota_reservations=[base];m.db.checkins=[guest('a')];await m.controller.load();assert.match(m.root.querySelector('[data-share-status]').textContent,/Partially/);
+const draft=m.root.querySelector('#shareMessage');draft.value='Specific guest edits & emoji 👋';draft.oninput();m.root.querySelector('[data-share-whatsapp]').onclick();assert.equal(new URL(m.opened.at(-1)[0]).searchParams.get('text'),draft.value);assert.equal(m.db.host_share_preferences.length,0,'opening message does not persist guest text');
+const defaults=m.root.querySelector('#shareDefaultTemplate');defaults.value='Welcome {guest_name} — {guest_link}';await m.root.querySelector('[data-share-save-default]').onclick();assert.equal(m.db.host_share_preferences[0].value,'Welcome {guest_name} — {guest_link}');assert.ok(!m.db.host_share_preferences[0].value.includes('Specific guest'));
+assert.equal(m.root.querySelector('#shareMessage').value,'Specific guest edits & emoji 👋');m.root.querySelector('[data-share-reset]').onclick();assert.match(m.root.querySelector('#shareMessage').value,/Welcome Sample/);
+const oldPrefs=m.db.host_share_preferences.length;m.root.querySelector('#shareDefaultTemplate').value='Invalid';await m.root.querySelector('[data-share-save-default]').onclick();assert.equal(m.db.host_share_preferences.length,oldPrefs);assert.match(m.root.querySelector('[data-share-feedback]').textContent,/Include/);
+const ml=m.root.querySelector('#shareLanguage');ml.value='it';ml.onchange();await Promise.resolve();await Promise.resolve();assert.match(m.root.querySelector('#shareMessage').value,/Ciao/);await m.controller.load();assert.equal(m.root.querySelector('#shareLanguage').value,'it');
+m.context.propertyId='p2';await m.controller.load();assert.equal(m.root.querySelector('#shareMessage'),null);
+console.log('PASS Phase 2 status/count/reopen/scoping, templates/validation, real WhatsApp encoding, private generic defaults, separate guest drafts/reset and language persistence');

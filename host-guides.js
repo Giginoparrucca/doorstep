@@ -1028,7 +1028,7 @@ const GUIDES = {
     when: { it: 'Appena ricevi una prenotazione.', en: 'As soon as you get a booking.' },
     steps: [
       { it: 'Scegli la prenotazione da condividere.', en: 'Choose the booking to share.', target: 'qr-select-booking', art: 'qr1' },
-      { it: 'Controlla il messaggio e premi «Copia messaggio».', en: 'Review the message and press “Copy message”.', target: 'qr-copy-template', art: 'qr2' },
+      { it: 'Scegli la lingua, controlla il messaggio in base alla registrazione e premi «Copia messaggio» o «Apri WhatsApp».', en: 'Choose the message language, review the registration-aware text and press “Copy message” or “Open WhatsApp”.', target: 'qr-copy-template', art: 'qr2' },
       { it: 'Incolla nella chat di Airbnb o Booking e invia.', en: 'Paste it in your Airbnb or Booking chat and send.', target: 'qr-copy-template', art: 'qr3' },
       { it: 'Stampa il QR della casa e mettilo vicino alla porta.', en: 'Print the property QR and place it near the door.', target: 'qr-apartment', art: 'qr4' },
     ],

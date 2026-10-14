@@ -545,6 +545,8 @@ function renderArrivalHTML(property, rows, lang) {
     const link = r.booking_code
       ? `${APP_BASE_URL}/?b=${encodeURIComponent(r.booking_code)}&p=${encodeURIComponent(property.id)}`
       : null;
+    const shareUrl = `${APP_BASE_URL}/host-console.html?notify_prop=${encodeURIComponent(property.id)}&open=share&booking=${encodeURIComponent(r.booking_code || '')}`;
+    const shareLabel = isIT ? 'Prepara messaggio' : 'Prepare message';
     const linkBlock = link
       ? `<p style="margin:8px 0 0;">
            ${T.guestLink}
@@ -556,6 +558,7 @@ function renderArrivalHTML(property, rows, lang) {
         <div style="font-size:12px;letter-spacing:0.06em;text-transform:uppercase;color:#005BFF;font-weight:600;">${esc(platform)}</div>
         <div style="font-weight:600;margin-top:4px;">${guest} · ${esc(r.checkin_date)} → ${esc(r.checkout_date)}</div>
         ${linkBlock}
+        ${link ? `<p><a href="${esc(shareUrl)}">${shareLabel}</a></p>` : ''}
       </div>`;
   }).join('');
 

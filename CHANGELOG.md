@@ -17,10 +17,16 @@ Round 51 remains paused. Existing guest links and booking identities stay stable
 
 | Phase | Status | Where / test gate |
 |---|---|---|
-| 0 — Specification | in-progress — GPT-6.1 | Scope, phase gates, release/rollback |
-| 1 — Booking-based sharing | pending | Reservation selector, shared composer, DOM/isolation/regression and live-source gates |
+| 0 — Specification | shipped — PR #152 — GPT-6.1 | Scope, phase gates, release/rollback |
+| 1 — Booking-based sharing | in-progress — GPT-6.1 | Reservation selector, shared composer, DOM/isolation/regression and live-source gates |
 | 2 — Status-aware messages | pending | Status model, private defaults/RLS, WhatsApp and draft persistence gates |
 | 3 — Printable property QR | pending | Print/download QR, integrated regressions, guide/PDF and live verification |
+
+### Round 55 Phase 1 — local gate (GPT-6.1, 2026-10-14)
+
+- Replaced standalone generator/recent browser codes with existing reservation selection, upcoming/all filters, editable message, copy-link/message and open-app actions. Shared entry points from dashboard and calendar/list cards retain the original booking code. Check-in-only bookings remain shareable; cancelled/deleted/block/covered/production-test rows cannot be resurrected through fallback. Missing codes use the existing persisted-reservation assignment path.
+- Owner-scoped paginated reads, empty/error/retry states, stale-request/property guards and missing deep-link rejection. IT/EN labels, per-booking in-memory draft preservation and clipboard failure feedback. Permanent property QR and test preview remain. Bilingual guide/cache updated.
+- PASS actual `host-share` DOM/controller gates in production/demo and IT/EN: selection, original IDs, copies, edits, refresh/language, exclusions, missing codes, check-in-only groups, past/deep-link failure, pagination, errors/retry, empty and property races. `guest-links`, `calendar-roundtrip`, `environment`, `onboarding-ui` and `onboarding-visibility` pass. Publication/live-source verification pending; no guest messages sent.
 
 ### Previous round — preserved completed status
 

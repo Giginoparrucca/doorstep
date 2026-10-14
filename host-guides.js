@@ -1022,13 +1022,13 @@ const GUIDES = {
     page: { it: 'QR Code & Link', en: 'QR Code & Link' },
     title: { it: 'Dare l’app agli ospiti', en: 'Sharing the app with guests' },
     purpose: {
-      it: 'Qui crei il link per ogni prenotazione e trovi il QR per la casa.',
-      en: 'Here you create the per-booking link and find the property QR.',
+      it: 'Qui condividi il link esistente della prenotazione e trovi il QR della casa.',
+      en: 'Share an existing booking link and find the permanent house QR here.',
     },
     when: { it: 'Appena ricevi una prenotazione.', en: 'As soon as you get a booking.' },
     steps: [
-      { it: 'Premi «🔑 Genera Nuovo Link Prenotazione».', en: 'Press “🔑 Generate New Booking Link”.', target: 'qr-gen-booking', art: 'qr1' },
-      { it: 'Premi «📋 Copia Modello»: prendi il messaggio pronto.', en: 'Press “📋 Copy Template”: grab the ready message.', target: 'qr-copy-template', art: 'qr2' },
+      { it: 'Scegli la prenotazione da condividere.', en: 'Choose the booking to share.', target: 'qr-select-booking', art: 'qr1' },
+      { it: 'Controlla il messaggio e premi «Copia messaggio».', en: 'Review the message and press “Copy message”.', target: 'qr-copy-template', art: 'qr2' },
       { it: 'Incolla nella chat di Airbnb o Booking e invia.', en: 'Paste it in your Airbnb or Booking chat and send.', target: 'qr-copy-template', art: 'qr3' },
       { it: 'Stampa il QR della casa e mettilo vicino alla porta.', en: 'Print the property QR and place it near the door.', target: 'qr-apartment', art: 'qr4' },
     ],

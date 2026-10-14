@@ -25,3 +25,13 @@ RLS with rolled-back SQL probes. Run relevant onboarding/admin/Share/link and
 guest regressions, syntax checks. Merge main under standing authorization, verify
 served source/config and deployment status. Update CHANGELOG and affected guide.
 Rollback source; additive nullable metadata may remain safely unused.
+
+## Execution — 2026-10-14
+Phase 1 shipped to production in PR #157, main commit
+`38a04098372f49bedf122cb18480a7eaa671cb41`. Chromium IT/EN at 390/1280px,
+actual guest gateway/rendering, app regressions and rolled-back fictional-owner
+SQL gates pass. Production schema ready; live console/editor/shared framing/guide/
+guest source matches tested files exactly. Vercel reports success and canonical
+origin remains app.welcomebnb.it. Full CHANGELOG upload failed; PR #157 retains
+that limitation while the source, tests, migration, guide and this plan are public.
+No separate demo rollout. Round 51 remains paused.

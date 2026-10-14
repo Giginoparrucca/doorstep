@@ -1186,7 +1186,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     <input type="checkbox" id="adminEditToggle" onchange="toggleAdminEdit(this.checked)" style="cursor:pointer;">
     <span data-h="admin_enable_edit">Enable editing</span>
   </label>
-  <button onclick="window.close()" style="background:rgba(255,255,255,0.12);border:none;color:#fff;border-radius:6px;padding:5px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" data-h="admin_close">Close</button>
+  <a href="/admin.html" style="background:rgba(255,255,255,0.12);border:none;color:#fff;border-radius:6px;padding:5px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;text-decoration:none;" data-h="admin_back">Back to admin</a>
 </div>
 
 <!-- LOGIN SCREEN -->
@@ -3550,7 +3550,7 @@ async function checkAuth() {
 }
 
 // Handle password recovery and invite from email links.
-sb.auth.onAuthStateChange(async (event, session) => {
+async function handleHostAuthEvent(event, session) {
   // Round 51 hotfix — an invite / magic-link / recovery lands here
   // with `type=<kind>` in the URL hash. Supabase emits SIGNED_IN once
   // the token exchange completes. On BOTH `type=invite` and
@@ -3612,7 +3612,7 @@ sb.auth.onAuthStateChange(async (event, session) => {
     try { history.replaceState({}, document.title, window.location.pathname + window.location.search); } catch (_) {}
     try { sessionStorage.removeItem('wbnb_auth_hint'); } catch (_) {}
     if (passwordSet) {
-      window.location.href = window.location.origin + '/host-console.html';
+      window.location.href = window.location.origin + '/host-console.html' + window.location.search;
     }
     return;
   }
@@ -3626,6 +3626,13 @@ sb.auth.onAuthStateChange(async (event, session) => {
       await sb.rpc('accept_my_invite');
     } catch (_) { /* non-fatal */ }
   }
+}
+// Auth callbacks run under the SDK's session lock. Release the callback before
+// calling updateUser/RPC or any other authenticated API, including invite work.
+sb.auth.onAuthStateChange((event, session) => {
+  setTimeout(() => {
+    handleHostAuthEvent(event, session).catch(error => console.warn('Host auth event failed:', error));
+  }, 0);
 });
 
 // Round 38 — sign-up is gone. Access is by invitation. toggleAuthMode
@@ -3992,7 +3999,7 @@ const HT = {
     rf_saved_ok: 'Saved.',
     rf_privacy_hint: '🔒 Contact and notes stay with you. They never appear in the guest app, exports or reminders.',
     admin_enable_edit: 'Enable editing',
-    admin_close: 'Close',
+    admin_close: 'Close', admin_back: 'Back to admin',
     cmp_intro: 'A plain-language guide to the three compliance obligations for short-term rentals in Italy. This is reference information — verify the specifics for your region and comune.',
     // Panel titles
     t_dashboard: 'Dashboard', s_dashboard: 'What needs your attention right now',
@@ -4547,7 +4554,7 @@ const HT = {
     rf_saved_ok: 'Salvato.',
     rf_privacy_hint: '🔒 Contatti e note restano con te. Non appaiono mai nell\'app ospiti, negli export o nei promemoria.',
     admin_enable_edit: 'Abilita modifica',
-    admin_close: 'Chiudi',
+    admin_close: 'Chiudi', admin_back: 'Torna all’admin',
     cmp_intro: 'Una guida in linguaggio semplice ai tre obblighi di conformità per le locazioni brevi in Italia. È informazione di riferimento — verifica i dettagli per la tua regione e il tuo comune.',
     t_dashboard: 'Dashboard', s_dashboard: 'Cosa richiede la tua attenzione adesso',
     // Round 15 — bacheca azioni
@@ -4994,7 +5001,8 @@ function setHostLang(l) {
   // failures don't block the UI switch. Uses the Round 20.2
   // .select()-after-update pattern so a silent RLS block is loud in
   // the console but doesn't surface a scary toast when nobody asked.
-  if (typeof propertyId !== 'undefined' && propertyId && (l === 'en' || l === 'it')) {
+  if (typeof propertyId !== 'undefined' && propertyId && (l === 'en' || l === 'it') &&
+      !(typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled)) {
     const prev = propertyData?.host_language;
     if (prev !== l) {
       if (propertyData) propertyData.host_language = l; // optimistic
@@ -7134,6 +7142,8 @@ async function _renderUpcomingCalendarBody(buildHeader) {
 // so subsequent renders / iCal syncs keep the same value — never
 // regenerated, or the link the host already shared would break.
 async function ensureReservationBookingCodes(rows) {
+  if (typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled) return rows;
+
   const propInit = (propertyData?.name || 'DS').replace(/[^A-Za-z]/g, '').substring(0, 3).toUpperCase() || 'DS';
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const rand6 = () => {
@@ -14437,8 +14447,8 @@ function showImpersonationError(propertyId, sessionEmail) {
         <h2 style="margin:0;font-size:1.15rem;font-weight:600;">${it ? 'Vista admin — impossibile caricare la proprietà' : 'Admin view — could not load property'}</h2>
       </div>
       <p style="margin:0 0 12px;font-size:0.9rem;line-height:1.5;color:#374151;">${it
-        ? 'La lettura della proprietà è stata bloccata da RLS. La sessione attuale non ha diritti di admin sulla tabella <code style="font-family:monospace;background:#f3f4f6;padding:1px 4px;border-radius:3px;">properties</code>.'
-        : 'The property read was blocked by RLS. The current session does not have admin rights on the <code style="font-family:monospace;background:#f3f4f6;padding:1px 4px;border-radius:3px;">properties</code> table.'}</p>
+        ? 'La proprietà non è disponibile per questa sessione. Accedi con il tuo account admin o torna alla console admin.'
+        : 'This property is not available to this session. Sign in with your admin account or return to the admin console.'}</p>
       <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:0.8rem;line-height:1.6;">
         <div><strong>${it ? 'Sessione' : 'Session'}:</strong> <code style="font-family:monospace;">${(sessionEmail || (it ? 'nessuna' : 'none')).replace(/[<>&]/g, '')}</code></div>
         <div><strong>${it ? 'Proprietà richiesta' : 'Requested property'}:</strong> <code style="font-family:monospace;font-size:0.72rem;">${String(propertyId).replace(/[<>&]/g, '')}</code></div>
@@ -14447,7 +14457,7 @@ function showImpersonationError(propertyId, sessionEmail) {
         ? 'Cause tipiche: 1) la sessione di questa tab è di un utente diverso da quello che ha aperto l\'admin (Chrome multi-profilo / sessione scaduta); 2) l\'email della sessione non è in <code style="font-family:monospace;background:#f3f4f6;padding:1px 4px;border-radius:3px;">admin_users</code>.'
         : 'Common causes: 1) this tab\'s session belongs to a different user than the admin tab (Chrome multi-profile / expired session); 2) the session email is not in <code style="font-family:monospace;background:#f3f4f6;padding:1px 4px;border-radius:3px;">admin_users</code>.'}</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
-        <button onclick="window.close()" style="padding:9px 16px;background:#fff;color:#6B7A90;border:1px solid #e5e7eb;border-radius:6px;font-size:0.85rem;cursor:pointer;font-family:inherit;">${it ? 'Chiudi' : 'Close'}</button>
+        <a href="/admin.html" style="padding:9px 16px;background:#fff;color:#6B7A90;border:1px solid #e5e7eb;border-radius:6px;font-size:0.85rem;cursor:pointer;font-family:inherit;text-decoration:none;">${it ? 'Torna all’admin' : 'Back to admin'}</a>
         <button onclick="sb.auth.signOut().then(() => window.location.reload())" style="padding:9px 16px;background:#b03939;color:#fff;border:none;border-radius:6px;font-size:0.85rem;cursor:pointer;font-family:inherit;">${it ? 'Esci e riprova' : 'Sign out and retry'}</button>
       </div>
     </div>`;
@@ -14482,7 +14492,16 @@ async function init() {
 
   // Admin override: ?p=UUID loads any property directly (for admin management)
   const adminPropId = new URLSearchParams(window.location.search).get('p');
-  const isAdminView = adminPropId && new URLSearchParams(window.location.search).get('admin') === '1';
+  // A URL flag is not authorization. Verify the current server-backed identity
+  // before querying another property or initializing any editable host controls.
+  if (adminPropId) {
+    if (!await _hostIsAdmin(userId)) {
+      showImpersonationError(adminPropId, _trackEmail);
+      return;
+    }
+    activateAdminView();
+  }
+
 
   // 1. Load the FULL list of properties this user owns (Round 21 multi-property)
   try {
@@ -14549,26 +14568,8 @@ async function init() {
   // 2. Load all property-scoped data for the selected property
   await loadPropertyData();
 
-  // 3. Round 25: if launched from the admin panel (?admin=1), AND the
-  // logged-in user is genuinely an admin, show the warning banner and lock
-  // read-only. We must verify admin status here — trusting the URL param
-  // alone would show the banner (and read-only lock) to a normal host who
-  // happens to have ?admin=1 left in their URL. (RLS already prevents a
-  // non-admin from actually reading another host's data; this is the UX
-  // half of that boundary.)
-  if (isAdminView) {
-    const reallyAdmin = await _hostIsAdmin(userId);
-    if (reallyAdmin) {
-      activateAdminView();
-    } else {
-      // Strip the stray params so the banner never shows for a normal host,
-      // and so a refresh doesn't keep re-triggering this path.
-      const url = new URL(window.location.href);
-      url.searchParams.delete('admin');
-      url.searchParams.delete('p');
-      history.replaceState(null, '', url.toString());
-    }
-  }
+  // Re-apply the verified support view after data/form rendering.
+  if (adminPropId) activateAdminView();
 
   // Round 42 — deep-link handler for push / email / telegram alert
   // clicks. Runs BEFORE the section-restore below so it wins. The
@@ -14641,7 +14642,7 @@ async function _hostIsAdmin(userId) {
     const { data: { user } } = await sb.auth.getUser();
     const email = user?.email;
     if (!email) return false;
-    const { data, error } = await sb.from('admin_users').select('email').eq('email', email).maybeSingle();
+    const { data, error } = await sb.from('admin_users').select('email').eq('email', email.toLowerCase()).maybeSingle();
     if (error) { console.warn('admin check failed:', error.message); return false; }
     return !!data;
   } catch (e) { console.warn('admin check exception:', e); return false; }
@@ -14650,8 +14651,16 @@ async function _hostIsAdmin(userId) {
 // ── Round 25: Admin "view as host" mode ──────────────────────────────────
 let IS_ADMIN_VIEW = false;
 let _adminEditEnabled = false;
+let _adminReadOnlyObserver = null;
 function activateAdminView() {
   IS_ADMIN_VIEW = true;
+  const main = document.querySelector('.main');
+  if (main && !_adminReadOnlyObserver) {
+    _adminReadOnlyObserver = new MutationObserver(() => {
+      if (IS_ADMIN_VIEW && !_adminEditEnabled) setConsoleReadOnly(true);
+    });
+    _adminReadOnlyObserver.observe(main, { childList: true, subtree: true });
+  }
   const banner = document.getElementById('adminViewBanner');
   if (!banner) return;
   banner.style.display = 'flex';

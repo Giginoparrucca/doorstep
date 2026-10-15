@@ -1931,6 +1931,7 @@ const T = {
     comune_no_match: 'No match — please check spelling',
     comune_did_you_mean: 'Did you mean',
     comune_pick_required: '⚠ Please pick a city from the list',
+    comune_free_text_ok: 'ℹ Accepted (not an Italian comune — ok for foreign-issued documents)',
     val_birth_country: 'Country of birth is required',
     val_citizenship: 'Citizenship is required',
     val_birth_country_unknown: 'Country of birth "{v}" isn\'t recognized — please pick one from the list.',
@@ -2086,6 +2087,7 @@ const T = {
     comune_no_match: 'Nessuna corrispondenza — controlla l\'ortografia',
     comune_did_you_mean: 'Forse intendevi',
     comune_pick_required: '⚠ Seleziona una città dall\'elenco',
+    comune_free_text_ok: 'ℹ Accettato (non è un comune italiano — ok per documenti rilasciati all\'estero)',
     val_birth_country: 'Lo stato di nascita è obbligatorio',
     val_citizenship: 'La cittadinanza è obbligatoria',
     val_birth_country_unknown: 'Stato di nascita "{v}" non riconosciuto — scegline uno dall\'elenco.',
@@ -2962,9 +2964,20 @@ function _comuneValidationApplies() {
   return isItalianCountry(val);
 }
 
-function attachComuneAutocomplete(input, onSelect) {
+function attachComuneAutocomplete(input, onSelect, opts) {
   if (!input || input._comuneAutoBound) return;
   input._comuneAutoBound = true;
+  // Round 51 hotfix — `strict` controls what the status hint says when
+  // the user typed a value that doesn't match an Italian comune.
+  //   strict=true  (default, birthplace): red "pick a city" warning,
+  //                because the submission really does require a comune
+  //                for Italian-born guests.
+  //   strict=false (docissue): muted info line "accepted as free text",
+  //                because the submission does NOT block foreign-issued
+  //                documents and "Italy" / "Paris" / "Préfecture de Lyon"
+  //                are all legitimate issuers.
+  const strict = !opts || opts.strict !== false;
+  input._comuneStrict = strict;
 
   // Build the dropdown panel. Positioned absolute relative to the input's
   // wrapping form-group (which is position:relative implicitly via flow,
@@ -3048,6 +3061,12 @@ function attachComuneAutocomplete(input, onSelect) {
             panel.style.display = 'none';
           });
         }
+      } else if (!strict) {
+        // Non-strict field (doc_issue_place): the submission accepts
+        // any text, so a non-comune value just gets a soft confirmation
+        // instead of a red error.
+        hint.style.color = 'var(--ink-soft, #6b7280)';
+        hint.textContent = T[lang]?.comune_free_text_ok || 'ℹ Accepted (not an Italian comune — ok for foreign-issued documents)';
       } else {
         hint.style.color = 'var(--red, #0047CC)';
         hint.textContent = T[lang]?.comune_pick_required || '⚠ Please pick a city from the list';
@@ -3726,7 +3745,7 @@ function _wireEditFormAutocomplete() {
     }
     const _edi = document.getElementById('ed_docissue' + i);
     if (_edi) {
-      attachComuneAutocomplete(_edi, null);
+      attachComuneAutocomplete(_edi, null, { strict: false });
       if (_edi.value && _edi.value.trim()) refreshComuneValidation(_edi, null);
     }
   });
@@ -5233,7 +5252,7 @@ async function init() {
     // foreign, the validator only blocks when bornInItaly is true.
     // For docissue, foreign issuers are still acceptable as plain text —
     // we don't gate this field on validation (see checkinNext).
-    attachComuneAutocomplete(docissueInput, null);
+    attachComuneAutocomplete(docissueInput, null, { strict: false });
   }
 
   // Round 18: if cache was cleared due to host-side delete, surface a

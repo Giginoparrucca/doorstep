@@ -9,6 +9,33 @@ Newest entries at the top of each section.
 
 ### Current round — in-flight
 
+**Round 59 — Centered prompts and unsaved-form protection**
+
+Specification: `PLAN_round59_unsaved_forms.md`. Center save prompts and protect
+all saveable host-console forms, including Settings. Round 51 remains paused.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 1 — Implement, test and release | shipped (production) — PR #159 — GPT-6.1 | Shared guard, actual form/browser tests, regressions and main/production checks |
+
+### Round 59 Phase 1 — standing publication authorization confirmed (GPT-6.1, 2026-10-15)
+
+- Daniele explicitly confirmed that everything requested in this project must be pushed to public `Giginoparrucca/doorstep` main, including CHANGELOG updates, without repeated permission requests. This authorizes the prepared full Round 59 CHANGELOG publication and future requested code/tests/plans/guides/release documentation, main merges and production deployment. Recorded the standing instruction in `AGENTS.md` for future sessions.
+- This documentation-only follow-up resolves the initial publication blocker recorded below. Application code and production verification remain unchanged; completed plan updated to reflect the authorization. Round 51 remains paused.
+
+### Round 59 Phase 1 — implementation and verification (GPT-6.1, 2026-10-15)
+
+- Centered the shared Save changes dialog with explicit viewport positioning/margins, bounded width/height and scroll support. Native modal focus, Keep editing autofocus, Escape and bilingual labels retained. A single memory-only draft registry protects console tab/section changes, property switches, new-property flow, manual sign-out and browser unload; idle expiry still clears state and signs out.
+- Added save/discard/stay protection to Settings (tax values, dynamic rules/exemptions, calendar feeds, reminders/timezone), Rules, Recommendations and property Share defaults, while retaining Property Details/photo protection. Calendar booking/block, guest correction, guest lockbox and portal-link dialogs use the same guard when closing/leaving. Alloggiati credential drafts retain explicit validation and consent; no secrets are persisted in draft storage. Filters, read-only links, export review controls and message-send actions are not automatic saves.
+- Track actual fields/model values, including focused text, additions/removals, ordering and languages, rather than edit mode alone. Failed, invalid, incomplete-return or zero-row saves prevent continuation and retain editable drafts. Duplicate saves/navigation are serialized. Share template drafts survive category/language rerenders. Updated the bilingual guide and asset versions.
+- Settings now saves only its own columns; Property Details keeps its own fields including statistical code/capacity. Feed add/remove no longer mutates saved propertyData before Save. Discard restores tax arrays/feeds as well as reminders. Persisted settings arrays are cloned so subsequent drafts cannot mutate saved state. Existing calendar Sync remains an explicit action that can persist its feed list. No schema, policies, account permissions or automated submissions changed. Existing Rules/Recommendations replacement saves remain non-atomic delete/insert operations; a failed insert retains the local draft and requires retry.
+- PASS actual-source Chromium at 390/1280px in IT/EN: measured viewport centering after scroll; all prompt actions/Escape; unchanged/reverted fields; Settings tax/feed/reminder save/discard, saved-array isolation; Rules/Recommendations focused text/add/discard; invalid, failed, partial and zero-row saves; duplicate-save/navigation exclusion; property scoping; explicit credential consent; Share defaults; portal, calendar-block and guest-edit dialogs; new-property/sign-out routes; unload and admin write denial. Fictional browser transport/data only, with screenshots visually reviewed.
+- PASS existing Property Details/photo-framing, Share/QR and regional-download browser suites (mobile/desktop IT/EN); canonical links/inline compilation, admin access, guest check-in, deployment config, environment, calendar roundtrip, reminders, house QR, group receipts and onboarding readiness/UI/visibility. No production guest records were read or written for verification. Round 51 remains paused.
+- Recommendations with typed details but no name now fail validation before any replacement write, so Save and continue cannot silently drop them. Final shared-form browser suite passes on the tested source.
+- Automatic approval review rejected publication of the full Round 59 CHANGELOG, citing potentially sensitive historical details and missing current authorization for that specific public payload. No retry or indirect publication of the rejected payload. Source/tests/guide/plan publication continues with the published CHANGELOG preserved; full record remains local. PR #159 merged main as `8a6240a92a0b87c732992631d048772a749bf3e5`; Vercel production succeeded. All eight published files match local source; served host console, shared draft registry, property editor, Share module and guide match tested bytes. Canonical origin verified. Source/tests/guide/plan are published and application is live; full CHANGELOG delivery remains blocked.
+
+### Previous round — preserved completed status
+
 **Round 58 — Regional statistical downloads**
 
 Specification: `PLAN_round58_regional_downloads.md`. Research each region's

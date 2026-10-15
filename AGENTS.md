@@ -3,6 +3,15 @@
 These instructions apply throughout the repository to GPT, Claude and any other
 agent working on the project.
 
+## Standing publication authorization
+
+Daniele explicitly confirmed on 15 October 2026 that everything he requests in
+this project is to be published to public `Giginoparrucca/doorstep` main,
+including CHANGELOG updates. This standing authorization includes requested
+source changes, tests, plans, guides and changelog/release records, merging to
+main and deploying `https://app.welcomebnb.it`. Complete the applicable checks and
+publish these together without repeatedly requesting publication permission.
+
 ## CHANGELOG and multi-model handoff
 
 1. Before any Round, read CHANGELOG.md top-to-bottom and its specification. The

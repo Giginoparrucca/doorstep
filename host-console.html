@@ -6748,96 +6748,96 @@ async function saveDirectReservation(ev) {
   if (!_consoleCanEdit()) return false;
   const form = document.getElementById('reservationForm'); if (form && !form.reportValidity()) return false;
   return consoleDrafts.run('reservation', async () => {
-  const modal = document.getElementById('reservationFormModal');
-  if (!modal) return;
-  const mode = modal.dataset.mode || 'reservation';
-  const reservationId = modal.dataset.reservationId || null;
-  const isBlock = mode === 'block';
-  const errEl = document.getElementById('rfError');
-  const saveBtn = document.getElementById('rfSaveBtn');
-  const setErr = (k) => {
-    if (!errEl) return;
-    errEl.textContent = h(k);
-    errEl.style.display = 'block';
-  };
-  if (errEl) errEl.style.display = 'none';
+    const modal = document.getElementById('reservationFormModal');
+    if (!modal) return;
+    const mode = modal.dataset.mode || 'reservation';
+    const reservationId = modal.dataset.reservationId || null;
+    const isBlock = mode === 'block';
+    const errEl = document.getElementById('rfError');
+    const saveBtn = document.getElementById('rfSaveBtn');
+    const setErr = (k) => {
+      if (!errEl) return;
+      errEl.textContent = h(k);
+      errEl.style.display = 'block';
+    };
+    if (errEl) errEl.style.display = 'none';
 
-  const ci = document.getElementById('rfCheckin')?.value || '';
-  const co = document.getElementById('rfCheckout')?.value || '';
-  const notes = (document.getElementById('rfNotes')?.value || '').trim();
-  const channel = isBlock
-    ? (document.getElementById('rfBlockReason')?.value || '')
-    : (document.getElementById('rfChannel')?.value || '');
-  const guestName = isBlock ? '' : (document.getElementById('rfGuestName')?.value || '').trim();
-  const guestCountRaw = isBlock ? '' : (document.getElementById('rfGuestCount')?.value || '').trim();
-  const contactPhone = isBlock ? '' : (document.getElementById('rfContactPhone')?.value || '').trim();
-  const contactEmail = isBlock ? '' : (document.getElementById('rfContactEmail')?.value || '').trim();
+    const ci = document.getElementById('rfCheckin')?.value || '';
+    const co = document.getElementById('rfCheckout')?.value || '';
+    const notes = (document.getElementById('rfNotes')?.value || '').trim();
+    const channel = isBlock
+      ? (document.getElementById('rfBlockReason')?.value || '')
+      : (document.getElementById('rfChannel')?.value || '');
+    const guestName = isBlock ? '' : (document.getElementById('rfGuestName')?.value || '').trim();
+    const guestCountRaw = isBlock ? '' : (document.getElementById('rfGuestCount')?.value || '').trim();
+    const contactPhone = isBlock ? '' : (document.getElementById('rfContactPhone')?.value || '').trim();
+    const contactEmail = isBlock ? '' : (document.getElementById('rfContactEmail')?.value || '').trim();
 
-  // Validate.
-  if (!ci || !co)       return setErr('rf_err_missing_dates');
-  if (co <= ci)         return setErr('rf_err_bad_dates');
-  const todayISO = new Date().toISOString().slice(0, 10);
-  // Blocks may legitimately start in the past (host retroactively marks
-  // days as unavailable). Reservations can't.
-  if (!isBlock && ci < todayISO && !reservationId) return setErr('rf_err_past_checkin');
-  if (!channel) return setErr(isBlock ? 'rf_err_missing_reason' : 'rf_err_missing_channel');
-  if (!isBlock && !guestName) return setErr('rf_err_missing_guest_name');
+    // Validate.
+    if (!ci || !co)       return setErr('rf_err_missing_dates');
+    if (co <= ci)         return setErr('rf_err_bad_dates');
+    const todayISO = new Date().toISOString().slice(0, 10);
+    // Blocks may legitimately start in the past (host retroactively marks
+    // days as unavailable). Reservations can't.
+    if (!isBlock && ci < todayISO && !reservationId) return setErr('rf_err_past_checkin');
+    if (!channel) return setErr(isBlock ? 'rf_err_missing_reason' : 'rf_err_missing_channel');
+    if (!isBlock && !guestName) return setErr('rf_err_missing_guest_name');
 
-  // Build payload.
-  const guestCount = guestCountRaw ? Math.max(1, Math.min(50, parseInt(guestCountRaw, 10) || 0)) : null;
-  const payload = {
-    property_id:   propertyId,
-    platform:      'direct',
-    entry_type:    isBlock ? 'block' : 'reservation',
-    status:        'active',
-    checkin_date:  ci,
-    checkout_date: co,
-    channel:       channel,
-    notes:         notes || null,
-  };
-  if (!isBlock) {
-    payload.guest_name    = guestName;
-    payload.guest_count   = guestCount;
-    payload.contact_phone = contactPhone || null;
-    payload.contact_email = contactEmail || null;
-  }
-  // Fresh rows also need a synthetic uid and (for reservations) a
-  // booking_code so the guest link works. Edits keep whatever was there.
-  if (!reservationId) {
-    payload.uid = _mintDirectUid();
-    if (!isBlock) payload.booking_code = _mintDirectBookingCode();
-    try { payload.created_by = (await sb.auth.getUser())?.data?.user?.id || null; } catch(_) {}
-  }
-
-  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = h('rf_saving'); }
-  try {
-    let error;
-    if (reservationId) {
-      const upd = await sb.from('ota_reservations').update(payload).eq('id', reservationId).select('id');
-      error = upd.error || (!upd.data?.length ? {message:h('rf_err_generic')} : null);
-    } else {
-      const ins = await sb.from('ota_reservations').insert(payload).select('id');
-      error = ins.error || (!ins.data?.length ? {message:h('rf_err_generic')} : null);
+    // Build payload.
+    const guestCount = guestCountRaw ? Math.max(1, Math.min(50, parseInt(guestCountRaw, 10) || 0)) : null;
+    const payload = {
+      property_id:   propertyId,
+      platform:      'direct',
+      entry_type:    isBlock ? 'block' : 'reservation',
+      status:        'active',
+      checkin_date:  ci,
+      checkout_date: co,
+      channel:       channel,
+      notes:         notes || null,
+    };
+    if (!isBlock) {
+      payload.guest_name    = guestName;
+      payload.guest_count   = guestCount;
+      payload.contact_phone = contactPhone || null;
+      payload.contact_email = contactEmail || null;
     }
-    if (error) {
-      console.warn('[direct] save failed:', error.message);
-      if (errEl) { errEl.textContent = error.message || h('rf_err_generic'); errEl.style.display = 'block'; }
-      return false;
+    // Fresh rows also need a synthetic uid and (for reservations) a
+    // booking_code so the guest link works. Edits keep whatever was there.
+    if (!reservationId) {
+      payload.uid = _mintDirectUid();
+      if (!isBlock) payload.booking_code = _mintDirectBookingCode();
+      try { payload.created_by = (await sb.auth.getUser())?.data?.user?.id || null; } catch(_) {}
     }
-    _closeReservationForm(true);
-    try { toast(h('rf_saved_ok')); } catch(_) {}
-    try { track('direct_reservation_saved', { mode, edit: !!reservationId, channel }); } catch(_) {}
-    // Refresh the surfaces that show reservations.
-    try { if (typeof renderCalendarPanel === 'function') await renderCalendarPanel(); } catch(_) {}
-    try { if (typeof renderDashboard === 'function') await renderDashboard(); } catch(_) {}
-    return true;
-  } catch (e) {
-    console.warn('[direct] save exception:', e);
-    if (errEl) { errEl.textContent = h('rf_err_generic'); errEl.style.display = 'block'; }
-  } finally {
-    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = h('rf_save'); }
-  }
-  return false;
+
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = h('rf_saving'); }
+    try {
+      let error;
+      if (reservationId) {
+        const upd = await sb.from('ota_reservations').update(payload).eq('id', reservationId).select('id');
+        error = upd.error || (!upd.data?.length ? {message:h('rf_err_generic')} : null);
+      } else {
+        const ins = await sb.from('ota_reservations').insert(payload).select('id');
+        error = ins.error || (!ins.data?.length ? {message:h('rf_err_generic')} : null);
+      }
+      if (error) {
+        console.warn('[direct] save failed:', error.message);
+        if (errEl) { errEl.textContent = error.message || h('rf_err_generic'); errEl.style.display = 'block'; }
+        return false;
+      }
+      _closeReservationForm(true);
+      try { toast(h('rf_saved_ok')); } catch(_) {}
+      try { track('direct_reservation_saved', { mode, edit: !!reservationId, channel }); } catch(_) {}
+      // Refresh the surfaces that show reservations.
+      try { if (typeof renderCalendarPanel === 'function') await renderCalendarPanel(); } catch(_) {}
+      try { if (typeof renderDashboard === 'function') await renderDashboard(); } catch(_) {}
+      return true;
+    } catch (e) {
+      console.warn('[direct] save exception:', e);
+      if (errEl) { errEl.textContent = h('rf_err_generic'); errEl.style.display = 'block'; }
+    } finally {
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = h('rf_save'); }
+    }
+    return false;
   });
 }
 
@@ -9203,30 +9203,30 @@ function openAlloggiatiForm(isUpdate) {
 async function saveAlloggiatiCredentials(btn) {
   if (!propertyId || !_consoleCanEdit()) return false;
   return consoleDrafts.run('credentials', async () => {
-  const it = hostLang === 'it';
-  const msgEl = document.getElementById('alloggiatiFormMsg');
-  const utente   = document.getElementById('alloggiatiUtente')?.value || '';
-  const password = document.getElementById('alloggiatiPassword')?.value || '';
-  const wskey    = document.getElementById('alloggiatiWsKey')?.value || '';
-  const consent  = document.getElementById('alloggiatiConsent')?.checked;
-  const err = (m) => { if (msgEl) msgEl.textContent = m; };
+    const it = hostLang === 'it';
+    const msgEl = document.getElementById('alloggiatiFormMsg');
+    const utente   = document.getElementById('alloggiatiUtente')?.value || '';
+    const password = document.getElementById('alloggiatiPassword')?.value || '';
+    const wskey    = document.getElementById('alloggiatiWsKey')?.value || '';
+    const consent  = document.getElementById('alloggiatiConsent')?.checked;
+    const err = (m) => { if (msgEl) msgEl.textContent = m; };
 
-  if (!utente.trim() || !password || !wskey.trim()) return err(it ? 'Compila tutti e tre i campi.' : 'Fill in all three fields.');
-  if (!consent) return err(it ? 'Devi confermare l\'autorizzazione per procedere.' : 'You must confirm the authorisation to proceed.');
-  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
-  err('');
-  try {
-    await _alloggiatiApi('save', { property_id: propertyId, utente, password, wskey, consent: true });
-    try { track('alloggiati_credentials_saved', {}); } catch(_) {}
-    try { toast(it ? '✓ Credenziali salvate. Ora clicca Verifica ora per confermare l\'accesso al portale.' : '✓ Credentials saved. Now click Verify now to confirm portal access.'); } catch(_) {}
-    await loadAlloggiatiCard();
-    return true;
-  } catch (e) {
-    console.warn('[alloggiati] save failed:', e.message);
-    err((it ? 'Salvataggio fallito: ' : 'Save failed: ') + e.message);
-    if (btn) { btn.disabled = false; btn.style.opacity = ''; }
-  }
-  return false;
+    if (!utente.trim() || !password || !wskey.trim()) return err(it ? 'Compila tutti e tre i campi.' : 'Fill in all three fields.');
+    if (!consent) return err(it ? 'Devi confermare l\'autorizzazione per procedere.' : 'You must confirm the authorisation to proceed.');
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+    err('');
+    try {
+      await _alloggiatiApi('save', { property_id: propertyId, utente, password, wskey, consent: true });
+      try { track('alloggiati_credentials_saved', {}); } catch(_) {}
+      try { toast(it ? '✓ Credenziali salvate. Ora clicca Verifica ora per confermare l\'accesso al portale.' : '✓ Credentials saved. Now click Verify now to confirm portal access.'); } catch(_) {}
+      await loadAlloggiatiCard();
+      return true;
+    } catch (e) {
+      console.warn('[alloggiati] save failed:', e.message);
+      err((it ? 'Salvataggio fallito: ' : 'Save failed: ') + e.message);
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+    }
+    return false;
   });
 }
 
@@ -9542,61 +9542,61 @@ function addRule() {
 async function saveRules() {
   if (!propertyId || !_consoleCanEdit()) return false;
   return consoleDrafts.run('rules', async () => {
-  const it = hostLang === 'it';
-  // Round 37.4 — the previous flow did DELETE-then-INSERT with no
-  // visibility on either half. Two failure modes bit us:
-  //   (a) The insert fails with a real DB error (a hostile character
-  //       in the title, a size violation) and the host sees a generic
-  //       "Error saving rules!" toast with no clue why. Now the DB
-  //       message is surfaced.
-  //   (b) A row the host added but never typed into (empty title_en)
-  //       reaches the insert. title_en is NOT NULL — the empty string
-  //       satisfies that, but shipping empty rows is silent junk we
-  //       shouldn't send. Filter first, then insert.
-  const rows = rulesData
-    .map((r, i) => ({
-      property_id: propertyId,
-      icon: (r.icon && String(r.icon).trim()) || '📌',
-      title_en: (r.title_en ?? r.title ?? '').toString().trim(),
-      title_it: (r.title_it ?? '').toString().trim(),
-      desc_en:  (r.desc_en  ?? r.desc  ?? '').toString(),
-      desc_it:  (r.desc_it  ?? '').toString(),
-      is_important: !!r.is_important,
-      sort_order: i,
-    }))
-    // Drop fully-empty rows the host added and never filled — no title,
-    // no description, either language. Anything with even one field
-    // typed is kept.
-    .filter(r => r.title_en || r.title_it || r.desc_en || r.desc_it);
+    const it = hostLang === 'it';
+    // Round 37.4 — the previous flow did DELETE-then-INSERT with no
+    // visibility on either half. Two failure modes bit us:
+    //   (a) The insert fails with a real DB error (a hostile character
+    //       in the title, a size violation) and the host sees a generic
+    //       "Error saving rules!" toast with no clue why. Now the DB
+    //       message is surfaced.
+    //   (b) A row the host added but never typed into (empty title_en)
+    //       reaches the insert. title_en is NOT NULL — the empty string
+    //       satisfies that, but shipping empty rows is silent junk we
+    //       shouldn't send. Filter first, then insert.
+    const rows = rulesData
+      .map((r, i) => ({
+        property_id: propertyId,
+        icon: (r.icon && String(r.icon).trim()) || '📌',
+        title_en: (r.title_en ?? r.title ?? '').toString().trim(),
+        title_it: (r.title_it ?? '').toString().trim(),
+        desc_en:  (r.desc_en  ?? r.desc  ?? '').toString(),
+        desc_it:  (r.desc_it  ?? '').toString(),
+        is_important: !!r.is_important,
+        sort_order: i,
+      }))
+      // Drop fully-empty rows the host added and never filled — no title,
+      // no description, either language. Anything with even one field
+      // typed is kept.
+      .filter(r => r.title_en || r.title_it || r.desc_en || r.desc_it);
 
-  // Delete first; check the result. RLS or a network issue can silently
-  // fail the whole save otherwise.
-  const del = await sb.from('rules').delete().eq('property_id', propertyId).select('id');
-  if (del.error) {
-    console.error('rules delete failed:', del.error);
-    toast((it ? 'Impossibile ripulire le regole precedenti: ' : 'Could not clear old rules: ') + del.error.message);
-    return false;
-  }
-  if (rows.length > 0) {
-    const ins = await sb.from('rules').insert(rows).select('id');
-    if (ins.error) {
-      console.error('rules insert failed:', ins.error);
-      toast((it ? 'Salvataggio fallito: ' : 'Save failed: ') + ins.error.message);
+    // Delete first; check the result. RLS or a network issue can silently
+    // fail the whole save otherwise.
+    const del = await sb.from('rules').delete().eq('property_id', propertyId).select('id');
+    if (del.error) {
+      console.error('rules delete failed:', del.error);
+      toast((it ? 'Impossibile ripulire le regole precedenti: ' : 'Could not clear old rules: ') + del.error.message);
       return false;
     }
-    if (!ins.data || ins.data.length < rows.length) {
-      // Not necessarily broken (RLS could allow the insert but hide
-      // the select), but surface it so a silent partial save doesn't
-      // hide.
-      console.warn('rules insert returned fewer rows than sent:', ins.data?.length, 'vs', rows.length);
-      toast(it ? 'Salvataggio incompleto. Riprova.' : 'Incomplete save. Try again.'); return false;
+    if (rows.length > 0) {
+      const ins = await sb.from('rules').insert(rows).select('id');
+      if (ins.error) {
+        console.error('rules insert failed:', ins.error);
+        toast((it ? 'Salvataggio fallito: ' : 'Save failed: ') + ins.error.message);
+        return false;
+      }
+      if (!ins.data || ins.data.length < rows.length) {
+        // Not necessarily broken (RLS could allow the insert but hide
+        // the select), but surface it so a silent partial save doesn't
+        // hide.
+        console.warn('rules insert returned fewer rows than sent:', ins.data?.length, 'vs', rows.length);
+        toast(it ? 'Salvataggio incompleto. Riprova.' : 'Incomplete save. Try again.'); return false;
+      }
     }
-  }
-  toast(h('toast_rules_saved'));
-  track('save_rules', { count: rows.length });
-  rulesEditMode = false;
-  renderRules();
-  return true;
+    toast(h('toast_rules_saved'));
+    track('save_rules', { count: rows.length });
+    rulesEditMode = false;
+    renderRules();
+    return true;
   });
 }
 
@@ -9947,49 +9947,53 @@ function addReco() {
 async function saveRecos() {
   if (!propertyId || !_consoleCanEdit()) return false;
   return consoleDrafts.run('recos', async () => {
-  const it = hostLang === 'it';
-  // Round 37.4 — same tightening as saveRules. Extra guard here:
-  // recommendations.name is NOT NULL, so a fresh row with no name
-  // would have blown up the INSERT and lost every reco after the
-  // DELETE. Filter empty rows before we touch the DB.
-  const rows = recoData
-    .map((r, i) => ({
-      property_id: propertyId,
-      category: (r.category || r.cat || 'food').toString(),
-      name: (r.name ?? '').toString().trim(),
-      desc_en: (r.desc_en ?? r.desc ?? '').toString(),
-      desc_it: (r.desc_it ?? '').toString(),
-      tags: (r.tags ?? '').toString(),
-      address: (r.address ?? '').toString(),
-      sort_order: i,
-    }))
-    // Drop entries that are just a category with no actual place —
-    // name is the only NOT NULL that a fresh row doesn't fill in.
-    .filter(r => r.name);
-
-  const del = await sb.from('recommendations').delete().eq('property_id', propertyId).select('id');
-  if (del.error) {
-    console.error('recos delete failed:', del.error);
-    toast((it ? 'Impossibile ripulire le raccomandazioni precedenti: ' : 'Could not clear old recommendations: ') + del.error.message);
-    return false;
-  }
-  if (rows.length > 0) {
-    const ins = await sb.from('recommendations').insert(rows).select('id');
-    if (ins.error) {
-      console.error('recos insert failed:', ins.error);
-      toast((it ? 'Salvataggio fallito: ' : 'Save failed: ') + ins.error.message);
+    const it = hostLang === 'it';
+    if (recoData.some(r => !String(r.name || '').trim() && [r.desc_en || r.desc, r.desc_it, r.tags, r.address].some(v => String(v || '').trim()))) {
+      toast(it ? 'Inserisci il nome di ogni consiglio prima di salvare.' : 'Enter a name for each recommendation before saving.');
       return false;
     }
-    if (!ins.data || ins.data.length < rows.length) {
-      console.warn('recos insert returned fewer rows than sent:', ins.data?.length, 'vs', rows.length);
-      toast(it ? 'Salvataggio incompleto. Riprova.' : 'Incomplete save. Try again.'); return false;
+    // Round 37.4 — same tightening as saveRules. Extra guard here:
+    // recommendations.name is NOT NULL, so a fresh row with no name
+    // would have blown up the INSERT and lost every reco after the
+    // DELETE. Filter empty rows before we touch the DB.
+    const rows = recoData
+      .map((r, i) => ({
+        property_id: propertyId,
+        category: (r.category || r.cat || 'food').toString(),
+        name: (r.name ?? '').toString().trim(),
+        desc_en: (r.desc_en ?? r.desc ?? '').toString(),
+        desc_it: (r.desc_it ?? '').toString(),
+        tags: (r.tags ?? '').toString(),
+        address: (r.address ?? '').toString(),
+        sort_order: i,
+      }))
+      // Drop entries that are just a category with no actual place —
+      // name is the only NOT NULL that a fresh row doesn't fill in.
+      .filter(r => r.name);
+
+    const del = await sb.from('recommendations').delete().eq('property_id', propertyId).select('id');
+    if (del.error) {
+      console.error('recos delete failed:', del.error);
+      toast((it ? 'Impossibile ripulire le raccomandazioni precedenti: ' : 'Could not clear old recommendations: ') + del.error.message);
+      return false;
     }
-  }
-  toast(h('toast_recos_saved'));
-  track('save_recos', { count: rows.length, categories: [...new Set(rows.map(r => r.category))] });
-  recosEditMode = false;
-  renderRecos();
-  return true;
+    if (rows.length > 0) {
+      const ins = await sb.from('recommendations').insert(rows).select('id');
+      if (ins.error) {
+        console.error('recos insert failed:', ins.error);
+        toast((it ? 'Salvataggio fallito: ' : 'Save failed: ') + ins.error.message);
+        return false;
+      }
+      if (!ins.data || ins.data.length < rows.length) {
+        console.warn('recos insert returned fewer rows than sent:', ins.data?.length, 'vs', rows.length);
+        toast(it ? 'Salvataggio incompleto. Riprova.' : 'Incomplete save. Try again.'); return false;
+      }
+    }
+    toast(h('toast_recos_saved'));
+    track('save_recos', { count: rows.length, categories: [...new Set(rows.map(r => r.category))] });
+    recosEditMode = false;
+    renderRecos();
+    return true;
   });
 }
 
@@ -12120,35 +12124,35 @@ async function closeHostPortalEditor(force = false) {
 async function saveHostPortalLink(tileKey) {
   if (!propertyId || !tileKey || !_consoleCanEdit()) return false;
   return consoleDrafts.run('portal-link', async () => {
-  const it = hostLang === 'it';
-  const urlRaw = document.getElementById('hostPortalUrlInput')?.value || '';
-  const label  = (document.getElementById('hostPortalLabelInput')?.value || '').trim().slice(0, 80);
-  const errEl  = document.getElementById('hostPortalError');
-  const url    = _normalizeHostPortalUrl(urlRaw);
-  if (!url) {
-    if (errEl) { errEl.textContent = it ? 'URL non valido. Usa http:// o https:// con un dominio corretto.' : 'Invalid URL. Use http:// or https:// with a real domain.'; errEl.style.display = 'block'; }
-    return false;
-  }
-  const next = _hostPortalMap();
-  next[tileKey] = label ? { url, label } : { url };
-  const { data, error } = await sb.from('properties')
-    .update({ portal_links: next })
-    .eq('id', propertyId)
-    .select('id, portal_links');
-  if (error) {
-    console.error('portal_links save failed:', error);
-    if (errEl) { errEl.textContent = (it ? 'Salvataggio fallito: ' : 'Save failed: ') + error.message; errEl.style.display = 'block'; }
-    return false;
-  }
-  if (!data || data.length === 0) {
-    if (errEl) { errEl.textContent = it ? 'Salvataggio bloccato dai permessi.' : 'Save blocked by permissions.'; errEl.style.display = 'block'; }
-    return false;
-  }
-  propertyData = { ...(propertyData || {}), portal_links: data[0].portal_links || next };
-  applyHostPortalLinks();
-  closeHostPortalEditor(true);
-  toast(it ? '✓ Link salvato' : '✓ Link saved');
-  track('save_portal_link', { tile: tileKey });  return true;
+    const it = hostLang === 'it';
+    const urlRaw = document.getElementById('hostPortalUrlInput')?.value || '';
+    const label  = (document.getElementById('hostPortalLabelInput')?.value || '').trim().slice(0, 80);
+    const errEl  = document.getElementById('hostPortalError');
+    const url    = _normalizeHostPortalUrl(urlRaw);
+    if (!url) {
+      if (errEl) { errEl.textContent = it ? 'URL non valido. Usa http:// o https:// con un dominio corretto.' : 'Invalid URL. Use http:// or https:// with a real domain.'; errEl.style.display = 'block'; }
+      return false;
+    }
+    const next = _hostPortalMap();
+    next[tileKey] = label ? { url, label } : { url };
+    const { data, error } = await sb.from('properties')
+      .update({ portal_links: next })
+      .eq('id', propertyId)
+      .select('id, portal_links');
+    if (error) {
+      console.error('portal_links save failed:', error);
+      if (errEl) { errEl.textContent = (it ? 'Salvataggio fallito: ' : 'Save failed: ') + error.message; errEl.style.display = 'block'; }
+      return false;
+    }
+    if (!data || data.length === 0) {
+      if (errEl) { errEl.textContent = it ? 'Salvataggio bloccato dai permessi.' : 'Save blocked by permissions.'; errEl.style.display = 'block'; }
+      return false;
+    }
+    propertyData = { ...(propertyData || {}), portal_links: data[0].portal_links || next };
+    applyHostPortalLinks();
+    closeHostPortalEditor(true);
+    toast(it ? '✓ Link salvato' : '✓ Link saved');
+    track('save_portal_link', { tile: tileKey });  return true;
   });
 }
 
@@ -13948,130 +13952,131 @@ async function unlockFiledForCorrection(id) {
 async function saveGuestEdits(id) {
   if (!_consoleCanEdit()) return false;
   return consoleDrafts.run('guest-edit', async () => {
-  const it = hostLang === 'it';
-  const statusEl = document.getElementById('editGuestStatus');
-  const setStatus = (html, tone) => {
-    if (!statusEl) return;
-    const color = tone === 'error' ? '#b03939' : tone === 'ok' ? '#2f7a44' : 'var(--ink-soft)';
-    statusEl.innerHTML = `<span style="color:${color};">${html}</span>`;
-  };
+    const it = hostLang === 'it';
+    const statusEl = document.getElementById('editGuestStatus');
+    const setStatus = (html, tone) => {
+      if (!statusEl) return;
+      const color = tone === 'error' ? '#b03939' : tone === 'ok' ? '#2f7a44' : 'var(--ink-soft)';
+      statusEl.innerHTML = `<span style="color:${color};">${html}</span>`;
+    };
 
-  const v = (elId) => (document.getElementById(elId)?.value ?? '').trim();
+    const v = (elId) => (document.getElementById(elId)?.value ?? '').trim();
 
-  // Read all fields from the form
-  const surname = v('edit_surname').toUpperCase();
-  const name = v('edit_name').toUpperCase();
-  const sex = v('edit_sex');
-  const dob = v('edit_dob');
-  const place_of_birth = v('edit_place_of_birth');
-  const citizenship = v('edit_citizenship');
-  const guest_type = v('edit_guest_type');
-  const document_type_raw = v('edit_document_type'); // '' means "none required"
-  const document_number = v('edit_document_number');
+    // Read all fields from the form
+    const surname = v('edit_surname').toUpperCase();
+    const name = v('edit_name').toUpperCase();
+    const sex = v('edit_sex');
+    const dob = v('edit_dob');
+    const place_of_birth = v('edit_place_of_birth');
+    const citizenship = v('edit_citizenship');
+    const guest_type = v('edit_guest_type');
+    const document_type_raw = v('edit_document_type'); // '' means "none required"
+    const document_number = v('edit_document_number');
 
-  // Required-field guard (mirrors DB NOT NULL constraints so the UI
-  // gives a helpful message instead of a Postgres 23502 that reads
-  // like a bug). document_type / document_number can be empty for
-  // member-type guests, so they're NOT enforced here.
-  const missing = [];
-  if (!surname)         missing.push(h('field_surname'));
-  if (!name)            missing.push(h('field_name'));
-  if (!sex)             missing.push(h('field_sex'));
-  if (!dob)             missing.push(h('field_dob'));
-  if (!place_of_birth)  missing.push(h('field_place_of_birth'));
-  if (!citizenship)     missing.push(h('field_citizenship'));
-  if (!guest_type)      missing.push(h('field_guest_type'));
-  if (missing.length > 0) {
-    setStatus(h('edit_field_missing').replace('{name}', missing.join(', ')), 'error');
-    return false;
-  }
-
-  // Round 31 — country values must resolve to an Alloggiati Web code.
-  // Otherwise the export silently emits 9 spaces for citizenship or
-  // birth_country and the .txt is rejected upstream.
-  const birth_country = v('edit_birth_country');
-  const unresolved = [];
-  if (!wbnbAcceptsCountry(citizenship))            unresolved.push(h('field_citizenship'));
-  if (birth_country && !wbnbAcceptsCountry(birth_country)) unresolved.push(h('field_birth_country'));
-  if (unresolved.length > 0) {
-    setStatus(h('edit_country_unresolved').replace('{name}', unresolved.join(', ')), 'error');
-    return false;
-  }
-
-  const arrival_date   = v('edit_arrival_date') || null;
-  const departure_date = v('edit_departure_date') || null;
-  const nightsRaw = v('edit_nights');
-  let nights = nightsRaw === '' ? null : Number(nightsRaw);
-  // 0 → auto-compute from dates
-  if (nights === 0 && arrival_date && departure_date) {
-    const da = new Date(arrival_date + 'T00:00:00');
-    const dd = new Date(departure_date + 'T00:00:00');
-    if (!isNaN(da) && !isNaN(dd)) nights = Math.max(0, Math.round((dd - da) / 86400000));
-  }
-
-  const birthProv = v('edit_birth_province').toUpperCase();
-  // NOT NULL columns: document_type / document_number must be non-null.
-  // If the host clears them, we store an empty string (the guest-side
-  // ingest already does this for member types).
-  const update = {
-    booking_code: v('edit_booking_code') || null,
-    guest_type,
-    surname,
-    name,
-    sex,
-    date_of_birth: dob,
-    place_of_birth,
-    birth_province: birthProv || null,
-    birth_country: birth_country || null,
-    citizenship,
-    // Round 47.2 — optional residence. '' coerces to null so the DB
-    // row doesn't carry an empty string; blank → ROSS1000 fallback.
-    residence_country: v('edit_residence_country') || null,
-    residence_place:   v('edit_residence_place')   || null,
-    document_type: document_type_raw || '',
-    document_number: document_number || '',
-    doc_issue_place: v('edit_doc_issue_place') || null,
-    arrival_date,
-    departure_date,
-    nights,
-  };
-
-  setStatus(it ? 'Salvataggio…' : 'Saving…');
-  // Round 20.2 pattern: request the rows back so a 0-row silent success
-  // (missing RLS UPDATE policy = Round 28 trap) surfaces loudly.
-  const { data: updated, error } = await sb.from('checkins')
-    .update(update)
-    .eq('id', id)
-    .select();
-  if (error) {
-    console.error('Edit save error:', error);
-    // Round 48 Phase 4 — the DB trigger raises `checkin_locked_filed`
-    // when a sensitive write hits a filed row. The modal is already
-    // disabled for filed rows, so this path is defensive — e.g. a stale
-    // local cache that still thinks a row is pending. Nudge the host
-    // toward the unlock flow.
-    if (/checkin_locked_filed/i.test(error.message || '')) {
-      setStatus(h('edit_save_filed_locked'), 'error');
+    // Required-field guard (mirrors DB NOT NULL constraints so the UI
+    // gives a helpful message instead of a Postgres 23502 that reads
+    // like a bug). document_type / document_number can be empty for
+    // member-type guests, so they're NOT enforced here.
+    const missing = [];
+    if (!surname)         missing.push(h('field_surname'));
+    if (!name)            missing.push(h('field_name'));
+    if (!sex)             missing.push(h('field_sex'));
+    if (!dob)             missing.push(h('field_dob'));
+    if (!place_of_birth)  missing.push(h('field_place_of_birth'));
+    if (!citizenship)     missing.push(h('field_citizenship'));
+    if (!guest_type)      missing.push(h('field_guest_type'));
+    if (missing.length > 0) {
+      setStatus(h('edit_field_missing').replace('{name}', missing.join(', ')), 'error');
       return false;
     }
-    setStatus(h('edit_save_failed') + ': ' + error.message, 'error');
-    return false;
-  }
-  if (!updated || updated.length === 0) {
-    setStatus(h('edit_save_blocked'), 'error');
-    return false;
-  }
 
-  // Splice the updated row back into allCheckins and re-render.
-  const row = updated[0];
-  const idx = allCheckins.findIndex(c => c.id === id);
-  if (idx > -1) allCheckins[idx] = { ...allCheckins[idx], ...row };
-  renderCheckins();
-  setStatus(h('edit_saved'), 'ok');
-  track('edit_checkin', { id, fields_updated: Object.keys(update).length });
-  // Give the host a beat to read the confirmation, then close.
-  closeGuestEditModal(true);
-  return true;  });
+    // Round 31 — country values must resolve to an Alloggiati Web code.
+    // Otherwise the export silently emits 9 spaces for citizenship or
+    // birth_country and the .txt is rejected upstream.
+    const birth_country = v('edit_birth_country');
+    const unresolved = [];
+    if (!wbnbAcceptsCountry(citizenship))            unresolved.push(h('field_citizenship'));
+    if (birth_country && !wbnbAcceptsCountry(birth_country)) unresolved.push(h('field_birth_country'));
+    if (unresolved.length > 0) {
+      setStatus(h('edit_country_unresolved').replace('{name}', unresolved.join(', ')), 'error');
+      return false;
+    }
+
+    const arrival_date   = v('edit_arrival_date') || null;
+    const departure_date = v('edit_departure_date') || null;
+    const nightsRaw = v('edit_nights');
+    let nights = nightsRaw === '' ? null : Number(nightsRaw);
+    // 0 → auto-compute from dates
+    if (nights === 0 && arrival_date && departure_date) {
+      const da = new Date(arrival_date + 'T00:00:00');
+      const dd = new Date(departure_date + 'T00:00:00');
+      if (!isNaN(da) && !isNaN(dd)) nights = Math.max(0, Math.round((dd - da) / 86400000));
+    }
+
+    const birthProv = v('edit_birth_province').toUpperCase();
+    // NOT NULL columns: document_type / document_number must be non-null.
+    // If the host clears them, we store an empty string (the guest-side
+    // ingest already does this for member types).
+    const update = {
+      booking_code: v('edit_booking_code') || null,
+      guest_type,
+      surname,
+      name,
+      sex,
+      date_of_birth: dob,
+      place_of_birth,
+      birth_province: birthProv || null,
+      birth_country: birth_country || null,
+      citizenship,
+      // Round 47.2 — optional residence. '' coerces to null so the DB
+      // row doesn't carry an empty string; blank → ROSS1000 fallback.
+      residence_country: v('edit_residence_country') || null,
+      residence_place:   v('edit_residence_place')   || null,
+      document_type: document_type_raw || '',
+      document_number: document_number || '',
+      doc_issue_place: v('edit_doc_issue_place') || null,
+      arrival_date,
+      departure_date,
+      nights,
+    };
+
+    setStatus(it ? 'Salvataggio…' : 'Saving…');
+    // Round 20.2 pattern: request the rows back so a 0-row silent success
+    // (missing RLS UPDATE policy = Round 28 trap) surfaces loudly.
+    const { data: updated, error } = await sb.from('checkins')
+      .update(update)
+      .eq('id', id)
+      .select();
+    if (error) {
+      console.error('Edit save error:', error);
+      // Round 48 Phase 4 — the DB trigger raises `checkin_locked_filed`
+      // when a sensitive write hits a filed row. The modal is already
+      // disabled for filed rows, so this path is defensive — e.g. a stale
+      // local cache that still thinks a row is pending. Nudge the host
+      // toward the unlock flow.
+      if (/checkin_locked_filed/i.test(error.message || '')) {
+        setStatus(h('edit_save_filed_locked'), 'error');
+        return false;
+      }
+      setStatus(h('edit_save_failed') + ': ' + error.message, 'error');
+      return false;
+    }
+    if (!updated || updated.length === 0) {
+      setStatus(h('edit_save_blocked'), 'error');
+      return false;
+    }
+
+    // Splice the updated row back into allCheckins and re-render.
+    const row = updated[0];
+    const idx = allCheckins.findIndex(c => c.id === id);
+    if (idx > -1) allCheckins[idx] = { ...allCheckins[idx], ...row };
+    renderCheckins();
+    setStatus(h('edit_saved'), 'ok');
+    track('edit_checkin', { id, fields_updated: Object.keys(update).length });
+    // Give the host a beat to read the confirmation, then close.
+    closeGuestEditModal(true);
+    return true;
+  });
 }
 
 // ── Round 19 / 36.2: rotating lockbox helpers ────────────────────────
@@ -14223,22 +14228,23 @@ async function saveReservationKeybox(inputEl) {
 async function saveGuestLockbox(checkinId, inputId) {
   if (!_consoleCanEdit()) return false;
   return consoleDrafts.run('guest-lockbox', async () => {
-  const input = document.getElementById(inputId);
-  if (!input) return;
-  const newVal = input.value.trim() || null;
-  const { data, error } = await sb.from('checkins')
-    .update({ keybox_code: newVal })
-    .eq('id', checkinId).select('id');
-  if (error || !data?.length) {
-    console.error('Lockbox save error:', error);
-    toast('Error: ' + (error?.message || 'Save not permitted.'));
-    return false;
-  }
-  // Update local cache so the modal stays consistent on re-open
-  const c = allCheckins.find(g => g.id === checkinId);
-  if (c) c.keybox_code = newVal;
-  toast(hostLang === 'it' ? '✓ Codice lockbox salvato' : '✓ Lockbox code saved');
-  track('save_guest_lockbox', { has_value: !!newVal });  return true;
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const newVal = input.value.trim() || null;
+    const { data, error } = await sb.from('checkins')
+      .update({ keybox_code: newVal })
+      .eq('id', checkinId).select('id');
+    if (error || !data?.length) {
+      console.error('Lockbox save error:', error);
+      toast('Error: ' + (error?.message || 'Save not permitted.'));
+      return false;
+    }
+    // Update local cache so the modal stays consistent on re-open
+    const c = allCheckins.find(g => g.id === checkinId);
+    if (c) c.keybox_code = newVal;
+    toast(hostLang === 'it' ? '✓ Codice lockbox salvato' : '✓ Lockbox code saved');
+    track('save_guest_lockbox', { has_value: !!newVal });
+    return true;
   });
 }
 

@@ -55,8 +55,17 @@ function create(adapter) {
  const root=adapter.root;
  let state={property:null,rows:[],checkins:[],selected:'',scope:'upcoming',loading:false,error:false};
  let generation=0;
- const drafts=new Map();
+ const drafts=new Map(),templateDrafts=new Map();
  const context=()=>adapter.context();
+ const templateKey=k=>state.property+'|'+k;
+ function changedTemplates(){return [...templateDrafts].filter(([k,d])=>k.startsWith(state.property+'|')&&d.value!==d.original);}
+ async function saveTemplateDrafts(keys){
+  const selected=changedTemplates().filter(([k])=>!keys||keys.includes(k));
+  if(selected.some(([,d])=>!validTemplate(d.value))){notify(t().invalid);return false;}
+  const operation=async()=>{for(const [k,d] of selected){if(!await savePreference(k.slice(state.property.length+1),d.value))return false;templateDrafts.delete(k);}notify(t().saved);return true;};
+  return adapter.drafts?adapter.drafts.run('share-defaults',operation):operation();
+ }
+ adapter.drafts?.register('share-defaults',{root,enabled:()=>valid(),dirty:()=>changedTemplates().length>0,save:()=>saveTemplateDrafts(),discard:()=>{for(const [k]of templateDrafts)if(k.startsWith(state.property+'|'))templateDrafts.delete(k);}});
  const lang=()=>context().lang==='it'?'it':'en';
  const messageLang=()=>state.language||lang();
  const kind=row=>registration(row,state.checkins,context().mode);
@@ -98,7 +107,8 @@ function create(adapter) {
   const reset=root.querySelector('[data-share-reset]');if(reset)reset.onclick=()=>{drafts.delete(key(row));render();};
   const whatsapp=root.querySelector('[data-share-whatsapp]');if(whatsapp)whatsapp.onclick=()=>{if(!valid())return;try{const tab=W.open('https://wa.me/?text='+encodeURIComponent(textarea.value),'_blank');if(tab){tab.opener=null;}else notify(t().blocked);}catch(_){notify(t().blocked);}};
   const defaultKind=root.querySelector('#shareDefaultKind'),defaultText=root.querySelector('#shareDefaultTemplate');
-  if(defaultKind){defaultKind.value=kind(row);const update=()=>{defaultText.value=state.preferences?.[messageLang()+'_'+defaultKind.value]||messages[messageLang()][defaultKind.value];};update();defaultKind.onchange=update;root.querySelector('[data-share-save-default]').onclick=async()=>{if(!validTemplate(defaultText.value)){notify(t().invalid);return;}const ok=await savePreference(messageLang()+'_'+defaultKind.value,defaultText.value);if(ok)notify(t().saved);};}
+  if(defaultKind){defaultKind.value=kind(row);const preference=()=>messageLang()+'_'+defaultKind.value;const original=()=>state.preferences?.[preference()]||messages[messageLang()][defaultKind.value];const update=()=>{defaultText.value=templateDrafts.get(templateKey(preference()))?.value??original();};update();defaultKind.onchange=update;defaultText.oninput=()=>{const k=templateKey(preference());templateDrafts.set(k,{original:templateDrafts.get(k)?.original??original(),value:defaultText.value});};root.querySelector('[data-share-save-default]').onclick=()=>{const k=templateKey(preference());templateDrafts.set(k,{original:templateDrafts.get(k)?.original??original(),value:defaultText.value});return saveTemplateDrafts([k]);};}
+
   const copy=root.querySelector('[data-share-copy]');if(copy)copy.onclick=()=>copyText(textarea.value);
   const link=root.querySelector('[data-share-link]');if(link)link.onclick=()=>copyText(url);
  }

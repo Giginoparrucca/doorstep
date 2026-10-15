@@ -86,17 +86,7 @@
         return false;
       } finally { navigating = false; }
     }
-    function ask() {
-      return new Promise(resolve => {
-        const dialog = document.createElement('dialog'); dialog.className = 'property-leave-dialog';
-        dialog.setAttribute('aria-labelledby', 'propertyLeaveTitle'); dialog.setAttribute('aria-describedby','propertyLeaveText');
-        dialog.innerHTML = `<h2 id="propertyLeaveTitle">${text('Salvare le modifiche?', 'Save your changes?')}</h2><p id="propertyLeaveText">${text('Hai modifiche non salvate ai dettagli della proprietà.', 'You have unsaved changes to Property Details.')}</p><div class="property-leave-actions"><button type="button" class="btn btn-primary" data-choice="save">${text('Salva e continua', 'Save and continue')}</button><button type="button" class="btn btn-secondary" data-choice="discard">${text('Scarta modifiche', 'Discard changes')}</button><button type="button" class="btn btn-secondary" data-choice="stay" autofocus>${text('Continua a modificare', 'Keep editing')}</button></div>`;
-        const done = choice => { dialog.close(); dialog.remove(); resolve(choice); };
-        dialog.addEventListener('cancel', event => {event.preventDefault(); done('stay');});
-        dialog.addEventListener('click', event => {const choice = event.target.closest('[data-choice]'); if (choice) done(choice.dataset.choice);});
-        document.body.appendChild(dialog); dialog.showModal();
-      });
-    }
+    function ask() { return HostUnsavedChanges.prompt(lang); }
     window.addEventListener('beforeunload', event => {
       if (dirty() || decoding) { event.preventDefault(); event.returnValue = ''; }
     });
@@ -106,6 +96,6 @@
     });
     el('coverFrameCenter').addEventListener('click', () => {adjust('x',50); adjust('y',50);});
     el('coverFrameReset').addEventListener('click', () => {adjust('zoom',1); adjust('x',50); adjust('y',50);});
-    return {begin, reset, dirty, stage, prepareCover, leave};
+    return {begin, reset, dirty, stage, prepareCover, leave, pending: () => decoding};
   }
 })();

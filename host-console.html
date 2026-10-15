@@ -1138,7 +1138,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 }
 .photo-upload-zone:hover .photo-upload-overlay { opacity: 1; }
 @media(max-width:720px){#panel-property>.panel-header-actions>div:first-child{flex:0 0 100%!important}#propertySaveBtn{white-space:normal;overflow:visible}}
-.cover-frame-controls{margin-top:16px;display:grid;gap:8px}.cover-frame-controls[hidden]{display:none}.cover-frame-controls input{width:100%;min-width:0}.cover-frame-controls label{font-size:.8rem}.cover-frame-controls output{float:right}.property-leave-actions{display:flex;gap:8px;flex-wrap:wrap}.property-leave-dialog{border:1px solid var(--border);border-radius:14px;padding:24px;max-width:min(520px,calc(100vw - 32px));color:var(--ink);background:var(--white)}.property-leave-dialog::backdrop{background:rgba(6,26,61,.45)}.property-leave-dialog h2{margin-top:0;font-size:1.2rem}.property-leave-dialog p{font-size:.88rem;line-height:1.5}.property-leave-dialog .btn{white-space:normal}
+.cover-frame-controls{margin-top:16px;display:grid;gap:8px}.cover-frame-controls[hidden]{display:none}.cover-frame-controls input{width:100%;min-width:0}.cover-frame-controls label{font-size:.8rem}.cover-frame-controls output{float:right}.property-leave-actions{display:flex;gap:8px;flex-wrap:wrap}.property-leave-dialog{position:fixed;inset:0;margin:auto;width:min(520px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;border:1px solid var(--border);border-radius:14px;padding:24px;max-width:min(520px,calc(100vw - 32px));color:var(--ink);background:var(--white)}.property-leave-dialog::backdrop{background:rgba(6,26,61,.45)}.property-leave-dialog h2{margin-top:0;font-size:1.2rem}.property-leave-dialog p{margin:12px 0 20px;font-size:.88rem;line-height:1.5}.property-leave-dialog .btn{white-space:normal}
 
 .regional-dialog{width:min(1000px,calc(100vw - 32px));max-height:90vh;overflow:auto;border:1px solid var(--border);border-radius:14px;padding:24px;color:var(--ink);background:var(--white)}.regional-dialog::backdrop{background:rgba(6,26,61,.5)}.regional-dialog-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.regional-dialog h2{font-size:1.2rem}.regional-dialog h3{font-size:1rem;margin-top:20px}.regional-dialog p{font-size:.82rem;line-height:1.5}.regional-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:12px;margin:12px 0;align-items:end}.regional-field{display:grid;gap:5px;font-size:.78rem;min-width:0}.regional-dialog input,.regional-dialog select{min-width:0;width:100%}.regional-dialog input[type=checkbox]{width:auto}.regional-dialog details{border:1px solid var(--border);border-radius:8px;padding:10px;margin:8px 0}.regional-dialog summary{cursor:pointer;font-size:.82rem;font-weight:500}.regional-guests{max-height:45vh;overflow:auto}.regional-table-wrap{overflow-x:auto}.regional-days{min-width:760px;width:100%}.regional-days th{white-space:normal;font-size:.7rem}.regional-days td{padding:5px}.regional-days th:last-child,.regional-days td:last-child{position:static;box-shadow:none;background:transparent}.regional-days th{letter-spacing:0;text-transform:none}.regional-days input,.regional-days select{min-width:90px}.regional-confirm{display:flex;gap:8px;font-size:.84rem;margin:18px 0;align-items:flex-start}.regional-dialog [data-errors]{white-space:pre-line;color:var(--red)}.regional-dialog .btn{white-space:normal}.regional-note{color:var(--ink-soft)}@media(max-width:540px){.regional-dialog{padding:14px}.regional-dialog h2{font-size:1.05rem}}
 </style>
@@ -2379,9 +2379,10 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 <script src="/lib/onboarding-readiness.js"></script>
 <script src="/lib/calendar-roundtrip.js"></script>
 <script src="/host-onboarding.js"></script>
-<script src="/host-share.js?v=55.3"></script>
+<script src="/host-share.js?v=59.1"></script>
 <script src="/lib/cover-layout.js?v=57.1"></script>
-<script src="/host-property-editor.js?v=57.1"></script>
+<script src="/host-unsaved-changes.js?v=59.1"></script>
+<script src="/host-property-editor.js?v=59.1"></script>
 <script src="/lib/regional-exports.js?v=58.1"></script>
 <script src="/host-regional-exports.js?v=58.1"></script>
 <script>
@@ -3715,7 +3716,7 @@ async function handleAuth() {
 
 // Sign out function
 async function signOut() {
-  if (_propertySavePending || !(await propertyEditor.leave({save: savePropertyEdit, discard: cancelPropertyEdit}))) return;
+  if (_propertySavePending || !(await leaveConsoleDrafts())) return;
   await sb.auth.signOut();
   document.getElementById('loginOverlay').classList.remove('hidden');
 }
@@ -3762,6 +3763,7 @@ async function _sessionCheckIdle() {
   try { localStorage.setItem(SESSION_EXPIRED_KEY, '1'); } catch (_) {}
   try { await sb.auth.signOut(); } catch (_) {}
   // Expired sessions must still reload; an unsaved draft cannot block sign-out.
+  consoleDrafts.expire();
   propertyEditor.reset(propertyData);
   // Reload to clear every module's in-memory state (allCheckins,
   // propertyData, cached DOM, chat subscriptions). Cheaper and safer
@@ -5253,8 +5255,8 @@ function _renderSectionTabs(sectionId, activePanelId) {
 async function showPanel(id, btn) {
   if (!document.getElementById('panel-' + id)) return;
   const alreadyActive = document.getElementById('panel-' + id).classList.contains('active');
-  if (alreadyActive && propertyEditMode) return;
-  if (!alreadyActive && (_propertySavePending || !(await propertyEditor.leave({save: savePropertyEdit, discard: cancelPropertyEdit})))) return;
+  if (alreadyActive && (propertyEditMode || settingsEditMode || rulesEditMode || recosEditMode || consoleDrafts.dirty('share-defaults') || consoleDrafts.busy())) return;
+  if (!alreadyActive && (_propertySavePending || !(await leaveConsoleDrafts()))) return;
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   const target = document.getElementById('panel-' + id);
   if (!target) { console.warn('showPanel: unknown panel', id); return; }
@@ -5334,7 +5336,7 @@ async function showPanel(id, btn) {
 const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','settings','rules','recos','qrlink'];
 // Bump on every host-guides.js change so browsers never see a stale
 // copy even if their cache is aggressive.
-const _HG_VERSION = '58.1-regional-downloads';
+const _HG_VERSION = '59.1-unsaved-forms';
 let _hgLoadPromise = null;
 function _hgLoad() {
   if (window.HG) return Promise.resolve();
@@ -6665,6 +6667,7 @@ function openReservationForm(opts) {
       </form>
     </div>`;
   document.body.appendChild(modal);
+  consoleDrafts.register('reservation', {root: modal, save: () => saveDirectReservation(), discard: () => _closeReservationForm(true)}); consoleDrafts.begin('reservation');
   // Focus the first input.
   setTimeout(() => {
     const first = modal.querySelector('select, input[type="text"], input[type="date"]');
@@ -6672,7 +6675,9 @@ function openReservationForm(opts) {
   }, 40);
 }
 
-function _closeReservationForm() {
+async function _closeReservationForm(force = false) {
+  if (force !== true && !(await consoleDrafts.leave(['reservation']))) return;
+  consoleDrafts.unregister('reservation');
   document.getElementById('reservationFormModal')?.remove();
 }
 
@@ -6740,6 +6745,9 @@ async function _reservationFormOverlapCheck() {
 // immediately without a full page reload.
 async function saveDirectReservation(ev) {
   if (ev && ev.preventDefault) ev.preventDefault();
+  if (!_consoleCanEdit()) return false;
+  const form = document.getElementById('reservationForm'); if (form && !form.reportValidity()) return false;
+  return consoleDrafts.run('reservation', async () => {
   const modal = document.getElementById('reservationFormModal');
   if (!modal) return;
   const mode = modal.dataset.mode || 'reservation';
@@ -6806,28 +6814,31 @@ async function saveDirectReservation(ev) {
     let error;
     if (reservationId) {
       const upd = await sb.from('ota_reservations').update(payload).eq('id', reservationId).select('id');
-      error = upd.error;
+      error = upd.error || (!upd.data?.length ? {message:h('rf_err_generic')} : null);
     } else {
       const ins = await sb.from('ota_reservations').insert(payload).select('id');
-      error = ins.error;
+      error = ins.error || (!ins.data?.length ? {message:h('rf_err_generic')} : null);
     }
     if (error) {
       console.warn('[direct] save failed:', error.message);
       if (errEl) { errEl.textContent = error.message || h('rf_err_generic'); errEl.style.display = 'block'; }
-      return;
+      return false;
     }
-    _closeReservationForm();
+    _closeReservationForm(true);
     try { toast(h('rf_saved_ok')); } catch(_) {}
     try { track('direct_reservation_saved', { mode, edit: !!reservationId, channel }); } catch(_) {}
     // Refresh the surfaces that show reservations.
     try { if (typeof renderCalendarPanel === 'function') await renderCalendarPanel(); } catch(_) {}
     try { if (typeof renderDashboard === 'function') await renderDashboard(); } catch(_) {}
+    return true;
   } catch (e) {
     console.warn('[direct] save exception:', e);
     if (errEl) { errEl.textContent = h('rf_err_generic'); errEl.style.display = 'block'; }
   } finally {
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = h('rf_save'); }
   }
+  return false;
+  });
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -7953,7 +7964,7 @@ function _applyLangSplit(field) {
   toast(hostLang === 'it' ? '✓ Split applicato — ricordati di premere Salva' : '✓ Split applied — remember to press Save');
 }
 
-async function saveProperty() {
+async function saveProperty(scope = 'property') {
   if (!propertyId) { toast(hostLang === 'it' ? 'Nessuna proprietà trovata!' : 'No property found!'); return false; }
   // Round 37.3 — capture the previous rotating-code length so a length
   // change can trigger regeneration of every dashboard-visible code
@@ -8047,15 +8058,17 @@ async function saveProperty() {
     timezone: document.getElementById('propTimezone')?.value || 'Europe/Rome',
   };
   if (typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled) return false;
-  Object.assign(update, await propertyEditor.prepareCover(sb, propertyId));
+  const settingsKeys = new Set(['tax_rate_eur','tax_max_nights','tax_max_nights_basis','tax_max_total_eur','tax_exempt_under_age','tax_rules','tax_declared_exemptions','tax_source_note','tax_verified_at','ical_feeds','reminder_email','timezone']);
+  for (const key of Object.keys(update)) if (settingsKeys.has(key) !== (scope === 'settings')) delete update[key];
+  if (scope === 'property') Object.assign(update, await propertyEditor.prepareCover(sb, propertyId));
   const { data: saved, error } = await sb.from('properties').update(update).eq('id', propertyId).select('id').maybeSingle();
   if (!error && !saved) { toast(hostLang === 'it' ? 'Salvataggio non consentito.' : 'Save not permitted.'); return false; }
   if (error) { console.error('Save error:', error); toast('Error: ' + error.message); return false; }
-  propertyData = { ...propertyData, ...update };
+  propertyData = { ...propertyData, ...structuredClone(update) };
   // Round 21: keep allProperties + switcher in sync after a save (name/city
   // may have changed, which the switcher displays)
   const idx = allProperties.findIndex(p => p.id === propertyId);
-  if (idx > -1) allProperties[idx] = { ...allProperties[idx], ...update };
+  if (idx > -1) allProperties[idx] = { ...allProperties[idx], ...structuredClone(update) };
   renderPropertySwitcher();
   toast(h('toast_property_saved'));
   track('save_property', { name: document.getElementById('propName').value });
@@ -8235,10 +8248,10 @@ function icalFeedRowHtml(feed, idx) {
     </div>`;
 }
 
-function renderIcalFeeds() {
+function renderIcalFeeds(draftFeeds) {
   const list = document.getElementById('icalFeedsList');
   if (!list) return;
-  const feeds = Array.isArray(propertyData?.ical_feeds) ? propertyData.ical_feeds : [];
+  const feeds = Array.isArray(draftFeeds) ? draftFeeds : (Array.isArray(propertyData?.ical_feeds) ? propertyData.ical_feeds : []);
   if (feeds.length === 0) {
     list.innerHTML = `<div style="color:var(--ink-soft);font-size:0.82rem;padding:4px 0;" data-h="ical_none">${h('ical_none')}</div>`;
   } else {
@@ -8277,15 +8290,13 @@ function addIcalFeed() {
   // Read current DOM into an array so we don't blow away any half-typed URL.
   const current = collectDomIcalFeedsIncludingBlank();
   current.push({ platform: 'airbnb', url: '', label: '' });
-  propertyData = { ...(propertyData || {}), ical_feeds: current };
-  renderIcalFeeds();
+  renderIcalFeeds(current);
 }
 
 function removeIcalFeed(idx) {
   const current = collectDomIcalFeedsIncludingBlank();
   current.splice(idx, 1);
-  propertyData = { ...(propertyData || {}), ical_feeds: current };
-  renderIcalFeeds();
+  renderIcalFeeds(current);
 }
 
 // Same as collectIcalFeeds but keeps rows whose URL is empty — used when
@@ -8321,7 +8332,7 @@ async function syncCalendarsFromDashboard(btn) {
     const { data: { session } } = await sb.auth.getSession();
     const jwt = session?.access_token;
     if (!jwt) { toast(it ? 'Sessione scaduta — accedi di nuovo' : 'Not signed in'); return; }
-    const feeds = Array.isArray(propertyData?.ical_feeds) ? propertyData.ical_feeds : [];
+    const feeds = Array.isArray(draftFeeds) ? draftFeeds : (Array.isArray(propertyData?.ical_feeds) ? propertyData.ical_feeds : []);
     if (feeds.length === 0) {
       toast(it ? 'Nessun feed configurato — vai in Dettagli proprietà' : 'No iCal feeds — add one in Property details');
       return;
@@ -8778,6 +8789,12 @@ const propertyEditor = HostPropertyEditor.create({
   canEdit: () => !(typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled),
 });
 let _propertySavePending = null;
+function _consoleCanEdit() { return !(typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled); }
+const consoleDrafts = HostUnsavedChanges.create({lang: () => hostLang, canEdit: _consoleCanEdit, onError: error => toast((hostLang === 'it' ? 'Salvataggio fallito: ' : 'Save failed: ') + error.message)});
+consoleDrafts.register('property', {root: document.getElementById('propertyFormBody'), enabled: () => propertyEditMode, dirty: () => propertyEditor.dirty() || propertyEditor.pending(), pending: () => _propertySavePending, save: savePropertyEdit, discard: cancelPropertyEdit});
+consoleDrafts.register('settings', {root: document.getElementById('panel-settings'), snapshot: () => JSON.stringify([HostUnsavedChanges.values(document.getElementById('panel-settings'), '.settings-edit-fieldset input:not(#propTaxCopyFrom),.settings-edit-fieldset select:not(#propTaxCopyFrom),.settings-edit-fieldset textarea'), _taxRulesDraft, _taxDeclaredDraft]), save: saveSettingsEdit, discard: cancelSettingsEdit});
+async function leaveConsoleDrafts() { return consoleDrafts.leave(); }
+
 function startPropertyEdit() {
   if (_propertySavePending || (typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled)) return;
   propertyEditor.begin();
@@ -8845,40 +8862,24 @@ function _setSettingsEditControls(editing) {
   if (cancelBtn) cancelBtn.style.display = editing ? '' : 'none';
 }
 function startSettingsEdit() {
-  settingsEditMode = true;
-  _setSettingsEditControls(true);
-  // Round 25 mirror — an admin viewer without _adminEditEnabled must
-  // stay locked even when the host-side edit toggle fires.
-  if (typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled) {
-    setTimeout(() => setConsoleReadOnly(true), 0);
-  }
+  if (consoleDrafts.busy() || !_consoleCanEdit()) return;
+  settingsEditMode = true; _setSettingsEditControls(true); consoleDrafts.begin('settings');
 }
 function cancelSettingsEdit() {
+  if (consoleDrafts.busy()) return;
   settingsEditMode = false;
-  // Reload the visible values from propertyData so any in-progress
-  // edits are discarded. iCal feeds re-render from propertyData too.
-  if (propertyData) {
-    const emailEl = document.getElementById('propReminderEmail');
-    const tzEl    = document.getElementById('propTimezone');
-    if (emailEl) emailEl.value = propertyData.reminder_email || '';
-    if (tzEl)    tzEl.value    = propertyData.timezone || 'Europe/Rome';
-    try { if (typeof renderIcalFeeds === 'function') renderIcalFeeds(); } catch (_) {}
-  }
-  const result = document.getElementById('reminderSaveResult');
-  if (result) result.textContent = '';
-  _setSettingsEditControls(false);
+  if (propertyData) fillPropertyForm(propertyData);
+  document.getElementById('reminderSaveResult').textContent = '';
+  _setSettingsEditControls(false); consoleDrafts.end('settings');
 }
 async function saveSettingsEdit() {
-  // Round 45 hotfix — Tourist Tax + Arrival Reminders live on the same
-  // properties row. saveProperty() already reads every property field
-  // from the DOM (including tax_* + reminder_email + timezone) and
-  // sends one merged PATCH, so we reuse it. iCal feed changes (add /
-  // remove / sync) write themselves the moment the host acts on them,
-  // so nothing extra is needed for that card.
-  const ok = await saveProperty();
-  if (ok === false) return;
-  settingsEditMode = false;
-  _setSettingsEditControls(false);
+  if (!_consoleCanEdit()) return false;
+  const invalid = [...document.querySelectorAll('#panel-settings .settings-edit-fieldset input')].find(e => !e.checkValidity());
+  if (invalid) { invalid.reportValidity(); return false; }
+  return consoleDrafts.run('settings', async () => {
+    if (await saveProperty('settings') !== true) return false;
+    settingsEditMode = false; _setSettingsEditControls(false); return true;
+  });
 }
 
 // Round 45 Step 4.6 — Arrival Reminders lives in the Impostazioni tab
@@ -9192,14 +9193,16 @@ function openAlloggiatiForm(isUpdate) {
       <div id="alloggiatiFormMsg" style="font-size:0.78rem;color:#b03939;min-height:1em;"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
         <button type="button" class="btn btn-primary btn-sm" onclick="saveAlloggiatiCredentials(this)">${safe(saveLabel)}</button>
-        <button type="button" class="btn btn-secondary btn-sm" onclick="renderAlloggiatiCard()">${safe(cancelLabel)}</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="consoleDrafts.end('credentials');renderAlloggiatiCard()">${safe(cancelLabel)}</button>
       </div>
     </div>`;
+  consoleDrafts.register('credentials', {root: body, save: () => saveAlloggiatiCredentials(), discard: () => renderAlloggiatiCard()}); consoleDrafts.begin('credentials');
   setTimeout(() => document.getElementById('alloggiatiUtente')?.focus(), 40);
 }
 
 async function saveAlloggiatiCredentials(btn) {
-  if (!propertyId) return;
+  if (!propertyId || !_consoleCanEdit()) return false;
+  return consoleDrafts.run('credentials', async () => {
   const it = hostLang === 'it';
   const msgEl = document.getElementById('alloggiatiFormMsg');
   const utente   = document.getElementById('alloggiatiUtente')?.value || '';
@@ -9217,11 +9220,14 @@ async function saveAlloggiatiCredentials(btn) {
     try { track('alloggiati_credentials_saved', {}); } catch(_) {}
     try { toast(it ? '✓ Credenziali salvate. Ora clicca Verifica ora per confermare l\'accesso al portale.' : '✓ Credentials saved. Now click Verify now to confirm portal access.'); } catch(_) {}
     await loadAlloggiatiCard();
+    return true;
   } catch (e) {
     console.warn('[alloggiati] save failed:', e.message);
     err((it ? 'Salvataggio fallito: ' : 'Save failed: ') + e.message);
     if (btn) { btn.disabled = false; btn.style.opacity = ''; }
   }
+  return false;
+  });
 }
 
 async function removeAlloggiatiCredentials() {
@@ -9285,6 +9291,9 @@ async function verifyAlloggiatiCredentials(btn) {
 // flips back to view mode automatically.
 let rulesEditMode = false;
 let recosEditMode = false;
+let _rulesDraftOriginal = [], _recosDraftOriginal = [];
+consoleDrafts.register('rules', {root: document.getElementById('panel-rules'), snapshot: () => JSON.stringify(rulesData), save: saveRules, discard: () => { rulesData = structuredClone(_rulesDraftOriginal); rulesEditMode = false; renderRules(); }});
+consoleDrafts.register('recos', {root: document.getElementById('panel-recos'), snapshot: () => JSON.stringify(recoData), save: saveRecos, discard: () => { recoData = structuredClone(_recosDraftOriginal); recosEditMode = false; renderRecos(); }});
 const _rulesSafe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
 
 function _setRulesEditControls(visible) {
@@ -9303,9 +9312,10 @@ function _setRulesEditControls(visible) {
     btn.classList.toggle('btn-secondary', !visible);
   }
 }
-function toggleRulesEditMode() {
-  rulesEditMode = !rulesEditMode;
-  _setRulesEditControls(rulesEditMode);
+async function toggleRulesEditMode() {
+  if (!_consoleCanEdit() || consoleDrafts.busy()) return;
+  if (rulesEditMode) { if (!(await consoleDrafts.leave(['rules']))) return; }
+  else { _rulesDraftOriginal = structuredClone(rulesData); rulesEditMode = true; consoleDrafts.begin('rules'); }
   renderRules();
 }
 
@@ -9324,9 +9334,10 @@ function _setRecosEditControls(visible) {
     btn.classList.toggle('btn-secondary', !visible);
   }
 }
-function toggleRecosEditMode() {
-  recosEditMode = !recosEditMode;
-  _setRecosEditControls(recosEditMode);
+async function toggleRecosEditMode() {
+  if (!_consoleCanEdit() || consoleDrafts.busy()) return;
+  if (recosEditMode) { if (!(await consoleDrafts.leave(['recos']))) return; }
+  else { _recosDraftOriginal = structuredClone(recoData); recosEditMode = true; consoleDrafts.begin('recos'); }
   renderRecos();
 }
 
@@ -9476,11 +9487,11 @@ function renderRules() {
           <div style="flex:1;display:flex;gap:6px;">
             <div style="flex:1;">
               <label style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:2px;">${h('rules_title_en')}</label>
-              <input class="form-input" style="font-size:0.75rem;" value="${r.title_en||r.title||''}" onchange="rulesData[${i}].title_en=this.value">
+              <input class="form-input" style="font-size:0.75rem;" value="${r.title_en||r.title||''}" oninput="rulesData[${i}].title_en=this.value">
             </div>
             <div style="flex:1;">
               <label style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:2px;">${h('rules_title_it')}</label>
-              <input class="form-input" style="font-size:0.75rem;" value="${r.title_it||''}" onchange="rulesData[${i}].title_it=this.value">
+              <input class="form-input" style="font-size:0.75rem;" value="${r.title_it||''}" oninput="rulesData[${i}].title_it=this.value">
             </div>
           </div>
           <!-- Round 41 Task 5 — severity toggle. "Info" is the neutral
@@ -9500,11 +9511,11 @@ function renderRules() {
         <div style="display:flex;gap:6px;">
           <div style="flex:1;">
             <label style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:2px;">${h('rules_desc_en')}</label>
-            <textarea class="form-textarea" style="min-height:38px;font-size:0.7rem;" onchange="rulesData[${i}].desc_en=this.value">${r.desc_en||r.desc||''}</textarea>
+            <textarea class="form-textarea" style="min-height:38px;font-size:0.7rem;" oninput="rulesData[${i}].desc_en=this.value">${r.desc_en||r.desc||''}</textarea>
           </div>
           <div style="flex:1;">
             <label style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:2px;">${h('rules_desc_it')}</label>
-            <textarea class="form-textarea" style="min-height:38px;font-size:0.7rem;" onchange="rulesData[${i}].desc_it=this.value">${r.desc_it||''}</textarea>
+            <textarea class="form-textarea" style="min-height:38px;font-size:0.7rem;" oninput="rulesData[${i}].desc_it=this.value">${r.desc_it||''}</textarea>
           </div>
         </div>
       </div>
@@ -9529,7 +9540,8 @@ function addRule() {
 }
 
 async function saveRules() {
-  if (!propertyId) return;
+  if (!propertyId || !_consoleCanEdit()) return false;
+  return consoleDrafts.run('rules', async () => {
   const it = hostLang === 'it';
   // Round 37.4 — the previous flow did DELETE-then-INSERT with no
   // visibility on either half. Two failure modes bit us:
@@ -9563,26 +9575,29 @@ async function saveRules() {
   if (del.error) {
     console.error('rules delete failed:', del.error);
     toast((it ? 'Impossibile ripulire le regole precedenti: ' : 'Could not clear old rules: ') + del.error.message);
-    return;
+    return false;
   }
   if (rows.length > 0) {
     const ins = await sb.from('rules').insert(rows).select('id');
     if (ins.error) {
       console.error('rules insert failed:', ins.error);
       toast((it ? 'Salvataggio fallito: ' : 'Save failed: ') + ins.error.message);
-      return;
+      return false;
     }
     if (!ins.data || ins.data.length < rows.length) {
       // Not necessarily broken (RLS could allow the insert but hide
       // the select), but surface it so a silent partial save doesn't
       // hide.
       console.warn('rules insert returned fewer rows than sent:', ins.data?.length, 'vs', rows.length);
+      toast(it ? 'Salvataggio incompleto. Riprova.' : 'Incomplete save. Try again.'); return false;
     }
   }
   toast(h('toast_rules_saved'));
   track('save_rules', { count: rows.length });
   rulesEditMode = false;
   renderRules();
+  return true;
+  });
 }
 
 /* ══════════════════════════════════════
@@ -9871,20 +9886,20 @@ function renderRecos() {
           <div style="display:flex;gap:8px;margin-bottom:8px;">
             <div style="flex:1;">
               <label style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:3px;">${h('reco_name')}</label>
-              <input class="form-input" value="${r.name}" placeholder="${h('reco_name_hint')}" onchange="recoData[${globalIdx}].name=this.value">
+              <input class="form-input" value="${r.name}" placeholder="${h('reco_name_hint')}" oninput="recoData[${globalIdx}].name=this.value">
             </div>
             <div style="flex:1;">
               <label style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:3px;">${h('reco_address')}</label>
-              <input class="form-input" value="${r.address||''}" placeholder="${h('reco_address_hint')}" onchange="recoData[${globalIdx}].address=this.value">
+              <input class="form-input" value="${r.address||''}" placeholder="${h('reco_address_hint')}" oninput="recoData[${globalIdx}].address=this.value">
             </div>
           </div>
           <div style="margin-bottom:8px;">
             <label style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:3px;">${h('reco_desc_en')}</label>
-            <textarea class="form-textarea" style="min-height:40px;font-size:0.72rem;" placeholder="${h('reco_desc_en_hint')}" onchange="recoData[${globalIdx}].desc_en=this.value">${r.desc_en||r.desc||''}</textarea>
+            <textarea class="form-textarea" style="min-height:40px;font-size:0.72rem;" placeholder="${h('reco_desc_en_hint')}" oninput="recoData[${globalIdx}].desc_en=this.value">${r.desc_en||r.desc||''}</textarea>
           </div>
           <div style="margin-bottom:8px;">
             <label style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:3px;">${h('reco_desc_it')}</label>
-            <textarea class="form-textarea" style="min-height:40px;font-size:0.72rem;" placeholder="${h('reco_desc_it_hint')}" onchange="recoData[${globalIdx}].desc_it=this.value">${r.desc_it||''}</textarea>
+            <textarea class="form-textarea" style="min-height:40px;font-size:0.72rem;" placeholder="${h('reco_desc_it_hint')}" oninput="recoData[${globalIdx}].desc_it=this.value">${r.desc_it||''}</textarea>
           </div>
           <div style="margin-bottom:6px;">
             <label style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink-soft);display:block;margin-bottom:5px;">${h('reco_tags')}</label>
@@ -9930,7 +9945,8 @@ function addReco() {
 }
 
 async function saveRecos() {
-  if (!propertyId) return;
+  if (!propertyId || !_consoleCanEdit()) return false;
+  return consoleDrafts.run('recos', async () => {
   const it = hostLang === 'it';
   // Round 37.4 — same tightening as saveRules. Extra guard here:
   // recommendations.name is NOT NULL, so a fresh row with no name
@@ -9955,23 +9971,26 @@ async function saveRecos() {
   if (del.error) {
     console.error('recos delete failed:', del.error);
     toast((it ? 'Impossibile ripulire le raccomandazioni precedenti: ' : 'Could not clear old recommendations: ') + del.error.message);
-    return;
+    return false;
   }
   if (rows.length > 0) {
     const ins = await sb.from('recommendations').insert(rows).select('id');
     if (ins.error) {
       console.error('recos insert failed:', ins.error);
       toast((it ? 'Salvataggio fallito: ' : 'Save failed: ') + ins.error.message);
-      return;
+      return false;
     }
     if (!ins.data || ins.data.length < rows.length) {
       console.warn('recos insert returned fewer rows than sent:', ins.data?.length, 'vs', rows.length);
+      toast(it ? 'Salvataggio incompleto. Riprova.' : 'Incomplete save. Try again.'); return false;
     }
   }
   toast(h('toast_recos_saved'));
   track('save_recos', { count: rows.length, categories: [...new Set(rows.map(r => r.category))] });
   recosEditMode = false;
   renderRecos();
+  return true;
+  });
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -12089,14 +12108,18 @@ function openHostPortalEditor(tileKey) {
       </div>
     </div>`;
   document.body.insertAdjacentHTML('beforeend', html);
+  consoleDrafts.register('portal-link', {root: document.getElementById('hostPortalModal'), save: () => saveHostPortalLink(tileKey), discard: () => closeHostPortalEditor(true)}); consoleDrafts.begin('portal-link');
   document.getElementById('hostPortalUrlInput')?.focus();
 }
-function closeHostPortalEditor() {
+async function closeHostPortalEditor(force = false) {
+  if (force !== true && !(await consoleDrafts.leave(['portal-link']))) return;
+  consoleDrafts.unregister('portal-link');
   document.getElementById('hostPortalModal')?.remove();
 }
 
 async function saveHostPortalLink(tileKey) {
-  if (!propertyId || !tileKey) return;
+  if (!propertyId || !tileKey || !_consoleCanEdit()) return false;
+  return consoleDrafts.run('portal-link', async () => {
   const it = hostLang === 'it';
   const urlRaw = document.getElementById('hostPortalUrlInput')?.value || '';
   const label  = (document.getElementById('hostPortalLabelInput')?.value || '').trim().slice(0, 80);
@@ -12104,7 +12127,7 @@ async function saveHostPortalLink(tileKey) {
   const url    = _normalizeHostPortalUrl(urlRaw);
   if (!url) {
     if (errEl) { errEl.textContent = it ? 'URL non valido. Usa http:// o https:// con un dominio corretto.' : 'Invalid URL. Use http:// or https:// with a real domain.'; errEl.style.display = 'block'; }
-    return;
+    return false;
   }
   const next = _hostPortalMap();
   next[tileKey] = label ? { url, label } : { url };
@@ -12115,24 +12138,25 @@ async function saveHostPortalLink(tileKey) {
   if (error) {
     console.error('portal_links save failed:', error);
     if (errEl) { errEl.textContent = (it ? 'Salvataggio fallito: ' : 'Save failed: ') + error.message; errEl.style.display = 'block'; }
-    return;
+    return false;
   }
   if (!data || data.length === 0) {
     if (errEl) { errEl.textContent = it ? 'Salvataggio bloccato dai permessi.' : 'Save blocked by permissions.'; errEl.style.display = 'block'; }
-    return;
+    return false;
   }
   propertyData = { ...(propertyData || {}), portal_links: data[0].portal_links || next };
   applyHostPortalLinks();
-  closeHostPortalEditor();
+  closeHostPortalEditor(true);
   toast(it ? '✓ Link salvato' : '✓ Link saved');
-  track('save_portal_link', { tile: tileKey });
+  track('save_portal_link', { tile: tileKey });  return true;
+  });
 }
 
 async function removeHostPortalLink(tileKey) {
   if (!propertyId || !tileKey) return;
   const it = hostLang === 'it';
   const next = _hostPortalMap();
-  if (!(tileKey in next)) { closeHostPortalEditor(); return; }
+  if (!(tileKey in next)) { closeHostPortalEditor(true); return; }
   delete next[tileKey];
   const { data, error } = await sb.from('properties')
     .update({ portal_links: next })
@@ -12150,7 +12174,7 @@ async function removeHostPortalLink(tileKey) {
   }
   propertyData = { ...(propertyData || {}), portal_links: data[0].portal_links || next };
   applyHostPortalLinks();
-  closeHostPortalEditor();
+  closeHostPortalEditor(true);
   toast(it ? '✓ Link rimosso' : '✓ Link removed');
   track('remove_portal_link', { tile: tileKey });
 }
@@ -12354,6 +12378,7 @@ function hostShareController() {
     root: document.getElementById('hostShareRoot'),
     context: () => ({ propertyId, property: propertyData, lang: hostLang, origin: APP_ORIGIN, mode: APP_CONFIG.mode, sb }),
     ensureCodes: rows => ensureReservationBookingCodes(rows),
+    drafts: consoleDrafts,
   });
   return _hostShareController;
 }
@@ -13517,6 +13542,8 @@ function viewGuest(id) {
     </div>`;
   document.body.insertAdjacentHTML('beforeend', modalHTML);
   document.body.style.overflow = 'hidden';
+  const lockboxInput = document.getElementById('lockboxEdit_' + c.id);
+  if (lockboxInput) { consoleDrafts.register('guest-lockbox', {root: lockboxInput.parentElement, keepActive: true, save: () => saveGuestLockbox(c.id, lockboxInput.id), discard: () => closeGuestDetailModal(true)}); consoleDrafts.begin('guest-lockbox'); }
 
   // Asynchronously fetch a signed URL for the ID photo (private bucket)
   if (c.id_photo_path) {
@@ -13849,9 +13876,12 @@ function editGuest(id) {
     </div>`;
   document.body.insertAdjacentHTML('beforeend', modalHTML);
   document.body.style.overflow = 'hidden';
+  consoleDrafts.register('guest-edit', {root: document.getElementById('guestEditModal'), save: () => saveGuestEdits(id), discard: () => closeGuestEditModal(true)}); consoleDrafts.begin('guest-edit');
 }
 
-function closeGuestEditModal() {
+async function closeGuestEditModal(force = false) {
+  if (force !== true && !(await consoleDrafts.leave(['guest-edit']))) return;
+  consoleDrafts.unregister('guest-edit');
   const m = document.getElementById('guestEditModal');
   if (m) m.remove();
   document.body.style.overflow = '';
@@ -13910,12 +13940,14 @@ async function unlockFiledForCorrection(id) {
   track('unlock_filed_checkin', { id });
   // Re-open the modal in editable mode so the host can make the correction
   // immediately. closeGuestEditModal first so the old one is cleaned up.
-  closeGuestEditModal();
+  closeGuestEditModal(true);
   editGuest(id);
   toast(it ? '🔓 Sbloccato — ricorda di reinviare dopo la correzione.' : '🔓 Unlocked — remember to re-file after correcting.');
 }
 
 async function saveGuestEdits(id) {
+  if (!_consoleCanEdit()) return false;
+  return consoleDrafts.run('guest-edit', async () => {
   const it = hostLang === 'it';
   const statusEl = document.getElementById('editGuestStatus');
   const setStatus = (html, tone) => {
@@ -13951,7 +13983,7 @@ async function saveGuestEdits(id) {
   if (!guest_type)      missing.push(h('field_guest_type'));
   if (missing.length > 0) {
     setStatus(h('edit_field_missing').replace('{name}', missing.join(', ')), 'error');
-    return;
+    return false;
   }
 
   // Round 31 — country values must resolve to an Alloggiati Web code.
@@ -13963,7 +13995,7 @@ async function saveGuestEdits(id) {
   if (birth_country && !wbnbAcceptsCountry(birth_country)) unresolved.push(h('field_birth_country'));
   if (unresolved.length > 0) {
     setStatus(h('edit_country_unresolved').replace('{name}', unresolved.join(', ')), 'error');
-    return;
+    return false;
   }
 
   const arrival_date   = v('edit_arrival_date') || null;
@@ -14020,14 +14052,14 @@ async function saveGuestEdits(id) {
     // toward the unlock flow.
     if (/checkin_locked_filed/i.test(error.message || '')) {
       setStatus(h('edit_save_filed_locked'), 'error');
-      return;
+      return false;
     }
     setStatus(h('edit_save_failed') + ': ' + error.message, 'error');
-    return;
+    return false;
   }
   if (!updated || updated.length === 0) {
     setStatus(h('edit_save_blocked'), 'error');
-    return;
+    return false;
   }
 
   // Splice the updated row back into allCheckins and re-render.
@@ -14038,7 +14070,8 @@ async function saveGuestEdits(id) {
   setStatus(h('edit_saved'), 'ok');
   track('edit_checkin', { id, fields_updated: Object.keys(update).length });
   // Give the host a beat to read the confirmation, then close.
-  setTimeout(closeGuestEditModal, 700);
+  closeGuestEditModal(true);
+  return true;  });
 }
 
 // ── Round 19 / 36.2: rotating lockbox helpers ────────────────────────
@@ -14188,25 +14221,30 @@ async function saveReservationKeybox(inputEl) {
 }
 
 async function saveGuestLockbox(checkinId, inputId) {
+  if (!_consoleCanEdit()) return false;
+  return consoleDrafts.run('guest-lockbox', async () => {
   const input = document.getElementById(inputId);
   if (!input) return;
   const newVal = input.value.trim() || null;
-  const { error } = await sb.from('checkins')
+  const { data, error } = await sb.from('checkins')
     .update({ keybox_code: newVal })
-    .eq('id', checkinId);
-  if (error) {
+    .eq('id', checkinId).select('id');
+  if (error || !data?.length) {
     console.error('Lockbox save error:', error);
-    toast('Error: ' + error.message);
-    return;
+    toast('Error: ' + (error?.message || 'Save not permitted.'));
+    return false;
   }
   // Update local cache so the modal stays consistent on re-open
   const c = allCheckins.find(g => g.id === checkinId);
   if (c) c.keybox_code = newVal;
   toast(hostLang === 'it' ? '✓ Codice lockbox salvato' : '✓ Lockbox code saved');
-  track('save_guest_lockbox', { has_value: !!newVal });
+  track('save_guest_lockbox', { has_value: !!newVal });  return true;
+  });
 }
 
-function closeGuestDetailModal() {
+async function closeGuestDetailModal(force = false) {
+  if (force !== true && !(await consoleDrafts.leave(['guest-lockbox']))) return;
+  consoleDrafts.unregister('guest-lockbox');
   const m = document.getElementById('guestDetailModal');
   if (m) m.remove();
   document.body.style.overflow = '';
@@ -14214,7 +14252,7 @@ function closeGuestDetailModal() {
 
 // Close on Escape
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && document.getElementById('guestDetailModal')) {
+  if (e.key === 'Escape' && !document.querySelector('dialog[open]') && document.getElementById('guestDetailModal')) {
     closeGuestDetailModal();
   }
 });
@@ -14552,7 +14590,7 @@ async function switchProperty(propId) {
   const target = allProperties.find(p => p.id === propId);
   if (!target) return;
 
-  if (_propertySavePending || !(await propertyEditor.leave({save: savePropertyEdit, discard: cancelPropertyEdit}))) return;
+  if (_propertySavePending || !(await leaveConsoleDrafts())) return;
 
   if (_regionalExportController) _regionalExportController.close();
   propertyId = propId;
@@ -14579,7 +14617,7 @@ async function switchProperty(propId) {
 
 // Round 21: create a new property owned by the current host and switch to it
 async function addProperty() {
-  if (_propertySavePending || !(await propertyEditor.leave({save: savePropertyEdit, discard: cancelPropertyEdit}))) return;
+  if (_propertySavePending || !(await leaveConsoleDrafts())) return;
   document.getElementById('propSwitcher')?.classList.remove('open');
   const name = prompt(h('switcher_add_prompt') || 'Name for the new property:');
   if (name === null) return; // cancelled

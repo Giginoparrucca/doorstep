@@ -24,3 +24,25 @@ property-editor/regional/Share/admin/links/onboarding and affected regressions.
 Publish source, tests, guides, plan and changelog; merge main and verify Vercel
 success and exact production source. No schema changes or live guest test writes.
 Round 51 remains paused.
+
+## Delivery — 15 October 2026
+
+Application scope shipped through PR #159, merged to main as
+`8a6240a92a0b87c732992631d048772a749bf3e5`. Vercel production succeeded.
+All eight published files match tested local source; served host console, shared
+draft registry, property editor, Share module and guide match byte for byte.
+The canonical origin remains https://app.welcomebnb.it.
+
+The new shared-form browser suite and existing property, Share/QR and regional
+download browser suites pass at 390/1280px in IT/EN, alongside affected regression
+gates. Booking/block and guest-edit dialogs use existing validation, permission
+and confirmed-row paths. No live guest records or schema were changed to test.
+The guide is updated. Existing Rules/Recommendations replacement writes remain
+non-atomic; errors retain the draft for retry.
+
+Documentation delivery is partial: automatic approval review rejected the full
+Round 59 CHANGELOG upload, citing potentially sensitive historical details and
+missing current authorization for that specific public payload. No retry or
+indirect publication was attempted. The published CHANGELOG remains unchanged;
+the complete prepared verification record is retained locally. Source, tests,
+guide and this plan are published. Round 51 remains paused.

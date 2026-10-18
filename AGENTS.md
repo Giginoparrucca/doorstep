@@ -37,6 +37,24 @@ publish these together without repeatedly requesting publication permission.
 8. If publication/access fails or tests fail, record the real blocker. Never
    invent a merge, deployment, test result or background execution.
 
+## Full regression (every Round, every phase)
+
+1. Every phase test gate runs the **whole** product test suite
+   (`npm run test:all`: all offline tests plus all browser suites), not only the
+   tests named in the Round specification. Plan-specific tests are added to the
+   full suite; they never replace it.
+2. A failure anywhere blocks the merge, including areas the Round did not
+   touch. Fix it, or record it in CHANGELOG as a named blocker with Daniele's
+   explicit decision; never mark the phase shipped over a red suite.
+3. Skipped tests must state why (missing secret, no network). A skip is not a
+   pass; list skips in CHANGELOG.
+4. Paste the runner's pass/fail/skip totals into CHANGELOG for every phase.
+5. After deploying, run `npm run test:live` (read-only smoke) against
+   production and record the result.
+6. Any new feature, endpoint or export ships with tests that join the full
+   suite. Compliance outputs (Alloggiati, SPOT, regional statistics, tourist
+   tax) need committed synthetic golden files compared byte-for-byte.
+
 ## Agent-owned execution
 
 GPT or Claude performs all authorized technical work and routine verification,

@@ -7,6 +7,15 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Planned rounds (not started)
+
+| Round | Scope | Specification | Status |
+|---|---|---|---|
+| 60a — Full regression suite | `npm test` / `test:browser` / `test:live` / `test:all` runner, coverage inventory, tests for uncovered areas (compliance golden files, tourist tax, chat, notifications, iCal sync, reminders, scanning), permanent AGENTS.md rule | `PLAN_round60a_full_regression.md` | pending — runs before 60 |
+| 60 — B&B rooms inside one property | Rooms within one struttura (one CIN/Alloggiati/statistics code); per-room iCal feeds, overlap, calendar lanes, guest room + door code, occupied-room prefill for regional exports. Private owners only; no B2B | `PLAN_round60_bnb_rooms.md` | pending — after 60a |
+
+Standing rule added 2026-10-18 (AGENTS.md "Full regression"): every phase gate runs the whole suite, not only plan-listed tests.
+
 ### Current round — in-flight
 
 **Round 59 — Centered prompts and unsaved-form protection**

@@ -51,11 +51,41 @@ function create({root,context,comuneCode,allog}){
   model=null;dialog.querySelector('[data-review]').innerHTML='';busy=true;dialog.querySelector('[data-load]').disabled=true;status(text('Caricamento…','Loading…'));
   try{
    const rows=[];let offset=0;
-   while(true){const {data,error}=await ctx.sb.from('checkins').select('id,property_id,is_test,deleted_at,submitted_at,booking_code,guest_type,name,surname,sex,date_of_birth,citizenship,birth_country,birth_province,place_of_birth,residence_country,residence_place,arrival_date,departure_date,nights,document_type,document_number,doc_issue_place').eq('property_id',activeProperty).eq('is_test',false).is('deleted_at',null).order('id',{ascending:true}).range(offset,offset+499);
+   // Round 60 Phase 5 — pull room_id into the fetch so the daily
+   // occupied prefill below can count DISTINCT rooms with an active
+   // stay (per the PLAN: "never from guest counts"). Adding a column
+   // to the select is byte-neutral for a no-rooms property because
+   // every row's room_id is null; the existing summary CSV / native
+   // formats never read room_id (regional-exports.test.mjs stays
+   // byte-identical for the no-rooms canary).
+   while(true){const {data,error}=await ctx.sb.from('checkins').select('id,property_id,is_test,deleted_at,submitted_at,booking_code,guest_type,name,surname,sex,date_of_birth,citizenship,birth_country,birth_province,place_of_birth,residence_country,residence_place,arrival_date,departure_date,nights,document_type,document_number,doc_issue_place,room_id').eq('property_id',activeProperty).eq('is_test',false).is('deleted_at',null).order('id',{ascending:true}).range(offset,offset+499);
     if(stale(token))return;if(error)throw Error(error.message);if(!Array.isArray(data))throw Error('Invalid response');rows.push(...data);if(data.length<500)break;offset+=500;if(offset>=100000)throw Error(text('Troppi dati: esportazione interrotta.','Too many records: export stopped.'));
    }
    const relevant=R.scope(rows,ctx.propertyId).filter(r=>!R.validDate(String(r.arrival_date||'').split('T')[0])||!R.validDate(String(r.departure_date||'').split('T')[0])||R.overlap(r,start,end));
-   model={pending:rows.filter(r=>r.property_id===ctx.propertyId&&r.is_test===false&&!r.deleted_at&&!r.submitted_at&&R.overlap(r,start,end)).length,property:{...ctx.property,id:ctx.propertyId},contextRows:rows,rows:relevant.map(r=>({...r})),start,end,daily:Object.fromEntries(period.map(date=>[date,{open:'',rooms:ctx.property.rooms_available??'',beds:ctx.property.beds_available??'',occupied:R.counts(relevant,date).present?'':0}])),format,allog,code:format==='ross'?(ctx.property.ross1000_codice||''):''};
+   // Round 60 Phase 5 — room-aware prefills.
+   // When the property has rooms:
+   //   * rooms_available defaults to the active room count (host can edit)
+   //   * beds_available defaults to the sum of per-room beds (host can edit)
+   //   * per-day `occupied` defaults to the count of DISTINCT rooms with
+   //     an active stay on that date, derived from room assignments
+   //     (not guest counts, per the PLAN).
+   // When the property has NO rooms, every default falls back to the
+   // host-entered property field (ctx.property.rooms_available /
+   // beds_available) and the pre-Round-60 "guests present? host must
+   // fill in : 0" logic.
+   const roomList=Array.isArray(ctx.rooms)?ctx.rooms:[];
+   const hasRooms=roomList.length>0;
+   const roomsDefault=hasRooms?roomList.length:(ctx.property.rooms_available??'');
+   const bedsDefault=hasRooms?roomList.reduce((s,r)=>s+Math.max(1,Number(r.beds)||1),0):(ctx.property.beds_available??'');
+   const occupiedForDate=date=>{
+    const present=relevant.filter(r=>!r.deleted_at&&r.submitted_at&&R.overlap(r,date,date));
+    if(hasRooms){
+     const roomIds=new Set();for(const r of present)if(r.room_id)roomIds.add(r.room_id);
+     return roomIds.size;
+    }
+    return R.counts(relevant,date).present?'':0;
+   };
+   model={pending:rows.filter(r=>r.property_id===ctx.propertyId&&r.is_test===false&&!r.deleted_at&&!r.submitted_at&&R.overlap(r,start,end)).length,property:{...ctx.property,id:ctx.propertyId},contextRows:rows,rows:relevant.map(r=>({...r})),rooms:roomList,start,end,daily:Object.fromEntries(period.map(date=>[date,{open:'',rooms:roomsDefault,beds:bedsDefault,occupied:occupiedForDate(date)}])),format,allog,code:format==='ross'?(ctx.property.ross1000_codice||''):''};
    status('');paintReview();
   }catch(error){if(!stale(token))status(text('Caricamento fallito: ','Load failed: ')+error.message);}finally{if(!stale(token)){busy=false;dialog.querySelector('[data-load]').disabled=false;}}
  }
@@ -68,7 +98,18 @@ function create({root,context,comuneCode,allog}){
   const html=`${model.pending?'<p role="status">'+E(text('Check-in non completati nel periodo: ','Incomplete check-ins in the period: ')+model.pending+text('. Questi ospiti non sono inclusi. Completa i dati prima di esportare.','. These guests are excluded. Complete their details before exporting.'))+'</p>':''}${model.format==='ross'?'<p>'+E(text('Se ci sono partenze di ospiti arrivati prima del periodo, verifica che gli arrivi siano già registrati nel portale; altrimenti amplia il periodo.','For guests arriving before this period, check their arrivals are already recorded in the portal; otherwise extend the period.'))+'</p>':''}<p class="regional-note">${E(text('Solo check-in inviati dagli ospiti, inclusi quelli già comunicati ad Alloggiati. Le correzioni qui valgono solo per questo download.','Only submitted guest check-ins, including those already filed with Alloggiati. Corrections here apply only to this download.'))}</p>${['ross','trento'].includes(model.format)?input('code',model.format==='trento'?'IDOBJ STU':fieldLabel('structure_code'),model.code):''}<details><summary>${E(text('Controlla ospiti e residenza','Review guests and residence'))} (${model.rows.length})</summary><div class="regional-guests">${model.rows.map((r,i)=>`<details data-guest="${i}"><summary>${E((r.surname||'')+' '+(r.name||''))} · ${E(r.arrival_date)} → ${E(r.departure_date)}</summary><label><input type="checkbox" data-include="${i}" checked> ${E(text('Includi nel download','Include in download'))}</label><div class="regional-grid">${fields.map(k=>`<label class="regional-field"><span>${E(fieldLabel(k))}</span><input class="form-input" data-row="${i}" data-key="${k}" value="${E(r[k]||'')}" type="${k==='date_of_birth'?'date':'text'}" list="${k.includes('country')||k==='citizenship'?'wbnbCountryList':''}"></label>`).join('')}${['umbria','trento'].includes(model.format)?`<label class="regional-field"><span>${E(fieldLabel('provenance'))}</span><select class="form-select" data-row="${i}" data-key="_provenance"><option value="">${E(text('Da residenza (se riconosciuta)','From residence (if recognised)'))}</option>${R.provenanceOptions(model.format,allog).map(x=>`<option value="${E(x.code)}">${E(x.label)} (${E(x.code)})</option>`).join('')}</select></label>`:''}</div></details>`).join('')}</div></details>${model.format!=='ps'?`<h3>${E(text('Apertura e disponibilità giornaliera','Daily opening and availability'))}</h3><div class="regional-grid"><label class="regional-field">${E(text('Imposta tutte le giornate','Set all days'))}<select class="form-select" data-bulk-open><option value="">${E(text('Scegli','Choose'))}</option><option value="SI">${E(text('Aperto','Open'))}</option><option value="NO">${E(text('Chiuso','Closed'))}</option></select></label><label class="regional-field">${E(text('Unità occupate nelle notti con ospiti','Occupied units on nights with guests'))}<input class="form-input" type="number" min="0" data-bulk-occupied></label><button type="button" class="btn btn-secondary" data-apply>${E(text('Applica','Apply'))}</button></div><div class="regional-table-wrap"><table class="regional-days"><thead><tr>${[text('Data','Date'),text('Ospiti / notte','Guests / night'),text('Apertura','Opening'),text('Unità occupate','Occupied units'),text('Unità disponibili','Available units'),text('Letti disponibili','Available beds')].map(t=>'<th>'+E(t)+'</th>').join('')}</tr></thead><tbody>${period.map(date=>dayRow(date)).join('')}</tbody></table></div>`:''}<label class="regional-confirm"><input type="checkbox" data-confirm> ${E(text('Ho verificato ospiti, periodo e disponibilità. Non mancano ospiti da comunicare.','I reviewed the guests, period and availability. No guests to report are missing.'))}</label><p data-errors role="alert"></p><button type="button" class="btn btn-primary" data-download>${E(text('📥 Scarica ','📥 Download ')+({ross:'ROSS1000 XML',ps:'SPOT Easy TXT',umbria:period.length>1?'Turismatica ZIP':'Turismatica TXT',trento:period.length>1?'STU ZIP':'STU TXT',summary:text('riepilogo CSV','summary CSV')}[model.format]))}</button><p>${E(model.format==='summary'?text('Riepilogo di riferimento: non importarlo come file regionale.','Reference summary: do not upload this as a regional import file.'):text('Carica il file sul portale e controlla l’esito. Scaricare non significa aver comunicato i dati. I file ZIP vanno estratti: carica un TXT per giornata.','Upload to the portal and check the result. Downloading does not file the data. Extract ZIP files, then upload one TXT per day.'))}</p>`;
   dialog.querySelector('[data-review]').innerHTML=html;
  }
- function dayRow(date){const d=model.daily[date],c=R.counts(model.rows.filter(r=>!r._excluded),date);return `<tr><th scope="row">${date}</th><td data-present="${date}">${c.present}</td><td><select class="form-select" data-date="${date}" data-day-key="open" aria-label="${E(text('Apertura','Opening'))} ${date}"><option value="">—</option><option value="SI" ${d.open==='SI'?'selected':''}>${E(text('Aperto','Open'))}</option><option value="NO" ${d.open==='NO'?'selected':''}>${E(text('Chiuso','Closed'))}</option></select></td>${['occupied','rooms','beds'].map(k=>`<td><input class="form-input" type="number" min="0" step="1" data-date="${date}" data-day-key="${k}" value="${E(d[k])}" aria-label="${E(k)} ${date}"></td>`).join('')}</tr>`;}
+ function dayRow(date){const d=model.daily[date],c=R.counts(model.rows.filter(r=>!r._excluded),date);
+  // Round 60 Phase 5 — when the property has rooms, warn on any day
+  // where at least one present stay has no room_id. The occupied
+  // prefill counted DISTINCT rooms, so an unassigned stay doesn't
+  // bump the count and the host would be reporting fewer occupied
+  // rooms than there are actual stays. Flag it with a small chip so
+  // the host assigns the room before downloading.
+  const hasRooms=Array.isArray(model.rooms)&&model.rooms.length>0;
+  const present=model.rows.filter(r=>!r._excluded&&!r.deleted_at&&r.submitted_at&&R.overlap(r,date,date));
+  const unassigned=hasRooms?present.filter(r=>!r.room_id).length:0;
+  const flag=unassigned?` <span class="regional-unassigned-flag" title="${E(text('Ospiti presenti senza camera assegnata','Guests present without a room assigned'))}" style="color:#9a6b00;font-weight:600;">⚠ ${unassigned}</span>`:'';
+  return `<tr${unassigned?' data-unassigned="1"':''}><th scope="row">${date}${flag}</th><td data-present="${date}">${c.present}</td><td><select class="form-select" data-date="${date}" data-day-key="open" aria-label="${E(text('Apertura','Opening'))} ${date}"><option value="">—</option><option value="SI" ${d.open==='SI'?'selected':''}>${E(text('Aperto','Open'))}</option><option value="NO" ${d.open==='NO'?'selected':''}>${E(text('Chiuso','Closed'))}</option></select></td>${['occupied','rooms','beds'].map(k=>`<td><input class="form-input" type="number" min="0" step="1" data-date="${date}" data-day-key="${k}" value="${E(d[k])}" aria-label="${E(k)} ${date}"></td>`).join('')}</tr>`;}
  function edit(event){if(!model)return;const t=event.target;
   if(t.dataset.row!==undefined){model.rows[Number(t.dataset.row)][t.dataset.key]=t.value;}
   if(t.dataset.include!==undefined){model.rows[Number(t.dataset.include)]._excluded=!t.checked;refreshDays();}
@@ -79,7 +120,14 @@ function create({root,context,comuneCode,allog}){
  }
  function refreshDays(){const tbody=dialog.querySelector('.regional-days tbody');if(tbody)tbody.innerHTML=R.days(model.start,model.end).map(dayRow).join('');}
  function applyDaily(){if(!model)return;const open=dialog.querySelector('[data-bulk-open]').value,occupied=dialog.querySelector('[data-bulk-occupied]').value;
-  for(const [date,d]of Object.entries(model.daily)){if(open)d.open=open;if(d.open==='NO')Object.assign(d,{rooms:0,beds:0,occupied:0});else {if(d.rooms===''||Number(d.rooms)===0)d.rooms=model.property.rooms_available??'';if(d.beds===''||Number(d.beds)===0)d.beds=model.property.beds_available??'';if(R.counts(model.rows.filter(r=>!r._excluded),date).present&&occupied!=='')d.occupied=occupied;}}
+  // Round 60 Phase 5 — same room-aware defaults as the initial load so
+  // "Apply" after an open-day re-fill matches what the host would have
+  // seen on load. For a no-rooms property these fall back to the
+  // pre-Round-60 property fields exactly.
+  const hasRooms=Array.isArray(model.rooms)&&model.rooms.length>0;
+  const roomsDefault=hasRooms?model.rooms.length:(model.property.rooms_available??'');
+  const bedsDefault=hasRooms?model.rooms.reduce((s,r)=>s+Math.max(1,Number(r.beds)||1),0):(model.property.beds_available??'');
+  for(const [date,d]of Object.entries(model.daily)){if(open)d.open=open;if(d.open==='NO')Object.assign(d,{rooms:0,beds:0,occupied:0});else {if(d.rooms===''||Number(d.rooms)===0)d.rooms=roomsDefault;if(d.beds===''||Number(d.beds)===0)d.beds=bedsDefault;if(R.counts(model.rows.filter(r=>!r._excluded),date).present&&occupied!=='')d.occupied=occupied;}}
   refreshDays();dialog.querySelector('[data-confirm]').checked=false;
  }
  function download(){

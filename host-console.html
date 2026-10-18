@@ -2402,7 +2402,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 <script src="/host-unsaved-changes.js?v=59.1"></script>
 <script src="/host-property-editor.js?v=59.1"></script>
 <script src="/lib/regional-exports.js?v=58.1"></script>
-<script src="/host-regional-exports.js?v=58.1"></script>
+<script src="/host-regional-exports.js?v=60.5"></script>
 <script>
 /* ══════════════════════════════════════
    SUPABASE CONNECTION
@@ -12269,7 +12269,11 @@ let _regionalExportController = null;
 function regionalExportController() {
   if (!_regionalExportController) _regionalExportController = HostRegionalExports.create({
     root: document.getElementById('regionalTile'),
-    context: () => ({propertyId, property:propertyData, lang:hostLang, sb}),
+    // Round 60 Phase 5 — pass allRooms into the review flow so it can
+    // prefill rooms_available / beds_available / per-day occupied from
+    // actual room assignments. Empty array keeps pre-Round-60 behaviour
+    // exactly (host-entered property fields are the only source).
+    context: () => ({propertyId, property:propertyData, rooms:(Array.isArray(allRooms)?allRooms:[]), lang:hostLang, sb}),
     comuneCode: city => comuneCodeFromCity(city), allog: window.AllogRecords,
   });
   return _regionalExportController;

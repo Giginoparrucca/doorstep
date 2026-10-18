@@ -32,7 +32,21 @@ cross-property dashboard, no room types/pricing. Round 51 remains paused.
 | 3b — Rooms CRUD + feed room selector | shipped — PR TBD — Claude Opus 4.7 | Rooms card in Property Details (add/rename/beds/door_code/delete, soft-delete, 6-cap), per-feed room selector in Settings (shown at 2+ rooms). 17 new i18n keys in IT+EN. |
 | 3c — Direct-booking room selector + calendar filter | shipped — PR TBD — Claude Opus 4.7 | Room select on direct-booking form (passes roomId into `_computeReservationOverlap`); calendar room-filter chip row + room name prefix on bars. Full per-room vertical lanes deferred (noted below). |
 | 4 — Guest app | shipped — PR TBD — Claude Opus 4.7 | `api/guest.js` `property` action attaches `{id, name, beds, door_code?}` when the stay is linked to a room; door_code gated behind check-in like wifi/access. `index.html` renders a Your-room card on the Home tab, hidden otherwise. |
-| 5 — Compliance outputs | pending | Regional/ROSS1000 review prefills `rooms_available`/`beds_available`/per-day `occupied` from room data; flags days with unassigned stays. Alloggiati / SPOT / tourist-tax **unchanged**; `regional-exports.test.mjs` byte-identical for the no-rooms case stays the canary. |
+| 5 — Compliance outputs | shipped — PR TBD — Claude Opus 4.7 | Regional review prefills `rooms_available` / `beds_available` / per-day `occupied` from room data (distinct-room count, never guest count); unassigned-stays flag on each day row. Alloggiati / SPOT / tourist-tax unchanged. `regional-exports.test.mjs` byte-identical. |
+
+### Round 60 Phase 5 — regional review prefills from room data (Claude Opus 4.7, 2026-10-18)
+
+- The regional review dialog (`host-regional-exports.js`) now reads an optional `ctx.rooms` array (the host-console passes `allRooms`). When the property has rooms:
+  - `rooms_available` defaults to the active room count (host can still edit before download).
+  - `beds_available` defaults to the sum of per-room `beds` (clamped per-room to ≥ 1).
+  - Per-day `occupied` defaults to the count of **distinct `room_ids`** with an active submitted stay on that date. **Never from guest counts** (two guests sharing one room → occupied 1, not 2), exactly as the PLAN says.
+- When the property has NO rooms, every default falls back to the pre-Round-60 shape (`ctx.property.rooms_available` / `beds_available` for the capacity, `present ? '' : 0` for occupied). `applyDaily` mirrors the same gate so the "Apply to all days" button matches what the host saw on load.
+- Days with at least one present stay whose `room_id` is `NULL` get a visible `⚠ <n>` chip and a `data-unassigned="1"` row attribute. The occupied prefill counts only assigned stays, so the host would under-report; the chip prompts them to assign the room before downloading.
+- The `checkins` SELECT now includes `room_id` (the fetch adds one column — the native file writers in `lib/regional-exports.js` never read it, so the on-disk bytes for a no-rooms property stay byte-identical and `regional-exports.test.mjs`'s golden invariants keep passing).
+- Alloggiati, SPOT Easy, PayTourist, tourist-tax: **unchanged** (confirmed by `regional-exports.test.mjs`, `alloggiati-golden.test.mjs`, `paytourist-golden.test.mjs`, `tourist-tax.test.mjs` all still green).
+- Asset version bumped: `host-regional-exports.js?v=58.1` → `?v=60.5`. `regional-exports.test.mjs` and `regional-downloads-browser.test.mjs` updated for the new version pin + `allRooms = []` fixture declaration.
+- `scripts/rooms-regional-prefill.test.mjs` joins the full suite. Covers source invariants (defaults derivation, distinct-room occupied, unassigned flag) and replays the pure prefill logic in isolation across 6 scenarios: no-rooms baseline, 2+ rooms distinct-count, unassigned excluded, beds clamp, drafts/soft-deleted stays ignored.
+- Full regression: **PASS 45 / FAIL 0 / SKIP 3**. `regional-exports.test.mjs` byte-identical. No schema, no API surface change, no new env var. Properties without rooms see the exact pre-Round-60 review dialog.
 
 ### Round 60 Phase 4 — guest app shows own room name + door code (Claude Opus 4.7, 2026-10-18)
 

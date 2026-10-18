@@ -102,20 +102,23 @@ const { createRequire } = await import('node:module');
 const req = createRequire(import.meta.url);
 const webpush = req('web-push');
 const originalSend = webpush.sendNotification;
+const pushPayloads = [];
+webpush.setVapidDetails = () => {};
 webpush.sendNotification = async (sub, payload) => {
+  pushPayloads.push(payload);
   return { statusCode: 201, body: payload };
 };
 
 const { notifyHostForChatInsert } = await import('../api/_notify-host.js');
 
-function clear() { fetchCalls.length = 0; notificationLog.length = 0; }
+function clear() { fetchCalls.length = 0; notificationLog.length = 0; pushPayloads.length = 0; }
 
 function serialisedPayloads() {
   // Any string the pipeline sent to an external channel (push, telegram,
   // email): we scan the whole set for forbidden tokens.
   return fetchCalls
     .filter(c => c.url.includes('telegram') || c.url.includes('resend') || c.url.includes('/rest/v1/push_subscriptions'))
-    .map(c => c.body || '').join('\n');
+    .map(c => c.body || '').concat(pushPayloads).join('\n');
 }
 
 // ── 1. isTest → skip entirely (no fetches at all) ─────────────────
@@ -161,19 +164,20 @@ settings = {
   const serialised = serialisedPayloads();
   // These must NEVER appear anywhere in the channel payload — they'd
   // be exfiltrated to FCM / Telegram / Resend otherwise.
-  for (const forbidden of [GUEST_NAME, GUEST_MESSAGE, 'passport', 'locked myself out']) {
+  for (const forbidden of [GUEST_NAME, BOOKING_CODE, GUEST_MESSAGE, 'passport', 'locked myself out']) {
     assert.ok(!serialised.includes(forbidden),
       `channel payloads must not contain "${forbidden}" — got: ${serialised.slice(0, 400)}`);
   }
   // The property name IS allowed — it's the only piece of context the host sees.
   assert.ok(serialised.includes(DOWNLOADED_PROPERTY_NAME),
     'property name must be present (that is the whole content of the alert)');
-  // The booking code is embedded in the deep-link URL (conv=<code>) by
-  // design, so the host's console opens the correct chat. The push/
-  // telegram title and body themselves still carry no guest data.
-  // This test asserts the current contract; if a future round moves to
-  // opaque conv tokens, tighten the assertion above to also forbid the
-  // booking code.
+  const push = JSON.parse(pushPayloads[0]);
+  const link = new URL(push.url);
+  assert.equal(link.searchParams.get('notify_prop'), PROPERTY_ID);
+  assert.equal(link.searchParams.get('open'), 'chat');
+  assert.equal(link.searchParams.has('conv'), false);
+  assert.equal(push.tag, 'wbnb-chat-' + PROPERTY_ID);
+  assert.ok(notificationLog.some(row => row.conversation_key === BOOKING_CODE));
 }
 
 // ── 4. Throttle: a recent 'sent' log row suppresses next guest_message ─

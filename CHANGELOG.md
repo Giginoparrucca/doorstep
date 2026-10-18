@@ -32,6 +32,12 @@ cross-property dashboard, no room types/pricing. Round 51 remains paused.
 | 4 — Guest app | pending | Guest sees own room name + door code on arrival; served from `api/guest.js`, scoped by signed token. Shared house content unchanged. |
 | 5 — Compliance outputs | pending | Regional/ROSS1000 review prefills `rooms_available`/`beds_available`/per-day `occupied` from room data; flags days with unassigned stays. Alloggiati / SPOT / tourist-tax **unchanged**; `regional-exports.test.mjs` byte-identical for the no-rooms case stays the canary. |
 
+### Round 60 handoff — retained approved notification repair (GPT-6, 2026-10-18)
+
+- Fetched main `a3a59f4`: Claude shipped Round 60a phases 2–3 (PR #163/#164/#165) and Round 60 phase 1 (PR #166/#167). Existing ownership and attribution retained; phase 2 was pending and is now claimed by GPT-6. Round 51 remains paused.
+- The earlier user-approved notification privacy repair (`e26fe02` on the preserved `codex/round60a-phase2-coverage` branch) was absent from main. Reconciled just that repair onto the new source, without replacing Claude's independent test suites or history. External chat links and push tags omit the booking code; property/chat navigation and internal per-conversation log/throttle remain.
+- Tightened Claude's notifier regression to inspect actual mocked web-push payloads as well as Telegram/email and forbid the booking code. Focused suite passes. Full regression/release evidence follows with phase 2. The live cloud instance still enforces no additional domains; GitHub API CONNECT returns proxy 403, while native Git fetch/push work. No deployment or merged privacy repair is claimed.
+
 ### Round 60 Phase 1 — property_rooms schema + hosted RLS probe (Claude Opus 4.7, 2026-10-18)
 
 - `migration_round60_bnb_rooms.sql` (and the byte-identical tracked copy at `supabase/migrations/20261018100000_round60_bnb_rooms.sql`) create `public.property_rooms` with per-property owner-scoped CRUD, admin read-only, service-role bypass, and **no anon grant**. Case-insensitive unique `(property_id, lower(name))` partial unique index excludes soft-deleted rows (a host can re-use a name after deleting a room). Per-room overlap index on `ota_reservations (property_id, room_id, checkin_date, checkout_date) WHERE deleted_at IS NULL AND status = 'active'`. Trigger function pins `search_path = public, pg_catalog`. Rollback block + post-apply verification queries at the bottom of the file.

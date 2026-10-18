@@ -44,12 +44,31 @@ When Daniele says "next round", "continue" or similar without naming one:
 1. If the CHANGELOG `Current round - in-flight` table has any phase not yet
    `shipped`, continue that Round from its first unfinished phase.
 2. Otherwise take the **first `pending` row** of the CHANGELOG `Planned rounds`
-   table (top to bottom). Open it as the current Round: move the completed
+   table (top to bottom). After Daniele confirms it (see "Confirm before every
+   new Round" below), open it as the current Round: move the completed
    table into history (rule 7 above), create its phase table from its PLAN file,
    and remove the row from `Planned rounds`. Commit that before any code.
 3. If nothing is pending, stop and ask Daniele. Never invent a Round.
 4. Whoever writes a new PLAN file adds it to `Planned rounds` in the order it
    must run.
+
+## Confirm before every new Round
+
+Before starting any new Round — whether Daniele said "next round" or named it —
+stop and send him a short recap in plain, non-technical language, then wait for
+his explicit confirmation. Do not change files, open the Round or commit until he
+confirms. The recap covers, in a few lines each:
+
+- **What** the Round is and **why** it matters, in everyday words.
+- **What changes** for hosts and guests (or "nothing visible" if internal).
+- **What it does not touch.**
+- **The phases**, one line each.
+- **Anything he may need to do** (owner-only settings, accounts, costs, legal)
+  and any risk worth knowing.
+
+If he asks for changes, update the PLAN file and recap again. Once confirmed,
+phases inside that Round continue automatically as described under
+"Agent-owned execution". Unattended or scheduled runs never start a new Round.
 
 ## Full regression (every Round, every phase)
 
@@ -77,7 +96,8 @@ When Daniele says "next round", "continue" or similar without naming one:
 GPT or Claude performs all authorized technical work and routine verification,
 including configuration, provisioning, secrets, migrations, fixtures, PRs,
 deployments, tests, fixes, documentation and cleanup. Continue automatically
-between phases after their gates pass; do not ask Daniele to run tools or approve
+between phases of a Round Daniele has confirmed, after their gates pass (a new
+Round always needs his confirmation first); do not ask Daniele to run tools or approve
 routine decisions when the agent has sufficient authorization and access.
 
 Involve Daniele only for a strictly necessary owner-only action, unavailable

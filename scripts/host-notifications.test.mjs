@@ -7,9 +7,11 @@ process.env.VAPID_PUBLIC_KEY = 'fixture-public';
 process.env.VAPID_PRIVATE_KEY = 'fixture-private';
 const originalPush = webpush.sendNotification, originalVapid = webpush.setVapidDetails;
 let pushes = [], pushStatus = 0;
+const allPushes = [];
 webpush.setVapidDetails = () => {};
 webpush.sendNotification = async (subscription, payload, options) => {
   pushes.push({ subscription, payload: JSON.parse(payload), options });
+  allPushes.push(JSON.parse(payload));
   if (pushStatus) throw Object.assign(Error('Fixture push failure'), { statusCode: pushStatus });
 };
 const { notifyHostForChatInsert: notify, sendTestNotification, notifyHostAutofileAlert } = await import('../api/_notify-host.js');
@@ -89,6 +91,13 @@ try {
   const auto = await notifyHostAutofileAlert({ propertyId: 'property-a', hostId: 'host-a', kind: 'overdue',
     text: { title: 'Filing reminder', body: '2 guests need filing', button: 'Open' } });
   assert.equal(auto.results.at(-1).channel, 'email', 'autofile forces fallback email even after successful push');
+  // The round's privacy contract includes routing metadata, not just prose.
+  // Keep this gate red until the existing booking-code disclosure is fixed
+  // or the user explicitly revises the requirement; never hide it as a skip.
+  for (const payload of [...allPushes, ...outgoing().map(c => c.body)]) {
+    assert.ok(!JSON.stringify(payload).includes(base.bookingCode),
+      'Notification privacy: external payload must not contain the guest booking code (including URL/tag metadata)');
+  }
   console.log('PASS real notifier: triggers/de-escalation/test skip, scope/throttle/host reply, push/TG/email precedence, dead subscription cleanup, test/autofile alerts and guest-content exclusion');
 } finally {
   webpush.sendNotification = originalPush; webpush.setVapidDetails = originalVapid;

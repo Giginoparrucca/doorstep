@@ -27,7 +27,7 @@ cross-property dashboard, no room types/pricing. Round 51 remains paused.
 | Phase | Status | Where / test gate |
 |---|---|---|
 | 1 — Schema (`property_rooms` + nullable `room_id` on reservations/checkins) | shipped (code + demo + prod) — PR #166 — Claude Opus 4.7 | Migration applied to demo (`wmegnnlmcrabndyzywmj`) and production (`jcjwaqqabgwqhhzhfbts`); seven-invariant RLS probe passed identically on both; zero rows leaked. `scripts/rooms-schema.test.mjs` added to the full suite. Merged as `1c8d048`; post-merge regression on main green. |
-| 2 — iCal sync, overlap, echo logic | pending | Stamp reservation `room_id` from feed; Booking per-room uniqueness check; echo/coverage match within one room; per-room overlap; booking_code-first check-in ↔ reservation correlation. |
+| 2 — iCal sync, overlap, echo logic | in-progress — GPT-6 | Stamp reservation `room_id` from feed; Booking per-room uniqueness check; echo/coverage match within one room; per-room overlap; booking_code-first check-in ↔ reservation correlation. |
 | 3 — Host console | pending | Rooms card in Property Details, per-feed room selector, per-room calendar lanes + "Unassigned", room selector on direct bookings, bilingual strings. |
 | 4 — Guest app | pending | Guest sees own room name + door code on arrival; served from `api/guest.js`, scoped by signed token. Shared house content unchanged. |
 | 5 — Compliance outputs | pending | Regional/ROSS1000 review prefills `rooms_available`/`beds_available`/per-day `occupied` from room data; flags days with unassigned stays. Alloggiati / SPOT / tourist-tax **unchanged**; `regional-exports.test.mjs` byte-identical for the no-rooms case stays the canary. |

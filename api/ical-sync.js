@@ -1,5 +1,6 @@
 import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, rejectDemoIntegration } from './_environment.js';
 import { createRequire } from 'node:module';
+import { createHash } from 'node:crypto';
 const CalendarRoundtrip = createRequire(import.meta.url)('../lib/calendar-roundtrip.js');
 // api/ical-sync.js — Round 26 iCal calendar sync (with Round 32.5 cron mode).
 //
@@ -47,6 +48,46 @@ function _validUuidOrNull(value) {
   const s = value.trim();
   return UUID_RE.test(s) ? s.toLowerCase() : null;
 }
+
+// Round 60 Phase 3a — stable per-feed identity.
+//
+// Design (ported from GPT-6.1's codex/round60-phase2 branch with the
+// same semantics; see CHANGELOG Round 60 Phase 3a entry):
+//
+//   feedIdentity(feed)       — 32-char hex, used as the per-row
+//                              welcomebnb_feed_key marker. Derived from
+//                              platform + (explicit feed_key || room_id
+//                              || url). Changes when a host assigns a
+//                              room to an existing feed, which is what
+//                              drives the one-time legacy adoption pass.
+//   sourceFeedIdentity(feed) — hex, used only to detect "same URL used
+//                              in two rooms" (one source cannot belong
+//                              to two different rooms). Not persisted.
+//   roomFeedUid(feedKey,uid) — the room-prefixed UID stored in the DB
+//                              when a feed is assigned to a room. Legacy
+//                              unassigned feeds keep their raw UID so
+//                              outbound guest links stay stable.
+//
+// Hashes contain no feed URL / credentials. Only persisted via the
+// `raw.welcomebnb_feed_key` / `raw.welcomebnb_feed_source` jsonb markers.
+const FEED_KEY_RE = /^[A-Za-z0-9_-]{1,80}$/;
+function _validFeedKeyOrNull(value) {
+  if (value == null) return null;
+  if (typeof value !== 'string') return undefined; // signal invalid
+  return FEED_KEY_RE.test(value) ? value : undefined;
+}
+function feedIdentity(feed) {
+  const base = feed?.feed_key
+    ? 'feed:' + feed.feed_key
+    : feed?.room_id
+      ? 'room:' + feed.room_id
+      : String(feed?.url || '').trim();
+  return createHash('sha256').update(normalizePlatform(feed?.platform) + '\n' + base).digest('hex').slice(0, 32);
+}
+function sourceFeedIdentity(feed) {
+  return createHash('sha256').update(normalizePlatform(feed?.platform) + '\n' + String(feed?.url || '').trim()).digest('hex');
+}
+function roomFeedUid(feedKey, uid) { return 'wbnb-feed:' + feedKey + ':' + uid; }
 
 export default async function handler(req, res) {
   if (rejectInvalidEnvironment(res)) return;
@@ -186,6 +227,55 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
   const errors = [];
   const seenByPlatform = {}; // platform -> Set(uid)
   const failedPlatforms = new Set();
+  // Round 60 Phase 3a — scopes[platform] carries { roomId, feedKey } for
+  // each feed, so the cancellation sweep later can refuse to touch rows
+  // belonging to another room (or another feed_key) in the same platform.
+  const scopes = new Map();
+
+  // Round 60 Phase 3a — pre-flight validation (ported from GPT-6.1's
+  // codex/round60-phase2 branch). Fails loudly and refuses the whole
+  // sync if anything is off, so a malformed JSONB edit never silently
+  // mis-assigns rows.
+  //
+  //   (1) Every assigned room_id must be a well-formed UUID AND must
+  //       reference an active (not soft-deleted) property_rooms row in
+  //       THIS property. Lookup gated behind "any assigned" so legacy
+  //       no-room setups don't pay an extra round-trip.
+  const assigned = feeds.filter(f => _validUuidOrNull(f?.room_id));
+  if (assigned.length) {
+    for (const f of assigned) {
+      if (!_validUuidOrNull(f.room_id)) throw new Error('Invalid feed room UUID');
+    }
+    const roomsRes = await pgrestGET(
+      `property_rooms?property_id=eq.${encodeURIComponent(propertyId)}&deleted_at=is.null&select=id`,
+      apikey, bearer,
+    );
+    if (!roomsRes.ok) throw new Error('Feed room validation unavailable');
+    const activeRooms = await roomsRes.json();
+    if (!Array.isArray(activeRooms)) throw new Error('Feed room validation returned no rows');
+    const activeRoomIds = new Set(activeRooms.map(r => r.id));
+    for (const f of assigned) {
+      if (!activeRoomIds.has(_validUuidOrNull(f.room_id))) {
+        throw new Error('Feed room not active in this property: ' + f.room_id);
+      }
+    }
+  }
+  //   (2) feed_key, when present, must match [A-Za-z0-9_-]{1,80}.
+  //   (3) The same source URL cannot be assigned to two different rooms
+  //       in the same sync — that would duplicate every event under two
+  //       different (room, uid) keys and double-count the stay.
+  const sourceToRoom = new Map();
+  for (const f of feeds) {
+    const fk = _validFeedKeyOrNull(f?.feed_key);
+    if (fk === undefined) throw new Error('Invalid feed_key (expected [A-Za-z0-9_-]{1,80})');
+    const src = sourceFeedIdentity(f);
+    const room = _validUuidOrNull(f?.room_id);
+    if (sourceToRoom.has(src) && sourceToRoom.get(src) !== room) {
+      throw new Error('One source feed URL cannot belong to two different rooms');
+    }
+    sourceToRoom.set(src, room);
+  }
+
   // Load all local sources and previous imported rows in bounded pages. A
   // failed lookup must not guess provenance or run a cancellation sweep.
   const existing = await loadCalendarRows(propertyId, apikey, bearer);
@@ -199,6 +289,14 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
     // host with rooms can set it later.
     const feedRoomId = _validUuidOrNull(feed?.room_id);
     if (!url) { failedPlatforms.add(platform); errors.push({ platform, url, error: 'Empty URL' }); continue; }
+    // Round 60 Phase 3a — stable per-feed identity. feedKey drives the
+    // UID prefix for room-enabled feeds; sourceKey marks the row's
+    // origin URL (used to adopt legacy unassigned rows when the host
+    // first assigns a room to a feed that was already syncing).
+    const feedKey = feedIdentity(feed);
+    const sourceKey = sourceFeedIdentity(feed);
+    if (!scopes.has(platform)) scopes.set(platform, []);
+    scopes.get(platform).push({ roomId: feedRoomId, feedKey });
     try {
       const text = await fetchWithTimeout(url, FETCH_TIMEOUT_MS);
       if (!/^BEGIN:VCALENDAR\r?$/m.test(text) || !/^END:VCALENDAR\r?$/m.test(text)) {
@@ -209,25 +307,93 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
       if (events.length !== eventCount || events.some(e => !CalendarRoundtrip.validRange({
         checkin_date: icsDateToISO(e.DTSTART), checkout_date: icsDateToISO(e.DTEND),
       }))) throw new Error('Invalid or incomplete calendar event');
-      // Stamp the feed's room_id on every event this feed produced. Later
-      // echo/overlap logic uses room_id to scope matching per-room.
-      let rows = events.map(e => ({ ...vEventToRow(e, propertyId, platform), room_id: feedRoomId }));
+      // Stamp room_id + feed_key + feed_source on every event this feed
+      // produced. Rooms-enabled feeds prefix their UIDs so two rooms'
+      // feeds from the same OTA stay distinct even if they share raw UIDs.
+      let rows = events.map(e => {
+        const row = { ...vEventToRow(e, propertyId, platform), room_id: feedRoomId };
+        // Preserve the raw UID in `raw.welcomebnb_feed_uid` so the
+        // legacy-adoption pass below can find the pre-prefixed row.
+        if (feedRoomId || existing.some(r => r.raw?.welcomebnb_feed_source === sourceKey)) {
+          row.raw = { ...(row.raw || {}),
+            welcomebnb_feed_source: sourceKey,
+            welcomebnb_feed_uid: row.uid,
+            welcomebnb_feed_key: feedKey,
+          };
+          if (feedRoomId) row.uid = roomFeedUid(feedKey, row.uid);
+        }
+        return row;
+      });
+
+      // Round 60 Phase 3a — legacy adoption. When a host assigns a room
+      // to a feed that was already syncing (unassigned → roomA), the
+      // incoming UID changes to `wbnb-feed:<key>:<raw-uid>`. Without
+      // adoption, the pre-existing row would hang around with the raw
+      // UID and look like a "gone" booking in the cancellation sweep,
+      // and the host's issued guest link would detach.
+      //
+      // Rule: adopt only when there is EXACTLY ONE legacy candidate
+      // (prior row with the matching source + raw-uid, OR prior
+      // unassigned row with the raw uid when the platform has only one
+      // feed in this sync). More than one candidate ⇒ ambiguous origin,
+      // refuse rather than steal the booking for the first-syncing room.
+      for (const row of rows) {
+        if (existing.some(r => r.platform === platform && r.uid === row.uid)) continue;
+        const originalUid = row.raw?.welcomebnb_feed_uid || row.uid;
+        const legacy = existing.filter(r => r.platform === platform &&
+          ((r.raw?.welcomebnb_feed_source === sourceKey && r.raw?.welcomebnb_feed_uid === originalUid) ||
+            (feedRoomId && !r.room_id && r.uid === originalUid)));
+        if (!legacy.length) continue;
+        const samePlatformFeeds = feeds.filter(f => normalizePlatform(f.platform) === platform).length;
+        if (legacy.length !== 1 || (!legacy[0].raw?.welcomebnb_feed_source && samePlatformFeeds !== 1)) {
+          throw new Error('Existing unassigned reservation has ambiguous feed ownership');
+        }
+        const update = { uid: row.uid, room_id: feedRoomId, raw: { ...(legacy[0].raw || {}), ...row.raw } };
+        // If the legacy row had an auto-echo link to a direct booking in
+        // another room, break it: a room A reservation can never cover
+        // a room B direct booking.
+        if (legacy[0].covered_by_reservation_id && !existing.some(src =>
+            src.id === legacy[0].covered_by_reservation_id && CalendarRoundtrip.sameRoom(src, row))) {
+          update.covered_by_reservation_id = null;
+          update.coverage_lost_at = null;
+        }
+        const adopted = await pgrestPATCH(
+          `ota_reservations?id=eq.${encodeURIComponent(legacy[0].id)}&property_id=eq.${encodeURIComponent(propertyId)}`,
+          update, apikey, bearer,
+        );
+        if (!adopted.ok) throw new Error('Could not preserve existing booking during room assignment');
+        Object.assign(legacy[0], update);
+      }
+
       rows = rows.map(row => {
         const previous = existing.find(r => r.platform === platform && r.uid === row.uid);
         if (previous?.raw?.welcomebnb_echo_ignored) {
           return { ...row, raw: { ...row.raw, welcomebnb_echo_ignored: true } };
         }
-        // Never overwrite a host-confirmed link or take away a guest link.
-        if (previous?.covered_by_reservation_id && !previous.raw?.welcomebnb_auto_echo) {
+        // Never overwrite a host-confirmed link — unless the host-confirmed
+        // link is to a direct booking in a DIFFERENT room (Round 60: a stay
+        // in Camera Blu cannot cover a stay in Camera Rossa).
+        if (previous?.covered_by_reservation_id && !previous.raw?.welcomebnb_auto_echo &&
+            existing.some(src => src.id === previous.covered_by_reservation_id && CalendarRoundtrip.sameRoom(src, row))) {
           return { ...row, coverage_lost_at: null };
         }
         const origin = CalendarRoundtrip.identifyOrigin(row, existing);
-        const originId = origin?.id || previous?.raw?.welcomebnb_origin_source;
+        const originId = origin?.id || (previous && CalendarRoundtrip.sameRoom(previous, row)
+          ? previous.raw?.welcomebnb_origin_source
+          : null);
         if (originId) row = { ...row, raw: { ...row.raw, welcomebnb_origin_source: originId } };
         const source = CalendarRoundtrip.matchOrigin(row, existing);
         if (source && !previous?.booking_code) {
           return { ...row, entry_type: 'block', covered_by_reservation_id: source.id, booking_code: null,
             coverage_lost_at: null, raw: { ...row.raw, welcomebnb_auto_echo: true } };
+        }
+        // Round 60: if an incoming OTA row's room no longer matches the
+        // direct source it used to cover (host reassigned the direct to
+        // another room), drop the covered link.
+        if (previous?.covered_by_reservation_id && !CalendarRoundtrip.sameRoom(previous, row)) {
+          return { ...row,
+            entry_type: previous.raw?.welcomebnb_auto_echo ? 'block' : row.entry_type,
+            covered_by_reservation_id: null, coverage_lost_at: null };
         }
         if (previous?.raw?.welcomebnb_auto_echo) {
           return { ...row, entry_type: 'block', covered_by_reservation_id: null, coverage_lost_at: null };
@@ -343,12 +509,25 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
         `&status=eq.active&is_test=eq.false` +
         `&deleted_at=is.null` +
         `&or=(checkin_date.gte.${todayISO},entry_type.eq.block)` +
-        `&select=id,uid,covered_by_reservation_id`,
+        // Round 60 Phase 3a — pull room_id + raw so the sweep below can
+        // scope cancellations to feeds we actually fetched in this run.
+        `&select=id,uid,room_id,raw,covered_by_reservation_id`,
         apikey, bearer,
       );
       if (!listRes.ok) continue;
       const candidates = await listRes.json();
-      const gone = candidates.filter(r => !uids.has(r.uid));
+      // Round 60 Phase 3a — a row is "gone" only when (a) its UID is not
+      // in this run's seen set AND (b) at least one feed we synced in
+      // this run owns the row's (room, feed_key) scope. Without this
+      // scoping, a sync of feedA (room 1) would cancel feedB (room 2)'s
+      // reservations because B's UIDs weren't in A's seen set.
+      const platformScopes = scopes.get(platform) || [];
+      const gone = candidates.filter(r => {
+        if (uids.has(r.uid)) return false;
+        return platformScopes.some(scope =>
+          (r.room_id || null) === scope.roomId &&
+          (!r.raw?.welcomebnb_feed_key || r.raw.welcomebnb_feed_key === scope.feedKey));
+      });
       const coveredIds = gone.filter(r => r.covered_by_reservation_id).map(r => r.id);
       const plainIds   = gone.filter(r => !r.covered_by_reservation_id).map(r => r.id);
 
@@ -459,9 +638,21 @@ async function mergeBookingRollingUIDs(propertyId, incoming, apikey, bearer, see
       // matched as the "same" reservation for a UID rotation — that
       // would silently move the covered link onto a live incoming
       // booking, breaking both.
+      // Round 60 Phase 3a — scope the rolling-UID merge to the same
+      // (room_id, feed_key) bucket. Without this, a Booking feed in
+      // room A would merge its rolling UID onto a Booking reservation
+      // in room B that happens to share the same checkout date (and
+      // move its booking_code / covered_by onto A).
+      const feedKeyFilter = r.raw?.welcomebnb_feed_key
+        ? `&raw->>welcomebnb_feed_key=eq.${encodeURIComponent(r.raw.welcomebnb_feed_key)}`
+        : '';
+      const roomFilter = r.room_id
+        ? `&room_id=eq.${encodeURIComponent(r.room_id)}`
+        : '&room_id=is.null';
       const q = 'ota_reservations?'
         + `property_id=eq.${encodeURIComponent(propertyId)}`
         + `&platform=eq.booking`
+        + roomFilter + feedKeyFilter
         + `&entry_type=eq.reservation`
         + `&status=eq.active&is_test=eq.false`
         + `&deleted_at=is.null`
@@ -474,6 +665,11 @@ async function mergeBookingRollingUIDs(propertyId, incoming, apikey, bearer, see
     } catch (_) { matchList = []; }
     // No existing match — treat as a genuinely new reservation.
     if (matchList.length === 0) { keptRows.push(r); continue; }
+    // Round 60 Phase 3a — ambiguous same-room candidates aren't evidence
+    // of UID rotation. Rather than guess which row to merge onto (and
+    // risk transferring an issued guest link), bail out and let the
+    // normal upsert path create a fresh row the host can resolve.
+    if (matchList.length > 1) { keptRows.push(r); continue; }
     // Deterministic pick: the earliest-arriving row wins. Booking's
     // trim behaviour only moves DTSTART forward, so the earliest one
     // is the true original arrival.
@@ -680,7 +876,8 @@ function normalizePlatform(p) {
 
 // Named exports for local testing. Vercel serverless functions only use the
 // default export; these are inert at runtime and only touched by tests.
-export { parseICS, vEventToRow, icsDateToISO, normalizePlatform, syncOnePropertyFeeds, _validUuidOrNull };
+export { parseICS, vEventToRow, icsDateToISO, normalizePlatform, syncOnePropertyFeeds,
+  _validUuidOrNull, _validFeedKeyOrNull, feedIdentity, sourceFeedIdentity, roomFeedUid };
 
 /* ══════════════════════════════════════════════════════════════════════
    Round 45 Step 4.5 — OUTBOUND iCal EXPORT

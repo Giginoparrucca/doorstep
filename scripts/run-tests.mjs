@@ -76,6 +76,15 @@ function haveChromium() {
   if (explicit && existsSync(explicit)) return true;
   // Default path baked into the remote-runtime image.
   if (existsSync('/opt/pw-browsers/chromium')) return true;
+  // Playwright-managed Chromium (local devs or CI after `playwright
+  // install chromium`). Ask the Playwright API for its own path; if the
+  // call succeeds and the binary exists, we're good.
+  try {
+    const probe = spawnSync(process.execPath, ['-e',
+      "const p=require('playwright');const fs=require('fs');const e=p.chromium.executablePath();process.stdout.write(fs.existsSync(e)?e:'')"
+    ], { encoding: 'utf8', timeout: 10000 });
+    if (probe.status === 0 && probe.stdout.trim()) return true;
+  } catch { /* ignore */ }
   return false;
 }
 

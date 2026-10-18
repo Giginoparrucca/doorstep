@@ -26,7 +26,7 @@ cross-property dashboard, no room types/pricing. Round 51 remains paused.
 
 | Phase | Status | Where / test gate |
 |---|---|---|
-| 1 — Schema (`property_rooms` + nullable `room_id` on reservations/checkins) | pending | New table + RLS + explicit GRANTs (owner / admin / service_role; no anon); unique `(property_id, lower(name))` where `deleted_at is null`; index for per-room overlap; rollback block. Schema tests: owner CRUD, cross-owner denied, anon denied, soft-delete uniqueness, cascades. Demo-apply + verify before production apply. |
+| 1 — Schema (`property_rooms` + nullable `room_id` on reservations/checkins) | in-progress — Claude Opus 4.7 | New table + RLS + explicit GRANTs (owner / admin / service_role; no anon); unique `(property_id, lower(name))` where `deleted_at is null`; index for per-room overlap; rollback block. Schema tests: owner CRUD, cross-owner denied, anon denied, soft-delete uniqueness, cascades. Demo-apply + verify before production apply. |
 | 2 — iCal sync, overlap, echo logic | pending | Stamp reservation `room_id` from feed; Booking per-room uniqueness check; echo/coverage match within one room; per-room overlap; booking_code-first check-in ↔ reservation correlation. |
 | 3 — Host console | pending | Rooms card in Property Details, per-feed room selector, per-room calendar lanes + "Unassigned", room selector on direct bookings, bilingual strings. |
 | 4 — Guest app | pending | Guest sees own room name + door code on arrival; served from `api/guest.js`, scoped by signed token. Shared house content unchanged. |

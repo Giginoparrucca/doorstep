@@ -3,6 +3,10 @@
 # sha256 goes in the PR body.
 scripts/golden/*
 !scripts/golden/.gitkeep
+# Round 60a Phase 2 — synthetic committed goldens live here; they
+# never contain real PII, so they do commit.
+!scripts/golden/synthetic/
+!scripts/golden/synthetic/**
 
 # Build helpers used only to assemble lib/alloggiati-records.js — the
 # shipped artifact is the lib file itself.

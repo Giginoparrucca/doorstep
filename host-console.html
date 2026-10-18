@@ -5912,7 +5912,7 @@ async function renderUpcomingReservationsPanel() {
     // echo linked to a direct booking doesn't show as a second row in
     // "Prossime prenotazioni" — the direct row already represents it.
     const { data, error } = await sb.from('ota_reservations')
-      .select('id, platform, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code, checkin_reopened_at').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
+      .select('id, platform, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code, checkin_reopened_at, room_id').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
       .eq('property_id', propertyId)
       .eq('entry_type', 'reservation')
       .eq('status', 'active')
@@ -6101,10 +6101,17 @@ function _renderReservationCard(r, todayISO) {
   let matched = [];
   if (r.booking_code) matched = dated.filter(c => c.booking_code === r.booking_code);
   if (matched.length === 0) {
-    matched = dated.filter(c =>
-      c.arrival_date < r.checkout_date &&
-      (!c.departure_date || c.departure_date > r.checkin_date)
-    );
+    // Round 60 Phase 2 — a date-only fallback mis-pairs stays once two
+    // guests share the same nights across different rooms. When the
+    // reservation has a room_id, require the check-in group to be in
+    // the same room (NULL/NULL still matches so no-rooms properties
+    // keep the original behaviour exactly).
+    matched = dated.filter(c => {
+      if (c.arrival_date >= r.checkout_date) return false;
+      if (c.departure_date && c.departure_date <= r.checkin_date) return false;
+      if (r.room_id && c.room_id && c.room_id !== r.room_id) return false;
+      return true;
+    });
   }
   const todayCmp = todayISO || new Date().toISOString().slice(0, 10);
   const guestAlreadyArrived = matched.some(c =>
@@ -6520,11 +6527,18 @@ function _mintDirectBookingCode() {
 // non-deleted row whose date range overlaps [checkinISO, checkoutISO).
 // Excludes `excludeId` so edit mode doesn't flag itself.
 // Return: array of { id, entry_type, guest_name, checkin_date, checkout_date, platform }.
-async function _computeReservationOverlap(propId, checkinISO, checkoutISO, excludeId) {
+// Round 60 Phase 2 — optional roomId arg scopes the overlap check to a
+// single room. The function still returns every active row whose dates
+// touch the window (the UI then decides what to warn about); setting
+// roomId tells the caller to treat cross-room collisions as warnings
+// rather than hard blocks (an "unassigned" booking warns but does not
+// block, per PLAN_round60_bnb_rooms.md). Callers that don't pass a
+// roomId get the pre-Round-60 behaviour exactly.
+async function _computeReservationOverlap(propId, checkinISO, checkoutISO, excludeId, roomId) {
   if (!propId || !checkinISO || !checkoutISO) return [];
   try {
     const q = sb.from('ota_reservations')
-      .select('id, property_id, uid, entry_type, guest_name, checkin_date, checkout_date, platform, covered_by_reservation_id, raw, status, is_test').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
+      .select('id, property_id, uid, entry_type, guest_name, checkin_date, checkout_date, platform, covered_by_reservation_id, room_id, raw, status, is_test').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
       .eq('property_id', propId)
       .eq('status', 'active')
       .is('deleted_at', null)
@@ -6532,8 +6546,14 @@ async function _computeReservationOverlap(propId, checkinISO, checkoutISO, exclu
       .gt('checkout_date', checkinISO);  // existing ends after our start
     const { data, error } = await q;
     if (error) { console.warn('[direct] overlap query failed:', error.message); return []; }
-    return CalendarRoundtrip.projectRows(data || []).filter(r => r.id !== excludeId &&
+    const projected = CalendarRoundtrip.projectRows(data || []).filter(r => r.id !== excludeId &&
       r.checkin_date < checkoutISO && r.checkout_date > checkinISO);
+    if (!roomId) return projected;
+    // When a room is specified: keep rows in the same room, plus any
+    // unassigned rows (room_id null) so the host still sees cross-room
+    // conflicts they haven't labelled yet. Rows in OTHER rooms are
+    // dropped — a stay in Camera Blu never blocks a stay in Camera Rossa.
+    return projected.filter(r => !r.room_id || r.room_id === roomId);
   } catch (e) {
     console.warn('[direct] overlap exception:', e);
     return [];

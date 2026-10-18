@@ -38,6 +38,16 @@ const FETCH_TIMEOUT_MS = 10_000;
 // endpoint) so we stay under the Hobby-plan 12-function cap.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Round 60 Phase 2 — accept a feed's optional room_id only if it looks
+// like a UUID. Anything malformed (empty, "undefined" string, random
+// text from a bad JSONB edit) falls back to null (unassigned) rather
+// than hitting the DB and raising a FK/syntax error.
+function _validUuidOrNull(value) {
+  if (typeof value !== 'string') return null;
+  const s = value.trim();
+  return UUID_RE.test(s) ? s.toLowerCase() : null;
+}
+
 export default async function handler(req, res) {
   if (rejectInvalidEnvironment(res)) return;
   if (rejectDemoIntegration(res, 'ota')) return;
@@ -183,6 +193,11 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
   for (const feed of feeds) {
     const platform = normalizePlatform(feed?.platform);
     const url = typeof feed?.url === 'string' ? feed.url.trim() : '';
+    // Round 60 Phase 2 — feeds may carry an optional `room_id` key so the
+    // host can tell WelcomeBnB which room each OTA calendar represents.
+    // Absent or null = unassigned; the UI/dashboard surfaces that so a
+    // host with rooms can set it later.
+    const feedRoomId = _validUuidOrNull(feed?.room_id);
     if (!url) { failedPlatforms.add(platform); errors.push({ platform, url, error: 'Empty URL' }); continue; }
     try {
       const text = await fetchWithTimeout(url, FETCH_TIMEOUT_MS);
@@ -194,7 +209,9 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
       if (events.length !== eventCount || events.some(e => !CalendarRoundtrip.validRange({
         checkin_date: icsDateToISO(e.DTSTART), checkout_date: icsDateToISO(e.DTEND),
       }))) throw new Error('Invalid or incomplete calendar event');
-      let rows = events.map(e => vEventToRow(e, propertyId, platform));
+      // Stamp the feed's room_id on every event this feed produced. Later
+      // echo/overlap logic uses room_id to scope matching per-room.
+      let rows = events.map(e => ({ ...vEventToRow(e, propertyId, platform), room_id: feedRoomId }));
       rows = rows.map(row => {
         const previous = existing.find(r => r.platform === platform && r.uid === row.uid);
         if (previous?.raw?.welcomebnb_echo_ignored) {
@@ -383,7 +400,9 @@ async function loadCalendarRows(propertyId, apikey, bearer) {
   for (let offset = 0; ; offset += pageSize) {
     const res = await pgrestGET(`ota_reservations?property_id=eq.${encodeURIComponent(propertyId)}` +
       '&is_test=eq.false' +
-      '&select=id,property_id,platform,uid,entry_type,status,checkin_date,checkout_date,covered_by_reservation_id,booking_code,raw,is_test,deleted_at,updated_at' +
+      // Round 60 Phase 2 — pull room_id into the existing set so echo and
+      // overlap matching below can scope to the same room.
+      '&select=id,property_id,platform,uid,entry_type,status,checkin_date,checkout_date,covered_by_reservation_id,booking_code,room_id,raw,is_test,deleted_at,updated_at' +
       `&order=id.asc&limit=${pageSize}&offset=${offset}`, apikey, bearer);
     if (!res.ok) throw new Error('Calendar provenance lookup failed');
     const page = await res.json();
@@ -661,7 +680,7 @@ function normalizePlatform(p) {
 
 // Named exports for local testing. Vercel serverless functions only use the
 // default export; these are inert at runtime and only touched by tests.
-export { parseICS, vEventToRow, icsDateToISO, normalizePlatform, syncOnePropertyFeeds };
+export { parseICS, vEventToRow, icsDateToISO, normalizePlatform, syncOnePropertyFeeds, _validUuidOrNull };
 
 /* ══════════════════════════════════════════════════════════════════════
    Round 45 Step 4.5 — OUTBOUND iCal EXPORT

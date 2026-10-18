@@ -20,7 +20,14 @@ behaviour changes in this round.
   report **skipped with the reason**, never pass silently.
 - Output: one summary line per file (pass / fail / skipped + reason) and totals;
   non-zero exit on any failure.
-- Gate: `npm run test:all` runs green on current main, and the summary is pasted
+- **CI (enforcement, not just instructions):** add
+  `.github/workflows/regression.yml` running `npm ci` (or `npm install`),
+  Chromium for the browser suites, and `npm run test:all` on every pull request
+  and every push to `main`. Then enable branch protection on `main` requiring
+  this check, so nothing merges over a red suite whichever model did the work.
+  Branch protection may need owner rights: try with available access, and if
+  refused, give Daniele the exact one-screen GitHub setting to tick.
+- Gate: `npm run test:all` runs green on current main locally **and** in CI, and the summary is pasted
   into the CHANGELOG. Any pre-existing failure found here is fixed or recorded
   as a named blocker before Phase 2.
 

@@ -37,6 +37,20 @@ publish these together without repeatedly requesting publication permission.
 8. If publication/access fails or tests fail, record the real blocker. Never
    invent a merge, deployment, test result or background execution.
 
+## Choosing the next Round
+
+When Daniele says "next round", "continue" or similar without naming one:
+
+1. If the CHANGELOG `Current round - in-flight` table has any phase not yet
+   `shipped`, continue that Round from its first unfinished phase.
+2. Otherwise take the **first `pending` row** of the CHANGELOG `Planned rounds`
+   table (top to bottom). Open it as the current Round: move the completed
+   table into history (rule 7 above), create its phase table from its PLAN file,
+   and remove the row from `Planned rounds`. Commit that before any code.
+3. If nothing is pending, stop and ask Daniele. Never invent a Round.
+4. Whoever writes a new PLAN file adds it to `Planned rounds` in the order it
+   must run.
+
 ## Full regression (every Round, every phase)
 
 1. Every phase test gate runs the **whole** product test suite
@@ -51,7 +65,10 @@ publish these together without repeatedly requesting publication permission.
 4. Paste the runner's pass/fail/skip totals into CHANGELOG for every phase.
 5. After deploying, run `npm run test:live` (read-only smoke) against
    production and record the result.
-6. Any new feature, endpoint or export ships with tests that join the full
+6. Until `npm run test:all` exists (Round 60a Phase 1), run every
+   `scripts/*.test.*` file and every browser suite individually and list each
+   result. Once CI exists, a red CI run on the PR blocks the merge.
+7. Any new feature, endpoint or export ships with tests that join the full
    suite. Compliance outputs (Alloggiati, SPOT, regional statistics, tourist
    tax) need committed synthetic golden files compared byte-for-byte.
 

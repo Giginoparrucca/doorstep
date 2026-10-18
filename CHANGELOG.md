@@ -26,7 +26,7 @@ product behaviour changes. Round 51 remains paused.
 | Phase | Status | Where / test gate |
 |---|---|---|
 | 1 — One command for everything | shipped — PR #161 — Claude Opus 4.7 | `scripts/run-tests.mjs` runner + npm scripts; `.github/workflows/regression.yml` runs `npm run test:all` on every PR and push to main; `npm run test:all` green locally and in CI. Branch protection on `main` requiring the `regression` check is an owner-only step Daniele applies in GitHub settings. |
-| 2 — Fill coverage gaps | pending | Coverage inventory + at least one passing test (or a named-blocker entry) for Alloggiati .txt / ROSS1000 / regional formats, tourist tax + PayTourist CSV, guest chat, host notifications, iCal sync, arrival reminders, document scanning. Golden files committed; all offline. |
+| 2 — Fill coverage gaps | in-progress — GPT-6 | Coverage inventory + at least one passing test (or a named-blocker entry) for Alloggiati .txt / ROSS1000 / regional formats, tourist tax + PayTourist CSV, guest chat, host notifications, iCal sync, arrival reminders, document scanning. Golden files committed; all offline. |
 | 3 — Make it permanent | pending | Full-regression rule referenced from `RELEASE.md`; `npm run test:all` on the PR template / release checklist if one exists; final pass/skip counts + coverage table in CHANGELOG |
 
 ### Round 60a Phase 1 — one-command regression runner + CI gate (Claude Opus 4.7, 2026-10-18)

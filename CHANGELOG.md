@@ -27,7 +27,7 @@ product behaviour changes. Round 51 remains paused.
 |---|---|---|
 | 1 — One command for everything | shipped — PR #161 — Claude Opus 4.7 | `scripts/run-tests.mjs` runner + npm scripts; `.github/workflows/regression.yml` runs `npm run test:all` on every PR and push to main; `npm run test:all` green locally and in CI. Branch protection on `main` requiring the `regression` check is an owner-only step Daniele applies in GitHub settings. |
 | 2 — Fill coverage gaps | shipped — PR #163 — Claude Opus 4.7 | Seven new offline tests cover every area the plan called out: Alloggiati .txt synthetic golden, PayTourist CSV golden, tourist-tax engine (Round 37 redux), guest-chat/guest-gateway cross-property isolation, host notification pipeline (payload PII scrub + throttle + escalation), iCal parser (Airbnb/Booking/Vrbo samples), arrival+filing reminder renderers, document-scanning handler end-to-end with Anthropic mocked. ROSS1000 + regional formats already have `regional-exports.test.mjs` coverage. All transport mocked; no live secrets. |
-| 3 — Make it permanent | in-progress — Claude Opus 4.7 | Full-regression rule referenced from `RELEASE.md`; `npm run test:all` on a committed PR template; final pass/skip counts + coverage table in CHANGELOG |
+| 3 — Make it permanent | shipped — PR #164 — Claude Opus 4.7 | Full-regression rule referenced from `RELEASE.md`; `npm run test:all` on a committed PR template; final pass/skip counts + coverage table in CHANGELOG |
 
 ### Round 60a Phase 3 — make the regression rule permanent (Claude Opus 4.7, 2026-10-18)
 

@@ -11,12 +11,25 @@ Newest entries at the top of each section.
 
 | Round | Scope | Specification | Status |
 |---|---|---|---|
-| 60a — Full regression suite | `npm test` / `test:browser` / `test:live` / `test:all` runner, coverage inventory, tests for uncovered areas (compliance golden files, tourist tax, chat, notifications, iCal sync, reminders, scanning), permanent AGENTS.md rule | `PLAN_round60a_full_regression.md` | pending — runs before 60 |
 | 60 — B&B rooms inside one property | Rooms within one struttura (one CIN/Alloggiati/statistics code); per-room iCal feeds, overlap, calendar lanes, guest room + door code, occupied-room prefill for regional exports. Private owners only; no B2B | `PLAN_round60_bnb_rooms.md` | pending — after 60a |
 
 Standing rule added 2026-10-18 (AGENTS.md "Full regression"): every phase gate runs the whole suite, not only plan-listed tests.
 
 ### Current round — in-flight
+
+**Round 60a — Full regression suite and coverage gaps**
+
+Specification: `PLAN_round60a_full_regression.md`. Make "run every test" a single
+command, enforce it in CI, fill the test-coverage gaps left by prior rounds. No
+product behaviour changes. Round 51 remains paused.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 1 — One command for everything | pending | `scripts/run-tests.mjs` runner + npm scripts, `.github/workflows/regression.yml`, branch protection on `main`, `npm run test:all` green locally and in CI, summary in CHANGELOG |
+| 2 — Fill coverage gaps | pending | Coverage inventory + at least one passing test (or a named-blocker entry) for Alloggiati .txt / ROSS1000 / regional formats, tourist tax + PayTourist CSV, guest chat, host notifications, iCal sync, arrival reminders, document scanning. Golden files committed; all offline. |
+| 3 — Make it permanent | pending | Full-regression rule referenced from `RELEASE.md`; `npm run test:all` on the PR template / release checklist if one exists; final pass/skip counts + coverage table in CHANGELOG |
+
+### Previous round — preserved completed status
 
 **Round 59 — Centered prompts and unsaved-form protection**
 

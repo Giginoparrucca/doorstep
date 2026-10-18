@@ -32,8 +32,11 @@ jobs:
       # web app itself does not use it; it exists only for the browser
       # test suites). CI installs it explicitly along with its Chromium.
       - name: Install Playwright + Chromium
+        # 1.56.x is the pinned version in the local-dev image; it passes
+        # --headless=new (older 1.47 passes --headless=old which the
+        # installed Chromium 131 refuses to launch with).
         run: |
-          npm install --no-save playwright@1.47.0
+          npm install --no-save playwright@1.56.1
           npx playwright install --with-deps chromium
 
       - name: Diagnostics

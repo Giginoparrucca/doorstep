@@ -1632,6 +1632,24 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
       </fieldset>
 
+      <!-- Round 60 Phase 3b — Rooms / Camere. One struttura can host
+           2–6 private rooms (common Italian B&B shape). Zero or one
+           room keeps the UI compact: the "Add room" entry point is
+           there but the lanes/selectors stay hidden across the rest
+           of the console. Two+ rooms light up per-room feed selectors
+           in Settings, calendar lanes, room selector on direct
+           bookings, and the per-room door_code on the guest arrival
+           screen (Phase 4). -->
+      <div class="form-card" id="roomsCard">
+        <div class="form-card-title" data-h="rooms_card_title">Rooms (B&amp;B)</div>
+        <div class="form-card-desc" data-h="rooms_card_desc">Add the bookable rooms inside this property. Each room gets its own OTA calendars, direct-booking slot and door code. Leave empty if you rent the whole place.</div>
+        <div id="roomsListBody" style="display:flex;flex-direction:column;gap:10px;margin-top:10px;"></div>
+        <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="addRoom()" data-h="btn_add_room">➕ Add room</button>
+          <span id="roomsLimitHint" style="font-size:0.72rem;color:var(--ink-soft);" data-h="rooms_limit_hint">Max 6 rooms. Delete frees the name for re-use.</span>
+        </div>
+      </div>
+
       <!-- Round 38 → moved to Dettagli Proprietà 2026-09-30 —
            the privacy-notice preview card lived in Impostazioni until
            now, but its content is derived entirely from the fields
@@ -2549,6 +2567,12 @@ async function renderDismissedList() {
   }).join('');
 }
 let allChats = [];
+// Round 60 Phase 3b — in-memory copy of property_rooms rows for the
+// current property. Empty array when the property has no rooms (every
+// production property today, as of Phase 1 ship), in which case the
+// Rooms card renders as a one-line "Add rooms" prompt and the rest of
+// the console behaves exactly as pre-Round-60.
+let allRooms = [];
 let hostLang = 'it';
 // The onboarding module runs in its own script; top-level let/const are
 // lexical bindings, not window properties. Getters follow property switches.
@@ -4197,6 +4221,23 @@ const HT = {
     prop_privacy_desc: 'The notice guests see in the app, auto-generated from the property details above. Preview to check it renders correctly; download to keep a legal copy of what was shown.',
     prop_privacy_preview_btn: '🔍 Preview as guest',
     prop_privacy_download_btn: '⬇ Download HTML',
+    rooms_card_title: 'Rooms (B&B)',
+    rooms_card_desc: 'Add the bookable rooms inside this property. Each room gets its own OTA calendars, direct-booking slot and door code. Leave empty if you rent the whole place.',
+    btn_add_room: '➕ Add room',
+    rooms_limit_hint: 'Max 6 rooms. Delete frees the name for re-use.',
+    rooms_empty: 'No rooms yet — the whole property is bookable as one unit.',
+    rooms_name_label: 'Name',
+    rooms_beds_label: 'Beds',
+    rooms_door_code_label: 'Door code (optional)',
+    rooms_delete_btn: '🗑 Delete',
+    rooms_delete_confirm: 'Delete this room? Reservations assigned to it stay but become unassigned.',
+    rooms_default_name: 'Room',
+    rooms_save_ok: '✓ Saved',
+    rooms_save_fail: 'Save failed — see the error toast',
+    rooms_limit_reached: 'Max 6 rooms per property.',
+    rooms_duplicate_name: 'Another active room already uses this name (case-insensitive).',
+    feed_room_label: 'Room',
+    feed_room_unassigned: '— Unassigned —',
     prop_privacy_data_title: 'Privacy & data',
     prop_privacy_data_desc: 'Bulk data actions for this property. Regular retention purges are automatic — see Data Retention in the admin console. Use this only when you need to wipe the current check-in history in one go.',
     prop_privacy_data_hint: 'Confirmation requires typing the property name.',
@@ -4744,6 +4785,23 @@ const HT = {
     prop_beds_available_hint: 'Capacità ricettiva totale (per la rilevazione statistica).',
     prop_tax_title: 'Configurazione Imposta di Soggiorno',
     prop_tax_desc: 'Usata dall\'assistente dichiarazione in Export. Inserisci i valori dalla delibera del tuo comune sull\'imposta di soggiorno. Lascia vuoto se il tuo comune non applica l\'imposta.',
+    rooms_card_title: 'Camere (B&B)',
+    rooms_card_desc: 'Aggiungi le camere prenotabili di questa struttura. Ogni camera ha i suoi calendari OTA, le prenotazioni dirette e il codice di accesso. Lascia vuoto se affitti l\'intera proprietà.',
+    btn_add_room: '➕ Aggiungi camera',
+    rooms_limit_hint: 'Max 6 camere. L\'eliminazione libera il nome per il riuso.',
+    rooms_empty: 'Nessuna camera — l\'intera proprietà è prenotabile come unità singola.',
+    rooms_name_label: 'Nome',
+    rooms_beds_label: 'Letti',
+    rooms_door_code_label: 'Codice accesso (opzionale)',
+    rooms_delete_btn: '🗑 Elimina',
+    rooms_delete_confirm: 'Eliminare questa camera? Le prenotazioni assegnate restano ma diventano non assegnate.',
+    rooms_default_name: 'Camera',
+    rooms_save_ok: '✓ Salvato',
+    rooms_save_fail: 'Salvataggio fallito — vedi l\'errore',
+    rooms_limit_reached: 'Max 6 camere per proprietà.',
+    rooms_duplicate_name: 'Un\'altra camera attiva usa già questo nome (indipendentemente da maiuscole).',
+    feed_room_label: 'Camera',
+    feed_room_unassigned: '— Non assegnato —',
     prop_privacy_title: 'Informativa privacy · Anteprima e scarica',
     prop_privacy_desc: 'L\'informativa che gli ospiti vedono nell\'app, generata automaticamente dai campi della proprietà qui sopra. Anteprima per verificare che sia corretta; scarica per conservare una copia legale di quanto mostrato.',
     prop_privacy_preview_btn: '🔍 Anteprima come ospite',
@@ -8243,10 +8301,28 @@ function icalFeedRowHtml(feed, idx) {
   const platform = feed?.platform || 'airbnb';
   const url = feed?.url || '';
   const label = feed?.label || '';
+  const roomId = feed?.room_id || '';
   const opt = (val, txt) =>
     `<option value="${val}"${val === platform ? ' selected' : ''}>${txt}</option>`;
+  // Round 60 Phase 3b — room selector only when the property has 2+
+  // rooms. Keeps the Settings UI identical for whole-property
+  // (every production property as of Phase 1 ship) hosts.
+  const rooms = Array.isArray(allRooms) ? allRooms : [];
+  const showRoom = rooms.length >= 2;
+  const roomOpt = (id, name, isSelected) =>
+    `<option value="${_icalEscape(id)}"${isSelected ? ' selected' : ''}>${_icalEscape(name)}</option>`;
+  const roomCell = showRoom
+    ? `<div class="form-group" style="margin:0;">
+        <label class="form-label" data-h="feed_room_label">Room</label>
+        <select class="form-select ical-room">
+          <option value=""${!roomId ? ' selected' : ''}>${_icalEscape(h('feed_room_unassigned'))}</option>
+          ${rooms.map(r => roomOpt(r.id, r.name, r.id === roomId)).join('')}
+        </select>
+       </div>`
+    : '';
+  const gridCols = showRoom ? '130px 1fr 160px 160px auto' : '130px 1fr 180px auto';
   return `
-    <div class="ical-feed-row" data-idx="${idx}" style="display:grid;grid-template-columns:130px 1fr 180px auto;gap:8px;align-items:end;padding:10px;background:var(--cream);border:1px solid var(--border);border-radius:8px;">
+    <div class="ical-feed-row" data-idx="${idx}" style="display:grid;grid-template-columns:${gridCols};gap:8px;align-items:end;padding:10px;background:var(--cream);border:1px solid var(--border);border-radius:8px;">
       <div class="form-group" style="margin:0;">
         <label class="form-label" data-h="ical_platform">Platform</label>
         <select class="form-select ical-platform">
@@ -8264,6 +8340,7 @@ function icalFeedRowHtml(feed, idx) {
         <label class="form-label" data-h="ical_label">Label (optional)</label>
         <input class="form-input ical-label" type="text" value="${_icalEscape(label)}" data-h-placeholder="ical_label_ph" placeholder="${h('ical_label_ph')}">
       </div>
+      ${roomCell}
       <button type="button" class="btn btn-secondary btn-sm" onclick="removeIcalFeed(${idx})" style="color:var(--red);border-color:rgba(224,69,94,0.25);height:38px;" data-h="ical_remove">Remove</button>
     </div>`;
 }
@@ -8300,8 +8377,16 @@ function collectIcalFeeds() {
     const platform = row.querySelector('.ical-platform')?.value || 'other';
     const url = (row.querySelector('.ical-url')?.value || '').trim();
     const label = (row.querySelector('.ical-label')?.value || '').trim();
+    // Round 60 Phase 3b — the room select only exists when the property
+    // has 2+ rooms. "" → null (unassigned); any other value is the
+    // room's UUID (ical-sync.js re-validates against property_rooms
+    // before touching the DB, so a stale option can't inject garbage).
+    const roomSel = row.querySelector('.ical-room');
+    const roomId = (roomSel?.value || '').trim() || null;
     if (!url) return; // silently drop empty rows on save
-    out.push({ platform, url, label });
+    const entry = { platform, url, label };
+    if (roomId) entry.room_id = roomId;
+    out.push(entry);
   });
   return out;
 }
@@ -8326,13 +8411,194 @@ function collectDomIcalFeedsIncludingBlank() {
   if (!list) return Array.isArray(propertyData?.ical_feeds) ? [...propertyData.ical_feeds] : [];
   const out = [];
   list.querySelectorAll('.ical-feed-row').forEach(row => {
-    out.push({
+    const roomSel = row.querySelector('.ical-room');
+    const roomId = roomSel ? (roomSel.value || null) : (row.dataset.roomIdFallback || null);
+    const entry = {
       platform: row.querySelector('.ical-platform')?.value || 'airbnb',
       url: row.querySelector('.ical-url')?.value || '',
       label: row.querySelector('.ical-label')?.value || '',
-    });
+    };
+    if (roomId) entry.room_id = roomId;
+    out.push(entry);
   });
   return out;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Round 60 Phase 3b — Rooms CRUD.
+//
+// Inline per-row controls (no modal). Add/rename/beds/door_code/delete
+// each hit the DB as a single-row operation; the UI re-renders from
+// the fresh server state so a failed save never leaves a ghost row.
+//
+// Why no shared-form Save/Cancel: a Room is a tiny object (name, beds,
+// door_code, sort_order). The common host workflow is "add two rooms
+// at setup", not "edit five rooms at once". Rendering a modal per
+// row would be more clicks than inline. The Round 59 unsaved-forms
+// guard still protects the surrounding Property Details fieldset.
+//
+// Hard cap: 6 active rooms per property (PLAN_round60_bnb_rooms.md
+// scope "2-6 rooms"). An exceeded limit is caught locally before any
+// POST so the host sees a toast rather than a hosted error.
+// ══════════════════════════════════════════════════════════════════════
+const ROOMS_LIMIT = 6;
+
+function renderRoomsCard() {
+  const body = document.getElementById('roomsListBody');
+  if (!body) return;
+  const rooms = Array.isArray(allRooms) ? allRooms : [];
+  if (rooms.length === 0) {
+    body.innerHTML = `<div style="color:var(--ink-soft);font-size:0.82rem;padding:4px 0;">${_rsEscape(h('rooms_empty'))}</div>`;
+    _updateRoomsLimitHint();
+    return;
+  }
+  body.innerHTML = rooms.map(_renderRoomRow).join('');
+  _updateRoomsLimitHint();
+}
+
+function _rsEscape(s) {
+  return String(s == null ? '' : s).replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function _renderRoomRow(r) {
+  // 180px name · 70px beds · 150px door code · ~auto · delete button
+  return `
+    <div class="room-row" data-room-id="${_rsEscape(r.id)}" style="display:grid;grid-template-columns:1fr 90px 160px auto;gap:8px;align-items:end;padding:10px;background:var(--cream);border:1px solid var(--border);border-radius:8px;">
+      <div class="form-group" style="margin:0;">
+        <label class="form-label">${_rsEscape(h('rooms_name_label'))}</label>
+        <input type="text" class="form-input room-name" value="${_rsEscape(r.name || '')}" maxlength="120" onchange="saveRoomField('${_rsEscape(r.id)}','name',this.value,this)">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label class="form-label">${_rsEscape(h('rooms_beds_label'))}</label>
+        <input type="number" class="form-input room-beds" value="${_rsEscape(String(r.beds || 1))}" min="1" max="20" onchange="saveRoomField('${_rsEscape(r.id)}','beds',Number(this.value),this)">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label class="form-label">${_rsEscape(h('rooms_door_code_label'))}</label>
+        <input type="text" class="form-input room-door-code" value="${_rsEscape(r.door_code || '')}" maxlength="60" onchange="saveRoomField('${_rsEscape(r.id)}','door_code',this.value||null,this)">
+      </div>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="deleteRoom('${_rsEscape(r.id)}')" style="color:var(--red);border-color:rgba(224,69,94,0.25);height:38px;">${_rsEscape(h('rooms_delete_btn'))}</button>
+    </div>`;
+}
+
+function _updateRoomsLimitHint() {
+  const hint = document.getElementById('roomsLimitHint');
+  if (!hint) return;
+  const count = Array.isArray(allRooms) ? allRooms.length : 0;
+  const base = h('rooms_limit_hint');
+  hint.textContent = count >= ROOMS_LIMIT
+    ? h('rooms_limit_reached')
+    : `${base} (${count}/${ROOMS_LIMIT})`;
+}
+
+async function addRoom() {
+  if (!propertyId) {
+    toast(hostLang === 'it' ? 'Seleziona prima una proprietà.' : 'Select a property first.');
+    return;
+  }
+  if ((allRooms?.length || 0) >= ROOMS_LIMIT) {
+    toast(h('rooms_limit_reached'));
+    return;
+  }
+  // Default name: "Camera 1", "Camera 2", … / "Room 1", "Room 2", …
+  // Picks the lowest free integer so a delete-then-add doesn't reuse
+  // a name that collides with another active row.
+  const base = h('rooms_default_name');
+  const existing = new Set((allRooms || []).map(r => (r.name || '').toLowerCase()));
+  let n = 1, name;
+  do { name = `${base} ${n++}`; } while (existing.has(name.toLowerCase()));
+  const sortOrder = Math.max(0, ...(allRooms || []).map(r => r.sort_order || 0)) + 10;
+  try {
+    const { data, error } = await sb.from('property_rooms')
+      .insert({ property_id: propertyId, name, beds: 1, sort_order: sortOrder })
+      .select('id,name,beds,door_code,sort_order')
+      .single();
+    if (error) throw error;
+    if (!data) { toast(h('rooms_save_fail')); return; }
+    allRooms = [...(allRooms || []), data].sort((a, b) =>
+      (a.sort_order - b.sort_order) || a.name.localeCompare(b.name));
+    renderRoomsCard();
+    // When crossing the 2+ threshold, the iCal feed rows gain a room
+    // selector and _computeReservationOverlap gets a roomId. Repaint
+    // the Settings feed list so the new selector shows up without
+    // a reload.
+    if (document.getElementById('icalFeedsList')) renderIcalFeeds();
+    toast(h('rooms_save_ok'));
+  } catch (e) {
+    console.warn('[rooms] insert failed:', e);
+    toast(h('rooms_save_fail') + (e?.message ? ': ' + e.message : ''));
+  }
+}
+
+async function saveRoomField(roomId, field, value, inputEl) {
+  if (!propertyId || !roomId) return;
+  const patch = { [field]: value };
+  if (field === 'name') {
+    const trimmed = String(value || '').trim();
+    if (!trimmed) {
+      toast(hostLang === 'it' ? 'Il nome è obbligatorio' : 'Name is required');
+      if (inputEl) {
+        const prev = (allRooms || []).find(r => r.id === roomId);
+        if (prev) inputEl.value = prev.name || '';
+      }
+      return;
+    }
+    patch.name = trimmed;
+    // Local duplicate check before the DB round-trip. The partial
+    // unique index on (property_id, lower(name)) WHERE deleted_at IS
+    // NULL enforces this server-side too, but a client-side guard
+    // avoids a confusing error toast.
+    const duplicate = (allRooms || []).some(r => r.id !== roomId &&
+      (r.name || '').toLowerCase() === trimmed.toLowerCase());
+    if (duplicate) {
+      toast(h('rooms_duplicate_name'));
+      if (inputEl) {
+        const prev = (allRooms || []).find(r => r.id === roomId);
+        if (prev) inputEl.value = prev.name || '';
+      }
+      return;
+    }
+  }
+  try {
+    const { data, error } = await sb.from('property_rooms')
+      .update(patch).eq('id', roomId)
+      .select('id,name,beds,door_code,sort_order').single();
+    if (error) throw error;
+    if (!data) { toast(h('rooms_save_fail')); return; }
+    allRooms = (allRooms || []).map(r => r.id === roomId ? { ...r, ...data } : r);
+    // Only re-render if the name changed (feed selectors show it) OR
+    // we need to update the "X/6" counter. For beds/door_code edits
+    // the field itself is already up to date on screen.
+    if (field === 'name' && document.getElementById('icalFeedsList')) renderIcalFeeds();
+    toast(h('rooms_save_ok'));
+  } catch (e) {
+    console.warn('[rooms] update failed:', e);
+    toast(h('rooms_save_fail') + (e?.message ? ': ' + e.message : ''));
+  }
+}
+
+async function deleteRoom(roomId) {
+  if (!propertyId || !roomId) return;
+  if (!confirm(h('rooms_delete_confirm'))) return;
+  try {
+    // Soft delete: deleted_at = now() so the partial unique index
+    // frees the name for re-use. The nullable room_id FK on
+    // ota_reservations / checkins is ON DELETE SET NULL at the DB
+    // level, so soft-deleting leaves existing assignments pointing
+    // at a soft-deleted row — the host sees "Unassigned" everywhere
+    // for those stays, as the PLAN says.
+    const { data, error } = await sb.from('property_rooms')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', roomId).select('id').single();
+    if (error) throw error;
+    if (!data) { toast(h('rooms_save_fail')); return; }
+    allRooms = (allRooms || []).filter(r => r.id !== roomId);
+    renderRoomsCard();
+    if (document.getElementById('icalFeedsList')) renderIcalFeeds();
+    toast(h('rooms_save_ok'));
+  } catch (e) {
+    console.warn('[rooms] delete failed:', e);
+    toast(h('rooms_save_fail') + (e?.message ? ': ' + e.message : ''));
+  }
 }
 
 // Dashboard shortcut for syncing calendars. Same endpoint + auth flow
@@ -14776,8 +15042,19 @@ async function loadPropertyData() {
   if (_hostShareController && document.getElementById("panel-qrlink")?.classList.contains("active")) initQRPanel();
   if (!propertyId) return;
   // Reset per-property in-memory state so nothing leaks across a switch
-  rulesData = []; recoData = []; allCheckins = []; allChats = [];
+  rulesData = []; recoData = []; allCheckins = []; allChats = []; allRooms = [];
   dismissedBookingCodes = new Set();
+
+  // Round 60 Phase 3b — rooms for this property. Zero or one room keeps
+  // the UI identical to the pre-Round-60 host console. Two+ rooms light
+  // up the Rooms card, the per-feed room selector, calendar lanes and
+  // the direct-booking room picker.
+  try {
+    const { data } = await sb.from('property_rooms').select('id,name,beds,door_code,sort_order')
+      .eq('property_id', propertyId).is('deleted_at', null)
+      .order('sort_order', { ascending: true }).order('name', { ascending: true });
+    if (Array.isArray(data)) allRooms = data;
+  } catch (e) { console.warn('property_rooms load failed:', e); }
 
   await loadDismissedBookings();
   try {
@@ -14810,6 +15087,7 @@ async function loadPropertyData() {
   renderRules();
   renderRecos();
   renderTaxConfigPanel();
+  renderRoomsCard();
   startHostChatSubscription();
   refreshChatBadge(); // Round 21.1: reflect this property's unread state
 }

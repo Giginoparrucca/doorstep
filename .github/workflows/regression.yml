@@ -36,8 +36,16 @@ jobs:
           npm install --no-save playwright@1.47.0
           npx playwright install --with-deps chromium
 
+      - name: Diagnostics
+        run: |
+          echo "node $(node --version)"
+          echo "cwd: $(pwd)"
+          echo "ls scripts/*.test.* | wc -l: $(ls scripts/*.test.* | wc -l)"
+          echo "playwright chromium path:"
+          node -e "console.log(require('playwright').chromium.executablePath())" || echo "FAIL to resolve"
+
       - name: Run full regression (npm run test:all)
-        run: npm run test:all
+        run: npm run test:all 2>&1 | tee /tmp/test-all.log
 
       - name: Upload artefacts on failure
         if: failure()
@@ -46,5 +54,14 @@ jobs:
           name: regression-logs
           path: |
             /tmp/welcomebnb-*
+            /tmp/test-all.log
           retention-days: 7
           if-no-files-found: ignore
+
+      - name: Summary on failure
+        if: failure()
+        run: |
+          echo "## test:all log (tail)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -200 /tmp/test-all.log 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo "(no log)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

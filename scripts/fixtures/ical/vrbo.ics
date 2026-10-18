@@ -1,0 +1,10 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:fictional-vrbo-reserved
+DTSTART:20990501T150000Z
+DTEND:20990504T100000Z
+SUMMARY:Reserved - Fictional Guest
+DESCRIPTION:Fictional\, escaped\; description\nSecond line
+END:VEVENT
+END:VCALENDAR

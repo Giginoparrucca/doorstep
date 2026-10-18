@@ -1,0 +1,17 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:fictional-airbnb-reserved
+DTSTART;VALUE=DATE:20990501
+DTEND;VALUE=DATE:20990504
+SUMMARY:Reserved
+DESCRIPTION:Reservation URL: https://airbnb.example.invalid/reservation/fixture\nPhone last 4
+ : 1234
+END:VEVENT
+BEGIN:VEVENT
+UID:fictional-airbnb-block
+DTSTART;VALUE=DATE:20990504
+DTEND;VALUE=DATE:20990506
+SUMMARY:Airbnb (Not available)
+END:VEVENT
+END:VCALENDAR

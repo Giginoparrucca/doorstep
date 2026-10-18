@@ -1,0 +1,7 @@
+[
+  {
+    "name": "spot_easy_ps_2026-05-01_2026-05-04.txt",
+    "content": "1701/05/202603ESEMPIO                                           ALFA                          202/01/1985412058091RM100000100100000100IDENTFICTIONAL-ID        412058091\r\n1901/05/202603ESEMPIO                                           BETA                          204/03/2015412058091RM100000100100000100                                  \r\n1601/05/202601FICTIONAL                                         GAMMA                         202/01/1985           100000215100000215PASORFICTIONAL-PASS      100000215\r\n1801/05/202603ESEMPIO                                           EPSILON                       202/01/1985412058091RM100000100100000100PATENFICTIONAL-DRIVE     412058091\r\n2001/05/202603ESEMPIO                                           DELTA                         202/01/1985412058091RM100000100100000100                                  ",
+    "type": "text/plain;charset=utf-8"
+  }
+]

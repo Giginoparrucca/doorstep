@@ -1,0 +1,22 @@
+[
+  {
+    "name": "01052026.txt",
+    "content": "Fictional & House\r\n\r\nPresenti notte precedente      0\r\nArrivati                       5\r\nTotale                         5\r\nPartiti                        0\r\nPresenti nella notte           5\r\nCAMERE OCCUPATE=  3\r\nARRIVATI E PARTITI DEL GIORNO 01-05-2026\r\n\r\nProvenienza |ARR. |PAR. |\r\nF    |FRANCIA                            |    1|    0|\r\nRM   |ROMA                               |    4|    0|\r\n",
+    "type": "text/plain;charset=us-ascii"
+  },
+  {
+    "name": "02052026.txt",
+    "content": "Fictional & House\r\n\r\nPresenti notte precedente      5\r\nArrivati                       0\r\nTotale                         5\r\nPartiti                        1\r\nPresenti nella notte           4\r\nCAMERE OCCUPATE=  2\r\nARRIVATI E PARTITI DEL GIORNO 02-05-2026\r\n\r\nProvenienza |ARR. |PAR. |\r\nF    |FRANCIA                            |    0|    1|\r\n",
+    "type": "text/plain;charset=us-ascii"
+  },
+  {
+    "name": "03052026.txt",
+    "content": "Fictional & House\r\n\r\nPresenti notte precedente      4\r\nArrivati                       0\r\nTotale                         4\r\nPartiti                        0\r\nPresenti nella notte           4\r\nCAMERE OCCUPATE=  2\r\nARRIVATI E PARTITI DEL GIORNO 03-05-2026\r\n\r\nProvenienza |ARR. |PAR. |\r\n",
+    "type": "text/plain;charset=us-ascii"
+  },
+  {
+    "name": "04052026.txt",
+    "content": "Fictional & House\r\n\r\nPresenti notte precedente      4\r\nArrivati                       0\r\nTotale                         4\r\nPartiti                        4\r\nPresenti nella notte           0\r\nCAMERE OCCUPATE=  0\r\nARRIVATI E PARTITI DEL GIORNO 04-05-2026\r\n\r\nProvenienza |ARR. |PAR. |\r\nRM   |ROMA                               |    0|    4|\r\n",
+    "type": "text/plain;charset=us-ascii"
+  }
+]

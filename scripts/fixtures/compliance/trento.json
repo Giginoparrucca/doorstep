@@ -1,0 +1,17 @@
+[
+  {
+    "name": "1234501052026.txt",
+    "content": ",u_abitative,3\r\n,12345,01052026,F,1,0\r\n,12345,01052026,RM,4,0\r\n",
+    "type": "text/plain;charset=us-ascii"
+  },
+  {
+    "name": "1234502052026.txt",
+    "content": ",u_abitative,2\r\n,12345,02052026,F,0,1\r\n",
+    "type": "text/plain;charset=us-ascii"
+  },
+  {
+    "name": "1234504052026.txt",
+    "content": ",u_abitative,0\r\n,12345,04052026,RM,0,4\r\n",
+    "type": "text/plain;charset=us-ascii"
+  }
+]

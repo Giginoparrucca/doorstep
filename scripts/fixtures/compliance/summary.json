@@ -1,0 +1,7 @@
+[
+  {
+    "name": "manual_entry_summary_2026-05-01_2026-05-04.csv",
+    "content": "﻿\"reference_only_not_a_portal_import\",\"date\",\"residence_country_code\",\"italian_residence_province\",\"arrivals\",\"departures\",\"guest_nights\",\"open\",\"occupied_units\",\"available_units\",\"available_beds\"\r\n\"REFERENCE ONLY\",\"2026-05-01\",\"100000100\",\"RM\",\"4\",\"0\",\"4\",\"SI\",\"3\",\"3\",\"6\"\r\n\"REFERENCE ONLY\",\"2026-05-01\",\"100000215\",\"\",\"1\",\"0\",\"1\",\"SI\",\"3\",\"3\",\"6\"\r\n\"REFERENCE ONLY\",\"2026-05-02\",\"100000100\",\"RM\",\"0\",\"0\",\"4\",\"SI\",\"2\",\"3\",\"6\"\r\n\"REFERENCE ONLY\",\"2026-05-02\",\"100000215\",\"\",\"0\",\"1\",\"0\",\"SI\",\"2\",\"3\",\"6\"\r\n\"REFERENCE ONLY\",\"2026-05-03\",\"100000100\",\"RM\",\"0\",\"0\",\"4\",\"SI\",\"2\",\"3\",\"6\"\r\n\"REFERENCE ONLY\",\"2026-05-04\",\"100000100\",\"RM\",\"0\",\"4\",\"0\",\"SI\",\"0\",\"3\",\"6\"\r\n",
+    "type": "text/csv;charset=utf-8"
+  }
+]

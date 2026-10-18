@@ -1,5 +1,6 @@
 import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, rejectDemoIntegration } from './_environment.js';
 import { createRequire } from 'node:module';
+import { createHash } from 'node:crypto';
 const CalendarRoundtrip = createRequire(import.meta.url)('../lib/calendar-roundtrip.js');
 // api/ical-sync.js — Round 26 iCal calendar sync (with Round 32.5 cron mode).
 //
@@ -169,6 +170,16 @@ async function handleCronSync(res) {
   });
 }
 
+// Namespace only room-enabled imports; existing unassigned UIDs and outbound
+// direct-booking UIDs remain stable. Hashes contain no feed URL/credentials.
+function feedIdentity(feed) {
+  return createHash('sha256').update(normalizePlatform(feed?.platform) + '\n' + (feed?.feed_key ? 'feed:' + feed.feed_key : feed?.room_id ? 'room:' + feed.room_id : String(feed?.url || '').trim())).digest('hex').slice(0, 32);
+}
+function sourceFeedIdentity(feed) {
+  return createHash('sha256').update(normalizePlatform(feed?.platform) + '\n' + String(feed?.url || '').trim()).digest('hex');
+}
+function roomFeedUid(feedKey, uid) { return 'wbnb-feed:' + feedKey + ':' + uid; }
+
 // ── Sync one property's feeds, given whichever auth pair to use ────────
 // Shared by USER (anon key + user JWT) and CRON (service_role for both).
 async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
@@ -176,6 +187,31 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
   const errors = [];
   const seenByPlatform = {}; // platform -> Set(uid)
   const failedPlatforms = new Set();
+  const scopes = new Map();
+  const assigned = feeds.filter(f => f?.room_id != null && f.room_id !== '');
+  // Only room-enabled syncs need this extra lookup; legacy feeds keep their
+  // existing network path. Do not trust a JSONB feed's room FK implicitly.
+  if (assigned.length) {
+    if (assigned.some(f => !UUID_RE.test(f.room_id))) throw new Error('Invalid feed room');
+    const response = await pgrestGET(`property_rooms?property_id=eq.${encodeURIComponent(propertyId)}&deleted_at=is.null&select=id`, apikey, bearer);
+    if (!response.ok) throw new Error('Feed room validation unavailable');
+    const rooms = await response.json();
+    if (!Array.isArray(rooms) || assigned.some(f => !rooms.some(r => r.id === f.room_id))) throw new Error('Feed room not active in this property');
+  }
+  const feedScopes = new Map();
+  const sourceRooms = new Map();
+  for (const f of feeds) {
+    if (f?.feed_key != null && (typeof f.feed_key !== 'string' || !/^[A-Za-z0-9_-]{1,80}$/.test(f.feed_key))) {
+      throw new Error('Invalid stable feed key');
+    }
+    const key = feedIdentity(f), room = f?.room_id || null;
+    const source = sourceFeedIdentity(f);
+    if (sourceRooms.has(source) && sourceRooms.get(source) !== room) throw new Error('One source feed cannot belong to different rooms');
+    sourceRooms.set(source, room);
+    const previous = feedScopes.get(key);
+    if (previous && room && previous.url !== f.url) throw new Error('Multiple feeds in one room/platform need distinct stable feed keys');
+    feedScopes.set(key, { room, url: f.url });
+  }
   // Load all local sources and previous imported rows in bounded pages. A
   // failed lookup must not guess provenance or run a cancellation sweep.
   const existing = await loadCalendarRows(propertyId, apikey, bearer);
@@ -184,6 +220,11 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
     const platform = normalizePlatform(feed?.platform);
     const url = typeof feed?.url === 'string' ? feed.url.trim() : '';
     if (!url) { failedPlatforms.add(platform); errors.push({ platform, url, error: 'Empty URL' }); continue; }
+    const roomId = feed.room_id || null;
+    const feedKey = feedIdentity(feed);
+    const sourceKey = sourceFeedIdentity(feed);
+    if (!scopes.has(platform)) scopes.set(platform, []);
+    scopes.get(platform).push({ roomId, feedKey });
     try {
       const text = await fetchWithTimeout(url, FETCH_TIMEOUT_MS);
       if (!/^BEGIN:VCALENDAR\r?$/m.test(text) || !/^END:VCALENDAR\r?$/m.test(text)) {
@@ -194,23 +235,62 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
       if (events.length !== eventCount || events.some(e => !CalendarRoundtrip.validRange({
         checkin_date: icsDateToISO(e.DTSTART), checkout_date: icsDateToISO(e.DTEND),
       }))) throw new Error('Invalid or incomplete calendar event');
-      let rows = events.map(e => vEventToRow(e, propertyId, platform));
+      let rows = events.map(e => {
+        const row = vEventToRow(e, propertyId, platform);
+        row.room_id = roomId;
+        if (roomId || existing.some(r => r.raw?.welcomebnb_feed_source === sourceKey)) {
+          row.raw.welcomebnb_feed_source = sourceKey;
+          row.raw.welcomebnb_feed_uid = row.uid;
+          row.raw.welcomebnb_feed_key = feedKey;
+          if (roomId) row.uid = roomFeedUid(feedKey, row.uid);
+        }
+        return row;
+      });
+      // Preserve issued guest links when a single legacy feed is first assigned
+      // to a room. With multiple feeds, origin is unproven: refuse instead of
+      // stealing an unassigned reservation for whichever room syncs first.
+      for (const row of rows) {
+        if (existing.some(r => r.platform === platform && r.uid === row.uid)) continue;
+        const originalUid = row.raw.welcomebnb_feed_uid || row.uid;
+        const legacy = existing.filter(r => r.platform === platform &&
+          ((r.raw?.welcomebnb_feed_source === sourceKey && r.raw.welcomebnb_feed_uid === originalUid) ||
+            (roomId && !r.room_id && r.uid === originalUid)));
+        if (!legacy.length) continue;
+        if (legacy.length !== 1 || (!legacy[0].raw?.welcomebnb_feed_source && feeds.filter(f => normalizePlatform(f.platform) === platform).length !== 1)) {
+          throw new Error('Existing unassigned reservation has ambiguous feed ownership');
+        }
+        const update = { uid: row.uid, room_id: roomId, raw: row.raw };
+        if (legacy[0].raw?.welcomebnb_echo_ignored) update.raw.welcomebnb_echo_ignored = true;
+        if (legacy[0].covered_by_reservation_id && !existing.some(source =>
+          source.id === legacy[0].covered_by_reservation_id && CalendarRoundtrip.sameRoom(source, row))) {
+          update.covered_by_reservation_id = null;
+          update.coverage_lost_at = null;
+        }
+        const adopted = await pgrestPATCH(`ota_reservations?id=eq.${encodeURIComponent(legacy[0].id)}&property_id=eq.${encodeURIComponent(propertyId)}`,
+          update, apikey, bearer);
+        if (!adopted.ok) throw new Error('Could not preserve existing booking during room assignment');
+        Object.assign(legacy[0], update);
+      }
       rows = rows.map(row => {
         const previous = existing.find(r => r.platform === platform && r.uid === row.uid);
         if (previous?.raw?.welcomebnb_echo_ignored) {
           return { ...row, raw: { ...row.raw, welcomebnb_echo_ignored: true } };
         }
         // Never overwrite a host-confirmed link or take away a guest link.
-        if (previous?.covered_by_reservation_id && !previous.raw?.welcomebnb_auto_echo) {
+        if (previous?.covered_by_reservation_id && !previous.raw?.welcomebnb_auto_echo &&
+            existing.some(source => source.id === previous.covered_by_reservation_id && CalendarRoundtrip.sameRoom(source, row))) {
           return { ...row, coverage_lost_at: null };
         }
         const origin = CalendarRoundtrip.identifyOrigin(row, existing);
-        const originId = origin?.id || previous?.raw?.welcomebnb_origin_source;
+        const originId = origin?.id || (previous && CalendarRoundtrip.sameRoom(previous, row) ? previous.raw?.welcomebnb_origin_source : null);
         if (originId) row = { ...row, raw: { ...row.raw, welcomebnb_origin_source: originId } };
         const source = CalendarRoundtrip.matchOrigin(row, existing);
         if (source && !previous?.booking_code) {
           return { ...row, entry_type: 'block', covered_by_reservation_id: source.id, booking_code: null,
             coverage_lost_at: null, raw: { ...row.raw, welcomebnb_auto_echo: true } };
+        }
+        if (previous?.covered_by_reservation_id && !CalendarRoundtrip.sameRoom(previous, row)) {
+          return { ...row, entry_type: previous.raw?.welcomebnb_auto_echo ? 'block' : row.entry_type, covered_by_reservation_id: null, coverage_lost_at: null };
         }
         if (previous?.raw?.welcomebnb_auto_echo) {
           return { ...row, entry_type: 'block', covered_by_reservation_id: null, coverage_lost_at: null };
@@ -326,12 +406,13 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
         `&status=eq.active&is_test=eq.false` +
         `&deleted_at=is.null` +
         `&or=(checkin_date.gte.${todayISO},entry_type.eq.block)` +
-        `&select=id,uid,covered_by_reservation_id`,
+        `&select=id,uid,room_id,raw,covered_by_reservation_id`,
         apikey, bearer,
       );
       if (!listRes.ok) continue;
       const candidates = await listRes.json();
-      const gone = candidates.filter(r => !uids.has(r.uid));
+      const gone = candidates.filter(r => !uids.has(r.uid) && scopes.get(platform).some(scope =>
+        (r.room_id || null) === scope.roomId && (!r.raw?.welcomebnb_feed_key || r.raw.welcomebnb_feed_key === scope.feedKey)));
       const coveredIds = gone.filter(r => r.covered_by_reservation_id).map(r => r.id);
       const plainIds   = gone.filter(r => !r.covered_by_reservation_id).map(r => r.id);
 
@@ -383,7 +464,7 @@ async function loadCalendarRows(propertyId, apikey, bearer) {
   for (let offset = 0; ; offset += pageSize) {
     const res = await pgrestGET(`ota_reservations?property_id=eq.${encodeURIComponent(propertyId)}` +
       '&is_test=eq.false' +
-      '&select=id,property_id,platform,uid,entry_type,status,checkin_date,checkout_date,covered_by_reservation_id,booking_code,raw,is_test,deleted_at,updated_at' +
+      '&select=id,property_id,platform,uid,room_id,entry_type,status,checkin_date,checkout_date,covered_by_reservation_id,booking_code,raw,is_test,deleted_at,updated_at' +
       `&order=id.asc&limit=${pageSize}&offset=${offset}`, apikey, bearer);
     if (!res.ok) throw new Error('Calendar provenance lookup failed');
     const page = await res.json();
@@ -443,6 +524,7 @@ async function mergeBookingRollingUIDs(propertyId, incoming, apikey, bearer, see
       const q = 'ota_reservations?'
         + `property_id=eq.${encodeURIComponent(propertyId)}`
         + `&platform=eq.booking`
+        + (r.room_id ? `&room_id=eq.${encodeURIComponent(r.room_id)}&raw->>welcomebnb_feed_key=eq.${r.raw.welcomebnb_feed_key}` : '&room_id=is.null')
         + `&entry_type=eq.reservation`
         + `&status=eq.active&is_test=eq.false`
         + `&deleted_at=is.null`
@@ -453,6 +535,9 @@ async function mergeBookingRollingUIDs(propertyId, incoming, apikey, bearer, see
       const res = await pgrestGET(q, apikey, bearer);
       if (res.ok) matchList = await res.json();
     } catch (_) { matchList = []; }
+    // Ambiguous same-room candidates are not evidence of UID rotation.
+    // Never transfer an issued guest link by picking an arbitrary row.
+    if (matchList.length > 1) { keptRows.push(r); continue; }
     // No existing match — treat as a genuinely new reservation.
     if (matchList.length === 0) { keptRows.push(r); continue; }
     // Deterministic pick: the earliest-arriving row wins. Booking's
@@ -661,7 +746,7 @@ function normalizePlatform(p) {
 
 // Named exports for local testing. Vercel serverless functions only use the
 // default export; these are inert at runtime and only touched by tests.
-export { parseICS, vEventToRow, icsDateToISO, normalizePlatform, syncOnePropertyFeeds };
+export { parseICS, vEventToRow, icsDateToISO, normalizePlatform, syncOnePropertyFeeds, feedIdentity, roomFeedUid, sourceFeedIdentity };
 
 /* ══════════════════════════════════════════════════════════════════════
    Round 45 Step 4.5 — OUTBOUND iCal EXPORT

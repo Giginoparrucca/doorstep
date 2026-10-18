@@ -2423,6 +2423,7 @@ let propertyData = null;
 let allProperties = [];  // Round 21: all properties owned by this user
 let _hostUserId = null;  // cached for property creation/switching
 let allCheckins = [];
+let propertyRooms = null; // null = unknown; no speculative date matching while room metadata loads.
 
 // Round 19.4 — per-host dismissed booking codes. Populated from
 // host_dismissed_bookings on property load and after any dismiss/restore
@@ -5336,7 +5337,7 @@ async function showPanel(id, btn) {
 const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','settings','rules','recos','qrlink'];
 // Bump on every host-guides.js change so browsers never see a stale
 // copy even if their cache is aggressive.
-const _HG_VERSION = '59.1-unsaved-forms';
+const _HG_VERSION = '60.2-room-calendar';
 let _hgLoadPromise = null;
 function _hgLoad() {
   if (window.HG) return Promise.resolve();
@@ -5912,7 +5913,7 @@ async function renderUpcomingReservationsPanel() {
     // echo linked to a direct booking doesn't show as a second row in
     // "Prossime prenotazioni" — the direct row already represents it.
     const { data, error } = await sb.from('ota_reservations')
-      .select('id, platform, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code, checkin_reopened_at').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
+      .select('id, property_id, room_id, platform, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code, checkin_reopened_at').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
       .eq('property_id', propertyId)
       .eq('entry_type', 'reservation')
       .eq('status', 'active')
@@ -6098,14 +6099,8 @@ function _renderReservationCard(r, todayISO) {
     { day: '2-digit', month: 'short' }) : '—';
 
   const dated = (allCheckins || []).filter(c => c.arrival_date);
-  let matched = [];
-  if (r.booking_code) matched = dated.filter(c => c.booking_code === r.booking_code);
-  if (matched.length === 0) {
-    matched = dated.filter(c =>
-      c.arrival_date < r.checkout_date &&
-      (!c.departure_date || c.departure_date > r.checkin_date)
-    );
-  }
+  const hasRooms = (typeof propertyRooms !== 'undefined' ? propertyRooms === null || propertyRooms.length > 1 : !!r.room_id);
+  const matched = CalendarRoundtrip.matchingCheckins({ property_id: propertyId, ...r }, dated, hasRooms);
   const todayCmp = todayISO || new Date().toISOString().slice(0, 10);
   const guestAlreadyArrived = matched.some(c =>
     c.arrival_date && c.arrival_date <= todayCmp &&
@@ -6520,11 +6515,11 @@ function _mintDirectBookingCode() {
 // non-deleted row whose date range overlaps [checkinISO, checkoutISO).
 // Excludes `excludeId` so edit mode doesn't flag itself.
 // Return: array of { id, entry_type, guest_name, checkin_date, checkout_date, platform }.
-async function _computeReservationOverlap(propId, checkinISO, checkoutISO, excludeId) {
+async function _computeReservationOverlap(propId, checkinISO, checkoutISO, excludeId, roomId = null) {
   if (!propId || !checkinISO || !checkoutISO) return [];
   try {
     const q = sb.from('ota_reservations')
-      .select('id, property_id, uid, entry_type, guest_name, checkin_date, checkout_date, platform, covered_by_reservation_id, raw, status, is_test').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
+      .select('id, property_id, room_id, uid, entry_type, guest_name, checkin_date, checkout_date, platform, covered_by_reservation_id, raw, status, is_test').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
       .eq('property_id', propId)
       .eq('status', 'active')
       .is('deleted_at', null)
@@ -6533,6 +6528,7 @@ async function _computeReservationOverlap(propId, checkinISO, checkoutISO, exclu
     const { data, error } = await q;
     if (error) { console.warn('[direct] overlap query failed:', error.message); return []; }
     return CalendarRoundtrip.projectRows(data || []).filter(r => r.id !== excludeId &&
+      (!roomId || !r.room_id || r.room_id === roomId) &&
       r.checkin_date < checkoutISO && r.checkout_date > checkinISO);
   } catch (e) {
     console.warn('[direct] overlap exception:', e);
@@ -6625,6 +6621,7 @@ function openReservationForm(opts) {
   const modal = document.createElement('div');
   modal.id = 'reservationFormModal';
   modal.dataset.mode = mode;
+  modal.dataset.roomId = prefill.room_id || '';
   if (reservationId) modal.dataset.reservationId = reservationId;
   modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10000;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;';
   modal.onclick = (e) => { if (e.target === modal) _closeReservationForm(); };
@@ -6694,6 +6691,11 @@ async function _closeReservationForm(force = false) {
 async function _confirmCoverage(otaRowId, directRowId) {
   if (!otaRowId || !directRowId) return;
   const it = hostLang === 'it';
+  const ota = _upcomingRowsById[otaRowId], direct = _upcomingRowsById[directRowId];
+  if (!ota || !direct || ota.property_id !== propertyId || direct.property_id !== propertyId || !CalendarRoundtrip.sameRoom(ota, direct)) {
+    toast(it ? 'Le righe devono appartenere alla stessa camera.' : 'Entries must belong to the same room.');
+    return;
+  }
   const q = it
     ? 'Confermi che questa riga OTA è la stessa prenotazione diretta? Verrà nascosta dal calendario e dai promemoria — la prenotazione diretta la rappresenta. Puoi annullare il collegamento dai dettagli della prenotazione OTA.'
     : 'Confirm that this OTA row is the same as the direct booking? It will disappear from the calendar and reminders — the direct booking represents it. You can unlink from the OTA row\'s detail popup.';
@@ -6707,6 +6709,7 @@ async function _confirmCoverage(otaRowId, directRowId) {
         coverage_lost_at: null,
       })
       .eq('id', otaRowId)
+      .eq('property_id', propertyId)
       .select('id')
       .maybeSingle();
     if (error) {
@@ -6734,7 +6737,8 @@ async function _reservationFormOverlapCheck() {
   if (!hint || !ci || !co || co <= ci) { if (hint) hint.style.display = 'none'; return; }
   const modal = document.getElementById('reservationFormModal');
   const excludeId = modal?.dataset?.reservationId || null;
-  const rows = await _computeReservationOverlap(propertyId, ci, co, excludeId);
+  const roomId = document.getElementById('rfRoom')?.value || modal?.dataset?.roomId || null;
+  const rows = await _computeReservationOverlap(propertyId, ci, co, excludeId, roomId);
   hint.style.display = rows.length > 0 ? 'block' : 'none';
 }
 
@@ -6795,6 +6799,8 @@ async function saveDirectReservation(ev) {
       channel:       channel,
       notes:         notes || null,
     };
+    const roomInput = document.getElementById('rfRoom');
+    if (roomInput || modal.dataset.roomId) payload.room_id = roomInput ? roomInput.value || null : modal.dataset.roomId;
     if (!isBlock) {
       payload.guest_name    = guestName;
       payload.guest_count   = guestCount;
@@ -6882,7 +6888,7 @@ async function _renderUpcomingCalendarBody(buildHeader) {
   let rows = [];
   try {
     const { data, error } = await sb.from('ota_reservations')
-      .select('id, property_id, platform, entry_type, channel, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code, covered_by_reservation_id, raw, status, is_test').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
+      .select('id, property_id, room_id, platform, entry_type, channel, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code, covered_by_reservation_id, raw, status, is_test').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
       .eq('property_id', propertyId)
       .in('entry_type', ['reservation', 'block'])
       .eq('status', 'active')
@@ -6931,13 +6937,8 @@ async function _renderUpcomingCalendarBody(buildHeader) {
         ? (blockLabels[r.channel] || (it ? 'Blocco' : 'Blocked'))
         : (it ? 'Non disponibile' : 'Unavailable');
     } else {
-      let matched = r.booking_code ? dated.filter(c => c.booking_code === r.booking_code) : [];
-      if (matched.length === 0) {
-        matched = dated.filter(c =>
-          c.arrival_date < r.checkout_date &&
-          (!c.departure_date || c.departure_date > r.checkin_date)
-        );
-      }
+      const hasRooms = (typeof propertyRooms !== 'undefined' ? propertyRooms === null || propertyRooms.length > 1 : !!r.room_id);
+      const matched = CalendarRoundtrip.matchingCheckins({ property_id: propertyId, ...r }, dated, hasRooms);
       if (matched.length > 0) {
         const head = matched.find(c => isHeadType(c.guest_type)) || matched[0];
         const nm = `${head.surname || ''} ${head.name || ''}`.trim();
@@ -6976,6 +6977,7 @@ async function _renderUpcomingCalendarBody(buildHeader) {
       if (e.isDirect || (e.isBlock && !e.r.raw?.welcomebnb_echo_ignored)) continue;
       if (e.r.covered_by_reservation_id) continue;    // already linked.
       const overlap = directRes.find(d =>
+        CalendarRoundtrip.sameRoom(d.r, e.r) &&
         d.r.checkin_date === e.r.checkin_date &&
         d.r.checkout_date === e.r.checkout_date
       );
@@ -8226,7 +8228,7 @@ function icalFeedRowHtml(feed, idx) {
   const opt = (val, txt) =>
     `<option value="${val}"${val === platform ? ' selected' : ''}>${txt}</option>`;
   return `
-    <div class="ical-feed-row" data-idx="${idx}" style="display:grid;grid-template-columns:130px 1fr 180px auto;gap:8px;align-items:end;padding:10px;background:var(--cream);border:1px solid var(--border);border-radius:8px;">
+    <div class="ical-feed-row" data-idx="${idx}" data-room-id="${_icalEscape(feed?.room_id || '')}" data-feed-key="${_icalEscape(feed?.feed_key || '')}" style="display:grid;grid-template-columns:130px 1fr 180px auto;gap:8px;align-items:end;padding:10px;background:var(--cream);border:1px solid var(--border);border-radius:8px;">
       <div class="form-group" style="margin:0;">
         <label class="form-label" data-h="ical_platform">Platform</label>
         <select class="form-select ical-platform">
@@ -8281,7 +8283,7 @@ function collectIcalFeeds() {
     const url = (row.querySelector('.ical-url')?.value || '').trim();
     const label = (row.querySelector('.ical-label')?.value || '').trim();
     if (!url) return; // silently drop empty rows on save
-    out.push({ platform, url, label });
+    out.push({ platform, url, label, ...(row.dataset.roomId ? { room_id: row.dataset.roomId } : {}), ...(row.dataset.feedKey ? { feed_key: row.dataset.feedKey } : {}) });
   });
   return out;
 }
@@ -8310,6 +8312,8 @@ function collectDomIcalFeedsIncludingBlank() {
       platform: row.querySelector('.ical-platform')?.value || 'airbnb',
       url: row.querySelector('.ical-url')?.value || '',
       label: row.querySelector('.ical-label')?.value || '',
+      ...(row.dataset.roomId ? { room_id: row.dataset.roomId } : {}),
+      ...(row.dataset.feedKey ? { feed_key: row.dataset.feedKey } : {}),
     });
   });
   return out;
@@ -14758,6 +14762,13 @@ async function loadPropertyData() {
   // Reset per-property in-memory state so nothing leaks across a switch
   rulesData = []; recoData = []; allCheckins = []; allChats = [];
   dismissedBookingCodes = new Set();
+  propertyRooms = null;
+  const roomPropertyId = propertyId;
+  try {
+    const { data, error } = await sb.from('property_rooms').select('id').eq('property_id', roomPropertyId).is('deleted_at', null);
+    if (propertyId !== roomPropertyId) return;
+    if (!error && Array.isArray(data)) propertyRooms = data;
+  } catch (_) { /* unknown room mode remains conservative */ }
 
   await loadDismissedBookings();
   try {

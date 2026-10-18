@@ -105,3 +105,37 @@ cross-property dashboard, room types/pricing, channel-manager features.
   without rooms. Record pass/fail counts in the CHANGELOG.
 - Update CHANGELOG (round table + findings), the host guide, and this plan's
   Delivery section. No live guest records written for testing.
+
+
+## Phase 2 implementation notes
+
+- Room-enabled imports retain the existing `(property_id, platform, uid)` unique
+  constraint. Stored UID = `wbnb-feed:<stable feed hash>:<original UID>`; the hash
+  uses platform + an explicit `feed_key` (when supplied), otherwise the room ID,
+  not URL credentials. This separates
+  equal OTA UIDs in different rooms and survives a feed URL/token change. Multiple
+  different feeds in the same room/platform require distinct stable `feed_key`
+  values. Existing unassigned UIDs and direct outbound UIDs remain unchanged.
+- Feed room IDs are checked against active rooms owned through the requested
+  property's normal JWT/RLS context. Cancellation and Booking UID rotation are
+  room-scoped. A single legacy feed can adopt its unassigned rows while retaining
+  guest codes; ambiguous legacy rows across multiple feeds stop sync for that
+  platform rather than guessing provenance. A hashed source fingerprint lets a
+  proven feed move between rooms or back to unassigned without changing the row
+  ID or losing its issued guest link. Cross-room coverage is cleared on a move.
+- The host loads active room IDs once per property selection to distinguish a
+  multi-room property with unassigned bookings from a property without rooms.
+  This is an explicit clarification to “same queries”: the existing business
+  queries remain, with one additional owner-scoped metadata lookup. A failed
+  room lookup disables speculative date matching; known booking codes still win.
+- Room selectors, room CRUD, calendar lanes and new room assignment remain Phase
+  3. Phase 2 preserves existing room/feed metadata through Settings and direct
+  booking edits so those operations cannot accidentally erase an assignment.
+
+## Delivery
+
+- Phase 1: shipped by Claude in PR #166/#167, as recorded in CHANGELOG.
+- Phase 2: implemented by GPT-6 on `codex/round60-phase2`; full regression
+  PASS 40 / FAIL 0 / SKIP 3. GitHub API access blocks PR/CI/merge and deployment
+  verification, as recorded in CHANGELOG. Not yet shipped.
+- Phases 3–5: pending.

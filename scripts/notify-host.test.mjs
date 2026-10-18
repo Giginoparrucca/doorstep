@@ -161,19 +161,18 @@ settings = {
   const serialised = serialisedPayloads();
   // These must NEVER appear anywhere in the channel payload — they'd
   // be exfiltrated to FCM / Telegram / Resend otherwise.
-  for (const forbidden of [GUEST_NAME, GUEST_MESSAGE, 'passport', 'locked myself out']) {
+  // BOOKING_CODE is on this list after Round 60 Phase 2 follow-up: the
+  // deep-link URL dropped `&conv=<booking>` and the push `tag` dropped
+  // the convKey suffix, so no guest booking identifier ever leaves
+  // the server across any channel.
+  for (const forbidden of [GUEST_NAME, GUEST_MESSAGE, BOOKING_CODE,
+    'passport', 'locked myself out']) {
     assert.ok(!serialised.includes(forbidden),
       `channel payloads must not contain "${forbidden}" — got: ${serialised.slice(0, 400)}`);
   }
   // The property name IS allowed — it's the only piece of context the host sees.
   assert.ok(serialised.includes(DOWNLOADED_PROPERTY_NAME),
     'property name must be present (that is the whole content of the alert)');
-  // The booking code is embedded in the deep-link URL (conv=<code>) by
-  // design, so the host's console opens the correct chat. The push/
-  // telegram title and body themselves still carry no guest data.
-  // This test asserts the current contract; if a future round moves to
-  // opaque conv tokens, tighten the assertion above to also forbid the
-  // booking code.
 }
 
 // ── 4. Throttle: a recent 'sent' log row suppresses next guest_message ─

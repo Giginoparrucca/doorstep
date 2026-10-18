@@ -32,6 +32,13 @@ cross-property dashboard, no room types/pricing. Round 51 remains paused.
 | 4 — Guest app | pending | Guest sees own room name + door code on arrival; served from `api/guest.js`, scoped by signed token. Shared house content unchanged. |
 | 5 — Compliance outputs | pending | Regional/ROSS1000 review prefills `rooms_available`/`beds_available`/per-day `occupied` from room data; flags days with unassigned stays. Alloggiati / SPOT / tourist-tax **unchanged**; `regional-exports.test.mjs` byte-identical for the no-rooms case stays the canary. |
 
+### Hotfix · Remove booking identifiers from external notification payloads (Claude Opus 4.7, 2026-10-18)
+
+- GPT-6.1's parallel Round 60a Phase 2 branch (`codex/round60a-phase2-coverage`) caught a privacy gap my Round 60a Phase 2 PR #163 documented but did not fix: the host-notification deep-link URL carried `&conv=<booking_code>` and the push `tag` ended with `-<convKey>`. Those payloads land on FCM / Telegram servers / Resend outbound mail, so the booking code was leaving the server against the "no guest data in channel payloads" invariant in the file header.
+- `api/_notify-host.js` — removed `conv=` from the chat notification URL (the host console auto-selects the first unread conversation on arrival) and dropped the `-<convKey>` suffix from the push `tag` (collapsing re-deliveries by property only). The `conv=` query parameter was never read by `host-console.html` — confirmed by grep — so no deep-link routing regression.
+- `scripts/notify-host.test.mjs` — tightened the "forbidden token" scan on serialised push/telegram/email payloads to include `BOOKING_CODE`. The previous assertion carried an explicit "known current behaviour" note excusing the leak; that note is gone.
+- Full regression after the change: **PASS 40 / FAIL 0 / SKIP 3**. Credit: GPT-6.1 identified and fixed this on their alternative Phase 2 branch; carried forward here with the same semantics.
+
 ### Round 60 Phase 2 — iCal sync + echo + overlap + correlation (Claude Opus 4.7, 2026-10-18)
 
 - `api/ical-sync.js` — the per-feed loop now reads `feed.room_id` (JSONB key on `properties.ical_feeds`, documented in the Phase 1 migration header), validates it with a new exported helper `_validUuidOrNull` (lowercases a valid UUID, otherwise null), and stamps every event the feed produces with that `room_id`. Missing / malformed room_ids fall back to null (unassigned) rather than hitting the DB and raising a FK error. `loadCalendarRows` now pulls `room_id` into the existing-row set so echo and overlap matching have it.

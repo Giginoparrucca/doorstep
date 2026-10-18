@@ -113,12 +113,18 @@ export async function notifyHostForChatInsert({ propertyId, bookingCode, sender,
     // Resolve fallback email address once.
     const emailAddr = await _resolveHostEmail(hostId, settings, prop.reminder_email);
 
-    // Build the fixed payload (no guest data).
-    const url = `${APP_BASE_URL}/host-console.html?notify_prop=${encodeURIComponent(propertyId)}&open=chat&conv=${encodeURIComponent(convKey)}`;
+    // Build the fixed payload (no guest data). The URL opens the host
+    // console on the right property's chat tab; the console auto-selects
+    // the first unread conversation. The booking_code (convKey) was
+    // previously sent as `&conv=<code>` and as part of the push tag,
+    // which exfiltrated it to FCM/Telegram/Resend servers against the
+    // "no guest data in channel payloads" invariant in the file header.
+    const url = `${APP_BASE_URL}/host-console.html?notify_prop=${encodeURIComponent(propertyId)}&open=chat`;
     const text = _fixedText(hostLang, propertyName);
-    // Same tag across all three channels of the same conversation so the
-    // OS collapses re-deliveries.
-    const tag = `wbnb-chat-${propertyId}-${convKey}`;
+    // Collapse re-deliveries by property. We lose per-conversation
+    // collapsing in exchange for never shipping the booking code out
+    // to third-party push services.
+    const tag = `wbnb-chat-${propertyId}`;
 
     // Fire enabled channels under an overall cap.
     const results = await _fireChannels({

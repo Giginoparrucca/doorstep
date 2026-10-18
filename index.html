@@ -977,6 +977,23 @@ function icon(name, cls) {
       </div>
     </div>
 
+    <!-- Round 60 Phase 4 — "Your room" card. Hidden unless the
+         booking is linked to a property_rooms row (resolved by
+         api/guest.js `property` action; name is always safe, door
+         code only ships once the group has at least one submitted
+         check-in). For whole-property stays the element stays
+         display:none and the layout matches the pre-Round-60 shape. -->
+    <div class="home-card" id="roomCard" style="display:none;">
+      <div class="home-card-row">
+        <div class="home-card-icon"><svg class="ic" aria-hidden="true"><use href="#ic-home"/></svg></div>
+        <div class="home-card-body">
+          <div class="home-card-label" data-i18n="room_label">Your room</div>
+          <div class="home-card-value" id="roomName">&nbsp;</div>
+          <div class="home-card-sub" id="roomDoorCode" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Check-in card: time on the left, lockbox chip on the right -->
     <div class="home-card" id="checkinCard">
       <div class="home-card-row home-card-row-split">
@@ -1867,6 +1884,7 @@ const T = {
     section_staying: 'Staying',
     section_leaving: 'Leaving',
     checkin_time_label: 'Check-in time',
+    room_label: 'Your room',
     checkout_time_label: 'Check-out time',
     wifi_label: 'WiFi',
     transport_label: 'Getting around',
@@ -2028,6 +2046,7 @@ const T = {
     section_staying: 'Soggiorno',
     section_leaving: 'Partenza',
     checkin_time_label: 'Orario check-in',
+    room_label: 'La tua camera',
     checkout_time_label: 'Orario check-out',
     wifi_label: 'WiFi',
     transport_label: 'Come spostarsi',
@@ -4928,6 +4947,12 @@ async function init() {
     propertyId = storedPropId;
     const r = await _guestCall('property', {});
     let data = r?.data?.property || null;
+    // Round 60 Phase 4 — the gateway now also returns `room` when the
+    // stay is linked to a property_rooms row. Shape:
+    //   { id, name, beds, door_code? }
+    // door_code only present once the group has at least one submitted
+    // check-in (same gating as wifi + access_method).
+    const roomInfo = r?.data?.room || null;
     if (!data) {
       console.error('❌ Property not found:', storedPropId, r);
       showLinkErrorAndHalt(lang === 'it'
@@ -4986,6 +5011,28 @@ async function init() {
         el('checkoutTime').textContent = coParts.length === 2 ? `${coParts[0].slice(0,5)} — ${coParts[1].slice(0,5)}` : co.slice(0,5);
       }
       if (el('accessMethod')) el('accessMethod').textContent = d.access_method || 'Self check-in';
+      // Round 60 Phase 4 — show the Your-room card when the gateway
+      // resolved a room for this booking. Name is always safe to show
+      // (it's just the host's label like "Camera Blu"); door_code only
+      // appears post-check-in because the gateway only ships it then.
+      // When no room came back (whole-property stay, or pre-Round-60
+      // property) the card stays display:none and the Home layout
+      // matches the pre-Round-60 shape exactly.
+      if (roomInfo && el('roomCard')) {
+        el('roomCard').style.display = '';
+        if (el('roomName')) el('roomName').textContent = roomInfo.name || '—';
+        const codeEl = el('roomDoorCode');
+        if (codeEl) {
+          if (roomInfo.door_code) {
+            const label = (lang === 'it' ? 'Codice porta: ' : 'Door code: ');
+            codeEl.textContent = label + roomInfo.door_code;
+            codeEl.style.display = '';
+          } else {
+            codeEl.textContent = '';
+            codeEl.style.display = 'none';
+          }
+        }
+      }
       if (el('hostName')) el('hostName').textContent = d.host_names || 'Your Host';
       if (el('hostAvatar')) el('hostAvatar').textContent = (d.host_names || 'H').charAt(0);
       // Round 41 Task 2 — read per-language column first, fall back to

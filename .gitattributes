@@ -1,0 +1,4 @@
+# Police fixed-width records require padding and CRLF, including blank document
+# fields at end of a member record. Never normalize these protocol bytes.
+scripts/fixtures/compliance/alloggiati.txt -text whitespace=-blank-at-eol,cr-at-eol
+scripts/fixtures/compliance/paytourist.csv -text

@@ -7,7 +7,10 @@ const image={style:{}};layout.apply(image,{zoom:2,x:25,y:75});assert.deepEqual(i
 const api=fs.readFileSync(new URL('../api/guest.js',import.meta.url),'utf8');
 const fields=api.match(/const PROPERTY_PUBLIC_FIELDS = (\[[\s\S]*?\]);/)[1],gated=api.match(/const PROPERTY_POST_CHECKIN_FIELDS = new Set\((\[[\s\S]*?\])\)/)[1];
 let checked=false,status,response;
-const gateway=vm.createContext({encodeURIComponent,PROPERTY_PUBLIC_FIELDS:vm.runInNewContext(fields),PROPERTY_POST_CHECKIN_FIELDS:new Set(vm.runInNewContext(gated)),pgrestGET:async url=>{assert.ok(url.startsWith('properties?id=eq.fixture'));return {ok:true,json:async()=>[{id:'fixture',hero_image_url:'https://example.invalid/image.jpg',hero_image_layout:{zoom:2,x:25,y:75},wifi_password:'secret',host_email:'private',owner_id:'private'}]};},bookingHasCheckin:async()=>checked});
+// Round 60 Phase 4 adds a resolveGuestRoom call inside doProperty.
+// This test doesn't care about room resolution (it's about the public-
+// fields projection + framing), so stub it as a no-op.
+const gateway=vm.createContext({encodeURIComponent,PROPERTY_PUBLIC_FIELDS:vm.runInNewContext(fields),PROPERTY_POST_CHECKIN_FIELDS:new Set(vm.runInNewContext(gated)),pgrestGET:async url=>{assert.ok(url.startsWith('properties?id=eq.fixture'));return {ok:true,json:async()=>[{id:'fixture',hero_image_url:'https://example.invalid/image.jpg',hero_image_layout:{zoom:2,x:25,y:75},wifi_password:'secret',host_email:'private',owner_id:'private'}]};},bookingHasCheckin:async()=>checked,resolveGuestRoom:async()=>null});
 let a=api.indexOf('async function doProperty(');vm.runInContext(api.slice(a,api.indexOf('\n}\n',a)+2),gateway);
 const res={status(v){status=v;return this;},json(v){response=v;return v;}};await gateway.doProperty(res,'fixture',null,false);assert.equal(status,200);assert.equal(response.property.hero_image_layout.zoom,2);assert.ok(!('owner_id' in response.property));assert.ok(!('host_email' in response.property));assert.ok(!('wifi_password' in response.property));checked=true;await gateway.doProperty(res,'fixture','booking',false);assert.equal(response.property.wifi_password,'secret');
 const guest=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');assert.equal((guest.match(/CoverLayout\.apply\(el\('heroImg'\), (propData|d)\.hero_image_layout\)/g)||[]).length,2);

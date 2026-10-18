@@ -78,10 +78,22 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-      - name: Summary on failure
-        if: failure()
+      - name: Comment failure to PR
+        if: failure() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
         run: |
-          echo "## test:all log (tail)" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          tail -200 /tmp/test-all.log 2>/dev/null >> $GITHUB_STEP_SUMMARY || echo "(no log)" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          {
+            echo "### regression CI failure (run ${GITHUB_RUN_ID})"
+            echo ""
+            echo "<details><summary>test:all tail</summary>"
+            echo ""
+            echo '```'
+            tail -200 /tmp/test-all.log 2>/dev/null || echo "(no log)"
+            echo '```'
+            echo "</details>"
+          } > /tmp/comment.md
+          gh api --method POST "repos/${REPO}/issues/${PR}/comments" \
+            -F body=@/tmp/comment.md

@@ -114,11 +114,11 @@ export async function notifyHostForChatInsert({ propertyId, bookingCode, sender,
     const emailAddr = await _resolveHostEmail(hostId, settings, prop.reminder_email);
 
     // Build the fixed payload (no guest data).
-    const url = `${APP_BASE_URL}/host-console.html?notify_prop=${encodeURIComponent(propertyId)}&open=chat&conv=${encodeURIComponent(convKey)}`;
+    const url = `${APP_BASE_URL}/host-console.html?notify_prop=${encodeURIComponent(propertyId)}&open=chat`;
     const text = _fixedText(hostLang, propertyName);
-    // Same tag across all three channels of the same conversation so the
-    // OS collapses re-deliveries.
-    const tag = `wbnb-chat-${propertyId}-${convKey}`;
+    // Collapse alerts for this property without sending a booking identifier
+    // to an external push service.
+    const tag = `wbnb-chat-${propertyId}`;
 
     // Fire enabled channels under an overall cap.
     const results = await _fireChannels({

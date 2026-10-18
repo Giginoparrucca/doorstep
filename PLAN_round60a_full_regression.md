@@ -75,3 +75,9 @@ No secrets, no live writes.
 
 Out of scope: refactoring product code beyond what a test needs to be
 importable (any such change must be behaviour-neutral and called out).
+
+Approved exception (2026-10-18): the phase-2 notification privacy test exposed
+booking codes in outbound alert URLs and push grouping tags. Daniele authorized
+removing those codes. Alerts open the owned property's chat without selecting a
+booking; push grouping is per property. Internal conversation throttling and
+logging retain their existing scope. The full-payload privacy assertion must pass.

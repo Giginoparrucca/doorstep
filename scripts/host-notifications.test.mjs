@@ -61,11 +61,17 @@ try {
   assert.equal(pushes[0].options.TTL, 3600);
   const tg = outgoing().at(-1).body;
   assert.match(tg.text, /Un ospite ha bisogno di te/);
-  // Prose contains no guest identity or message. Existing URL/tag booking-code
-  // disclosure is recorded separately in the coverage inventory, not hidden.
+  // Both visible content and routing metadata must exclude guest information.
   for (const payload of [pushes[0].payload, tg]) {
     assert.ok(!JSON.stringify(payload).match(/FICTIONAL-NAME|FICTIONAL-DOCUMENT|private help text/));
   }
+  const destination = new URL(pushes[0].payload.url);
+  assert.equal(destination.searchParams.get('notify_prop'), base.propertyId);
+  assert.equal(destination.searchParams.get('open'), 'chat');
+  assert.equal(destination.searchParams.has('conv'), false);
+  assert.equal(pushes[0].payload.tag, 'wbnb-chat-' + base.propertyId);
+  assert.ok(net.calls.some(c => c.url.pathname.endsWith('/notification_log') && c.method === 'POST'
+    && c.body.conversation_key === base.bookingCode), 'internal conversation tracking stays scoped');
 
   reset(); pushStatus = 410; telegramStatus = 403;
   const failedChannels = await notify(base);
@@ -92,8 +98,6 @@ try {
     text: { title: 'Filing reminder', body: '2 guests need filing', button: 'Open' } });
   assert.equal(auto.results.at(-1).channel, 'email', 'autofile forces fallback email even after successful push');
   // The round's privacy contract includes routing metadata, not just prose.
-  // Keep this gate red until the existing booking-code disclosure is fixed
-  // or the user explicitly revises the requirement; never hide it as a skip.
   for (const payload of [...allPushes, ...outgoing().map(c => c.body)]) {
     assert.ok(!JSON.stringify(payload).includes(base.bookingCode),
       'Notification privacy: external payload must not contain the guest booking code (including URL/tag metadata)');

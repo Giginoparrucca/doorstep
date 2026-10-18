@@ -26,8 +26,43 @@ product behaviour changes. Round 51 remains paused.
 | Phase | Status | Where / test gate |
 |---|---|---|
 | 1 — One command for everything | shipped — PR #161 — Claude Opus 4.7 | `scripts/run-tests.mjs` runner + npm scripts; `.github/workflows/regression.yml` runs `npm run test:all` on every PR and push to main; `npm run test:all` green locally and in CI. Branch protection on `main` requiring the `regression` check is an owner-only step Daniele applies in GitHub settings. |
-| 2 — Fill coverage gaps | shipped — PR TBD — Claude Opus 4.7 | Seven new offline tests cover every area the plan called out: Alloggiati .txt synthetic golden, PayTourist CSV golden, tourist-tax engine (Round 37 redux), guest-chat/guest-gateway cross-property isolation, host notification pipeline (payload PII scrub + throttle + escalation), iCal parser (Airbnb/Booking/Vrbo samples), arrival+filing reminder renderers, document-scanning handler end-to-end with Anthropic mocked. ROSS1000 + regional formats already have `regional-exports.test.mjs` coverage. All transport mocked; no live secrets. |
-| 3 — Make it permanent | pending | Full-regression rule referenced from `RELEASE.md`; `npm run test:all` on the PR template / release checklist if one exists; final pass/skip counts + coverage table in CHANGELOG |
+| 2 — Fill coverage gaps | shipped — PR #163 — Claude Opus 4.7 | Seven new offline tests cover every area the plan called out: Alloggiati .txt synthetic golden, PayTourist CSV golden, tourist-tax engine (Round 37 redux), guest-chat/guest-gateway cross-property isolation, host notification pipeline (payload PII scrub + throttle + escalation), iCal parser (Airbnb/Booking/Vrbo samples), arrival+filing reminder renderers, document-scanning handler end-to-end with Anthropic mocked. ROSS1000 + regional formats already have `regional-exports.test.mjs` coverage. All transport mocked; no live secrets. |
+| 3 — Make it permanent | in-progress — Claude Opus 4.7 | Full-regression rule referenced from `RELEASE.md`; `npm run test:all` on a committed PR template; final pass/skip counts + coverage table in CHANGELOG |
+
+### Round 60a Phase 3 — make the regression rule permanent (Claude Opus 4.7, 2026-10-18)
+
+- `RELEASE.md` now opens with a **Round 60a rule** section at the top: `npm run test:all` must be green locally AND the `regression` CI check must be green on every PR. Lists the four npm scripts (`test`, `test:browser`, `test:live`, `test:all`), names the exit-77 skip contract, and points to `AGENTS.md`'s "Full regression (every Round, every phase)" rule for the full policy.
+- `.github/pull_request_template.md` added: a short checklist with `npm run test:all` green, regression CI green, CHANGELOG updated with real pass/skip counts, new feature/export ships with a test joining the full suite, compliance outputs compared byte-for-byte against a committed synthetic golden. Mirrors the AGENTS.md rules in the form every PR reviewer sees.
+- Final coverage inventory for this Round:
+
+  | Area / module | Test file | Scope |
+  |---|---|---|
+  | `lib/alloggiati-records.js` (buildBatch, lookups) | `alloggiati-golden.test.mjs` | Byte-identity vs committed synthetic golden, 168-char invariant, foreign-born provincia, group codes |
+  | `host-console.html` tourist-tax engine | `tourist-tax.test.mjs` | 11 scenarios: base rate, cap, legacy age-exempt, host rules, best-rule, declared exemptions, totalCap, missing DOB, season-wrap |
+  | `host-console.html` exportPayTourist | `paytourist-golden.test.mjs` | 19-column CSV byte-for-byte golden |
+  | `host-console.html` export filtering (`is_test`) | `onboarding-test-isolation.test.mjs` | Mixed real/test cache per exporter |
+  | `lib/regional-exports.js` (ROSS1000 + 21 regions) | `regional-exports.test.mjs` + `regional-downloads-browser.test.mjs` | Serializer tests + actual Chromium downloads IT/EN |
+  | `api/chat.js` + `api/guest.js` chat path | `guest-chat-isolation.test.mjs` | Token-driven propertyId, body ignored; method/token/size/origin gates |
+  | `api/_notify-host.js` | `notify-host.test.mjs` | Payload PII scrub, throttle, escalation bypass, de-escalation skip |
+  | `api/ical-sync.js` (parseICS, vEventToRow) | `ical-sync-parse.test.mjs` | Airbnb/Booking/Vrbo samples, folded lines, cancelled, echo UID |
+  | `api/send-arrival-reminders.js` renderers | `arrival-reminders.test.mjs` | Filing count-only; arrival IT/EN rendering, XSS escape, singular/plural |
+  | `api/scan-document.js` | `scan-document.test.mjs` | All gates, happy path, future DOB nulled, 422/500, token-driven propertyId |
+  | `api/_alloggiati-receipts.js` | `alloggiati-receipts.test.mjs` | Receipt collection + storage upload (pre-existing) |
+  | `api/_guest-token.js` | covered via `guest-chat-isolation.test.mjs` & `scan-document.test.mjs` | Round-trip sign/verify |
+  | `api/_environment.js` → `lib/environment.mjs` | `environment.test.mjs` | Production + demo config contract (pre-existing) |
+  | `api/_cors.js` | covered via `guest-chat-isolation.test.mjs` | Allowlist 403 |
+  | `host-console.html` iCal export (outbound) | `calendar-roundtrip.test.mjs` + browser suite | Pre-existing |
+  | `lib/calendar-roundtrip.js` | `calendar-roundtrip.test.mjs` | Pre-existing |
+  | Host console UI (property editor, Share, unsaved-forms, admin access) | 5 `*-browser.test.mjs` files | Actual Chromium IT/EN 390/1280px |
+  | Demo infra (fixtures, seeder, reset, e2e) | `demo-*.test.mjs` set | Pre-existing |
+  | Onboarding readiness/visibility/UI | `onboarding-*.test.mjs` set | Pre-existing |
+
+  Still not covered by an offline test (named-blocker entries):
+  - `api/_alloggiati-crypto.js` encrypt/decrypt — exercised indirectly through `alloggiati-receipts` but no dedicated unit test for the crypto helpers themselves. Not a Phase 2 target; a future Round can add one if the crypto surface changes.
+  - `api/telegram-webhook.js` inbound Telegram command handler — unused by hosts today beyond the link flow, exercised only by `telegram-link` writes. Flagged for a future test when inbound commands matter.
+  - `api/parse-tax-delibera.js` — Anthropic parse of city-tax documents; a focused happy-path test could be added analogous to `scan-document.test.mjs`.
+
+- Final full regression on this phase (after RELEASE.md + PR template changes): **PASS 38 / FAIL 0 / SKIP 3**. Same 3 documented skips: `demo-schema` (private catalog), `demo-e2e` (needs demo origin), `demo-schema-parse` (pglast not installed in CI).
 
 ### Round 60a Phase 2 — fill coverage gaps (Claude Opus 4.7, 2026-10-18)
 

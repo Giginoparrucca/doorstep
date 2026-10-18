@@ -38,14 +38,31 @@ jobs:
 
       - name: Diagnostics
         run: |
-          echo "node $(node --version)"
-          echo "cwd: $(pwd)"
-          echo "ls scripts/*.test.* | wc -l: $(ls scripts/*.test.* | wc -l)"
-          echo "playwright chromium path:"
-          node -e "console.log(require('playwright').chromium.executablePath())" || echo "FAIL to resolve"
+          {
+            echo "## Diagnostics"
+            echo '```'
+            echo "node $(node --version)"
+            echo "cwd: $(pwd)"
+            echo "scripts/*.test.* count: $(ls scripts/*.test.* | wc -l)"
+            echo "playwright chromium path:"
+            node -e "console.log(require('playwright').chromium.executablePath())" || echo "FAIL to resolve"
+            echo "chromium exists? $(node -e "const fs=require('fs');console.log(fs.existsSync(require('playwright').chromium.executablePath()))" 2>&1)"
+            echo "runner haveChromium probe:"
+            node -e "const {spawnSync}=require('child_process');const r=spawnSync(process.execPath,['-e',\"const p=require('playwright');const fs=require('fs');const e=p.chromium.executablePath();process.stdout.write(fs.existsSync(e)?e:'')\"],{encoding:'utf8'});console.log('status',r.status,'stdout',JSON.stringify(r.stdout),'stderr',r.stderr.slice(0,200))"
+            echo '```'
+          } | tee -a $GITHUB_STEP_SUMMARY
 
       - name: Run full regression (npm run test:all)
-        run: npm run test:all 2>&1 | tee /tmp/test-all.log
+        run: |
+          npm run test:all 2>&1 | tee /tmp/test-all.log
+          code=${PIPESTATUS[0]}
+          {
+            echo "## test:all output"
+            echo '```'
+            tail -200 /tmp/test-all.log
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
+          exit $code
 
       - name: Upload artefacts on failure
         if: failure()

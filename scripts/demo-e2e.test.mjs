@@ -148,7 +148,12 @@ export async function runE2E({ origin, fetchImpl = fetch, logger = console.log }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const origin = process.argv[2];
-  if (!origin) { console.error('Usage: node scripts/demo-e2e.test.mjs <demo-origin>'); process.exit(2); }
+  if (!origin) {
+    // The suite needs a deployed demo to probe; reported as skip (exit 77) so
+    // the runner surfaces the gap without inventing a pass.
+    process.stderr.write('SKIP needs a demo origin (Usage: node scripts/demo-e2e.test.mjs <demo-origin>)\n');
+    process.exit(77);
+  }
   try { console.log(await runE2E({ origin })); }
   catch (error) { console.error('FAIL ' + error.message); process.exit(1); }
 }

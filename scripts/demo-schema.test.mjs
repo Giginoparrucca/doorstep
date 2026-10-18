@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { renderDemoSchema } from './demo-schema.mjs';
-if (!process.argv[2]) throw new Error('Pass a private catalog JSON path; metadata snapshots are not published.');
+if (!process.argv[2]) {
+  // Catalog JSON is private metadata; the runner reports this as skipped (exit 77)
+  // when run without an argument, so the gap is visible in CI without an invented pass.
+  process.stderr.write('SKIP needs a private catalog JSON path; metadata snapshots are not published\n');
+  process.exit(77);
+}
 const catalog = JSON.parse(fs.readFileSync(process.argv[2]));
 assert.throws(() => renderDemoSchema(catalog, 'jcjwaqqabgwqhhzhfbts'));
 assert.throws(() => renderDemoSchema(catalog, ''));

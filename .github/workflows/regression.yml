@@ -1,0 +1,50 @@
+# Round 60a Phase 1 — full regression suite.
+# Runs on every PR and every push to main. Blocks the merge if any
+# test file reports a failure. Skips (exit 77) with recorded reasons
+# are counted and shown in the job log, but do not fail the gate.
+name: regression
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: regression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install project devDependencies
+        run: npm install
+
+      # Playwright is intentionally not a committed devDependency (the
+      # web app itself does not use it; it exists only for the browser
+      # test suites). CI installs it explicitly along with its Chromium.
+      - name: Install Playwright + Chromium
+        run: |
+          npm install --no-save playwright@1.47.0
+          npx playwright install --with-deps chromium
+
+      - name: Run full regression (npm run test:all)
+        run: npm run test:all
+
+      - name: Upload artefacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-logs
+          path: |
+            /tmp/welcomebnb-*
+          retention-days: 7
+          if-no-files-found: ignore

@@ -31,7 +31,7 @@ cross-property dashboard, no room types/pricing. Round 51 remains paused.
 | 3a — Backend room-aware defenses | shipped — PR TBD — Claude Opus 4.7 | GPT-6.1's defensive design (`codex/round60-phase2`) ported on top of current main. All seven defenses in place; `scripts/rooms-sync-defenses.test.mjs` added to the full suite. |
 | 3b — Rooms CRUD + feed room selector | shipped — PR TBD — Claude Opus 4.7 | Rooms card in Property Details (add/rename/beds/door_code/delete, soft-delete, 6-cap), per-feed room selector in Settings (shown at 2+ rooms). 17 new i18n keys in IT+EN. |
 | 3c — Direct-booking room selector + calendar filter | shipped — PR TBD — Claude Opus 4.7 | Room select on direct-booking form (passes roomId into `_computeReservationOverlap`); calendar room-filter chip row + room name prefix on bars. Full per-room vertical lanes deferred (noted below). |
-| 4 — Guest app | pending | Guest sees own room name + door code on arrival; served from `api/guest.js`, scoped by signed token. Shared house content unchanged. |
+| 4 — Guest app | in-progress — Claude Opus 4.7 | Guest sees own room name + door code on arrival; served from `api/guest.js`, scoped by signed token. Shared house content unchanged. |
 | 5 — Compliance outputs | pending | Regional/ROSS1000 review prefills `rooms_available`/`beds_available`/per-day `occupied` from room data; flags days with unassigned stays. Alloggiati / SPOT / tourist-tax **unchanged**; `regional-exports.test.mjs` byte-identical for the no-rooms case stays the canary. |
 
 ### Round 60 Phase 3c — direct-booking room selector + calendar room filter (Claude Opus 4.7, 2026-10-18)

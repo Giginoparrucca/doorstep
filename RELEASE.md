@@ -6,6 +6,29 @@ production. Keep it in the repo root alongside `CHANGELOG.md`.
 
 ---
 
+## Round 60a rule — full regression on every PR
+
+Before merging any PR, `npm run test:all` must be green locally **and** the
+`regression` GitHub Actions check must be green on the PR. The check is a
+required status check on `main` (branch protection), so an unreviewed red
+suite cannot slip in regardless of which model opened the PR.
+
+- `npm test` — offline tests only (fast; no browser).
+- `npm run test:browser` — the Chromium suites (needs `npx playwright install chromium`).
+- `npm run test:all` — both of the above. This is what CI runs.
+- `npm run test:live` — read-only hosted smoke (only when `DEMO_SMOKE_ORIGIN`
+  and `DEMO_SMOKE_PROPERTY_ID` are set; skipped otherwise). Run against
+  production after a merge-to-main deployment and paste the result into
+  CHANGELOG.
+
+A test file that needs a secret or network it does not have must exit 77
+with `SKIP <reason>` on stderr. A skip is not a pass — the runner lists each
+skip in its totals, and every skip should be named in the CHANGELOG entry.
+
+Full policy in `AGENTS.md` → **Full regression (every Round, every phase)**.
+
+---
+
 ## Round 43 maintenance rule — guides
 
 If a round changes the host-console UI, update the matching guide in

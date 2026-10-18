@@ -32,7 +32,7 @@ cross-property dashboard, no room types/pricing. Round 51 remains paused.
 | 3b — Rooms CRUD + feed room selector | shipped — PR TBD — Claude Opus 4.7 | Rooms card in Property Details (add/rename/beds/door_code/delete, soft-delete, 6-cap), per-feed room selector in Settings (shown at 2+ rooms). 17 new i18n keys in IT+EN. |
 | 3c — Direct-booking room selector + calendar filter | shipped — PR TBD — Claude Opus 4.7 | Room select on direct-booking form (passes roomId into `_computeReservationOverlap`); calendar room-filter chip row + room name prefix on bars. Full per-room vertical lanes deferred (noted below). |
 | 4 — Guest app | shipped — PR TBD — Claude Opus 4.7 | `api/guest.js` `property` action attaches `{id, name, beds, door_code?}` when the stay is linked to a room; door_code gated behind check-in like wifi/access. `index.html` renders a Your-room card on the Home tab, hidden otherwise. |
-| 5 — Compliance outputs | pending | Regional/ROSS1000 review prefills `rooms_available`/`beds_available`/per-day `occupied` from room data; flags days with unassigned stays. Alloggiati / SPOT / tourist-tax **unchanged**; `regional-exports.test.mjs` byte-identical for the no-rooms case stays the canary. |
+| 5 — Compliance outputs | in-progress — Claude Opus 4.7 | Regional/ROSS1000 review prefills `rooms_available`/`beds_available`/per-day `occupied` from room data; flags days with unassigned stays. Alloggiati / SPOT / tourist-tax **unchanged**; `regional-exports.test.mjs` byte-identical for the no-rooms case stays the canary. |
 
 ### Round 60 Phase 4 — guest app shows own room name + door code (Claude Opus 4.7, 2026-10-18)
 

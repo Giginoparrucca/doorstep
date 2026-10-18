@@ -217,15 +217,20 @@ async function main() {
   }
 
   if (run.browser) {
+    // Resolve the executable path only when the hard-coded local-image
+    // path actually exists; otherwise leave CHROMIUM_EXECUTABLE_PATH
+    // unset so Playwright falls back to its own-managed browser (what
+    // CI uses after `npx playwright install chromium`).
+    const browserEnv = { ...process.env };
+    if (!process.env.CHROMIUM_EXECUTABLE_PATH && existsSync('/opt/pw-browsers/chromium')) {
+      browserEnv.CHROMIUM_EXECUTABLE_PATH = '/opt/pw-browsers/chromium';
+    }
     const r3 = await runGroup('browser (chromium)', browser, (file) => ({
       label: relative(repoRoot, file),
       skip: chromiumAvailable ? null : 'no Chromium executable found (set CHROMIUM_EXECUTABLE_PATH)',
       cmd: process.execPath,
       args: [file],
-      env: {
-        ...process.env,
-        CHROMIUM_EXECUTABLE_PATH: process.env.CHROMIUM_EXECUTABLE_PATH || '/opt/pw-browsers/chromium',
-      },
+      env: browserEnv,
     }));
     allResults.push(...r3);
   }

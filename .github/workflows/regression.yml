@@ -1,7 +1,7 @@
 # Round 60a Phase 1 — full regression suite.
 # Runs on every PR and every push to main. Blocks the merge if any
-# test file reports a failure. Skips (exit 77) with recorded reasons
-# are counted and shown in the job log, but do not fail the gate.
+# test file reports a failure. Skips (exit 77 + "SKIP <reason>" on
+# stderr, POSIX convention) are counted but do not fail the gate.
 name: regression
 
 on:
@@ -32,55 +32,18 @@ jobs:
       - name: Install project devDependencies
         run: npm install
 
-      # Playwright is intentionally not a committed devDependency (the
-      # web app itself does not use it; it exists only for the browser
-      # test suites). CI installs it explicitly along with its Chromium.
       - name: Install Playwright + Chromium
-        # 1.56.x is the pinned version in the local-dev image; it passes
-        # --headless=new (older 1.47 passes --headless=old which the
-        # installed Chromium 131 refuses to launch with).
+        # 1.56.x pins the version the local-dev image uses, so CI and
+        # local runs behave the same. Playwright stays out of
+        # package.json devDependencies to keep local installs lean.
         run: |
           npm install --no-save playwright@1.56.1
           npx playwright install --with-deps chromium
 
-      - name: Diagnostics
-        run: |
-          {
-            echo "## Diagnostics"
-            echo '```'
-            echo "node $(node --version)"
-            echo "cwd: $(pwd)"
-            echo "scripts/*.test.* count: $(ls scripts/*.test.* | wc -l)"
-            echo "playwright chromium path:"
-            node -e "console.log(require('playwright').chromium.executablePath())" || echo "FAIL to resolve"
-            echo "chromium exists? $(node -e "const fs=require('fs');console.log(fs.existsSync(require('playwright').chromium.executablePath()))" 2>&1)"
-            echo "runner haveChromium probe:"
-            node -e "const {spawnSync}=require('child_process');const r=spawnSync(process.execPath,['-e',\"const p=require('playwright');const fs=require('fs');const e=p.chromium.executablePath();process.stdout.write(fs.existsSync(e)?e:'')\"],{encoding:'utf8'});console.log('status',r.status,'stdout',JSON.stringify(r.stdout),'stderr',r.stderr.slice(0,200))"
-            echo '```'
-          } | tee -a $GITHUB_STEP_SUMMARY
-
       - name: Run full regression (npm run test:all)
         run: |
           npm run test:all 2>&1 | tee /tmp/test-all.log
-          code=${PIPESTATUS[0]}
-          {
-            echo "## test:all output"
-            echo '```'
-            tail -200 /tmp/test-all.log
-            echo '```'
-          } >> $GITHUB_STEP_SUMMARY
-          exit $code
-
-      - name: Upload artefacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: regression-logs
-          path: |
-            /tmp/welcomebnb-*
-            /tmp/test-all.log
-          retention-days: 7
-          if-no-files-found: ignore
+          exit ${PIPESTATUS[0]}
 
       - name: Comment failure to PR
         if: failure() && github.event_name == 'pull_request'

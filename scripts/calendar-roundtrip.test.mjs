@@ -217,7 +217,7 @@ const {document,window}=parseHTML('<html><body><main id="calendar"></main></body
 let calendarRows=[d,mismatch],clicked=[];
 const query=new Proxy({}, {get(_,key){if(key==='then')return resolve=>resolve({data:structuredClone(calendarRows)});return ()=>query;}});
 const ctx=vm.createContext({document,window,console,Date,Intl,CalendarRoundtrip:C,propertyId:'p1',propertyData:{},hostLang:'it',
-  APP_CONFIG:{mode:'production'},APP_ORIGIN:'https://fixture.invalid',allCheckins:[],_upcomingCalYear:2026,_upcomingCalMonth:9,
+  APP_CONFIG:{mode:'production'},APP_ORIGIN:'https://fixture.invalid',allCheckins:[],allRooms:[],_calendarRoomFilter:null,_upcomingCalYear:2026,_upcomingCalMonth:9,
   _upcomingCalSelectedDay:null,_upcomingRowsById:{},sb:{from:()=>query},h:k=>k,
   ensureReservationBookingCodes:async rows=>rows,_cleanOtaGuestName:n=>n,_showReservationDetail:id=>clicked.push(id)});
 for(const name of ['_r39Pad','_r39IsoDate','_r39ParseISO','_r39AddDays','_r39DowMon','_r39WeekdayLabels','_r39MonthLabel'])vm.runInContext(fn(name),ctx);

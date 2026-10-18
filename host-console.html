@@ -2695,6 +2695,11 @@ let _upcomingView = (localStorage.getItem('wbnb_upcoming_view') === 'calendar') 
 let _upcomingCalYear = null;          // int, e.g. 2026. Initialised on first render.
 let _upcomingCalMonth = null;         // int, 0..11
 let _upcomingCalSelectedDay = null;   // YYYY-MM-DD string, mobile tap-to-expand only.
+// Round 60 Phase 3c — calendar room filter. null = all rooms + unassigned
+// (default). A room UUID = that room + unassigned. '__unassigned__' = only
+// unassigned. Reset to null on property switch so one property's filter
+// never leaks into another.
+let _calendarRoomFilter = null;
 
 // Timezone-safe YYYY-MM-DD helpers. new Date('2026-09-19') parses as
 // UTC midnight which can flip the day depending on the viewer's
@@ -2754,6 +2759,14 @@ async function _upcomingCalToday() {
   _upcomingCalSelectedDay = _r39IsoDate(now);
   await _upcomingRepaint();
 }
+// Round 60 Phase 3c — chip handler. Takes '' (All), '__unassigned__'
+// (only unassigned), or a room UUID. Re-renders the calendar panel in
+// place; no network round-trip beyond the room-aware SELECT.
+async function _setCalendarRoomFilter(value) {
+  _calendarRoomFilter = value || null;
+  try { if (typeof renderCalendarPanel === 'function') await renderCalendarPanel(); } catch (e) { console.warn('calendar re-render failed:', e); }
+}
+
 async function _upcomingCalSelectDay(iso) {
   // Round 45 hotfix (v2) — tapping a day cell used to select the day
   // and render a list of that day's bookings below the month grid, so
@@ -3967,6 +3980,10 @@ const HT = {
     rf_title_edit_res: 'Edit direct booking',
     rf_title_new_block: 'Block dates',
     rf_title_edit_block: 'Edit blocked dates',
+    rf_room_lbl: 'Room',
+    rf_room_unassigned: '— Unassigned (whole property) —',
+    cal_room_filter_all: 'All rooms',
+    cal_room_filter_unassigned: 'Unassigned',
     rf_channel_lbl: 'Where did the booking come from?',
     rf_channel_placeholder: 'Choose a channel…',
     rf_channel_website: 'Our own website',
@@ -4540,6 +4557,10 @@ const HT = {
     rf_title_edit_res: 'Modifica prenotazione diretta',
     rf_title_new_block: 'Blocca date',
     rf_title_edit_block: 'Modifica date bloccate',
+    rf_room_lbl: 'Camera',
+    rf_room_unassigned: '— Non assegnata (intera proprietà) —',
+    cal_room_filter_all: 'Tutte le camere',
+    cal_room_filter_unassigned: 'Non assegnate',
     rf_channel_lbl: 'Da dove arriva la prenotazione?',
     rf_channel_placeholder: 'Scegli un canale…',
     rf_channel_website: 'Il nostro sito',
@@ -6662,6 +6683,23 @@ function openReservationForm(opts) {
   const reasonOpts = BLOCK_REASONS
     .map(([v, l]) => `<option value="${safe(v)}"${prefill.channel === v ? ' selected' : ''}>${safe(l)}</option>`).join('');
 
+  // Round 60 Phase 3c — room selector. Only rendered when the property
+  // has 2+ rooms (otherwise it's noise). Prefill.room_id carries the
+  // existing value in edit mode. The host can set it to "" (Unassigned)
+  // at any time; the overlap check then falls back to the whole-property
+  // scope (per `_computeReservationOverlap`'s roomId behaviour).
+  const rooms = Array.isArray(allRooms) ? allRooms : [];
+  const showRoomSel = rooms.length >= 2;
+  const prefillRoomId = prefill.room_id || '';
+  const roomBlock = showRoomSel ? `
+    <label style="display:block;margin-top:12px;">
+      <span style="display:block;font-size:0.78rem;color:var(--ink-soft);margin-bottom:4px;">${safe(h('rf_room_lbl'))}</span>
+      <select id="rfRoom" onchange="_reservationFormOverlapCheck()" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:0.9rem;background:var(--white);">
+        <option value=""${!prefillRoomId ? ' selected' : ''}>${safe(h('rf_room_unassigned'))}</option>
+        ${rooms.map(r => `<option value="${safe(r.id)}"${r.id === prefillRoomId ? ' selected' : ''}>${safe(r.name)}</option>`).join('')}
+      </select>
+    </label>` : '';
+
   const reservationBlock = isBlock ? '' : `
     <label style="display:block;margin-top:12px;">
       <span style="display:block;font-size:0.78rem;color:var(--ink-soft);margin-bottom:4px;">${safe(h('rf_channel_lbl'))} *</span>
@@ -6713,6 +6751,7 @@ function openReservationForm(opts) {
         <button type="button" onclick="_closeReservationForm()" aria-label="${safe(h('rf_cancel'))}" style="background:none;border:none;font-size:1.4rem;color:var(--ink-soft);cursor:pointer;padding:2px 8px;line-height:1;">×</button>
       </div>
       <form id="reservationForm" onsubmit="saveDirectReservation(event); return false;">
+        ${roomBlock}
         ${reservationBlock}
         ${blockBlock}
         <div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;">
@@ -6812,7 +6851,13 @@ async function _reservationFormOverlapCheck() {
   if (!hint || !ci || !co || co <= ci) { if (hint) hint.style.display = 'none'; return; }
   const modal = document.getElementById('reservationFormModal');
   const excludeId = modal?.dataset?.reservationId || null;
-  const rows = await _computeReservationOverlap(propertyId, ci, co, excludeId);
+  // Round 60 Phase 3c — scope the overlap check to the selected room
+  // (if any). `_computeReservationOverlap` with a roomId keeps same-
+  // room and unassigned rows and drops rows in OTHER rooms, so a stay
+  // in Camera Blu never flags a conflict against a stay in Camera Rossa.
+  const roomSel = document.getElementById('rfRoom');
+  const roomId = (roomSel?.value || '').trim() || null;
+  const rows = await _computeReservationOverlap(propertyId, ci, co, excludeId, roomId);
   hint.style.display = rows.length > 0 ? 'block' : 'none';
 }
 
@@ -6863,6 +6908,13 @@ async function saveDirectReservation(ev) {
 
     // Build payload.
     const guestCount = guestCountRaw ? Math.max(1, Math.min(50, parseInt(guestCountRaw, 10) || 0)) : null;
+    // Round 60 Phase 3c — room_id from the selector (if present).
+    // "" → null (unassigned). The RLS policy on ota_reservations is
+    // owner-scoped, and ON DELETE SET NULL on the room_id FK means
+    // picking a soft-deleted room (shouldn't happen because the
+    // selector only shows active rooms) can't break the row later.
+    const roomSel = document.getElementById('rfRoom');
+    const roomId = (roomSel?.value || '').trim() || null;
     const payload = {
       property_id:   propertyId,
       platform:      'direct',
@@ -6872,6 +6924,7 @@ async function saveDirectReservation(ev) {
       checkout_date: co,
       channel:       channel,
       notes:         notes || null,
+      room_id:       roomId,
     };
     if (!isBlock) {
       payload.guest_name    = guestName;
@@ -6960,7 +7013,7 @@ async function _renderUpcomingCalendarBody(buildHeader) {
   let rows = [];
   try {
     const { data, error } = await sb.from('ota_reservations')
-      .select('id, property_id, platform, entry_type, channel, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code, covered_by_reservation_id, raw, status, is_test').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
+      .select('id, property_id, platform, entry_type, channel, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code, covered_by_reservation_id, room_id, raw, status, is_test').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
       .eq('property_id', propertyId)
       .in('entry_type', ['reservation', 'block'])
       .eq('status', 'active')
@@ -6970,6 +7023,15 @@ async function _renderUpcomingCalendarBody(buildHeader) {
       .order('checkin_date', { ascending: true });
     if (error) { console.warn('Calendar reservations load failed:', error.message); }
     else rows = data || [];
+  // Round 60 Phase 3c — apply the room filter (null = all). When a
+  // specific room is picked, keep rows in that room AND unassigned
+  // (so the host still sees stays they haven't labelled yet). When
+  // _calendarRoomFilter === '__unassigned__' keep only unassigned.
+  if (_calendarRoomFilter) {
+    rows = (_calendarRoomFilter === '__unassigned__')
+      ? rows.filter(r => !r.room_id)
+      : rows.filter(r => r.room_id === _calendarRoomFilter || !r.room_id);
+  }
   } catch (e) {
     console.warn('Calendar reservations exception:', e);
   }
@@ -7028,7 +7090,15 @@ async function _renderUpcomingCalendarBody(buildHeader) {
     const fallback = isBlock
       ? (it ? 'Blocco' : 'Blocked')
       : (isDirect ? (it ? 'Diretta' : 'Direct') : (it ? 'Prenotazione' : 'Reservation'));
-    const label = name || r.booking_code || fallback;
+    let label = name || r.booking_code || fallback;
+    // Round 60 Phase 3c — prefix the bar label with the room name when
+    // the property has 2+ rooms AND no single-room filter is active
+    // (if the filter is a specific room, the prefix is redundant).
+    const roomsForLabels = Array.isArray(allRooms) ? allRooms : [];
+    if (roomsForLabels.length >= 2 && !_calendarRoomFilter && r.room_id) {
+      const match = roomsForLabels.find(x => x.id === r.room_id);
+      if (match?.name) label = `${match.name} · ${label}`;
+    }
     // Bar tone selection.
     let tone;
     if (isBlock)         tone = 'block';
@@ -7093,6 +7163,26 @@ async function _renderUpcomingCalendarBody(buildHeader) {
     trackEnds[t] = b.endD;
   }
   const maxTracks = trackEnds.length;
+
+  // Round 60 Phase 3c — room filter chip row. Only painted when the
+  // property has 2+ rooms. "All" (default), each active room, then
+  // "Unassigned". Clicking a chip sets _calendarRoomFilter and
+  // re-renders. Picking a specific room includes unassigned stays
+  // (so the host doesn't lose sight of a booking they haven't
+  // labelled yet); the Unassigned chip shows only unassigned.
+  const rooms = Array.isArray(allRooms) ? allRooms : [];
+  const chipsRow = (rooms.length >= 2) ? (() => {
+    const chip = (val, lbl, active) => {
+      const bg = active ? 'background:var(--warm);color:#fff;border-color:var(--warm);' : 'background:var(--white);color:var(--ink);border-color:var(--border);';
+      const value = val == null ? '' : String(val);
+      return `<button type="button" onclick="_setCalendarRoomFilter(${JSON.stringify(value)})" style="padding:4px 10px;border:1px solid var(--border);border-radius:999px;font-size:0.76rem;cursor:pointer;${bg}">${safe(lbl)}</button>`;
+    };
+    const chips = [chip('', h('cal_room_filter_all'), !_calendarRoomFilter)]
+      .concat(rooms.map(r => chip(r.id, r.name, _calendarRoomFilter === r.id)))
+      .concat([chip('__unassigned__', h('cal_room_filter_unassigned'),
+        _calendarRoomFilter === '__unassigned__')]);
+    return `<div style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;background:var(--cream);border-bottom:1px solid var(--border);">${chips.join('')}</div>`;
+  })() : '';
 
   // Weekday header row.
   const headerRow = `
@@ -7200,6 +7290,7 @@ async function _renderUpcomingCalendarBody(buildHeader) {
     <div id="upcomingPanelWrap" style="margin-bottom:18px;">
       ${buildHeader(bookings.length)}
       ${nav}
+      ${chipsRow}
       <div class="cal-grid-wrap">
         ${headerRow}
         <div class="cal-body">
@@ -15043,6 +15134,7 @@ async function loadPropertyData() {
   if (!propertyId) return;
   // Reset per-property in-memory state so nothing leaks across a switch
   rulesData = []; recoData = []; allCheckins = []; allChats = []; allRooms = [];
+  _calendarRoomFilter = null;
   dismissedBookingCodes = new Set();
 
   // Round 60 Phase 3b — rooms for this property. Zero or one room keeps

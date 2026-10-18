@@ -11,11 +11,28 @@ Newest entries at the top of each section.
 
 | Round | Scope | Specification | Status |
 |---|---|---|---|
-| 60 — B&B rooms inside one property | Rooms within one struttura (one CIN/Alloggiati/statistics code); per-room iCal feeds, overlap, calendar lanes, guest room + door code, occupied-room prefill for regional exports. Private owners only; no B2B | `PLAN_round60_bnb_rooms.md` | pending — after 60a |
 
 Standing rule added 2026-10-18 (AGENTS.md "Full regression"): every phase gate runs the whole suite, not only plan-listed tests.
 
 ### Current round — in-flight
+
+**Round 60 — B&B rooms inside one property**
+
+Specification: `PLAN_round60_bnb_rooms.md`. Support one struttura with 2–6 rooms
+(one CIN, one Alloggiati account, one regional statistics code, one tourist-tax
+setup) with several guests staying in different rooms on the same nights. Zero
+visible change for properties without rooms. No B2B / company invoicing, no
+cross-property dashboard, no room types/pricing. Round 51 remains paused.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 1 — Schema (`property_rooms` + nullable `room_id` on reservations/checkins) | pending | New table + RLS + explicit GRANTs (owner / admin / service_role; no anon); unique `(property_id, lower(name))` where `deleted_at is null`; index for per-room overlap; rollback block. Schema tests: owner CRUD, cross-owner denied, anon denied, soft-delete uniqueness, cascades. Demo-apply + verify before production apply. |
+| 2 — iCal sync, overlap, echo logic | pending | Stamp reservation `room_id` from feed; Booking per-room uniqueness check; echo/coverage match within one room; per-room overlap; booking_code-first check-in ↔ reservation correlation. |
+| 3 — Host console | pending | Rooms card in Property Details, per-feed room selector, per-room calendar lanes + "Unassigned", room selector on direct bookings, bilingual strings. |
+| 4 — Guest app | pending | Guest sees own room name + door code on arrival; served from `api/guest.js`, scoped by signed token. Shared house content unchanged. |
+| 5 — Compliance outputs | pending | Regional/ROSS1000 review prefills `rooms_available`/`beds_available`/per-day `occupied` from room data; flags days with unassigned stays. Alloggiati / SPOT / tourist-tax **unchanged**; `regional-exports.test.mjs` byte-identical for the no-rooms case stays the canary. |
+
+### Previous round — preserved completed status
 
 **Round 60a — Full regression suite and coverage gaps**
 

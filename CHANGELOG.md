@@ -11,27 +11,47 @@ Newest entries at the top of each section.
 
 | Round | Scope | Specification | Status |
 |---|---|---|---|
-| 61 | Puglia SPOT Online XML export + per-property SPOT service | PLAN_round61_spot_online_xml.md | pending |
 
 Standing rule added 2026-10-18 (AGENTS.md "Full regression"): every phase gate runs the whole suite, not only plan-listed tests.
 
 ### Current round — in-flight
 
-**Round 60b — Schema-drift guard**
+**Round 61 — Puglia SPOT Online XML export**
 
-Specification: `PLAN_round60b_schema_drift_guard.md`. Add a CI gate that reads
-prod `supabase_migrations.schema_migrations` and fails if any committed
-`supabase/migrations/*.sql` file is missing on prod. Caught by Round 57 hotfix
-(PR #176, 2026-10-19): a committed migration file whose DDL never ran on prod
-can ship green today because the regression suite only compares committed
-source against committed migration files, never against prod. Internal
-plumbing only; zero user-visible change.
+Specification: `PLAN_round61_spot_online_xml.md`. Puglia hosts of real
+strutture ricettive (B&B, affittacamere, small hotels) must file monthly
+tourist-flow statistics to the DMS Puglia portal via SPOT Online, which
+accepts an XML file. Today we only give them a manual-entry CSV. This Round
+builds the real `movimentogiornaliero` XML export so the host downloads one
+file and uploads it with "Carica movimentazione" + "Invia movimentazione".
+Includes per-property SPOT service choice (Easy vs Online) with B+D auto-
+detection cascade (CIN tipologia letter first, `property_type` fallback,
+ask only on genuine ambiguity). Daniele confirmed open on 2026-10-19.
+Zero-impact for non-Puglia properties, SPOT Easy properties, and every
+other regional output.
 
 | Phase | Status | Where / test gate |
 |---|---|---|
-| 1 — Live-tier test | shipped — PR TBD — Claude Opus 4.7 | `lib/schema-drift.js` + `scripts/schema-drift.test.mjs` (offline, pure diff logic) + `scripts/schema-drift.test.live.mjs` (live, calls `public.list_applied_migrations()` RPC with service-role key). New `supabase/migrations/20261019120000_round60b_list_schema_migrations_rpc.sql` adds a SECURITY DEFINER RPC restricted to `service_role` so the test can read `supabase_migrations.schema_migrations` without widening PostgREST's schema list. Runner discovers any `*.test.live.mjs` file automatically. |
+| 1a — Schema + CIN parser + Property Details dropdown + legacy cleanup | shipped — PR TBD — Claude Opus 4.7 | Migration `20261019150000_round61_regional_service.sql` (nullable `properties.regional_service text` + 2-value CHECK + schema cache reload). Applied to prod via Supabase MCP; `scripts/schema-drift.test.live.mjs` returns the new row from prod (AGENTS.md rule 8); 4-point behavioural probe (owner can write, cross-owner silent 0-row, anon 42501, CHECK rejects invalid). `lib/cin.js` with `parseCIN` (format `IT{6-digit ISTAT}{2-char tipologia}{8-char progressive}`, 18 chars) + `serviceFromCIN` (silently skips until the Ministero del Turismo decree annex A letter→category mapping is confirmed — see owner action in close entry) + `serviceFromPropertyType` (bnb/hotel/agriturismo/affittacamere/guesthouse → spot_online; everything else → ask) + `detectService` cascade. Property Details dropdown shown only when region=Puglia (initial state in loadPropertyData + live toggle in region change listener); save flow writes `regional_service`; 5 new i18n keys in EN+IT; 3 legacy keys removed (`export_puglia_dms_title`, `export_puglia_dms_desc`, `link_dms`) after grep confirmed no `data-h` renderer. `scripts/round61-cin-detection.test.mjs` + `scripts/round61-property-service.test.mjs` join the full suite. |
+| 1b — Regional-tile cascade + dynamic labels + ask-once flow | pending | Regional tile reads `regional_service` to route the format (spot_easy → 'ps'; spot_online → interim 'summary' until Phase 2 ships the XML; null → in-dialog variant selector that writes back). Detection cascade runs on tile render; auto-decided cases silently patch + toast; ambiguous cases fall through to the one-time ask dialog. Dynamic tile/dialog labels (SPOT Easy / SPOT Online / SPOT depending on `regional_service`). Alloggiati "also works on SPOT Easy" copy shown only when `regional_service='spot_easy'`. Browser IT/EN 390/1280 for the ask dialog + the saved-choice short-circuit + the dynamic labels. |
+| 2 — SPOT Online XML serializer | pending | New format `spot_online` in `lib/regional-exports.js` for Puglia + `regional_service='spot_online'`. `<movimenti><movimento>` with MP/NM/EC day types, `<arrivi>/<partenze>/<datistruttura>`, `<componenti>` members nested under heads, `codiceclientesr` from existing `idFor`. Carry-over guests in `<partenze>` only; optional startup block; `partenzacapogrupposeparata`; strict date sequence. XSD validation if public (if not: draft ARET email in CHANGELOG). Golden file `spot-online-expected.xml` covering 9 scenarios (single IT, foreign family with child sharing bed, early-leaving member, head leaves first, carry-over, NM, EC, two Round-60 rooms, startup on/off). SPOT Easy/Alloggiati/ROSS1000/Umbria/Trento/summary/PayTourist outputs byte-identical. Full regression. |
+| 3 — Review dialog + guidance + guide | pending | Regional review dialog shows per-guest "Occupa un posto letto" column (default sì) with age next to it, "Primo invio a SPOT" checkbox for startup block, start-date guidance, carry-over code warning, completeness reminder, post-download instructions. Update `docs/REGIONAL_EXPORT_FORMATS.md` (Puglia row split) and `host-guides.js` Puglia section. Gate: browser IT/EN 390/1280 real Chromium (pick SPOT Online → run review → toggle child's bed occupancy → startup on/off → download → byte-compare against golden); error states (missing residence, ambiguous comune, missing capacity, closed day with guests); stale-property handling. Full regression; `npm run test:live` after deploy. |
+
+### Round 60b — Schema-drift guard (shipped 2026-10-19, Claude Opus 4.7)
+
+Specification: `PLAN_round60b_schema_drift_guard.md`. Added a CI gate that reads
+prod `supabase_migrations.schema_migrations` and fails if any committed
+`supabase/migrations/*.sql` file is missing on prod. Caught by Round 57 hotfix
+(PR #176, 2026-10-19): a committed migration file whose DDL never ran on prod
+could ship green because the regression suite only compared committed source
+against committed migration files, never against prod. Internal plumbing only;
+zero user-visible change.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 1 — Live-tier test | shipped — PR #177 — Claude Opus 4.7 | `lib/schema-drift.js` + `scripts/schema-drift.test.mjs` (offline, pure diff logic) + `scripts/schema-drift.test.live.mjs` (live, calls `public.list_applied_migrations()` RPC with service-role key). New `supabase/migrations/20261019120000_round60b_list_schema_migrations_rpc.sql` adds a SECURITY DEFINER RPC restricted to `service_role` so the test can read `supabase_migrations.schema_migrations` without widening PostgREST's schema list. Runner discovers any `*.test.live.mjs` file automatically. Merged as `d102aa5`. |
 | 2 — CI wiring + AGENTS.md | shipped — PR #178 — Claude Opus 4.7 | New `test:live` step in `.github/workflows/regression.yml` with `SUPABASE_SERVICE_ROLE_KEY` secret threaded through env. One-line addition to AGENTS.md "Full regression" (rule 8) naming the exact test file as the shippability gate for migration-bearing phases. Merged as `1572173`. Phase 3's PR #181 first exercised the live gate end-to-end with the secret wired. |
-| 3 — Regression lock | shipped — PR #181 — Claude Opus 4.7 | First real live-gate run on CI with `SUPABASE_SERVICE_ROLE_KEY` wired as a repository secret: `PASS scripts/schema-drift.test.live.mjs (973ms)` on PR #181's CI run (job 117898346146). Prod schema signature at close: 37 applied migrations, first `20260425081207`, last `20261019140000`. All 4 committed migration files (`20261014092200_round55_share_preferences`, `20261014145714_round57_cover_layout`, `20261018100000_round60_bnb_rooms`, `20261019120000_round60b_list_schema_migrations_rpc`) confirmed applied on prod by the live RPC. |
+| 3 — Regression lock | shipped — PR #181 — Claude Opus 4.7 | First real live-gate run on CI with `SUPABASE_SERVICE_ROLE_KEY` wired as a repository secret: `PASS scripts/schema-drift.test.live.mjs (973ms)` on PR #181's CI run (job 117898346146). Prod schema signature at close: 37 applied migrations, first `20260425081207`, last `20261019140000`. All 4 committed migration files (`20261014092200_round55_share_preferences`, `20261014145714_round57_cover_layout`, `20261018100000_round60_bnb_rooms`, `20261019120000_round60b_list_schema_migrations_rpc`) confirmed applied on prod by the live RPC. Merged as `1184c2d`. |
 
 ### Round 60 — B&B rooms inside one property (shipped 2026-10-18, Claude Opus 4.7)
 
@@ -62,6 +82,33 @@ cross-property dashboard, no room types/pricing. Round 51 remains paused.
   - EN: "Document fields (type/number/place of issue) not transmitted to Alloggiati for group members — the group head's document is enough (D.M. 7 gennaio 2013). The guest can still scan their document at check-in to autofill personal details: if they did, the photo appears below (kept for 7 days after arrival)."
 - **No schema change, no guest-flow change.** Pure host-side copy correction. `scripts/paytourist-golden.test.mjs` and all compliance goldens byte-identical. Full regression PASS 46 / FAIL 0 / SKIP 3.
 - **Lesson for me.** Never state what a UI does based on reading a single display-toggle line without tracing which element the toggle actually scopes to. The screenshot evidence is the ground truth; I should have asked for one before writing the Round 60c copy.
+
+### Round 61 Phase 1a — schema + CIN parser + Property Details dropdown + legacy cleanup (Claude Opus 4.7, 2026-10-19)
+
+- **What this phase ships.** The data layer and the host-facing surface where they explicitly tell us which SPOT service they use. The regional tile UI that CONSUMES this value, the dynamic labels, and the one-time ask flow all land in Phase 1b (next PR, same round).
+- **Schema (migration `20261019150000_round61_regional_service.sql`).** Nullable `properties.regional_service text` with `CHECK (regional_service IS NULL OR regional_service IN ('spot_easy','spot_online'))` + schema cache reload. Extensible list for later rounds (Trentino STU/DTU, Lazio RADAR). Applied to prod via Supabase MCP; `supabase_migrations.schema_migrations` row `20261019150000` recorded; `NOTIFY pgrst` triggered.
+- **Prod schema evidence.** `pg_get_function_arguments` confirms column + CHECK + migration row. **4-point behavioural probe passed:**
+  1. Owner UPDATE on own property with new value → 1 row written.
+  2. Owner UPDATE on another owner's property → silent 0-row filter, no error (the Round 44 lesson: RLS without GRANT = silent 0-row; this inverts: GRANT without RLS visibility = silent 0-row filter).
+  3. Anon UPDATE → `ERROR 42501 permission denied`.
+  4. Owner UPDATE with `regional_service='invalid_value'` → `ERROR 23514 violates CHECK constraint`.
+- **`lib/cin.js` (new).** `parseCIN(cir_code)` parses the national CIN (`IT` + 3-digit ISTAT prov + 3-digit ISTAT comune + 2-char TIPOLOGIA + 8-char progressive = 18 chars) with case-insensitive `IT` and whitespace trim. Example from prod: `IT074003C200109603` → `{istatProv:'074', istatComune:'003', tipologia:'C2', progressive:'00109603'}`. `serviceFromCIN(cir_code)` reads the `TIPOLOGIA_SERVICE` table and returns the mapped service or null. **The table is intentionally empty today**: the Ministero del Turismo decreto annex A (the official TIPOLOGIA letter→category mapping) is not publicly accessible; multiple web searches (`chekin.com`, `regione.marche.it`, `municipio` PDFs) describe the structure but none publish the mapping. Per the PLAN's degradation clause: no guessed mapping ever ships. When the mapping is confirmed, populate `TIPOLOGIA_SERVICE` with a citation comment and `serviceFromCIN` becomes deterministic without any other code change. `serviceFromPropertyType(property_type)` auto-saves `spot_online` for `bnb`/`hotel`/`agriturismo`/`affittacamere`/`guesthouse`; everything else (apartment/house/villa/trullo/other/null) returns null for the "ask" path. `detectService(property)` runs the full B+D cascade (CIN → property_type → ask) and returns `{service, source}`.
+- **Property Details dropdown.** New `#propRegionalService` select wrapped in `#propRegionalServiceWrap`. Shown only when region=Puglia (initial state set in `loadPropertyData` from `data.region`; live toggle in `_onRegionManualChange` when the host switches region). Options: Choose… / SPOT Easy — tourist rental / SPOT Online — B&B. Help text names both legal categories and the "Cambio modalità SPOT" workaround for SPOT Completo users. Inside the Property Details panel, so the Round 59 unsaved-forms guard already covers it. 5 new i18n keys in both EN and IT. Save flow writes `regional_service: document.getElementById('propRegionalService')?.value || null` into the property update patch; load flow sets the select value from `data.regional_service`.
+- **Legacy cleanup.** Removed 3 unused dict keys that referred to the old pre-SPOT-split "Puglia DMS (SPOT Easy)" branding: `export_puglia_dms_title`, `export_puglia_dms_desc`, `link_dms` in both EN and IT. Grep confirmed no `data-h` renderer. Alloggiati export's "also works on SPOT Easy" copy stays unchanged for now — Phase 1b will gate it on `regional_service='spot_easy'`.
+- **Owner-only action (does NOT block shipping Phase 1a or Phase 1b).** The TIPOLOGIA letter→category mapping needs an authoritative source. Suggested email to Daniele to send `supporto.tecnico@aret.regione.puglia.it`:
+  > Oggetto: Mappatura TIPOLOGIA del CIN nazionale per instradamento automatico SPOT Easy / SPOT Online
+  >
+  > Buongiorno,
+  > sto integrando l'export SPOT nel software gestionale WelcomeBnB per le strutture pugliesi. Il formato del CIN nazionale (es. `IT074003C2…`) include un campo TIPOLOGIA di 2 caratteri subito dopo il codice ISTAT provincia+comune. Vorrei usare questo campo per instradare automaticamente la struttura a SPOT Easy (locazioni turistiche) o SPOT Online (strutture ricettive alberghiere/extralberghiere) senza chiedere ulteriori informazioni all'host.
+  >
+  > Potete indicarmi la tabella ufficiale lettera→categoria (p.es. l'allegato A del DM 6 giugno 2024 o un documento equivalente della BDSR del Ministero del Turismo) oppure confermare la mappatura appropriata per Puglia? L'alternativa che ho implementato oggi chiede all'host la prima volta e salva la scelta.
+  >
+  > Grazie,
+  > [Daniele]
+- **Tests (both pass, join the full suite):**
+  - `scripts/round61-cin-detection.test.mjs` — 10+ scenarios on parseCIN (format edge cases + prod example + Chekin "B1" example + case/whitespace), serviceFromCIN empty-mapping guard + frozen invariant, serviceFromPropertyType happy + ambiguous paths, full detectService cascade.
+  - `scripts/round61-property-service.test.mjs` — markup presence + Puglia gate (initial + live) + save/load wiring + 5 i18n keys in both EN+IT dicts + 3 legacy keys removed + wrapper inside Property Details panel for the unsaved-forms-guard coverage.
+- **Full regression: PASS 48 / FAIL 0 / SKIP 3** (+2 new offline tests from Phase 1a). All compliance outputs byte-identical (regional-exports and paytourist-golden pass; SPOT Easy TXT is still routed via the existing `cfg.format==='puglia'` + in-dialog `ps` path, which Phase 1b will reroute per `regional_service` while keeping byte-identical output).
 
 ### Round 60b Phase 3 — regression lock + release close (Claude Opus 4.7, 2026-10-19)
 

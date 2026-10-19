@@ -2405,6 +2405,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 <!-- Round 51 Phase 1-3 — pure readiness module + checklist/widget UI. -->
 <script src="/lib/onboarding-readiness.js"></script>
 <script src="/lib/calendar-roundtrip.js"></script>
+<!-- Round 61 Phase 1 — CIN parser + B+D service detection cascade. -->
+<script src="/lib/cin.js?v=61.1"></script>
 <script src="/host-onboarding.js"></script>
 <script src="/host-share.js?v=59.1"></script>
 <script src="/lib/cover-layout.js?v=57.1"></script>
@@ -15284,6 +15286,27 @@ function fillPropertyForm(data) {
   // Non-Puglia regions have no SPOT concept and the field would be noise.
   const _rsWrap = el('propRegionalServiceWrap');
   if (_rsWrap) _rsWrap.style.display = (data.region === 'Puglia') ? '' : 'none';
+  // Round 61 Phase 1b — B+D auto-detect for Puglia properties with no
+  // service chosen yet. The cascade in lib/cin.js tries the national
+  // CIN TIPOLOGIA first (silently skipped today), then property_type.
+  // Only auto-save when the cascade returns a confident service; the
+  // "ask" path stays null until the host picks via the dropdown or
+  // the regional tile. Fire-and-forget; a failed update does not
+  // block the page (host can still pick manually).
+  if (data.region === 'Puglia' && !data.regional_service && typeof Cin !== 'undefined') {
+    const detected = Cin.detectService(data);
+    if (detected.service && (detected.source === 'cin' || detected.source === 'property_type')) {
+      sb.from('properties').update({ regional_service: detected.service }).eq('id', data.id).then(({ error }) => {
+        if (error) return;
+        data.regional_service = detected.service;
+        propertyData.regional_service = detected.service;
+        if (el('propRegionalService')) el('propRegionalService').value = detected.service;
+        const label = detected.service === 'spot_online' ? 'SPOT Online' : 'SPOT Easy';
+        const sourceLabel = detected.source === 'cin' ? (hostLang === 'it' ? 'dal CIN' : 'from CIN') : (hostLang === 'it' ? 'dal tipo di proprietà' : 'from property type');
+        toast(`${label} ${hostLang === 'it' ? 'rilevato automaticamente ' : 'auto-detected '}${sourceLabel}`);
+      });
+    }
+  }
   if (el('propRoomsAvailable')) el('propRoomsAvailable').value = (data.rooms_available ?? '');
   if (el('propBedsAvailable')) el('propBedsAvailable').value = (data.beds_available ?? '');
   if (el('propTaxRate')) el('propTaxRate').value = (data.tax_rate_eur ?? '');

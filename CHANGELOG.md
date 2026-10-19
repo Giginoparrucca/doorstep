@@ -30,7 +30,7 @@ plumbing only; zero user-visible change.
 |---|---|---|
 | 1 — Live-tier test | shipped — PR TBD — Claude Opus 4.7 | `lib/schema-drift.js` + `scripts/schema-drift.test.mjs` (offline, pure diff logic) + `scripts/schema-drift.test.live.mjs` (live, calls `public.list_applied_migrations()` RPC with service-role key). New `supabase/migrations/20261019120000_round60b_list_schema_migrations_rpc.sql` adds a SECURITY DEFINER RPC restricted to `service_role` so the test can read `supabase_migrations.schema_migrations` without widening PostgREST's schema list. Runner discovers any `*.test.live.mjs` file automatically. |
 | 2 — CI wiring + AGENTS.md | in-progress — Claude Opus 4.7 | New `test:live` step in `.github/workflows/regression.yml` with `SUPABASE_SERVICE_ROLE_KEY` secret threaded through env. One-line addition to AGENTS.md "Full regression" (rule 8) naming the exact test file as the shippability gate for migration-bearing phases. |
-| 3 — Regression lock | pending | `npm run test:all` green; `npm run test:live` green against prod with secret exported; totals pasted into CHANGELOG; prod schema signature recorded. |
+| 3 — Regression lock | in-progress — Claude Opus 4.7 | `npm run test:all` green; `npm run test:live` green against prod with secret exported; totals pasted into CHANGELOG; prod schema signature recorded. |
 
 ### Round 60 — B&B rooms inside one property (shipped 2026-10-18, Claude Opus 4.7)
 

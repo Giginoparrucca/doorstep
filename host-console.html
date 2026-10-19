@@ -1485,6 +1485,15 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <input class="form-input" placeholder="e.g., A00927P" id="propRossCodice">
             <div class="form-hint" data-h="prop_ross_codice_hint">The code your Region assigns in ROSS1000 (not the CIN). Needed for the statistical XML export. Leave empty if your region doesn't use ROSS1000.</div>
           </div>
+          <div class="form-group" id="propRegionalServiceWrap" style="display:none;">
+            <label class="form-label" data-h="prop_regional_service">SPOT service (Puglia)</label>
+            <select class="form-input" id="propRegionalService">
+              <option value="" data-h-opt="prop_regional_service_opt_choose">Choose…</option>
+              <option value="spot_easy" data-h-opt="prop_regional_service_opt_easy">SPOT Easy — tourist rental</option>
+              <option value="spot_online" data-h-opt="prop_regional_service_opt_online">SPOT Online — B&amp;B / affittacamere / hotel</option>
+            </select>
+            <div class="form-hint" data-h="prop_regional_service_hint">SPOT Easy is for locazioni turistiche. SPOT Online is for strutture ricettive (B&amp;B, affittacamere, agriturismo, small hotels). If the DMS shows "SPOT Completo", switch to Online via "Cambio modalità SPOT" to upload files. Leave blank to be asked once in the SPOT download tile.</div>
+          </div>
           <div class="form-group">
             <label class="form-label" data-h="prop_rooms_available">Rooms available</label>
             <input class="form-input" type="number" min="0" placeholder="e.g., 1" id="propRoomsAvailable">
@@ -4228,6 +4237,11 @@ const HT = {
     prop_transport_hint: 'Parking situation, nearest bus/metro/train, taxi numbers, airport transfers. Shown to guests in the "Staying" section. Write in your preferred language — guests can browser-translate.',
     prop_ross_codice: 'ROSS1000 structure code',
     prop_ross_codice_hint: "The code your Region assigns in ROSS1000 (not the CIN). Needed for the statistical XML export. Leave empty if your region doesn't use ROSS1000.",
+    prop_regional_service: 'SPOT service (Puglia)',
+    prop_regional_service_opt_choose: 'Choose…',
+    prop_regional_service_opt_easy: 'SPOT Easy — tourist rental (locazione turistica)',
+    prop_regional_service_opt_online: 'SPOT Online — B&B / affittacamere / hotel',
+    prop_regional_service_hint: 'SPOT Easy is for locazioni turistiche. SPOT Online is for strutture ricettive (B&B, affittacamere, agriturismo, small hotels). If the DMS shows "SPOT Completo", switch to Online via "Cambio modalità SPOT" to upload files. Leave blank to be asked once in the SPOT download tile.',
     prop_rooms_available: 'Rooms available',
     prop_rooms_available_hint: 'Total rooms in this property (for statistical reporting).',
     prop_beds_available: 'Beds available',
@@ -4360,8 +4374,6 @@ const HT = {
     export_axis_util_title: 'Your own records',
     export_monthly_summary: '📊 Monthly Summary (C/59)',
     export_monthly_summary_desc: 'A human-readable <strong>monthly breakdown by nationality</strong> (italiani / stranieri, arrivi e presenze) you can use to fill in your regional statistical portal by hand. <em>Note: not yet the ROSS1000 file format — it is a reference summary for manual entry.</em>',
-    export_puglia_dms_title: '🏛 Puglia DMS (SPOT Easy)',
-    export_puglia_dms_desc: 'Puglia hosts file tourist flow reports through <strong>SPOT Easy</strong>. Use the same <strong>Alloggiati .txt</strong> file generated in the police section above — upload it to Puglia DMS → <em>Carica Scheda Alloggiati</em>.',
     export_region_generic_desc: 'Your region collects monthly arrivals & nights (incl. zero months) on {system}. Log in with SPID/CIE and enter or upload your guests there.',
     export_region_unverified: 'Link checked Oct 2026 — tell us if it has changed.',
     export_region_note_toscana_provincial: 'In your province, tourist-flow reporting runs on a provincial system (e.g. MOTouristOffice or RiceStat). Ask your Comune\'s tourism office which one, then save its link with the ✎ button on this section.',
@@ -4384,7 +4396,6 @@ const HT = {
     btn_dl_csv: '📥 Download CSV',
     btn_gen_istat: '📊 Generate C/59 Summary',
     link_alloggiati: 'Open Alloggiati Web',
-    link_dms: 'Open Puglia DMS (SPOT Easy)',
     link_ross1000: 'Open ROSS1000 (Veneto)',
     export_paytourist: '💶 Tourist tax (PayTourist CSV)',
     export_paytourist_desc: 'CSV file for municipal tourist tax in <strong>PayTourist</strong> format. Auto-fills guest groups, CIN code, nationality codes. For comuni that use PayTourist: upload at Soggiorni → Importa. For comuni with their own portal (Taranto, Firenze, etc.): the CSV is a reference you can reuse manually.',
@@ -4800,6 +4811,11 @@ const HT = {
     prop_transport_hint: 'Situazione parcheggio, bus/metro/treno più vicini, numeri dei taxi, trasferimenti aeroportuali. Mostrato agli ospiti nella sezione "Soggiorno". Scrivi nella tua lingua preferita — gli ospiti possono tradurre con il browser.',
     prop_ross_codice: 'Codice struttura ROSS1000',
     prop_ross_codice_hint: 'Il codice che la tua Regione assegna in ROSS1000 (non il CIN). Necessario per l\'export XML statistico. Lascia vuoto se la tua regione non usa ROSS1000.',
+    prop_regional_service: 'Servizio SPOT (Puglia)',
+    prop_regional_service_opt_choose: 'Seleziona…',
+    prop_regional_service_opt_easy: 'SPOT Easy — locazione turistica',
+    prop_regional_service_opt_online: 'SPOT Online — B&B / affittacamere / albergo',
+    prop_regional_service_hint: 'SPOT Easy è per le locazioni turistiche. SPOT Online è per le strutture ricettive (B&B, affittacamere, agriturismo, piccoli alberghi). Se la DMS mostra "SPOT Completo", passa a Online con "Cambio modalità SPOT" per caricare i file. Lascia vuoto per decidere al momento del download nella tile SPOT.',
     prop_rooms_available: 'Camere disponibili',
     prop_rooms_available_hint: 'Numero totale di camere della struttura (per la rilevazione statistica).',
     prop_beds_available: 'Posti letto disponibili',
@@ -4926,8 +4942,6 @@ const HT = {
     export_axis_util_title: 'I tuoi archivi',
     export_monthly_summary: '📊 Riepilogo Mensile (C/59)',
     export_monthly_summary_desc: 'Un <strong>riepilogo mensile per nazionalità</strong> leggibile (italiani / stranieri, arrivi e presenze) da usare per compilare a mano il portale statistico regionale. <em>Nota: non è ancora il formato file ROSS1000 — è un riepilogo di riferimento per l\'inserimento manuale.</em>',
-    export_puglia_dms_title: '🏛 Puglia DMS (SPOT Easy)',
-    export_puglia_dms_desc: 'Le strutture pugliesi comunicano i flussi turistici tramite <strong>SPOT Easy</strong>. Usa lo stesso file <strong>Alloggiati .txt</strong> generato nella sezione polizia sopra — caricalo su Puglia DMS → <em>Carica Scheda Alloggiati</em>.',
     export_region_generic_desc: 'La tua regione raccoglie mensilmente arrivi e presenze (anche mesi "a zero") su {system}. Accedi con SPID/CIE e inserisci o carica gli ospiti lì.',
     export_region_unverified: 'Link verificato a ott. 2026 — segnalaci se è cambiato.',
     export_region_note_toscana_provincial: 'Nella tua provincia la rilevazione flussi usa un sistema provinciale (es. MOTouristOffice o RiceStat). Chiedi all\'ufficio turismo del Comune quale, poi salva il link con il pulsante ✎ in questa sezione.',
@@ -4950,7 +4964,6 @@ const HT = {
     btn_dl_csv: '📥 Scarica CSV',
     btn_gen_istat: '📊 Genera Riepilogo C/59',
     link_alloggiati: 'Apri Alloggiati Web',
-    link_dms: 'Apri Puglia DMS (SPOT Easy)',
     link_ross1000: 'Apri ROSS1000 (Veneto)',
     export_paytourist: '💶 Imposta di soggiorno (CSV PayTourist)',
     export_paytourist_desc: 'File CSV per l\'imposta di soggiorno comunale in formato <strong>PayTourist</strong>. Compila automaticamente gruppi ospiti, codice CIN, codici nazionalità. Per i comuni che usano PayTourist: carica su Soggiorni → Importa. Per i comuni con portale proprio (Taranto, Firenze, ecc.): il CSV ti serve come riferimento da riutilizzare manualmente.',
@@ -8195,6 +8208,7 @@ async function saveProperty(scope = 'property') {
       };
     })(),
     ross1000_codice: document.getElementById('propRossCodice')?.value?.trim() || null,
+    regional_service: document.getElementById('propRegionalService')?.value || null,
     rooms_available: _numOrNull(document.getElementById('propRoomsAvailable')?.value),
     beds_available: _numOrNull(document.getElementById('propBedsAvailable')?.value),
     tax_rate_eur: _numOrNull(document.getElementById('propTaxRate')?.value),
@@ -12240,6 +12254,12 @@ function _autoDetectRegionFromCity() {
 function _onRegionManualChange() {
   const hint = document.getElementById('propRegionAutoHint');
   if (hint) hint.style.display = 'none';
+  // Round 61 Phase 1 — reflect the Puglia-only SPOT service dropdown
+  // live when the host changes region. The initial state on data load
+  // is set in loadPropertyData; this listener handles manual edits.
+  const rsWrap = document.getElementById('propRegionalServiceWrap');
+  const regionSel = document.getElementById('propRegion');
+  if (rsWrap && regionSel) rsWrap.style.display = (regionSel.value === 'Puglia') ? '' : 'none';
 }
 // Wire the two listeners once, after the form exists.
 (function _wireRegionCityListeners() {
@@ -15259,6 +15279,11 @@ function fillPropertyForm(data) {
   _i18nHydrateField('propCheckoutInstructions',  data, 'checkout_instructions');
   _i18nHydrateField('propTransportInfo',         data, 'transport_info');
   if (el('propRossCodice')) el('propRossCodice').value = data.ross1000_codice || '';
+  if (el('propRegionalService')) el('propRegionalService').value = data.regional_service || '';
+  // Round 61 Phase 1 — show the SPOT service dropdown only for Puglia.
+  // Non-Puglia regions have no SPOT concept and the field would be noise.
+  const _rsWrap = el('propRegionalServiceWrap');
+  if (_rsWrap) _rsWrap.style.display = (data.region === 'Puglia') ? '' : 'none';
   if (el('propRoomsAvailable')) el('propRoomsAvailable').value = (data.rooms_available ?? '');
   if (el('propBedsAvailable')) el('propBedsAvailable').value = (data.beds_available ?? '');
   if (el('propTaxRate')) el('propTaxRate').value = (data.tax_rate_eur ?? '');

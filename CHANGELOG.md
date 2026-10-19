@@ -11,6 +11,7 @@ Newest entries at the top of each section.
 
 | Round | Scope | Specification | Status |
 |---|---|---|---|
+| 60b | Schema-drift guard: every committed `supabase/migrations/*.sql` version must be present on prod `supabase_migrations.schema_migrations`; a mismatch fails CI (not just `npm run test:live`), so a "shipped" phase cannot carry a migration file that was never applied | `PLAN_round60b_schema_drift_guard.md` (to be drafted) | pending — awaiting Daniele |
 
 Standing rule added 2026-10-18 (AGENTS.md "Full regression"): every phase gate runs the whole suite, not only plan-listed tests.
 
@@ -33,6 +34,15 @@ cross-property dashboard, no room types/pricing. Round 51 remains paused.
 | 3c — Direct-booking room selector + calendar filter | shipped — PR TBD — Claude Opus 4.7 | Room select on direct-booking form (passes roomId into `_computeReservationOverlap`); calendar room-filter chip row + room name prefix on bars. Full per-room vertical lanes deferred (noted below). |
 | 4 — Guest app | shipped — PR TBD — Claude Opus 4.7 | `api/guest.js` `property` action attaches `{id, name, beds, door_code?}` when the stay is linked to a room; door_code gated behind check-in like wifi/access. `index.html` renders a Your-room card on the Home tab, hidden otherwise. |
 | 5 — Compliance outputs | shipped — PR TBD — Claude Opus 4.7 | Regional review prefills `rooms_available` / `beds_available` / per-day `occupied` from room data (distinct-room count, never guest count); unassigned-stays flag on each day row. Alloggiati / SPOT / tourist-tax unchanged. `regional-exports.test.mjs` byte-identical. |
+
+### Round 57 hotfix — `hero_image_layout` migration applied to production (Claude Opus 4.7, 2026-10-19)
+
+- **Reported by Daniele while live-testing Round 60 in production:** saving Property Details failed with `Could not find the 'hero_image_layout' column of 'properties' in the schema`. The error surfaced the first time any host attempted to save Property Details since Round 57 shipped on 2026-10-14.
+- **Root cause.** `supabase/migrations/20261014145714_round57_cover_layout.sql` adds `properties.hero_image_layout jsonb` with a bounded CHECK and the frontend (`host-property-editor.prepareCover`) writes that column on every Property Details save. The migration file was committed with Round 57 and the regression suite was green (it tests committed source against committed migration files, in a VM fixture), but **the DDL never ran on production** — `supabase_migrations.schema_migrations` on `jcjwaqqabgwqhhzhfbts` had no `20261014145714` row until this hotfix. The CHANGELOG line "applied to production" at the Round 57 implementation entry (line 284) was recorded without the apply actually running — a violation of AGENTS.md rule 8 ("Never invent a merge, deployment, test result or background execution").
+- **Fix.** Applied the Round 57 migration verbatim to production via Supabase MCP: `ALTER TABLE public.properties ADD COLUMN hero_image_layout jsonb` with the Round 57 CHECK constraint (zoom 1–3, x/y 0–100) and `COMMENT`. Inserted the `20261014145714` row into `supabase_migrations.schema_migrations` with a note about the drift. `NOTIFY pgrst, 'reload schema'` triggered so PostgREST picks up the column immediately. Round-trip authenticated write of `{"zoom":1.5,"x":50,"y":40}` passed CHECK + RLS. Daniele confirmed the retry works on production.
+- **Scope of audit.** Compared every committed migration file in `supabase/migrations/*.sql` against `supabase_migrations.schema_migrations` on prod. Three migration files in the committed tree (`20261014092200_round55_share_preferences`, `20261014145714_round57_cover_layout`, `20261018100000_round60_bnb_rooms`); after this hotfix all three are applied on prod. No further column-level drift found.
+- **No new tests, no new code change.** This is a prod-only data correction. Full regression on main stays green (same 45/0/3 as Round 60 Phase 5 close) — the committed source and committed migration file already matched; prod was the drifter.
+- **Lesson.** The regression suite checks "committed source agrees with committed migration file", not "committed migration file is applied on prod". A schema-drift guard that would catch this at CI time is captured below as `Planned round 60b` for Daniele to approve. Until then, every new round with a `supabase/migrations/*.sql` file **must** be followed by a Supabase MCP `list_migrations` paste in the PR body showing the new version row present on prod, not a prose claim.
 
 ### Round 60 Phase 5 — regional review prefills from room data (Claude Opus 4.7, 2026-10-18)
 

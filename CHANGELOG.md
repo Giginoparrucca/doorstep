@@ -51,6 +51,30 @@ cross-property dashboard, no room types/pricing. Round 51 remains paused.
 | 5 — Compliance outputs | shipped — PR #175 — Claude Opus 4.7 | Regional review prefills `rooms_available` / `beds_available` / per-day `occupied` from room data (distinct-room count, never guest count); unassigned-stays flag on each day row. Alloggiati / SPOT / tourist-tax unchanged. `regional-exports.test.mjs` byte-identical. Merged as `532688e`. |
 | Hotfix — Round 57 `hero_image_layout` migration applied to prod | shipped — PR #176 — Claude Opus 4.7 | Caught during live Round 60 testing: committed migration file was never applied to prod. DDL applied via Supabase MCP + `schema_migrations` row inserted + `NOTIFY pgrst`. Merged as `0e12dc7`. Motivates Round 60b. |
 
+### Hotfix — PayTourist → "Tourist tax" / "Imposta di soggiorno" labeling (Claude Opus 4.7, 2026-10-19)
+
+- **Reported by Daniele while live-testing Round 60 in production:** Taranto hosts don't use PayTourist (comune runs its own portal) but the host console UI framed the whole tourist-tax section around PayTourist. "Set your PayTourist portal to show a link here" is misleading when the comune doesn't use PayTourist at all.
+- **Option B chosen** (recommended against A/C): generic framing for section/card headers and field labels, keep "PayTourist CSV" on the specific export action because the file format really is PayTourist's. Comuni like Taranto, Firenze and others that run their own portal are called out by name in the hints and the FAQ.
+- **Strings changed in `host-console.html` (14 lines across EN+IT dicts):**
+  - Property Details field label: `PayTourist portal` → `Tourist tax portal (PayTourist)` / `Portale imposta di soggiorno (PayTourist)`. Hint rephrased to say "if your comune uses PayTourist, enter its subdomain here; comuni with their own portal (Taranto, Firenze, etc.) can leave this empty — doesn't affect tourist tax collection".
+  - Export card title: `💶 PayTourist (Tourist Tax)` → `💶 Tourist tax (PayTourist CSV)` / `💶 Imposta di soggiorno (CSV PayTourist)`.
+  - Export description rephrased to lead with "municipal tourist tax" and spell out that for comuni with their own portal the CSV is a reference to reuse manually.
+  - `paytourist_not_set` empty-state banner updated similarly.
+  - `edit_intro` text swapped `Alloggiati / PayTourist` → `Alloggiati / tourist-tax` (EN) / `Alloggiati / imposta di soggiorno` (IT).
+- **Strings changed in `host-guides.js` (1 line):** FAQ "I can't see the PayTourist link" / "Non vedo il link PayTourist" generalized to "tourist tax portal link" / "link al portale dell'imposta di soggiorno" with a mention of comuni that run their own portal.
+- **Strings kept unchanged (specific-format or specific-action references):**
+  - Button `Generate PayTourist CSV` / `Genera CSV PayTourist` — the format really is PayTourist.
+  - Link `Open PayTourist Import` / `Apri Importazione PayTourist` — the portal URL is specifically PayTourist's.
+  - Dashboard quick action button `📥 Export PayTourist` — specific action.
+  - Alert/toast messages after export (`PayTourist CSV: N guests ...`) — technical reference.
+  - Code identifiers (`exportPayTourist`, `normalizePayTouristUrl`, `refreshPayTouristLink`, `paytouristUrl` field id, `export_paytourist` i18n keys) — not user-facing text.
+  - Placeholder `e.g., bari (or bari.paytourist.com)` — specifically illustrates PayTourist's subdomain shape.
+  - `admin.html` audit log `exported a PayTourist CSV` — specific action.
+  - Guide tourist-tax panel (host-guides, EN+IT): now says "if your comune uses PayTourist" instead of "if you use PayTourist", and names Taranto/Firenze as examples of comuni with their own portals.
+- **Compliance outputs (Alloggiati, SPOT, ROSS1000, PayTourist CSV, tourist-tax CSV, Umbria STU, Trento):** all unchanged — this is UI copy only. `scripts/paytourist-golden.test.mjs` byte-identical.
+- **Full regression: PASS 46 / FAIL 0 / SKIP 3** (unchanged from Round 60b Phase 1 close).
+- **No new round** — this is a UI copy hotfix outside the round structure. Round 60b Phase 2 (CI wiring + AGENTS.md) is still in flight on PR #178 and will merge in sequence.
+
 ### Round 60b Phase 1 — schema-drift guard test infrastructure (Claude Opus 4.7, 2026-10-19)
 
 - **Problem recap.** Round 57 shipped a migration file whose DDL never ran on prod. The CHANGELOG claimed "applied to production" without verification. The regression suite was green because it only checks committed source against committed migration files — not against the live `supabase_migrations.schema_migrations` table on prod. 5 days of broken Property Details saves before Daniele caught it live-testing Round 60.

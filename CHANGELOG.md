@@ -30,7 +30,7 @@ plumbing only; zero user-visible change.
 |---|---|---|
 | 1 — Live-tier test | shipped — PR TBD — Claude Opus 4.7 | `lib/schema-drift.js` + `scripts/schema-drift.test.mjs` (offline, pure diff logic) + `scripts/schema-drift.test.live.mjs` (live, calls `public.list_applied_migrations()` RPC with service-role key). New `supabase/migrations/20261019120000_round60b_list_schema_migrations_rpc.sql` adds a SECURITY DEFINER RPC restricted to `service_role` so the test can read `supabase_migrations.schema_migrations` without widening PostgREST's schema list. Runner discovers any `*.test.live.mjs` file automatically. |
 | 2 — CI wiring + AGENTS.md | in-progress — Claude Opus 4.7 | New `test:live` step in `.github/workflows/regression.yml` with `SUPABASE_SERVICE_ROLE_KEY` secret threaded through env. One-line addition to AGENTS.md "Full regression" (rule 8) naming the exact test file as the shippability gate for migration-bearing phases. |
-| 3 — Regression lock | pending | `npm run test:all` green; `npm run test:live` green against prod with secret exported; totals pasted into CHANGELOG; prod schema signature recorded. |
+| 3 — Regression lock | shipped — PR #181 — Claude Opus 4.7 | First real live-gate run on CI with `SUPABASE_SERVICE_ROLE_KEY` wired as a repository secret: `PASS scripts/schema-drift.test.live.mjs (973ms)` on PR #181's CI run (job 117898346146). Prod schema signature at close: 37 applied migrations, first `20260425081207`, last `20261019140000`. All 4 committed migration files (`20261014092200_round55_share_preferences`, `20261014145714_round57_cover_layout`, `20261018100000_round60_bnb_rooms`, `20261019120000_round60b_list_schema_migrations_rpc`) confirmed applied on prod by the live RPC. |
 
 ### Round 60 — B&B rooms inside one property (shipped 2026-10-18, Claude Opus 4.7)
 
@@ -50,6 +50,22 @@ cross-property dashboard, no room types/pricing. Round 51 remains paused.
 | 4 — Guest app | shipped — PR #174 — Claude Opus 4.7 | `api/guest.js` `property` action attaches `{id, name, beds, door_code?}` when the stay is linked to a room; door_code gated behind check-in like wifi/access. `index.html` renders a Your-room card on the Home tab, hidden otherwise. Merged as `712ec97`. |
 | 5 — Compliance outputs | shipped — PR #175 — Claude Opus 4.7 | Regional review prefills `rooms_available` / `beds_available` / per-day `occupied` from room data (distinct-room count, never guest count); unassigned-stays flag on each day row. Alloggiati / SPOT / tourist-tax unchanged. `regional-exports.test.mjs` byte-identical. Merged as `532688e`. |
 | Hotfix — Round 57 `hero_image_layout` migration applied to prod | shipped — PR #176 — Claude Opus 4.7 | Caught during live Round 60 testing: committed migration file was never applied to prod. DDL applied via Supabase MCP + `schema_migrations` row inserted + `NOTIFY pgrst`. Merged as `0e12dc7`. Motivates Round 60b. |
+
+### Round 60b Phase 3 — regression lock + release close (Claude Opus 4.7, 2026-10-19)
+
+- **Secret wired.** Daniele added `SUPABASE_SERVICE_ROLE_KEY` as a repository secret in `giginoparrucca/doorstep` → Settings → Secrets and variables → Actions (one-time owner-only step, value sourced from Supabase dashboard, not Vercel). PR #181 is the first CI run after the secret landed.
+- **Live-gate evidence (PR #181 CI, job 117898346146):**
+  ```
+  ── live (hosted smoke) (2) ──
+  SKIP  scripts/demo-live-smoke.mjs — DEMO_SMOKE_ORIGIN not set
+  PASS  scripts/schema-drift.test.live.mjs (973ms)
+  PASS 1   FAIL 0   SKIP 1   (mode: live)
+  ```
+  The schema-drift live test authenticates to prod with the service-role key, calls `public.list_applied_migrations()` RPC (SECURITY DEFINER, service_role-only EXECUTE), compares the returned {version, name} rows against `supabase/migrations/*.sql` files on disk, and asserts every committed migration name has a matching applied row. First time this gate has run end-to-end on CI.
+- **Prod schema signature at close:** 37 applied migrations, first `20260425081207`, last `20261019140000`. The 4 committed migration files are all present under their recorded names.
+- **Full `test:all` on this PR:** PASS 46 / FAIL 0 / SKIP 3 (unchanged — Phase 3 adds no new test files, only exercises the already-committed live test for real).
+- **Round 60b end state.** All three phases shipped (PR #177 / #178 / #181). A committed `supabase/migrations/*.sql` file whose DDL was never applied to prod will now be caught by CI on the first PR after it's committed — same failure mode as Round 57 blocked at merge-time rather than discovered 5 days later in production.
+- **Not blocking the merge:** `demo-live-smoke.mjs` still shows SKIP because its `DEMO_SMOKE_ORIGIN` env var is unrelated to the schema-drift gate. That smoke is a Round 50 artifact for the demo environment and will be revived when demo re-launch work resumes.
 
 ### Round 60c hotfix — document photo retention 48h → 7 days + group-member message clarity (Claude Opus 4.7, 2026-10-19)
 

@@ -51,18 +51,23 @@ function listTests() {
   const offline = [];
   const browser = [];
   const python = [];
+  const liveSuffix = [];
   for (const name of entries) {
     const full = resolve(scriptsDir, name);
     if (!statSync(full).isFile()) continue;
     if (name.endsWith('-browser.test.mjs')) { browser.push(full); continue; }
+    if (name.endsWith('.test.live.mjs')) { liveSuffix.push(full); continue; }
     if (name.endsWith('.test.mjs')) { offline.push(full); continue; }
     if (name.endsWith('.test.py')) { python.push(full); continue; }
   }
-  offline.sort(); browser.sort(); python.sort();
-  // Live suite is an explicit allowlist, not a glob, because the
-  // producing files are plain .mjs scripts (not .test.mjs) that
-  // intentionally talk to a hosted environment.
-  const live = [resolve(scriptsDir, 'demo-live-smoke.mjs')].filter(existsSync);
+  offline.sort(); browser.sort(); python.sort(); liveSuffix.sort();
+  // Live suite is a hybrid: a short allowlist of legacy files whose
+  // names don't follow the `.test.live.mjs` convention (demo-live-smoke
+  // predates it), plus every discovered `*.test.live.mjs` file (Round
+  // 60b onward). The convention wins for new tests so adding one needs
+  // no runner edit.
+  const liveAllowlist = [resolve(scriptsDir, 'demo-live-smoke.mjs')].filter(existsSync);
+  const live = [...liveAllowlist, ...liveSuffix];
   return { offline, browser, python, live };
 }
 
@@ -236,13 +241,30 @@ async function main() {
   }
 
   if (run.live) {
-    const r4 = await runGroup('live (hosted smoke)', live, (file) => ({
-      label: relative(repoRoot, file),
-      skip: livePre.ok ? null : livePre.reason,
-      cmd: process.execPath,
-      args: [file, livePre.origin || ''],
-      env: { ...process.env },
-    }));
+    const r4 = await runGroup('live (hosted smoke)', live, (file) => {
+      const label = relative(repoRoot, file);
+      // Legacy allowlist entry needs its origin + property id up front;
+      // the runner enforces the preflight for it and spawns no process
+      // if either is missing. Discovered *.test.live.mjs files decide
+      // their own skip conditions (exit 77 with a reason on stderr) so
+      // adding a new live test needs no runner edit.
+      const isLegacySmoke = file.endsWith('/demo-live-smoke.mjs');
+      if (isLegacySmoke) {
+        return {
+          label,
+          skip: livePre.ok ? null : livePre.reason,
+          cmd: process.execPath,
+          args: [file, livePre.origin || ''],
+          env: { ...process.env },
+        };
+      }
+      return {
+        label,
+        cmd: process.execPath,
+        args: [file],
+        env: { ...process.env },
+      };
+    });
     allResults.push(...r4);
   }
 

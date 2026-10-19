@@ -45,6 +45,19 @@ jobs:
           npm run test:all 2>&1 | tee /tmp/test-all.log
           exit ${PIPESTATUS[0]}
 
+      - name: Schema-drift guard against production
+        # Round 60b Phase 2 — Reads supabase_migrations.schema_migrations
+        # on prod via the SECURITY DEFINER RPC and fails if any committed
+        # supabase/migrations/*.sql file has no matching applied row.
+        # Catches the Round 57 failure mode (committed file, never applied).
+        # Skips (exit 77) when the secret is not available on a fork PR,
+        # which is counted but does not fail the gate.
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          npm run test:live 2>&1 | tee /tmp/test-live.log
+          exit ${PIPESTATUS[0]}
+
       - name: Comment failure to PR
         if: failure() && github.event_name == 'pull_request'
         env:

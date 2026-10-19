@@ -13826,8 +13826,8 @@ function viewGuest(id) {
     <div style="font-size:0.82rem;color:var(--ink-soft);font-style:italic;padding:10px;background:rgba(250,246,240,0.6);border-radius:6px;line-height:1.5;">
       ${isGroupMember
         ? (it
-          ? 'Documento non richiesto per i membri gruppo — il documento del capogruppo basta per l\'invio Alloggiati (D.M. 7 gennaio 2013). Non viene chiesta la scansione in fase di check-in; se ti serve verificare un documento, chiedi al capogruppo di mostrartelo.'
-          : 'Document not required for group members — the group head\'s document is enough for the Alloggiati filing (D.M. 7 gennaio 2013). We don\'t ask for a scan at check-in; if you need to verify a document, ask the group head to show you theirs.')
+          ? 'Dati documento (tipo/numero/luogo di rilascio) non trasmessi ad Alloggiati per i membri gruppo — il documento del capogruppo basta per l\'invio (D.M. 7 gennaio 2013). L\'ospite può comunque scansionare il documento al check-in per compilare automaticamente i dati personali: se lo ha fatto, la foto appare qui sotto (conservata 7 giorni dall\'arrivo).'
+          : 'Document fields (type/number/place of issue) not transmitted to Alloggiati for group members — the group head\'s document is enough (D.M. 7 gennaio 2013). The guest can still scan their document at check-in to autofill personal details: if they did, the photo appears below (kept for 7 days after arrival).')
         : (it ? 'Documento non richiesto per questo tipo di ospite.' : 'Document not required for this guest type.')}
     </div>
   `;

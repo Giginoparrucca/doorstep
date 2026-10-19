@@ -11,27 +11,46 @@ Newest entries at the top of each section.
 
 | Round | Scope | Specification | Status |
 |---|---|---|---|
-| 61 | Puglia SPOT Online XML export + per-property SPOT service | PLAN_round61_spot_online_xml.md | pending |
 
 Standing rule added 2026-10-18 (AGENTS.md "Full regression"): every phase gate runs the whole suite, not only plan-listed tests.
 
 ### Current round — in-flight
 
-**Round 60b — Schema-drift guard**
+**Round 61 — Puglia SPOT Online XML export**
 
-Specification: `PLAN_round60b_schema_drift_guard.md`. Add a CI gate that reads
-prod `supabase_migrations.schema_migrations` and fails if any committed
-`supabase/migrations/*.sql` file is missing on prod. Caught by Round 57 hotfix
-(PR #176, 2026-10-19): a committed migration file whose DDL never ran on prod
-can ship green today because the regression suite only compares committed
-source against committed migration files, never against prod. Internal
-plumbing only; zero user-visible change.
+Specification: `PLAN_round61_spot_online_xml.md`. Puglia hosts of real
+strutture ricettive (B&B, affittacamere, small hotels) must file monthly
+tourist-flow statistics to the DMS Puglia portal via SPOT Online, which
+accepts an XML file. Today we only give them a manual-entry CSV. This Round
+builds the real `movimentogiornaliero` XML export so the host downloads one
+file and uploads it with "Carica movimentazione" + "Invia movimentazione".
+Includes per-property SPOT service choice (Easy vs Online) with B+D auto-
+detection cascade (CIN tipologia letter first, `property_type` fallback,
+ask only on genuine ambiguity). Daniele confirmed open on 2026-10-19.
+Zero-impact for non-Puglia properties, SPOT Easy properties, and every
+other regional output.
 
 | Phase | Status | Where / test gate |
 |---|---|---|
-| 1 — Live-tier test | shipped — PR TBD — Claude Opus 4.7 | `lib/schema-drift.js` + `scripts/schema-drift.test.mjs` (offline, pure diff logic) + `scripts/schema-drift.test.live.mjs` (live, calls `public.list_applied_migrations()` RPC with service-role key). New `supabase/migrations/20261019120000_round60b_list_schema_migrations_rpc.sql` adds a SECURITY DEFINER RPC restricted to `service_role` so the test can read `supabase_migrations.schema_migrations` without widening PostgREST's schema list. Runner discovers any `*.test.live.mjs` file automatically. |
+| 1 — Remember which SPOT service (schema + detection cascade + dynamic labels) | pending | Nullable `properties.regional_service text` with `CHECK (regional_service IS NULL OR regional_service IN ('spot_easy','spot_online'))`. Migration applied to demo + prod; `scripts/schema-drift.test.live.mjs` returns the new row from prod (AGENTS.md rule 8). B+D detection cascade: parse national CIN tipologia (authoritative mapping confirmed from Ministero del Turismo or ARET, lives in `lib/cin.js` with citation) → `property_type` fallback → ask only when both are inconclusive. Property Details dropdown; dynamic labels replace all static "SPOT Easy Puglia" text; legacy keys removed after grep. Gate: migration RLS probe (owner/other/anon), detection cascade unit tests, label-routing tests (Puglia × null/easy/online, non-Puglia unchanged), browser IT/EN 390/1280 for ask dialog + auto-save toast + Property Details select, full regression. |
+| 2 — SPOT Online XML serializer | pending | New format `spot_online` in `lib/regional-exports.js` for Puglia + `regional_service='spot_online'`. `<movimenti><movimento>` with MP/NM/EC day types, `<arrivi>/<partenze>/<datistruttura>`, `<componenti>` members nested under heads, `codiceclientesr` from existing `idFor`. Carry-over guests in `<partenze>` only; optional startup block; `partenzacapogrupposeparata`; strict date sequence. XSD validation if public (if not: draft ARET email in CHANGELOG). Golden file `spot-online-expected.xml` covering 9 scenarios (single IT, foreign family with child sharing bed, early-leaving member, head leaves first, carry-over, NM, EC, two Round-60 rooms, startup on/off). SPOT Easy/Alloggiati/ROSS1000/Umbria/Trento/summary/PayTourist outputs byte-identical. Full regression. |
+| 3 — Review dialog + guidance + guide | pending | Regional review dialog shows per-guest "Occupa un posto letto" column (default sì) with age next to it, "Primo invio a SPOT" checkbox for startup block, start-date guidance, carry-over code warning, completeness reminder, post-download instructions. Update `docs/REGIONAL_EXPORT_FORMATS.md` (Puglia row split) and `host-guides.js` Puglia section. Gate: browser IT/EN 390/1280 real Chromium (pick SPOT Online → run review → toggle child's bed occupancy → startup on/off → download → byte-compare against golden); error states (missing residence, ambiguous comune, missing capacity, closed day with guests); stale-property handling. Full regression; `npm run test:live` after deploy. |
+
+### Round 60b — Schema-drift guard (shipped 2026-10-19, Claude Opus 4.7)
+
+Specification: `PLAN_round60b_schema_drift_guard.md`. Added a CI gate that reads
+prod `supabase_migrations.schema_migrations` and fails if any committed
+`supabase/migrations/*.sql` file is missing on prod. Caught by Round 57 hotfix
+(PR #176, 2026-10-19): a committed migration file whose DDL never ran on prod
+could ship green because the regression suite only compared committed source
+against committed migration files, never against prod. Internal plumbing only;
+zero user-visible change.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 1 — Live-tier test | shipped — PR #177 — Claude Opus 4.7 | `lib/schema-drift.js` + `scripts/schema-drift.test.mjs` (offline, pure diff logic) + `scripts/schema-drift.test.live.mjs` (live, calls `public.list_applied_migrations()` RPC with service-role key). New `supabase/migrations/20261019120000_round60b_list_schema_migrations_rpc.sql` adds a SECURITY DEFINER RPC restricted to `service_role` so the test can read `supabase_migrations.schema_migrations` without widening PostgREST's schema list. Runner discovers any `*.test.live.mjs` file automatically. Merged as `d102aa5`. |
 | 2 — CI wiring + AGENTS.md | shipped — PR #178 — Claude Opus 4.7 | New `test:live` step in `.github/workflows/regression.yml` with `SUPABASE_SERVICE_ROLE_KEY` secret threaded through env. One-line addition to AGENTS.md "Full regression" (rule 8) naming the exact test file as the shippability gate for migration-bearing phases. Merged as `1572173`. Phase 3's PR #181 first exercised the live gate end-to-end with the secret wired. |
-| 3 — Regression lock | shipped — PR #181 — Claude Opus 4.7 | First real live-gate run on CI with `SUPABASE_SERVICE_ROLE_KEY` wired as a repository secret: `PASS scripts/schema-drift.test.live.mjs (973ms)` on PR #181's CI run (job 117898346146). Prod schema signature at close: 37 applied migrations, first `20260425081207`, last `20261019140000`. All 4 committed migration files (`20261014092200_round55_share_preferences`, `20261014145714_round57_cover_layout`, `20261018100000_round60_bnb_rooms`, `20261019120000_round60b_list_schema_migrations_rpc`) confirmed applied on prod by the live RPC. |
+| 3 — Regression lock | shipped — PR #181 — Claude Opus 4.7 | First real live-gate run on CI with `SUPABASE_SERVICE_ROLE_KEY` wired as a repository secret: `PASS scripts/schema-drift.test.live.mjs (973ms)` on PR #181's CI run (job 117898346146). Prod schema signature at close: 37 applied migrations, first `20260425081207`, last `20261019140000`. All 4 committed migration files (`20261014092200_round55_share_preferences`, `20261014145714_round57_cover_layout`, `20261018100000_round60_bnb_rooms`, `20261019120000_round60b_list_schema_migrations_rpc`) confirmed applied on prod by the live RPC. Merged as `1184c2d`. |
 
 ### Round 60 — B&B rooms inside one property (shipped 2026-10-18, Claude Opus 4.7)
 

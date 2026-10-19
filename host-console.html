@@ -11365,7 +11365,7 @@ const HOST_PRIVACY_TPL_IT = `
 <p style="margin:0 0 10px;">Comunicazione dei dati degli alloggiati alla Questura tramite il Portale Alloggiati Web &mdash; obbligo legale, art. 6.1.c GDPR e art. 109 TULPS. Comunicazioni statistiche ai portali regionali &mdash; obbligo legale, art. 6.1.c GDPR. Determinazione e riscossione dell'imposta di soggiorno &mdash; obbligo legale, art. 6.1.c GDPR. Gestione del soggiorno, informazioni pratiche, assistenza e servizio di concierge &mdash; esecuzione del contratto, art. 6.1.b GDPR. Invio di comunicazioni promozionali &mdash; consenso, art. 6.1.a GDPR, revocabile in ogni momento.</p>
 <p style="margin:0 0 10px;">Il conferimento dei dati per le prime tre finalità è obbligatorio per legge: in loro assenza non è possibile ospitarLa. Il consenso promozionale è facoltativo e il rifiuto non ha alcuna conseguenza sul soggiorno.</p>
 <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">4. Per quanto tempo conserviamo i dati</h4>
-<p style="margin:0 0 10px;">Dati di identificazione e soggiorno: 5 anni, per obbligo di legge. Ricevute di trasmissione ai portali: 5 anni, per obbligo di legge. Immagine del documento di identità: 48 ore dall'arrivo, poi cancellazione automatica. Messaggi in chat: 90 giorni dalla chiusura della conversazione. Dati statistici di utilizzo: 180 giorni, poi aggregazione anonima. Consenso promozionale e indirizzo e-mail: fino a revoca.</p>
+<p style="margin:0 0 10px;">Dati di identificazione e soggiorno: 5 anni, per obbligo di legge. Ricevute di trasmissione ai portali: 5 anni, per obbligo di legge. Immagine del documento di identità: 7 giorni dall'arrivo, poi cancellazione automatica. Messaggi in chat: 90 giorni dalla chiusura della conversazione. Dati statistici di utilizzo: 180 giorni, poi aggregazione anonima. Consenso promozionale e indirizzo e-mail: fino a revoca.</p>
 <p style="margin:0 0 10px;">L'immagine del documento viene cancellata automaticamente decorso il tempo necessario alla comunicazione alle autorità. Conserviamo il dato, non l'immagine, in conformità alla nota del Garante per la protezione dei dati personali dell'aprile 2026.</p>
 <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">5. Miglioramento del servizio</h4>
 <p style="margin:0 0 10px;">Al termine della conversazione, i messaggi scambiati con l'assistente possono essere utilizzati in forma anonimizzata per migliorare il servizio. Nome, codice prenotazione, date esatte, telefono, e-mail e numeri di documento vengono rimossi automaticamente prima della conservazione. Può opporsi a questo utilizzo comunicandolo prima della fine del soggiorno.</p>
@@ -11396,7 +11396,7 @@ const HOST_PRIVACY_TPL_EN = `
 <p style="margin:0 0 10px;">Reporting guest data to the Italian State Police via the Alloggiati Web portal &mdash; legal obligation, Art. 6(1)(c) GDPR and Art. 109 TULPS. Statistical reporting to regional authorities &mdash; legal obligation, Art. 6(1)(c). Calculating and collecting the tourist tax &mdash; legal obligation, Art. 6(1)(c). Managing your stay, practical information, assistance and concierge service &mdash; performance of a contract, Art. 6(1)(b). Sending promotional communications &mdash; consent, Art. 6(1)(a), withdrawable at any time.</p>
 <p style="margin:0 0 10px;">Providing data for the first three purposes is required by law: without it we cannot accommodate you. Marketing consent is optional and refusing has no effect on your stay.</p>
 <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">4. How long we keep it</h4>
-<p style="margin:0 0 10px;">Identification and stay data: 5 years, legal requirement. Portal filing receipts: 5 years, legal requirement. Image of your identity document: 48 hours after arrival, then automatically deleted. Chat messages: 90 days after the conversation is closed. Usage statistics: 180 days, then anonymised. Marketing consent and email: until withdrawn.</p>
+<p style="margin:0 0 10px;">Identification and stay data: 5 years, legal requirement. Portal filing receipts: 5 years, legal requirement. Image of your identity document: 7 days after arrival, then automatically deleted. Chat messages: 90 days after the conversation is closed. Usage statistics: 180 days, then anonymised. Marketing consent and email: until withdrawn.</p>
 <p style="margin:0 0 10px;">The document image is deleted automatically once the time needed to report to the authorities has passed. We keep the data, not the image, in line with the Italian Data Protection Authority's April 2026 guidance.</p>
 <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">5. Improving our service</h4>
 <p style="margin:0 0 10px;">After your conversation ends, messages exchanged with the assistant may be used in anonymised form to improve the service. Your name, booking code, exact dates, phone, email and document numbers are removed automatically before storage. You can object to this use by telling us before the end of your stay.</p>
@@ -13814,6 +13814,7 @@ function viewGuest(id) {
     ${field(it ? 'Cittadinanza' : 'Citizenship', safe(c.citizenship))}
   `;
 
+  const isGroupMember = c.guest_type === 'group_member' || c.guest_type === 'member';
   const docSection = (c.document_type || c.document_number || c.doc_issue_place) ? `
     ${sectionTitle(it ? 'Documento' : 'Document')}
     ${field(it ? 'Tipo documento' : 'Document type', safe(c.document_type))}
@@ -13822,8 +13823,12 @@ function viewGuest(id) {
     ${field(it ? 'Stato documenti' : 'Documents status', safe(docStatusLabel))}
   ` : `
     ${sectionTitle(it ? 'Documento' : 'Document')}
-    <div style="font-size:0.82rem;color:var(--ink-soft);font-style:italic;padding:10px;background:rgba(250,246,240,0.6);border-radius:6px;">
-      ${it ? 'Documento non richiesto per questo tipo di ospite.' : 'Document not required for this guest type.'}
+    <div style="font-size:0.82rem;color:var(--ink-soft);font-style:italic;padding:10px;background:rgba(250,246,240,0.6);border-radius:6px;line-height:1.5;">
+      ${isGroupMember
+        ? (it
+          ? 'Documento non richiesto per i membri gruppo — il documento del capogruppo basta per l\'invio Alloggiati (D.M. 7 gennaio 2013). Non viene chiesta la scansione in fase di check-in; se ti serve verificare un documento, chiedi al capogruppo di mostrartelo.'
+          : 'Document not required for group members — the group head\'s document is enough for the Alloggiati filing (D.M. 7 gennaio 2013). We don\'t ask for a scan at check-in; if you need to verify a document, ask the group head to show you theirs.')
+        : (it ? 'Documento non richiesto per questo tipo di ospite.' : 'Document not required for this guest type.')}
     </div>
   `;
 
@@ -13834,8 +13839,8 @@ function viewGuest(id) {
     </div>
     <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:6px;line-height:1.4;">
       ${it
-        ? 'La foto viene cancellata 48 ore dopo l\'arrivo (nota Garante aprile 2026). La ricevuta di invio del gruppo è conservata 5 anni come prova di adempimento.'
-        : 'Photo is deleted 48 hours after arrival (Garante April 2026 note). The group filing receipt is kept for 5 years as proof of compliance.'}
+        ? 'La foto viene cancellata 7 giorni dopo l\'arrivo (nota Garante aprile 2026). La ricevuta di invio del gruppo è conservata 5 anni come prova di adempimento.'
+        : 'Photo is deleted 7 days after arrival (Garante April 2026 note). The group filing receipt is kept for 5 years as proof of compliance.'}
     </div>
   ` : '';
 
@@ -15313,7 +15318,7 @@ setTimeout(() => setHostLang('it'), 200);
         <li style="margin:4px 0;"><strong>Chat with the AI assistant or guests</strong> — deleted 90 days after the conversation is resolved, or 30 days after you archive it.</li>
         <li style="margin:4px 0;"><strong>App usage data</strong> (which pages were opened, which recommendations were tapped) — kept for 180 days, then anonymized into monthly totals before deletion.</li>
         <li style="margin:4px 0;"><strong>Guest check-in data</strong> (name, document number, dates of stay) — kept for 5 years per Italian law (TULPS art. 109; Alloggiati Web).</li>
-        <li style="margin:4px 0;"><strong>Document photos</strong> (passport / ID images) — kept for <strong>48 hours after arrival</strong>, then permanently deleted. Following the Italian Garante's April 2026 clarification: TULPS art. 109 requires transmitting the data to Alloggiati Web, not retaining copies of the document image. The Alloggiati filing receipt (if you upload it) is kept for 5 years as proof of compliance.</li>
+        <li style="margin:4px 0;"><strong>Document photos</strong> (passport / ID images) — kept for <strong>7 days after arrival</strong>, then permanently deleted. Following the Italian Garante's April 2026 clarification: TULPS art. 109 requires transmitting the data to Alloggiati Web, not retaining copies of the document image. 7 days gives you an operational window to review recent arrivals; the Alloggiati filing receipt (if you upload it) is kept for 5 years as proof of compliance.</li>
         <li style="margin:4px 0;"><strong>Property setup data</strong> (rules, recommendations, welcome message) — kept while your account is active.</li>
       </ul>
 
@@ -15340,7 +15345,7 @@ setTimeout(() => setHostLang('it'), 200);
         <li style="margin:4px 0;"><strong>Chat con l'assistente AI o con gli ospiti</strong> — cancellate 90 giorni dopo la chiusura della conversazione, o 30 giorni dopo che le hai archiviate.</li>
         <li style="margin:4px 0;"><strong>Dati di utilizzo dell'app</strong> (pagine aperte, consigli cliccati) — conservati per 180 giorni, poi anonimizzati in totali mensili prima della cancellazione.</li>
         <li style="margin:4px 0;"><strong>Dati di check-in degli ospiti</strong> (nome, numero documento, date soggiorno) — conservati per 5 anni come previsto dalla normativa italiana (TULPS art. 109; Alloggiati Web).</li>
-        <li style="margin:4px 0;"><strong>Foto del documento</strong> (immagini di passaporto / carta d'identità) — conservate per <strong>48 ore dall'arrivo</strong>, poi cancellate definitivamente. Segue la nota del Garante di aprile 2026: l'art. 109 TULPS impone la trasmissione dei dati ad Alloggiati Web, non la conservazione della copia del documento. La ricevuta di invio Alloggiati (se caricata) è conservata 5 anni come prova di adempimento.</li>
+        <li style="margin:4px 0;"><strong>Foto del documento</strong> (immagini di passaporto / carta d'identità) — conservate per <strong>7 giorni dall'arrivo</strong>, poi cancellate definitivamente. Segue la nota del Garante di aprile 2026: l'art. 109 TULPS impone la trasmissione dei dati ad Alloggiati Web, non la conservazione della copia del documento. 7 giorni ti danno una finestra operativa per rivedere gli arrivi recenti; la ricevuta di invio Alloggiati (se caricata) è conservata 5 anni come prova di adempimento.</li>
         <li style="margin:4px 0;"><strong>Dati di setup dell'immobile</strong> (regole, consigli, messaggio di benvenuto) — conservati finché il tuo account è attivo.</li>
       </ul>
 

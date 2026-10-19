@@ -822,7 +822,7 @@ const GUIDES = {
     warn: { it: 'Ogni portale ha una scadenza. Se la salti, puoi ricevere una sanzione.', en: 'Each portal has its deadline. Missing it can lead to a fine.' },
     faq: [
       { q_it: 'Quali file servono a me?', a_it: 'Apri «Guida Conformità»: ti dice cosa vale per la tua casa.', q_en: 'Which files do I actually need?', a_en: 'Open Compliance Guide: it tells you what applies to your property.' },
-      { q_it: 'Non vedo il link PayTourist.', a_it: 'Inseriscilo in «Dettagli Proprietà» e comparirà qui.', q_en: 'I can’t see the PayTourist link.', a_en: 'Add it in Property Details and it will appear here.' },
+      { q_it: 'Non vedo il link al portale dell\'imposta di soggiorno.', a_it: 'Se il tuo comune usa PayTourist, inserisci il sottodominio in «Dettagli Proprietà» e il link apparirà qui. I comuni con portale proprio (Taranto, Firenze, ecc.) si gestiscono direttamente dal sito del comune — in quel caso lascia vuoto e usa il CSV come riferimento.', q_en: "I can't see the tourist tax portal link.", a_en: 'If your comune uses PayTourist, add its subdomain in Property Details and the link will appear here. Comuni with their own portal (Taranto, Firenze, etc.) are accessed directly on the comune\'s website — leave this empty and use the CSV as a reference.' },
       { q_it: 'A cosa serve «📋 Esportazione Dati»?', a_it: 'È solo per te: un file con tutti i dati per la tua contabilità.', q_en: 'What is “📋 Raw Data Export” for?', a_en: 'It’s for you only: a file with all your data for your bookkeeping.' },
     ],
   },

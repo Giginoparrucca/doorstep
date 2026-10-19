@@ -1496,9 +1496,9 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <div class="form-hint" data-h="prop_beds_available_hint">Total sleeping capacity (for statistical reporting).</div>
           </div>
           <div class="form-group">
-            <label class="form-label" data-h="prop_paytourist">PayTourist portal</label>
+            <label class="form-label" data-h="prop_paytourist">Tourist tax portal (PayTourist)</label>
             <input class="form-input" placeholder="e.g., bari  (or bari.paytourist.com)" id="paytouristUrl" oninput="refreshPayTouristLink()">
-            <div class="form-hint" data-h="prop_paytourist_hint">Your municipality's PayTourist subdomain. Leave empty if your comune doesn't use PayTourist.</div>
+            <div class="form-hint" data-h="prop_paytourist_hint">If your comune uses PayTourist, enter its subdomain here. Leave empty for comuni that use their own portal (Taranto, Firenze, etc.) — this doesn't affect your tourist tax collection.</div>
           </div>
 
         </div>
@@ -2144,10 +2144,10 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="export-axis-note" data-h="export_axis_tax_note"></div>
         <div class="export-tile-h">
           <div class="tile-body">
-            <h3 data-h="export_paytourist">💶 PayTourist (Tourist Tax)</h3>
+            <h3 data-h="export_paytourist">💶 Tourist tax (PayTourist CSV)</h3>
             <p data-h="export_paytourist_desc"></p>
             <div id="paytouristPortalHint" class="form-hint" style="display:none" data-h="paytourist_not_set">
-              ℹ️ Set your PayTourist portal in property settings to show a direct link here.
+              ℹ️ If your comune uses PayTourist, set its subdomain in property settings to show a direct link here. Comuni that use their own portal (Taranto, Firenze, etc.) can leave this empty.
             </div>
           </div>
           <div class="tile-actions">
@@ -4157,7 +4157,7 @@ const HT = {
     prop_readonly_hint: 'View mode — click Edit to change these details.',
     // Round 30 — edit check-in modal (single-line values; applyLang collapses newlines)
     edit_title: 'Edit check-in',
-    edit_intro: 'Corrections update this check-in in place. Alloggiati / PayTourist exports re-read the row on next generation.',
+    edit_intro: 'Corrections update this check-in in place. Alloggiati / tourist-tax exports re-read the row on next generation.',
     edit_save: 'Save changes',
     edit_cancel: 'Cancel',
     edit_saved: '✓ Check-in updated',
@@ -4204,7 +4204,7 @@ const HT = {
     prop_city: 'City', prop_zip: 'ZIP / CAP', prop_region: 'Region', prop_cir: 'CIN Code (National ID)', prop_cir_hint: 'Codice Identificativo Nazionale — required for tourist-accommodation reporting',
     prop_region_pick: '— Select region —',
     prop_region_auto: 'Detected from city — change it if wrong.',
-    prop_paytourist: 'PayTourist portal', prop_paytourist_hint: "Your municipality's PayTourist subdomain. Leave empty if your comune doesn't use PayTourist.", paytourist_not_set: 'ℹ️ Set your PayTourist portal in property settings to show a direct link here.',
+    prop_paytourist: 'Tourist tax portal (PayTourist)', prop_paytourist_hint: "If your comune uses PayTourist, enter its subdomain here. Leave empty for comuni that use their own portal (Taranto, Firenze, etc.) — this doesn't affect your tourist tax collection.", paytourist_not_set: 'ℹ️ If your comune uses PayTourist, set its subdomain in property settings to show a direct link here. Comuni that use their own portal (Taranto, Firenze, etc.) can leave this empty.',
     prop_type: 'Property type', prop_type_hint: 'Helps with platform analytics and audience-aware suggestions.',
     prop_times: 'Check-in / Check-out', prop_times_desc: 'Times and access instructions for your guests.',
     prop_checkin_time: 'Check-in Time', prop_checkout_time: 'Check-out Time',
@@ -4386,8 +4386,8 @@ const HT = {
     link_alloggiati: 'Open Alloggiati Web',
     link_dms: 'Open Puglia DMS (SPOT Easy)',
     link_ross1000: 'Open ROSS1000 (Veneto)',
-    export_paytourist: '💶 PayTourist (Tourist Tax)',
-    export_paytourist_desc: 'CSV file for <strong>PayTourist</strong> (municipal tourist tax). Auto-fills guest groups, CIN code, nationality codes. Upload at Soggiorni → Importa.',
+    export_paytourist: '💶 Tourist tax (PayTourist CSV)',
+    export_paytourist_desc: 'CSV file for municipal tourist tax in <strong>PayTourist</strong> format. Auto-fills guest groups, CIN code, nationality codes. For comuni that use PayTourist: upload at Soggiorni → Importa. For comuni with their own portal (Taranto, Firenze, etc.): the CSV is a reference you can reuse manually.',
     btn_gen_paytourist: '📥 Generate PayTourist CSV',
     link_paytourist: 'Open PayTourist Import',
     // QR
@@ -4731,7 +4731,7 @@ const HT = {
     prop_readonly_hint: 'Modalità visualizzazione — clicca Modifica per aggiornare i dettagli.',
     // Round 30 — modifica check-in
     edit_title: 'Modifica check-in',
-    edit_intro: 'Le correzioni aggiornano questo check-in. Le esportazioni Alloggiati / PayTourist rileggeranno la riga alla prossima generazione.',
+    edit_intro: 'Le correzioni aggiornano questo check-in. Le esportazioni Alloggiati / imposta di soggiorno rileggeranno la riga alla prossima generazione.',
     edit_save: 'Salva modifiche',
     edit_cancel: 'Annulla',
     edit_saved: '✓ Check-in aggiornato',
@@ -4777,7 +4777,7 @@ const HT = {
     prop_city: 'Città', prop_zip: 'CAP', prop_region: 'Regione', prop_cir: 'Codice CIN (ID Nazionale)', prop_cir_hint: 'Codice Identificativo Nazionale — richiesto per la segnalazione delle locazioni turistiche',
     prop_region_pick: '— Seleziona regione —',
     prop_region_auto: 'Rilevata dalla città — modificala se errata.',
-    prop_paytourist: 'Portale PayTourist', prop_paytourist_hint: 'Il sottodominio PayTourist del tuo comune. Lascia vuoto se il tuo comune non usa PayTourist.', paytourist_not_set: 'ℹ️ Imposta il portale PayTourist nei dettagli proprietà per mostrare qui un link diretto.',
+    prop_paytourist: 'Portale imposta di soggiorno (PayTourist)', prop_paytourist_hint: 'Se il tuo comune usa PayTourist, inserisci qui il sottodominio. Lascia vuoto per i comuni che usano il proprio portale (Taranto, Firenze, ecc.) — non influisce sulla riscossione dell\'imposta.', paytourist_not_set: 'ℹ️ Se il tuo comune usa PayTourist, imposta il sottodominio nei dettagli proprietà per mostrare qui un link diretto. I comuni con portale proprio (Taranto, Firenze, ecc.) possono lasciarlo vuoto.',
     prop_type: 'Tipo di immobile', prop_type_hint: 'Aiuta con le statistiche di piattaforma e i suggerimenti mirati al pubblico.',
     prop_times: 'Check-in / Check-out', prop_times_desc: 'Orari e istruzioni di accesso per gli ospiti.',
     prop_checkin_time: 'Orario Check-in', prop_checkout_time: 'Orario Check-out',
@@ -4952,8 +4952,8 @@ const HT = {
     link_alloggiati: 'Apri Alloggiati Web',
     link_dms: 'Apri Puglia DMS (SPOT Easy)',
     link_ross1000: 'Apri ROSS1000 (Veneto)',
-    export_paytourist: '💶 PayTourist (Imposta di Soggiorno)',
-    export_paytourist_desc: 'File CSV per <strong>PayTourist</strong> (tassa di soggiorno comunale). Compila automaticamente gruppi ospiti, codice CIN, codici nazionalità. Carica su Soggiorni → Importa.',
+    export_paytourist: '💶 Imposta di soggiorno (CSV PayTourist)',
+    export_paytourist_desc: 'File CSV per l\'imposta di soggiorno comunale in formato <strong>PayTourist</strong>. Compila automaticamente gruppi ospiti, codice CIN, codici nazionalità. Per i comuni che usano PayTourist: carica su Soggiorni → Importa. Per i comuni con portale proprio (Taranto, Firenze, ecc.): il CSV ti serve come riferimento da riutilizzare manualmente.',
     btn_gen_paytourist: '📥 Genera CSV PayTourist',
     link_paytourist: 'Apri Importazione PayTourist',
     qr_title: 'Link App Ospiti',
@@ -10037,7 +10037,7 @@ const COMPLIANCE_CONTENT = {
           <li><strong>Payment to the comune</strong> — its own schedule (usually monthly or quarterly), set by the delibera.</li>
           <li><strong>Annual declaration to the Agenzia delle Entrate</strong> — single national deadline, <strong>30 June</strong> each year (introduced by D.L. 34/2020, art. 180). Being current on payments does <strong>not</strong> exempt you from the declaration. Declarations must be kept until 31 December of the fifth following year.</li>
         </ul>
-        <p>If you use <strong>PayTourist</strong>, it handles the calculation, exemptions and the comune-specific rules for you, and assists with the annual declaration. Check your comune's delibera for the exact rates and exemptions.</p>`,
+        <p>If your comune uses <strong>PayTourist</strong>, it handles the calculation, exemptions and the comune-specific rules for you, and assists with the annual declaration. Not every comune uses it — Taranto, Firenze and others run their own portals, which you access directly on the comune's website. Check your comune's delibera for the exact rates and exemptions, and ask them which portal to use for payment and declaration.</p>`,
     },
     disclaimer: 'This guide is general reference information, not legal or tax advice, and obligations change. Always verify the current rules with your Region, your Comune, and the Agenzia delle Entrate, or consult a qualified advisor.',
   },
@@ -10075,7 +10075,7 @@ const COMPLIANCE_CONTENT = {
           <li><strong>Versamento al comune</strong> — con cadenza propria (di solito mensile o trimestrale), fissata dalla delibera.</li>
           <li><strong>Dichiarazione annuale all'Agenzia delle Entrate</strong> — scadenza nazionale unica, <strong>30 giugno</strong> di ogni anno (introdotta dal D.L. 34/2020, art. 180). Essere in regola con i versamenti <strong>non</strong> esonera dalla dichiarazione. Le dichiarazioni vanno conservate fino al 31 dicembre del quinto anno successivo.</li>
         </ul>
-        <p>Se usi <strong>PayTourist</strong>, gestisce per te il calcolo, le esenzioni e le regole specifiche del comune, e assiste con la dichiarazione annuale. Controlla la delibera del tuo comune per tariffe ed esenzioni esatte.</p>`,
+        <p>Se il tuo comune usa <strong>PayTourist</strong>, gestisce per te il calcolo, le esenzioni e le regole specifiche del comune, e assiste con la dichiarazione annuale. Non tutti i comuni lo usano — Taranto, Firenze e altri hanno un proprio portale, accessibile direttamente dal sito del comune. Controlla la delibera del tuo comune per tariffe ed esenzioni esatte, e chiedi quale portale usare per pagamento e dichiarazione.</p>`,
     },
     disclaimer: 'Questa guida è informazione generale di riferimento, non consulenza legale o fiscale, e gli obblighi cambiano. Verifica sempre le regole aggiornate con la tua Regione, il tuo Comune e l\'Agenzia delle Entrate, oppure consulta un professionista.',
   },

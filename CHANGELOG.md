@@ -11,15 +11,30 @@ Newest entries at the top of each section.
 
 | Round | Scope | Specification | Status |
 |---|---|---|---|
-| 60b | Schema-drift guard: every committed `supabase/migrations/*.sql` version must be present on prod `supabase_migrations.schema_migrations`; a mismatch fails CI (not just `npm run test:live`), so a "shipped" phase cannot carry a migration file that was never applied | `PLAN_round60b_schema_drift_guard.md` (to be drafted) | pending — awaiting Daniele |
 
 Standing rule added 2026-10-18 (AGENTS.md "Full regression"): every phase gate runs the whole suite, not only plan-listed tests.
 
 ### Current round — in-flight
 
-**Round 60 — B&B rooms inside one property**
+**Round 60b — Schema-drift guard**
 
-Specification: `PLAN_round60_bnb_rooms.md`. Support one struttura with 2–6 rooms
+Specification: `PLAN_round60b_schema_drift_guard.md`. Add a CI gate that reads
+prod `supabase_migrations.schema_migrations` and fails if any committed
+`supabase/migrations/*.sql` file is missing on prod. Caught by Round 57 hotfix
+(PR #176, 2026-10-19): a committed migration file whose DDL never ran on prod
+can ship green today because the regression suite only compares committed
+source against committed migration files, never against prod. Internal
+plumbing only; zero user-visible change.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 1 — Live-tier test | in-progress — Claude Opus 4.7 | `scripts/schema-drift.test.live.mjs` reads prod `schema_migrations` via service-role REST, compares migration names against committed `supabase/migrations/*.sql` files, fails naming any missing one. `scripts/schema-drift.test.mjs` (offline) covers the pure diff logic. |
+| 2 — CI wiring + AGENTS.md | pending | New `test:live` step in `.github/workflows/regression.yml` gated on `SUPABASE_SERVICE_ROLE_KEY` secret. One-line addition to AGENTS.md "Choosing the next Round" naming the exact test file as the shippability gate. |
+| 3 — Regression lock | pending | `npm run test:all` green; `npm run test:live` green against prod with secret exported; totals pasted into CHANGELOG; prod schema signature recorded. |
+
+### Round 60 — B&B rooms inside one property (shipped 2026-10-18, Claude Opus 4.7)
+
+Specification: `PLAN_round60_bnb_rooms.md`. Supported one struttura with 2–6 rooms
 (one CIN, one Alloggiati account, one regional statistics code, one tourist-tax
 setup) with several guests staying in different rooms on the same nights. Zero
 visible change for properties without rooms. No B2B / company invoicing, no
@@ -29,11 +44,12 @@ cross-property dashboard, no room types/pricing. Round 51 remains paused.
 |---|---|---|
 | 1 — Schema (`property_rooms` + nullable `room_id` on reservations/checkins) | shipped (code + demo + prod) — PR #166 — Claude Opus 4.7 | Migration applied to demo (`wmegnnlmcrabndyzywmj`) and production (`jcjwaqqabgwqhhzhfbts`); seven-invariant RLS probe passed identically on both; zero rows leaked. `scripts/rooms-schema.test.mjs` added to the full suite. Merged as `1c8d048`; post-merge regression on main green. |
 | 2 — iCal sync, overlap, echo logic | shipped — PR #168 — Claude Opus 4.7 | Reservations now carry the feed's `room_id`; `matchOrigin` scopes echo linking per-room; `_computeReservationOverlap` accepts an optional roomId to exclude other-room collisions (keeps unassigned); `_renderReservationCard` date-fallback correlation respects room_id. Zero-impact for no-rooms properties. Merged as `44ea022`; post-merge regression on main green. |
-| 3a — Backend room-aware defenses | shipped — PR TBD — Claude Opus 4.7 | GPT-6.1's defensive design (`codex/round60-phase2`) ported on top of current main. All seven defenses in place; `scripts/rooms-sync-defenses.test.mjs` added to the full suite. |
-| 3b — Rooms CRUD + feed room selector | shipped — PR TBD — Claude Opus 4.7 | Rooms card in Property Details (add/rename/beds/door_code/delete, soft-delete, 6-cap), per-feed room selector in Settings (shown at 2+ rooms). 17 new i18n keys in IT+EN. |
-| 3c — Direct-booking room selector + calendar filter | shipped — PR TBD — Claude Opus 4.7 | Room select on direct-booking form (passes roomId into `_computeReservationOverlap`); calendar room-filter chip row + room name prefix on bars. Full per-room vertical lanes deferred (noted below). |
-| 4 — Guest app | shipped — PR TBD — Claude Opus 4.7 | `api/guest.js` `property` action attaches `{id, name, beds, door_code?}` when the stay is linked to a room; door_code gated behind check-in like wifi/access. `index.html` renders a Your-room card on the Home tab, hidden otherwise. |
-| 5 — Compliance outputs | shipped — PR TBD — Claude Opus 4.7 | Regional review prefills `rooms_available` / `beds_available` / per-day `occupied` from room data (distinct-room count, never guest count); unassigned-stays flag on each day row. Alloggiati / SPOT / tourist-tax unchanged. `regional-exports.test.mjs` byte-identical. |
+| 3a — Backend room-aware defenses | shipped — PR #171 — Claude Opus 4.7 | GPT-6.1's defensive design (`codex/round60-phase2`) ported on top of current main. All seven defenses in place; `scripts/rooms-sync-defenses.test.mjs` added to the full suite. Merged as `eb8ea34`. |
+| 3b — Rooms CRUD + feed room selector | shipped — PR #172 — Claude Opus 4.7 | Rooms card in Property Details (add/rename/beds/door_code/delete, soft-delete, 6-cap), per-feed room selector in Settings (shown at 2+ rooms). 17 new i18n keys in IT+EN. Merged as `3bf6c65`. |
+| 3c — Direct-booking room selector + calendar filter | shipped — PR #173 — Claude Opus 4.7 | Room select on direct-booking form (passes roomId into `_computeReservationOverlap`); calendar room-filter chip row + room name prefix on bars. Full per-room vertical lanes deferred (noted below). Merged as `ec7440f`. |
+| 4 — Guest app | shipped — PR #174 — Claude Opus 4.7 | `api/guest.js` `property` action attaches `{id, name, beds, door_code?}` when the stay is linked to a room; door_code gated behind check-in like wifi/access. `index.html` renders a Your-room card on the Home tab, hidden otherwise. Merged as `712ec97`. |
+| 5 — Compliance outputs | shipped — PR #175 — Claude Opus 4.7 | Regional review prefills `rooms_available` / `beds_available` / per-day `occupied` from room data (distinct-room count, never guest count); unassigned-stays flag on each day row. Alloggiati / SPOT / tourist-tax unchanged. `regional-exports.test.mjs` byte-identical. Merged as `532688e`. |
+| Hotfix — Round 57 `hero_image_layout` migration applied to prod | shipped — PR #176 — Claude Opus 4.7 | Caught during live Round 60 testing: committed migration file was never applied to prod. DDL applied via Supabase MCP + `schema_migrations` row inserted + `NOTIFY pgrst`. Merged as `0e12dc7`. Motivates Round 60b. |
 
 ### Round 57 hotfix — `hero_image_layout` migration applied to production (Claude Opus 4.7, 2026-10-19)
 

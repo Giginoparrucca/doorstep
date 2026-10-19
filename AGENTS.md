@@ -90,6 +90,12 @@ phases inside that Round continue automatically as described under
 7. Any new feature, endpoint or export ships with tests that join the full
    suite. Compliance outputs (Alloggiati, SPOT, regional statistics, tourist
    tax) need committed synthetic golden files compared byte-for-byte.
+8. A phase that adds a `supabase/migrations/*.sql` file is not shippable
+   until `scripts/schema-drift.test.live.mjs` passes against prod. The
+   CHANGELOG line "applied to production" is accepted only when that live
+   test's RPC lookup returns the migration name — a prose claim without
+   that evidence is a Round-57-class drift and must be rejected (Round 60b
+   Phase 1).
 
 ## Agent-owned execution
 

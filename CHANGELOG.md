@@ -29,7 +29,7 @@ plumbing only; zero user-visible change.
 | Phase | Status | Where / test gate |
 |---|---|---|
 | 1 — Live-tier test | shipped — PR TBD — Claude Opus 4.7 | `lib/schema-drift.js` + `scripts/schema-drift.test.mjs` (offline, pure diff logic) + `scripts/schema-drift.test.live.mjs` (live, calls `public.list_applied_migrations()` RPC with service-role key). New `supabase/migrations/20261019120000_round60b_list_schema_migrations_rpc.sql` adds a SECURITY DEFINER RPC restricted to `service_role` so the test can read `supabase_migrations.schema_migrations` without widening PostgREST's schema list. Runner discovers any `*.test.live.mjs` file automatically. |
-| 2 — CI wiring + AGENTS.md | pending | New `test:live` step in `.github/workflows/regression.yml` gated on `SUPABASE_SERVICE_ROLE_KEY` secret. One-line addition to AGENTS.md "Choosing the next Round" naming the exact test file as the shippability gate. |
+| 2 — CI wiring + AGENTS.md | in-progress — Claude Opus 4.7 | New `test:live` step in `.github/workflows/regression.yml` with `SUPABASE_SERVICE_ROLE_KEY` secret threaded through env. One-line addition to AGENTS.md "Full regression" (rule 8) naming the exact test file as the shippability gate for migration-bearing phases. |
 | 3 — Regression lock | pending | `npm run test:all` green; `npm run test:live` green against prod with secret exported; totals pasted into CHANGELOG; prod schema signature recorded. |
 
 ### Round 60 — B&B rooms inside one property (shipped 2026-10-18, Claude Opus 4.7)
@@ -73,7 +73,15 @@ cross-property dashboard, no room types/pricing. Round 51 remains paused.
   - Guide tourist-tax panel (host-guides, EN+IT): now says "if your comune uses PayTourist" instead of "if you use PayTourist", and names Taranto/Firenze as examples of comuni with their own portals.
 - **Compliance outputs (Alloggiati, SPOT, ROSS1000, PayTourist CSV, tourist-tax CSV, Umbria STU, Trento):** all unchanged — this is UI copy only. `scripts/paytourist-golden.test.mjs` byte-identical.
 - **Full regression: PASS 46 / FAIL 0 / SKIP 3** (unchanged from Round 60b Phase 1 close).
-- **No new round** — this is a UI copy hotfix outside the round structure. Round 60b Phase 2 (CI wiring + AGENTS.md) is still in flight on PR #178 and will merge in sequence.
+- **No new round** — this is a UI copy hotfix outside the round structure, merged after Round 60b Phase 2.
+
+### Round 60b Phase 2 — CI wiring + AGENTS.md shippability rule (Claude Opus 4.7, 2026-10-19)
+
+- **Workflow change (`.github/workflows/regression.yml`).** New `Schema-drift guard against production` step after `Run full regression`, running `npm run test:live` with `SUPABASE_SERVICE_ROLE_KEY` threaded through env from GitHub Actions secrets. When the secret is set (prod CI, authenticated contributor PRs), the live test calls `public.list_applied_migrations()` on prod and fails if any committed `supabase/migrations/*.sql` file is missing. When the secret is empty (fork PR, or secret not configured yet), the test skips with exit 77 — a counted skip, not a pass.
+- **AGENTS.md rule 8 (new) in the "Full regression" section.** "A phase that adds a `supabase/migrations/*.sql` file is not shippable until `scripts/schema-drift.test.live.mjs` passes against prod. The CHANGELOG line 'applied to production' is accepted only when that live test's RPC lookup returns the migration name — a prose claim without that evidence is a Round-57-class drift and must be rejected." This is the policy encoding of what the test enforces mechanically.
+- **No source change outside workflow + AGENTS.md.** `test:all` totals unchanged (**PASS 46 / FAIL 0 / SKIP 3**).
+- **CI evidence (PR #178).** The new live step executed on this PR's CI run; `SUPABASE_SERVICE_ROLE_KEY` was not yet set as a GitHub secret, so the test skipped with `SKIP SUPABASE_SERVICE_ROLE_KEY not set`, counted but passing — proving the wiring works and the skip path is clean.
+- **Secret-provisioning note.** `SUPABASE_SERVICE_ROLE_KEY` is not yet in GitHub Actions secrets on `giginoparrucca/doorstep` (CI run confirmed). Daniele adds it once in Settings → Secrets and variables → Actions. One-time owner-only step. The value is the same key already in Vercel for `send-arrival-reminders.js`. Phase 3 (next, same round) verifies the test runs green on CI with the secret and the regression lock is in place.
 
 ### Round 60b Phase 1 — schema-drift guard test infrastructure (Claude Opus 4.7, 2026-10-19)
 

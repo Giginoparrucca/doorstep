@@ -21,7 +21,13 @@ function create({root,context,comuneCode,allog}){
   activeProperty=ctx.propertyId;
   if(!cfg){root.innerHTML='';return;}
   const native=['ross','puglia','umbria','trentino'].includes(cfg.format);
-  const label={ross:'ROSS1000 XML',puglia:'SPOT Easy TXT',umbria:'Turismatica TXT',trentino:'STU TXT'}[cfg.format];
+  // Round 61 Phase 1b — dynamic Puglia label follows the saved regional_service.
+  //   spot_easy    → "SPOT Easy TXT"       (unchanged from Round 58)
+  //   spot_online  → "SPOT Online CSV"     (interim; XML lands in Phase 2)
+  //   null/other   → "SPOT (scegli servizio)" so the host knows to pick first
+  const svc=ctx.property&&ctx.property.regional_service;
+  const pugliaLabel=svc==='spot_online'?'SPOT Online CSV':svc==='spot_easy'?'SPOT Easy TXT':text('SPOT (scegli servizio)','SPOT (choose service)');
+  const label={ross:'ROSS1000 XML',puglia:pugliaLabel,umbria:'Turismatica TXT',trentino:'STU TXT'}[cfg.format];
   root.innerHTML=`<div class="export-tile-h"><div class="tile-body"><h3>${E(cfg.system)} · ${E(ctx.property.region)}</h3><p>${native?E(text('Prepara e controlla il file prima di caricarlo sul portale regionale.','Prepare and review your file before uploading it to the regional portal.')):E(reason(cfg))}</p></div><div class="tile-actions"><button type="button" class="btn btn-primary" data-regional-open>${E(native?text('📥 Scarica ','📥 Download ')+label:text('📥 Riepilogo per inserimento manuale (CSV)','📥 Manual-entry summary (CSV)'))}</button><a href="${E(cfg.portal)}" target="_blank" rel="noopener" class="export-portal-link">${E(text('Apri portale','Open portal'))} ↗</a></div></div>`;
   if(ctx.property.region==="Valle d'Aosta")root.insertAdjacentHTML('beforeend','<a href="https://locazionituristiche.regione.vda.it/" target="_blank" rel="noopener">'+E(text('Portale locazioni turistiche','Tourist rentals portal'))+' ↗</a>');
   root.querySelector('[data-regional-open]').addEventListener('click',open);
@@ -32,7 +38,22 @@ function create({root,context,comuneCode,allog}){
   dialog=document.createElement('dialog');dialog.className='regional-dialog';dialog.setAttribute('aria-labelledby','regionalDialogTitle');
   const date=today();
   dialog.innerHTML=`<div class="regional-dialog-head"><h2 id="regionalDialogTitle">${E(cfg.system)} — ${E(text('Scarica file','Download file'))}</h2><button type="button" class="btn btn-secondary" data-close aria-label="${E(text('Chiudi','Close'))}">×</button></div><p>${E(ctx.property.name||'')}</p><div class="regional-grid">${input('start',text('Dal','From'),date.slice(0,8)+'01','date',`max="${date}"`)}${input('end',text('Al','To'),date,'date',`max="${date}"`)}</div><div data-variant></div><p data-mode-note></p><button type="button" class="btn btn-primary" data-load>${E(text('Prepara dati','Prepare data'))}</button><p data-status role="status" aria-live="polite"></p><div data-review></div>`;
-  if(cfg.format==='puglia')dialog.querySelector('[data-variant]').innerHTML=`<label class="regional-field"><span>${E(text('Servizio usato dalla struttura','Service used by this property'))}</span><select class="form-select" data-format><option value="">${E(text('Seleziona','Choose'))}</option><option value="ps">SPOT Easy — ${E(text('locazione turistica','tourist rental'))}</option><option value="summary">SPOT Online / Completo — ${E(text('riepilogo manuale','manual summary'))}</option></select></label>`;
+  // Round 61 Phase 1b — Puglia dialog adapts to the saved regional_service.
+  //   spot_easy    → no in-dialog chooser; format pre-selected to 'ps'
+  //   spot_online  → no in-dialog chooser; format pre-selected to 'summary'
+  //                  (XML serializer lands in Phase 2; interim CSV until then)
+  //   null/other   → the Round 58 chooser; on change it persists back to the
+  //                  property so the next session skips the question.
+  if(cfg.format==='puglia'){
+    const svc=ctx.property&&ctx.property.regional_service;
+    if(svc==='spot_easy'||svc==='spot_online'){
+      const preset=svc==='spot_easy'?'ps':'summary';
+      const label=svc==='spot_easy'?'SPOT Easy':'SPOT Online';
+      dialog.querySelector('[data-variant]').innerHTML=`<input type="hidden" data-format value="${preset}"><div class="regional-field" data-saved-service><span>${E(text('Servizio salvato','Saved service'))}: <strong>${E(label)}</strong></span> <a href="#" data-h-link="prop_regional_service_change" data-change-service>${E(text('Cambia nei Dettagli Proprietà','Change in Property Details'))}</a></div>`;
+    }else{
+      dialog.querySelector('[data-variant]').innerHTML=`<label class="regional-field"><span>${E(text('Servizio usato dalla struttura','Service used by this property'))}</span><select class="form-select" data-format data-persist-service><option value="">${E(text('Seleziona','Choose'))}</option><option value="ps">SPOT Easy — ${E(text('locazione turistica','tourist rental'))}</option><option value="summary">SPOT Online / Completo — ${E(text('riepilogo manuale','manual summary'))}</option></select></label>`;
+    }
+  }
   if(cfg.format==='trentino')dialog.querySelector('[data-variant]').innerHTML=`<label class="regional-field"><span>${E(text('Tipo di servizio','Service type'))}</span><select class="form-select" data-format><option value="">${E(text('Seleziona','Choose'))}</option><option value="trento">STU — ${E(text('struttura con licenza','licensed accommodation'))}</option><option value="summary">DTU Alloggi — ${E(text('riepilogo manuale','manual summary'))}</option></select></label>`;
   const note=cfg.format==='puglia'?text('Il TXT PS vale per SPOT Easy delle locazioni turistiche. Abilita «Carica file PS» nel portale e completa la residenza dopo l’importazione. Per SPOT Online/Completo il tracciato XML è diverso.','PS TXT is for tourist rentals using SPOT Easy. Enable “Carica file PS” in the portal and complete residence after import. SPOT Online/Completo uses a different XML format.'):cfg.format==='trentino'?text('Il TXT STU usa l’IDOBJ dell’esercizio e un file per giorno con movimenti. Verifica con l’APT l’abilitazione del gestionale all’importazione. Questo tracciato non è quello di DTU Alloggi.','STU TXT uses the property IDOBJ and one file per day with arrivals/departures. Confirm management-software import approval with the APT. This is not the DTU Alloggi format.'):reason(cfg);
   dialog.querySelector('[data-mode-note]').textContent=note;
@@ -115,7 +136,21 @@ function create({root,context,comuneCode,allog}){
   if(t.dataset.include!==undefined){model.rows[Number(t.dataset.include)]._excluded=!t.checked;refreshDays();}
   if(t.dataset.dayKey){model.daily[t.dataset.date][t.dataset.dayKey]=t.value;if(t.dataset.dayKey==='open'&&t.value==='NO'){Object.assign(model.daily[t.dataset.date],{occupied:0,rooms:0,beds:0});refreshDays();}}
   if(t.dataset.field==='code')model.code=t.value.trim();
-  if(t.dataset.field==='start'||t.dataset.field==='end'||t.hasAttribute('data-format')){model=null;dialog.querySelector('[data-review]').innerHTML='';status(text('Premi Prepara dati per il nuovo periodo o servizio.','Press Prepare data for the new period or service.'));return;}
+  if(t.dataset.field==='start'||t.dataset.field==='end'||t.hasAttribute('data-format')){
+   // Round 61 Phase 1b — the Round 58 Puglia chooser persists back to
+   // properties.regional_service so the next visit skips the question.
+   // Fire-and-forget: a failed update is logged but doesn't block the
+   // current download (the host can still finish this session).
+   if(t.hasAttribute('data-persist-service')&&t.value){
+    const ctx2=context(),svc=t.value==='ps'?'spot_easy':t.value==='summary'?'spot_online':null;
+    if(svc&&ctx2.property&&ctx2.property.id&&ctx2.sb){
+     ctx2.sb.from('properties').update({regional_service:svc}).eq('id',ctx2.property.id).then(({error})=>{
+      if(error){console.error('[round61] regional_service persist failed',error);return;}
+      ctx2.property.regional_service=svc;
+     });
+    }
+   }
+   model=null;dialog.querySelector('[data-review]').innerHTML='';status(text('Premi Prepara dati per il nuovo periodo o servizio.','Press Prepare data for the new period or service.'));return;}
   const confirm=dialog.querySelector('[data-confirm]');if(confirm&&t!==confirm)confirm.checked=false;
  }
  function refreshDays(){const tbody=dialog.querySelector('.regional-days tbody');if(tbody)tbody.innerHTML=R.days(model.start,model.end).map(dayRow).join('');}

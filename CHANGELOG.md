@@ -11,6 +11,7 @@ Newest entries at the top of each section.
 
 | Round | Scope | Specification | Status |
 |---|---|---|---|
+| 61 | Puglia SPOT Online XML export + per-property SPOT service | PLAN_round61_spot_online_xml.md | pending |
 
 Standing rule added 2026-10-18 (AGENTS.md "Full regression"): every phase gate runs the whole suite, not only plan-listed tests.
 

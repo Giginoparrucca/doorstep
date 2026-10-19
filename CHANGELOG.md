@@ -11,15 +11,30 @@ Newest entries at the top of each section.
 
 | Round | Scope | Specification | Status |
 |---|---|---|---|
-| 60b | Schema-drift guard: every committed `supabase/migrations/*.sql` version must be present on prod `supabase_migrations.schema_migrations`; a mismatch fails CI (not just `npm run test:live`), so a "shipped" phase cannot carry a migration file that was never applied | `PLAN_round60b_schema_drift_guard.md` (to be drafted) | pending — awaiting Daniele |
 
 Standing rule added 2026-10-18 (AGENTS.md "Full regression"): every phase gate runs the whole suite, not only plan-listed tests.
 
 ### Current round — in-flight
 
-**Round 60 — B&B rooms inside one property**
+**Round 60b — Schema-drift guard**
 
-Specification: `PLAN_round60_bnb_rooms.md`. Support one struttura with 2–6 rooms
+Specification: `PLAN_round60b_schema_drift_guard.md`. Add a CI gate that reads
+prod `supabase_migrations.schema_migrations` and fails if any committed
+`supabase/migrations/*.sql` file is missing on prod. Caught by Round 57 hotfix
+(PR #176, 2026-10-19): a committed migration file whose DDL never ran on prod
+can ship green today because the regression suite only compares committed
+source against committed migration files, never against prod. Internal
+plumbing only; zero user-visible change.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 1 — Live-tier test | shipped — PR TBD — Claude Opus 4.7 | `lib/schema-drift.js` + `scripts/schema-drift.test.mjs` (offline, pure diff logic) + `scripts/schema-drift.test.live.mjs` (live, calls `public.list_applied_migrations()` RPC with service-role key). New `supabase/migrations/20261019120000_round60b_list_schema_migrations_rpc.sql` adds a SECURITY DEFINER RPC restricted to `service_role` so the test can read `supabase_migrations.schema_migrations` without widening PostgREST's schema list. Runner discovers any `*.test.live.mjs` file automatically. |
+| 2 — CI wiring + AGENTS.md | pending | New `test:live` step in `.github/workflows/regression.yml` gated on `SUPABASE_SERVICE_ROLE_KEY` secret. One-line addition to AGENTS.md "Choosing the next Round" naming the exact test file as the shippability gate. |
+| 3 — Regression lock | pending | `npm run test:all` green; `npm run test:live` green against prod with secret exported; totals pasted into CHANGELOG; prod schema signature recorded. |
+
+### Round 60 — B&B rooms inside one property (shipped 2026-10-18, Claude Opus 4.7)
+
+Specification: `PLAN_round60_bnb_rooms.md`. Supported one struttura with 2–6 rooms
 (one CIN, one Alloggiati account, one regional statistics code, one tourist-tax
 setup) with several guests staying in different rooms on the same nights. Zero
 visible change for properties without rooms. No B2B / company invoicing, no
@@ -29,11 +44,24 @@ cross-property dashboard, no room types/pricing. Round 51 remains paused.
 |---|---|---|
 | 1 — Schema (`property_rooms` + nullable `room_id` on reservations/checkins) | shipped (code + demo + prod) — PR #166 — Claude Opus 4.7 | Migration applied to demo (`wmegnnlmcrabndyzywmj`) and production (`jcjwaqqabgwqhhzhfbts`); seven-invariant RLS probe passed identically on both; zero rows leaked. `scripts/rooms-schema.test.mjs` added to the full suite. Merged as `1c8d048`; post-merge regression on main green. |
 | 2 — iCal sync, overlap, echo logic | shipped — PR #168 — Claude Opus 4.7 | Reservations now carry the feed's `room_id`; `matchOrigin` scopes echo linking per-room; `_computeReservationOverlap` accepts an optional roomId to exclude other-room collisions (keeps unassigned); `_renderReservationCard` date-fallback correlation respects room_id. Zero-impact for no-rooms properties. Merged as `44ea022`; post-merge regression on main green. |
-| 3a — Backend room-aware defenses | shipped — PR TBD — Claude Opus 4.7 | GPT-6.1's defensive design (`codex/round60-phase2`) ported on top of current main. All seven defenses in place; `scripts/rooms-sync-defenses.test.mjs` added to the full suite. |
-| 3b — Rooms CRUD + feed room selector | shipped — PR TBD — Claude Opus 4.7 | Rooms card in Property Details (add/rename/beds/door_code/delete, soft-delete, 6-cap), per-feed room selector in Settings (shown at 2+ rooms). 17 new i18n keys in IT+EN. |
-| 3c — Direct-booking room selector + calendar filter | shipped — PR TBD — Claude Opus 4.7 | Room select on direct-booking form (passes roomId into `_computeReservationOverlap`); calendar room-filter chip row + room name prefix on bars. Full per-room vertical lanes deferred (noted below). |
-| 4 — Guest app | shipped — PR TBD — Claude Opus 4.7 | `api/guest.js` `property` action attaches `{id, name, beds, door_code?}` when the stay is linked to a room; door_code gated behind check-in like wifi/access. `index.html` renders a Your-room card on the Home tab, hidden otherwise. |
-| 5 — Compliance outputs | shipped — PR TBD — Claude Opus 4.7 | Regional review prefills `rooms_available` / `beds_available` / per-day `occupied` from room data (distinct-room count, never guest count); unassigned-stays flag on each day row. Alloggiati / SPOT / tourist-tax unchanged. `regional-exports.test.mjs` byte-identical. |
+| 3a — Backend room-aware defenses | shipped — PR #171 — Claude Opus 4.7 | GPT-6.1's defensive design (`codex/round60-phase2`) ported on top of current main. All seven defenses in place; `scripts/rooms-sync-defenses.test.mjs` added to the full suite. Merged as `eb8ea34`. |
+| 3b — Rooms CRUD + feed room selector | shipped — PR #172 — Claude Opus 4.7 | Rooms card in Property Details (add/rename/beds/door_code/delete, soft-delete, 6-cap), per-feed room selector in Settings (shown at 2+ rooms). 17 new i18n keys in IT+EN. Merged as `3bf6c65`. |
+| 3c — Direct-booking room selector + calendar filter | shipped — PR #173 — Claude Opus 4.7 | Room select on direct-booking form (passes roomId into `_computeReservationOverlap`); calendar room-filter chip row + room name prefix on bars. Full per-room vertical lanes deferred (noted below). Merged as `ec7440f`. |
+| 4 — Guest app | shipped — PR #174 — Claude Opus 4.7 | `api/guest.js` `property` action attaches `{id, name, beds, door_code?}` when the stay is linked to a room; door_code gated behind check-in like wifi/access. `index.html` renders a Your-room card on the Home tab, hidden otherwise. Merged as `712ec97`. |
+| 5 — Compliance outputs | shipped — PR #175 — Claude Opus 4.7 | Regional review prefills `rooms_available` / `beds_available` / per-day `occupied` from room data (distinct-room count, never guest count); unassigned-stays flag on each day row. Alloggiati / SPOT / tourist-tax unchanged. `regional-exports.test.mjs` byte-identical. Merged as `532688e`. |
+| Hotfix — Round 57 `hero_image_layout` migration applied to prod | shipped — PR #176 — Claude Opus 4.7 | Caught during live Round 60 testing: committed migration file was never applied to prod. DDL applied via Supabase MCP + `schema_migrations` row inserted + `NOTIFY pgrst`. Merged as `0e12dc7`. Motivates Round 60b. |
+
+### Round 60b Phase 1 — schema-drift guard test infrastructure (Claude Opus 4.7, 2026-10-19)
+
+- **Problem recap.** Round 57 shipped a migration file whose DDL never ran on prod. The CHANGELOG claimed "applied to production" without verification. The regression suite was green because it only checks committed source against committed migration files — not against the live `supabase_migrations.schema_migrations` table on prod. 5 days of broken Property Details saves before Daniele caught it live-testing Round 60.
+- **`lib/schema-drift.js`** — pure diff logic. `parseFilename(name)` extracts the migration name (the part after the leading 14-digit timestamp) from `supabase/migrations/*.sql` filenames; `diff({files, applied})` returns `{missing, ok}` naming every committed file whose name has no matching `schema_migrations` row. Timestamp drift is tolerated — only name matters — because historical migrations like Round 55 have slightly drifted timestamps between committed filename (`20261014092200`) and applied version (`20261014092424`) that reflect correct application, not drift. Extra rows on prod (migrations applied via MCP without a committed file) are also tolerated: the guard only catches "committed but never applied", not the opposite direction.
+- **`scripts/schema-drift.test.mjs`** — offline test exercising the diff logic. 10 scenarios: parse edge cases, all-applied-passes, Round-57-pre-hotfix-state-caught-by-name, timestamp drift tolerated, extra applied rows allowed, multiple missing surfaced, garbage filenames ignored, empty inputs, failure message includes project ref + file + apply hint.
+- **`scripts/schema-drift.test.live.mjs`** — live test. Reads `SUPABASE_SERVICE_ROLE_KEY` from env (exits 77 with reason if missing — POSIX skip, same convention as `demo-live-smoke.mjs`). Calls `public.list_applied_migrations()` RPC via standard PostgREST `/rest/v1/rpc/` endpoint. Fails loud if any committed migration file is missing from the response, including the exact apply command the operator should run.
+- **`supabase/migrations/20261019120000_round60b_list_schema_migrations_rpc.sql`** — SECURITY DEFINER RPC `public.list_applied_migrations()` returning `{version, name}` from `supabase_migrations.schema_migrations`. `REVOKE ALL FROM PUBLIC, anon, authenticated` + `GRANT EXECUTE TO service_role` so only the CI secret can enumerate migration history; anon and authenticated still cannot. Verified on prod: `prosecdef=true`, `svc_can_exec=true`, `anon_can_exec=false`, `auth_can_exec=false`, RPC returns 36 rows (35 historical + its own self-insert).
+- **Prod application.** Migration applied via Supabase MCP + `schema_migrations` row inserted + `NOTIFY pgrst 'reload schema'` triggered. Prod `schema_migrations` count: 36 rows. Committed migration files: 4 (`20261014092200_round55_share_preferences`, `20261014145714_round57_cover_layout`, `20261018100000_round60_bnb_rooms`, `20261019120000_round60b_list_schema_migrations_rpc`); all four have matching applied names on prod. The guard would catch its own introduction if we had merged without applying.
+- **Runner change.** `scripts/run-tests.mjs` now discovers `*.test.live.mjs` under `scripts/` automatically for the `live` tier (`npm run test:live`). The legacy `demo-live-smoke.mjs` allowlist entry stays for backward compatibility. Adding a new live test needs no runner edit.
+- **Phase 2 (next, same round).** Wire the live step into `.github/workflows/regression.yml` gated on `SUPABASE_SERVICE_ROLE_KEY` secret. Add one-line AGENTS.md rule naming `scripts/schema-drift.test.live.mjs` as the shippability gate for migration-bearing phases.
+- **Full regression (this PR):** **PASS 46 / FAIL 0 / SKIP 3**. New offline test joins the suite (+1 from 45). Live test skips on CI without the secret wired yet; that's Phase 2's job.
 
 ### Round 57 hotfix — `hero_image_layout` migration applied to production (Claude Opus 4.7, 2026-10-19)
 

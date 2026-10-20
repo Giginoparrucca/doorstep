@@ -3734,17 +3734,12 @@ async function handleAuth() {
       // a retryable error.
       errEl.textContent = h('login_err_timeout');
       errEl.classList.add('show');
-      btn.disabled = false;
-      btn.textContent = h('login_signin');
       return;
     }
-    if (timeoutId) clearTimeout(timeoutId);
     const result = raced;
     if (result.error) {
       errEl.textContent = result.error.message;
       errEl.classList.add('show');
-      btn.disabled = false;
-      btn.textContent = h('login_signin');
       return;
     }
 
@@ -3754,9 +3749,12 @@ async function handleAuth() {
     document.getElementById('loginOverlay').classList.add('hidden');
     init();
   } catch (e) {
-    if (timeoutId) clearTimeout(timeoutId);
     errEl.textContent = h('login_err_connection');
     errEl.classList.add('show');
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+    // Success hides this form; logout reveals the same DOM again. Always
+    // restore the button so another login never requires a page refresh.
     btn.disabled = false;
     btn.textContent = h('login_signin');
   }

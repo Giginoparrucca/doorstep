@@ -90,3 +90,20 @@ opening/closure changes remain a separate portal/APT operation.
 17. Official WebTur login/training page: https://servizistatistici.regione.fvg.it/webtur/jsp/wt/login_video.jsp ; login confirms digital identity access and separate file-loading video. No authenticated operator surface was accessed.
 18. Sicilia official FAQ: https://osservatorioturistico.regione.sicilia.it/public/info ; current document list https://osservatorioturistico.regione.sicilia.it/public/documents returned 0 documents; public API landing https://osservatorioturistico.regione.sicilia.it/webapi . No authenticated records or endpoints used.
 19. Campania official API procedure: https://www.regione.campania.it/assets/documents/modalita-operative-per-la-trasmissione-della-movimentazione-turistica-via-web-api-tramite-software-gestionali.pdf ; current public user-guide link returned 404. No verified standalone import format retrieved.
+
+## Round 61 SPOT Online (20 October 2026)
+
+The `spot_online` serializer follows official specification v1.0, rechecked via
+ARET's public document library. Both XSD 0.6 files are public and committed under
+`docs/spot/`; source URLs, retrieval date, prefix normalization and decisions are
+recorded in `docs/spot/README.md`. Ordinary and startup goldens validate with lxml.
+The XSD requires lowercase `si` for separate-head departures (the prose says SI).
+Capacity is included on every ordinary day and omitted on startup, as permitted
+by XSD and described by the specification's startup section.
+
+XML contains only stable anonymous guest codes and required statistics, with
+no inferred residence or invented qualitative fields. Explicit `_bedOccupancy`
+review values are mandatory. Legacy exports remain byte-identical.
+The serializer is ready; Phase 3 wires the review inputs and download into the UI.
+**Not yet verified on the live portal**: the first real upload requires a host's
+SPID login. No request for XSD files is now needed.

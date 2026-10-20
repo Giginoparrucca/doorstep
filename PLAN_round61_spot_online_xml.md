@@ -84,3 +84,32 @@ Owner-only actions for Daniele (none block shipping)
 
 Delivery
 To be filled in by the executing model: PRs, merge SHAs, test totals per phase, XSD status, deployment verification.
+
+Phase 2 handoff — GPT-6, 19 October 2026
+
+- Claimed Phase 2 from main `871cb93` after Claude's PR #186/#187. Round 60 is
+  already closed; its previous GPT review branch was preserved.
+- Added the draft `spot_online` generation path and fictional ordinary/startup
+  XML goldens, independent XML/guest-ledger checks and legacy byte baselines.
+- `_bedOccupancy` (`si`/`no`) is required per reviewed row; `startup` is optional
+  boolean. Groups are tied by booking code, arrival and head type. Bed-sharing
+  guests do not consume an extra available bed. Closed days cannot have previous
+  night guests or movements. Carry-over members may reference a historical head
+  in `contextRows`; a new arrival cannot silently omit its head from review.
+- Partial Phase 2 only: official document recheck blocked (proxy CONNECT 403),
+  XSD availability unknown. Source register records ambiguity and draft status.
+  UI routing remains CSV until the official-spec check and review inputs are
+  ready; Phase 3 has not started. No merge, deployment or portal acceptance claim.
+- Delivery branch: `codex/round61-phase2`. Final test/release evidence is in
+  CHANGELOG. Next: restore official-source access, reconcile PDF/XSD, finish
+  routing with the review contract, then pass PR/CI and deployment gates.
+
+Phase 2 continuation — GPT-6, 20 October 2026
+
+- Located public ARET PDF and XSD links; official schemas now committed under
+  docs/spot with exact source provenance and normalization notes. Recheck is
+  complete; the previous access blocker no longer applies.
+- XSD overrides prose for separate-head departures: lowercase `si` is required.
+  Both golden files pass XSD validation plus the independent guest-ledger checks.
+- PR #188; local full regression PASS 50 / FAIL 0 / SKIP 3, details in CHANGELOG.
+  UI wiring remains Phase 3, after the Phase 2 CI/merge/deployment gates.

@@ -1140,7 +1140,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 @media(max-width:720px){#panel-property>.panel-header-actions>div:first-child{flex:0 0 100%!important}#propertySaveBtn{white-space:normal;overflow:visible}}
 .cover-frame-controls{margin-top:16px;display:grid;gap:8px}.cover-frame-controls[hidden]{display:none}.cover-frame-controls input{width:100%;min-width:0}.cover-frame-controls label{font-size:.8rem}.cover-frame-controls output{float:right}.property-leave-actions{display:flex;gap:8px;flex-wrap:wrap}.property-leave-dialog{position:fixed;inset:0;margin:auto;width:min(520px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;border:1px solid var(--border);border-radius:14px;padding:24px;max-width:min(520px,calc(100vw - 32px));color:var(--ink);background:var(--white)}.property-leave-dialog::backdrop{background:rgba(6,26,61,.45)}.property-leave-dialog h2{margin-top:0;font-size:1.2rem}.property-leave-dialog p{margin:12px 0 20px;font-size:.88rem;line-height:1.5}.property-leave-dialog .btn{white-space:normal}
 
-.regional-dialog{width:min(1000px,calc(100vw - 32px));max-height:90vh;overflow:auto;border:1px solid var(--border);border-radius:14px;padding:24px;color:var(--ink);background:var(--white)}.regional-dialog::backdrop{background:rgba(6,26,61,.5)}.regional-dialog-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.regional-dialog h2{font-size:1.2rem}.regional-dialog h3{font-size:1rem;margin-top:20px}.regional-dialog p{font-size:.82rem;line-height:1.5}.regional-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:12px;margin:12px 0;align-items:end}.regional-field{display:grid;gap:5px;font-size:.78rem;min-width:0}.regional-dialog input,.regional-dialog select{min-width:0;width:100%}.regional-dialog input[type=checkbox]{width:auto}.regional-dialog details{border:1px solid var(--border);border-radius:8px;padding:10px;margin:8px 0}.regional-dialog summary{cursor:pointer;font-size:.82rem;font-weight:500}.regional-guests{max-height:45vh;overflow:auto}.regional-table-wrap{overflow-x:auto}.regional-days{min-width:760px;width:100%}.regional-days th{white-space:normal;font-size:.7rem}.regional-days td{padding:5px}.regional-days th:last-child,.regional-days td:last-child{position:static;box-shadow:none;background:transparent}.regional-days th{letter-spacing:0;text-transform:none}.regional-days input,.regional-days select{min-width:90px}.regional-confirm{display:flex;gap:8px;font-size:.84rem;margin:18px 0;align-items:flex-start}.regional-dialog [data-errors]{white-space:pre-line;color:var(--red)}.regional-dialog .btn{white-space:normal}.regional-note{color:var(--ink-soft)}@media(max-width:540px){.regional-dialog{padding:14px}.regional-dialog h2{font-size:1.05rem}}
+.regional-dialog{width:min(1000px,calc(100vw - 32px));max-height:90vh;overflow:auto;border:1px solid var(--border);border-radius:14px;padding:24px;color:var(--ink);background:var(--white)}.regional-dialog::backdrop{background:rgba(6,26,61,.5)}.regional-dialog-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.regional-dialog h2{font-size:1.2rem}.regional-dialog h3{font-size:1rem;margin-top:20px}.regional-dialog p{font-size:.82rem;line-height:1.5}.regional-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:12px;margin:12px 0;align-items:end}.regional-field{display:grid;gap:5px;font-size:.78rem;min-width:0}.regional-dialog input,.regional-dialog select{min-width:0;width:100%}.regional-dialog input[type=checkbox]{width:auto}.regional-dialog details{border:1px solid var(--border);border-radius:8px;padding:10px;margin:8px 0}.regional-dialog summary{cursor:pointer;font-size:.82rem;font-weight:500}.regional-guests{max-height:45vh;overflow:auto}.regional-table-wrap{overflow-x:auto}.regional-days{min-width:760px;width:100%}.regional-days th{white-space:normal;font-size:.7rem}.regional-days td{padding:5px}.regional-days th:last-child,.regional-days td:last-child{position:static;box-shadow:none;background:transparent}.regional-days th{letter-spacing:0;text-transform:none}.regional-days input,.regional-days select{min-width:90px}.regional-bed-table{width:100%;font-size:.8rem}.regional-bed-table th{white-space:normal;letter-spacing:0;text-transform:none}.regional-bed-table td{padding:6px}.regional-bed-table .form-select{min-width:70px}.regional-confirm{display:flex;gap:8px;font-size:.84rem;margin:18px 0;align-items:flex-start}.regional-dialog [data-errors]{white-space:pre-line;color:var(--red)}.regional-dialog .btn{white-space:normal}.regional-note{color:var(--ink-soft)}@media(max-width:540px){.regional-dialog{padding:14px}.regional-dialog h2{font-size:1.05rem}}
 </style>
 <style>
 .share-actions,.share-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
@@ -2412,8 +2412,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 <script src="/lib/cover-layout.js?v=57.1"></script>
 <script src="/host-unsaved-changes.js?v=59.1"></script>
 <script src="/host-property-editor.js?v=59.1"></script>
-<script src="/lib/regional-exports.js?v=58.1"></script>
-<script src="/host-regional-exports.js?v=60.5"></script>
+<script src="/lib/regional-exports.js?v=61.2"></script>
+<script src="/host-regional-exports.js?v=61.3"></script>
 <script>
 /* ══════════════════════════════════════
    SUPABASE CONNECTION
@@ -5430,7 +5430,7 @@ async function showPanel(id, btn) {
 const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','settings','rules','recos','qrlink'];
 // Bump on every host-guides.js change so browsers never see a stale
 // copy even if their cache is aggressive.
-const _HG_VERSION = '59.1-unsaved-forms';
+const _HG_VERSION = '61.3';
 let _hgLoadPromise = null;
 function _hgLoad() {
   if (window.HG) return Promise.resolve();
@@ -10552,11 +10552,15 @@ function exportAlloggiati() {
   downloadFile('alloggiati_' + new Date().toISOString().slice(0,10) + '.txt', fileContent);
   track('export_alloggiati', { guests: lines.length, groups: groupCount, warnings: warnings.length });
 
+  const spotEasy = propertyData.region === 'Puglia' && propertyData.regional_service === 'spot_easy';
+  const it = hostLang === 'it';
+  const destination = it ? 'Alloggiati Web → Invio File (entro 24 ore)' : 'Alloggiati Web → Invio File (within 24h)';
+  const spotNote = spotEasy ? (it ? '\nSPOT Easy → Carica file PS (mensile)' : '\nSPOT Easy → Carica file PS (monthly)') : '';
   if (warnings.length > 0) {
-    alert(`File generated: ${lines.length} guest(s) in ${groupCount} stay(s).\n\nThis .txt file works on both:\n  • Alloggiati Web → Invio File (within 24h)\n  • SPOT Easy → Carica Scheda Alloggiati (monthly)\n\n⚠️ Review:\n` + warnings.join('\n'));
-    toast(`File generated — ${warnings.length} item(s) need review`);
+    alert(`${it ? 'File generato' : 'File generated'}: ${lines.length} ${it ? 'ospiti' : 'guests'} · ${groupCount} ${it ? 'soggiorni' : 'stays'}.\n\n${destination}${spotNote}\n\n⚠️ ${it ? 'Da verificare' : 'Review'}:\n` + warnings.join('\n'));
+    toast(`${it ? 'File generato — elementi da verificare' : 'File generated — items to review'}: ${warnings.length}`);
   } else {
-    toast(`✅ ${lines.length} guest(s) · ${groupCount} stay(s) · works on Alloggiati + SPOT Easy`);
+    toast(`✅ ${lines.length} ${it ? 'ospiti' : 'guests'} · ${groupCount} ${it ? 'soggiorni' : 'stays'} · Alloggiati${spotEasy ? ' + SPOT Easy' : ''}`);
   }
 }
 
@@ -12107,8 +12111,8 @@ const HOST_PORTAL_TILES = {
   },
   'axis.stats': {
     defaultLabel: { en: 'My tourist-flow portal',            it: 'Il mio portale flussi turistici' },
-    hint:         { en: 'One link for the tourist-flow / statistical filing — ROSS1000 Veneto, Turismo5, SPOT Easy Puglia, Stat.-er, etc.',
-                    it: 'Un link per la dichiarazione dei flussi turistici — ROSS1000 Veneto, Turismo5, SPOT Easy Puglia, Stat.-er, ecc.' },
+    hint:         { en: 'One link for the tourist-flow / statistical filing — ROSS1000 Veneto, Turismo5, SPOT Puglia, Stat.-er, etc.',
+                    it: 'Un link per la dichiarazione dei flussi turistici — ROSS1000 Veneto, Turismo5, SPOT Puglia, Stat.-er, ecc.' },
   },
   'axis.tax': {
     defaultLabel: { en: 'My tourist-tax portal',             it: 'Portale imposta di soggiorno' },
@@ -12297,6 +12301,7 @@ function regionalExportController() {
     // exactly (host-entered property fields are the only source).
     context: () => ({propertyId, property:propertyData, rooms:(Array.isArray(allRooms)?allRooms:[]), lang:hostLang, sb}),
     comuneCode: city => comuneCodeFromCity(city), allog: window.AllogRecords,
+    changeService: async () => { await showPanel('property'); document.getElementById('propRegionalService')?.focus(); },
   });
   return _regionalExportController;
 }
@@ -12485,7 +12490,8 @@ function openHostPortalEditor(tileKey) {
   const meta = HOST_PORTAL_TILES[tileKey] || {};
   const cur = _hostPortalMap()[tileKey] || {};
   const defaultLabel = meta.defaultLabel?.[hostLang] || (it ? 'Il mio portale' : 'My portal');
-  const hint = meta.hint?.[hostLang] || '';
+  const spotLabel = propertyData.regional_service === 'spot_easy' ? 'SPOT Easy' : propertyData.regional_service === 'spot_online' ? 'SPOT Online' : (it ? 'SPOT (scegli servizio)' : 'SPOT (choose service)');
+  const hint = (meta.hint?.[hostLang] || '').replace('SPOT Puglia', propertyData.region === 'Puglia' ? spotLabel + ' Puglia' : 'SPOT Puglia');
   const html = `
     <div id="hostPortalModal" style="display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10000;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;" onclick="if(event.target===this)closeHostPortalEditor()">
       <div style="background:var(--white);max-width:520px;width:100%;border-radius:14px;padding:22px 26px 18px;box-shadow:0 12px 48px rgba(0,0,0,0.25);">
@@ -15296,14 +15302,15 @@ function fillPropertyForm(data) {
   if (data.region === 'Puglia' && !data.regional_service && typeof Cin !== 'undefined') {
     const detected = Cin.detectService(data);
     if (detected.service && (detected.source === 'cin' || detected.source === 'property_type')) {
-      sb.from('properties').update({ regional_service: detected.service }).eq('id', data.id).then(({ error }) => {
-        if (error) return;
+      sb.from('properties').update({ regional_service: detected.service }).eq('id', data.id).is('regional_service', null).select('id').single().then(({ data: saved, error }) => {
+        if (error || !saved || saved.id !== data.id || propertyId !== data.id || propertyData.id !== data.id || propertyData.regional_service || (el('propRegionalService')?.value)) return;
         data.regional_service = detected.service;
         propertyData.regional_service = detected.service;
         if (el('propRegionalService')) el('propRegionalService').value = detected.service;
         const label = detected.service === 'spot_online' ? 'SPOT Online' : 'SPOT Easy';
         const sourceLabel = detected.source === 'cin' ? (hostLang === 'it' ? 'dal CIN' : 'from CIN') : (hostLang === 'it' ? 'dal tipo di proprietà' : 'from property type');
         toast(`${label} ${hostLang === 'it' ? 'rilevato automaticamente ' : 'auto-detected '}${sourceLabel}`);
+        renderRegionalTile();
       });
     }
   }

@@ -5279,16 +5279,6 @@ function _writeLastTab(sectionId, panelId) {
     localStorage.setItem(SECTION_LAST_TAB_KEY, JSON.stringify(obj));
   } catch (_) {}
 }
-// The section that was last visible, so a full reload lands the host
-// on the same view they left. Stored alongside the per-section tab
-// map so a single localStorage key covers both.
-const SECTION_LAST_ACTIVE_KEY = 'wbnb_section_last';
-function _readLastSection() {
-  try { return localStorage.getItem(SECTION_LAST_ACTIVE_KEY); } catch (_) { return null; }
-}
-function _writeLastSection(sectionId) {
-  try { localStorage.setItem(SECTION_LAST_ACTIVE_KEY, sectionId); } catch (_) {}
-}
 // Keep old titles object for compatibility
 const titles = {};
 Object.keys(titlesMap).forEach(k => {
@@ -5364,7 +5354,6 @@ async function showPanel(id, btn) {
   if (window.HostOnboarding) window.HostOnboarding.renderPropertyAttention(sectionId);
   _renderSectionTabs(sectionId, id);
   _writeLastTab(sectionId, id);
-  _writeLastSection(sectionId);
   document.getElementById('panelTitle').textContent = titles[id][0];
   document.getElementById('panelSubtitle').textContent = titles[id][1];
   // Close sidebar + overlay on mobile
@@ -14806,7 +14795,6 @@ async function init() {
       fillPropertyForm(chosen);
       // First-property onboarding banner (only when the single property is blank)
       if (allProperties.length === 1 && !chosen.address && !chosen.wifi_name) {
-        showPanel('property', document.querySelector('[onclick*=property]'));
         const ob = document.getElementById('onboardingBanner');
         if (ob) ob.style.display = 'block';
       }
@@ -14821,7 +14809,7 @@ async function init() {
   if (adminPropId) activateAdminView();
 
   // Round 42 — deep-link handler for push / email / telegram alert
-  // clicks. Runs BEFORE the section-restore below so it wins. The
+  // clicks. Explicit notification destinations take precedence over the default dashboard. The
   // notify_prop query param must resolve to a property the current
   // host owns; otherwise the whole trio is ignored silently
   // (a malicious link can't jump the host into someone else's chat).
@@ -14860,28 +14848,14 @@ async function init() {
         cleanUrl.searchParams.delete('open');
         cleanUrl.searchParams.delete('conv');
         history.replaceState(null, '', cleanUrl.toString());
-        return; // skip the section-restore below
+        return; // notification destination already selected
       }
     }
   } catch (e) { console.warn('[notif] deep-link handler failed:', e); }
 
-  // Round 40 Task 4 — restore the last visible section/tab across
-  // reloads. Panels other than dashboard start hidden until an explicit
-  // showPanel is called, so we need to fire one at boot regardless.
-  // The onboarding redirect above may already have called showPanel;
-  // don't second-guess that here.
-  const alreadyOnPanel = document.querySelector('.panel.active')?.id?.replace('panel-', '');
-  if (alreadyOnPanel && alreadyOnPanel !== 'dashboard') {
-    // Onboarding forced us onto property — paint the tab strip to match.
-    showPanel(alreadyOnPanel);
-  } else {
-    const lastSection = _readLastSection();
-    if (lastSection && SECTIONS[lastSection]) {
-      showSection(lastSection);
-    } else {
-      showPanel('dashboard');
-    }
-  }
+  // Every ordinary sign-in or reload starts on the dashboard. Remembered
+  // tabs are only used when the host explicitly opens a sidebar section.
+  await showPanel('dashboard');
 }
 
 // Is the currently-authenticated user an admin? Checks the admin_users

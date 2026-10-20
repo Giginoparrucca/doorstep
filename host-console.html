@@ -190,7 +190,7 @@ body { display: flex; overflow: hidden; }
 .btn-danger { background: var(--red); color: #fff; }
 .btn-sm { padding: 5px 10px; font-size: 0.75rem; }
 
-.content { flex: 1; padding: 24px 28px 40px; }
+.content { --page-gutter: 28px; flex: 1; padding: 24px 28px 40px; }
 
 /* Round 37.2 — action buttons follow the scroll so the host can
    always reach them. Desktop: floating pill pinned top-right,
@@ -691,7 +691,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   .qr-preview { flex-direction: column; text-align: center; }
   .qr-box { margin: 0 auto; }
   .main-header { padding: 14px 16px; }
-  .content { padding: 16px 14px 32px; }
+  .content { --page-gutter: 14px; padding: 16px 14px 32px; }
 
   /* Check-in table → card layout on mobile */
   .table-wrap table, .table-wrap thead, .table-wrap tbody, .table-wrap th, .table-wrap td, .table-wrap tr {
@@ -729,7 +729,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   .main-header { padding: 12px 14px; gap: 8px; }
   .main-title { font-size: 1.2rem; }
   .main-subtitle { font-size: 0.82rem; }
-  .content { padding: 12px 10px 60px; }
+  .content { --page-gutter: 10px; padding: 12px 10px 60px; }
   .header-actions { gap: 4px; }
 
   /* Bigger touch targets */
@@ -830,6 +830,33 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     text-overflow: ellipsis;
   }
 }
+/* Page actions belong to the whole workspace, above the content cards. */
+.content:has(> .panel.active > .page-edit-toolbar) { padding-top: 0; }
+.panel > .page-edit-toolbar {
+  top: var(--console-header-height, 0px);
+  margin: 0 calc(-1 * var(--page-gutter, 0px)) 24px;
+  padding: 16px var(--page-gutter, 16px);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--white);
+}
+.panel[data-edit-mode="edit"] > .page-edit-toolbar {
+  background: #fff8e8;
+  border-color: var(--amber);
+  box-shadow: none;
+}
+.page-edit-scope { font-size: .74rem; color: var(--ink-soft); margin-top: 3px; }
+.page-edit-label { display: none; }
+.panel[data-edit-mode="edit"] .page-view-label { display: none; }
+.panel[data-edit-mode="edit"] .page-edit-label { display: inline; color: #8b5b10; }
+.page-edit-toolbar .btn { min-height: 40px; }
+@media (max-width: 860px) {
+  .panel > .page-edit-toolbar { padding: 12px var(--page-gutter, 14px); margin-bottom: 20px; }
+  .page-edit-toolbar .btn { min-height: 44px; white-space: normal; overflow: visible; justify-content: center; }
+}
+
 .mobile-toggle {
   display: none; align-items: center; justify-content: center;
   width: 42px; height: 42px; border-radius: 8px;
@@ -1354,10 +1381,10 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       <!-- Round 40 T8 → 43.4 — sticky in-panel header bar. Styles now
            live on the .panel-header-actions class (Round 43.4 unified
            it with .panel-actions on Rules/Recos). -->
-      <div class="panel-header-actions">
+      <div class="panel-header-actions page-edit-toolbar">
         <div style="flex:1;min-width:0;">
           <div style="font-family:'Playfair Display',serif;font-weight:600;font-size:1rem;" data-h="prop_header_title">Property details</div>
-          <div style="font-size:0.72rem;color:var(--ink-soft);" data-h="prop_header_hint">View mode</div>
+          <div class="page-edit-scope"><span class="page-view-label" data-h="page_view_scope">Viewing · Entire page</span><span class="page-edit-label" data-h="page_edit_scope">Editing · Entire page</span></div>
         </div>
         <button type="button" class="btn btn-secondary btn-sm" onclick="openPreviewAsGuest()" data-h="btn_preview_guest" data-guide="prop-preview" title="Open the guest app in test mode (no analytics)">🧪 Preview as guest</button>
         <button type="button" id="propertyEditBtn" class="btn btn-secondary btn-sm" onclick="startPropertyEdit()" data-guide="prop-edit">✏️ <span data-h="btn_edit_list">Edit</span></button>
@@ -1693,10 +1720,10 @@ tr:hover td { background: rgba(250,246,240,0.6); }
            fieldset is disabled; Edit toggles it live, Save fires the
            card-level save helpers, Cancel reloads propertyData. Tourist
            Tax keeps its own edit lifecycle from Round 37 (redux). -->
-      <div class="panel-header-actions">
+      <div class="panel-header-actions page-edit-toolbar">
         <div style="flex:1;min-width:0;">
           <div style="font-family:'Playfair Display',serif;font-weight:600;font-size:1rem;" data-h="settings_header_title">Settings</div>
-          <div style="font-size:0.72rem;color:var(--ink-soft);" data-h="settings_header_hint">Integrations, tourist tax, reminders, privacy</div>
+          <div class="page-edit-scope"><span class="page-view-label" data-h="page_view_scope">Viewing · Entire page</span><span class="page-edit-label" data-h="page_edit_scope">Editing · Entire page</span></div>
         </div>
         <button type="button" id="settingsEditBtn" class="btn btn-secondary btn-sm" onclick="startSettingsEdit()">✏️ <span data-h="btn_edit_list">Edit</span></button>
         <button type="button" id="settingsSaveBtn" class="btn btn-primary btn-sm" onclick="saveSettingsEdit()" style="display:none;" data-h="btn_save_settings">💾 Save Settings</button>
@@ -1931,10 +1958,10 @@ tr:hover td { background: rgba(250,246,240,0.6); }
            sticky in flow, matching Property. Avoids the old
            .panel-actions floating pill overlapping the language toggle
            on desktop. -->
-      <div class="panel-header-actions">
+      <div class="panel-header-actions page-edit-toolbar">
         <div style="flex:1;min-width:0;">
           <div style="font-family:'Playfair Display',serif;font-weight:600;font-size:1rem;" data-h="t_rules">House Rules</div>
-          <div style="font-size:0.72rem;color:var(--ink-soft);" data-h="prop_header_hint">View mode</div>
+          <div class="page-edit-scope"><span class="page-view-label" data-h="page_view_scope">Viewing · Entire page</span><span class="page-edit-label" data-h="page_edit_scope">Editing · Entire page</span></div>
         </div>
         <button id="rulesEditToggle" class="btn btn-secondary btn-sm" onclick="toggleRulesEditMode()" data-guide="rules-edit">✏️ <span data-h="btn_edit_list">Edit</span></button>
         <button class="btn btn-secondary btn-sm" onclick="addRule()" data-h="btn_add_rule" data-guide="rules-add-custom" data-rules-edit-only style="display:none;">+ Add Custom Rule</button>
@@ -1960,10 +1987,10 @@ tr:hover td { background: rgba(250,246,240,0.6); }
     <div class="panel" id="panel-recos" data-edit-mode="view">
 
       <!-- Round 43.4 — sticky in-flow header, matching Property + Rules. -->
-      <div class="panel-header-actions">
+      <div class="panel-header-actions page-edit-toolbar">
         <div style="flex:1;min-width:0;">
           <div style="font-family:'Playfair Display',serif;font-weight:600;font-size:1rem;" data-h="t_recos">Recommendations</div>
-          <div style="font-size:0.72rem;color:var(--ink-soft);" data-h="prop_header_hint">View mode</div>
+          <div class="page-edit-scope"><span class="page-view-label" data-h="page_view_scope">Viewing · Entire page</span><span class="page-edit-label" data-h="page_edit_scope">Editing · Entire page</span></div>
         </div>
         <button id="recosEditToggle" class="btn btn-secondary btn-sm" onclick="toggleRecosEditMode()">✏️ <span data-h="btn_edit_list">Edit</span></button>
         <button class="btn btn-secondary btn-sm" onclick="addReco()" data-h="btn_add_reco" data-guide="recos-add" data-recos-edit-only style="display:none;">+ Add Recommendation</button>
@@ -2378,6 +2405,19 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
+<script>
+function observePageToolbarHeader() {
+  const header = document.querySelector('.main-header');
+  if (!header) return null;
+  const root = header.closest('.main') || document.documentElement;
+  const measure = () => root.style.setProperty('--console-header-height', header.getBoundingClientRect().height + 'px');
+  measure();
+  const observer = new ResizeObserver(measure);
+  observer.observe(header, {box: 'border-box'});
+  return observer;
+}
+observePageToolbarHeader();
+</script>
 <script src="/app-config.js"></script>
 <script src="/app-bootstrap.js"></script>
 <script>
@@ -4278,6 +4318,7 @@ const HT = {
     prop_privacy_data_hint: 'Confirmation requires typing the property name.',
     btn_delete_all_prop: 'Delete all check-in records',
     prop_header_title: 'Property details',
+    page_view_scope: 'Viewing · Entire page', page_edit_scope: 'Editing · Entire page',
     prop_header_hint:  'View mode',
     btn_split_langs: '✂ Split existing content by language',
     prop_tax_rate: 'Rate (€ per person per night)',
@@ -4852,6 +4893,7 @@ const HT = {
     prop_privacy_data_hint: 'La conferma richiede di digitare il nome della proprietà.',
     btn_delete_all_prop: 'Elimina tutti i check-in',
     prop_header_title: 'Dettagli proprietà',
+    page_view_scope: 'Visualizzazione · Tutta la pagina', page_edit_scope: 'Modifica · Tutta la pagina',
     prop_header_hint:  'Modalità visualizzazione',
     btn_split_langs: '✂ Dividi il contenuto per lingua',
     prop_tax_rate: 'Tariffa (€ per persona a notte)',
@@ -9108,8 +9150,6 @@ let propertyEditMode = false;
 function _setPropertyEditControls(editing) {
   const panel = document.getElementById('panel-property');
   if (panel) panel.setAttribute('data-edit-mode', editing ? 'edit' : 'view');
-  const modeHint = panel?.querySelector('[data-h="prop_header_hint"], [data-h="prop_editing_hint"]');
-  if (modeHint) { modeHint.dataset.h = editing ? 'prop_editing_hint' : 'prop_header_hint'; modeHint.textContent = h(modeHint.dataset.h); }
   const fs = document.getElementById('propertyFormBody');
   if (fs) fs.disabled = !editing;
   // The cover-photo upload zone is a plain <div onclick=…>, so a disabled

@@ -42,7 +42,7 @@ other regional output.
 - Continued the existing Phase 2 branch and preserved its earlier handoff below. Located official v1.0 PDF and both public XSD 0.6 files on ARET; committed normalized schemas and source provenance. The official download has an invalid `o;?` prefix; only those three bytes were removed.
 - XSD validation caught and fixed uppercase `SI` in `partenzacapogrupposeparata`: the schema requires lowercase `si`. Ordinary and startup goldens now validate. Existing serializers remain byte-identical. Added lightweight lxml validation to CI.
 - Capacity ambiguity resolved: XSD permits omission; ordinary records include it per specification section 2.2.2.3, startup omits it per section 2.2.2.1. No longer blocked on ARET providing public schemas. No live portal upload claimed.
-- Full regression and release verification pending below. Phase 3 remains pending until Phase 2 merges.
+- Full local regression (Chromium Headless Shell 141): **PASS 50 / FAIL 0 / SKIP 3**. Skips: demo-e2e requires a hosted demo origin; demo-schema requires private catalog JSON; demo-schema-parse requires unavailable pglast 7.7/private schema SQL. Initial full-Chrome attempt failed at the container’s forbidden singleton socket; the supported Headless Shell rerun passed all five browser suites. PR #188 CI checks full regression and the production schema-drift RPC before merge. Phase 3 remains pending until Phase 2 merges.
 
 ### Round 61 Phase 2 — partial serializer handoff (GPT-6, 2026-10-19)
 

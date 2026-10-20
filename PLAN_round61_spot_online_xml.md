@@ -103,3 +103,13 @@ Phase 2 handoff — GPT-6, 19 October 2026
 - Delivery branch: `codex/round61-phase2`. Final test/release evidence is in
   CHANGELOG. Next: restore official-source access, reconcile PDF/XSD, finish
   routing with the review contract, then pass PR/CI and deployment gates.
+
+Phase 2 continuation — GPT-6, 20 October 2026
+
+- Located public ARET PDF and XSD links; official schemas now committed under
+  docs/spot with exact source provenance and normalization notes. Recheck is
+  complete; the previous access blocker no longer applies.
+- XSD overrides prose for separate-head departures: lowercase `si` is required.
+  Both golden files pass XSD validation plus the independent guest-ledger checks.
+- PR #188; local full regression PASS 50 / FAIL 0 / SKIP 3, details in CHANGELOG.
+  UI wiring remains Phase 3, after the Phase 2 CI/merge/deployment gates.

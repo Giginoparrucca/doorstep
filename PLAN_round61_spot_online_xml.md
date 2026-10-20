@@ -128,3 +128,15 @@ Phase 3 implementation — GPT-6, 20 October 2026
   release evidence follows in CHANGELOG after CI and deployment verification.
 - First real SPID-authenticated portal upload still unverified. XSDs were found
   publicly, so the earlier proposed XSD request is superseded.
+
+Round 61 closed — GPT-6, 20 October 2026
+
+- Phase 1a: PR #186, Claude; Phase 1b: PR #187, Claude (attribution preserved).
+- Phase 2: PR #188, merge `925f59f`; Phase 3: PR #189, merge `e1bcb63`.
+- Final full regression local and PR CI: PASS 51 / FAIL 0 / SKIP 3.
+  CI production schema-drift: PASS; demo and post-deploy SPOT smoke skip in CI.
+- Production `dpl_7TfcWzqSWUijQShnuWZfVd1LLZet` READY at app.welcomebnb.it.
+  Explicit post-deploy live suite: PASS 1 / FAIL 0 / SKIP 2; five public assets
+  exactly matched tested source and deployed generation matched both goldens.
+- Official XSD validation complete. First real SPID portal upload still unverified.
+  CIN typology mapping remains dormant pending an authoritative mapping.

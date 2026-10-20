@@ -113,3 +113,18 @@ Phase 2 continuation — GPT-6, 20 October 2026
   Both golden files pass XSD validation plus the independent guest-ledger checks.
 - PR #188; local full regression PASS 50 / FAIL 0 / SKIP 3, details in CHANGELOG.
   UI wiring remains Phase 3, after the Phase 2 CI/merge/deployment gates.
+
+Phase 3 implementation — GPT-6, 20 October 2026
+
+- Native XML routed from saved/first-time Online selection; explicit bed-occupancy
+  review and age, optional startup, carry-over/sequential/completeness guidance
+  and DMS upload instructions in IT+EN. Host guide and source register updated.
+- Returned-row checks fix the inherited first-choice persistence bug; stale
+  reads/saves/auto-detection cannot change another property. SPOT occupancy
+  prefills exclude checkout nights; legacy outputs remain byte-identical.
+- Full local regression PASS 51 / FAIL 0 / SKIP 3. Six real Chromium suites;
+  new SPOT browser matrix downloads both exact XML goldens in IT/EN at 390/1280.
+- Phase 2 merged PR #188 (`925f59f`) and production READY verified. Phase 3
+  release evidence follows in CHANGELOG after CI and deployment verification.
+- First real SPID-authenticated portal upload still unverified. XSDs were found
+  publicly, so the earlier proposed XSD request is superseded.

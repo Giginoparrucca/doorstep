@@ -24,7 +24,7 @@ No regional credentials or guest data were used to research/test these adapters.
 | Toscana: Firenze, Prato, Pistoia | ROSS1000 | ROSS1000 XML | [1] lists precisely these provinces; not all Toscana |
 | Toscana: other provinces / unresolved city | MOTouristOffice / assigned local system | Manual-entry reference CSV | [9], [10]; assigned system varies. No verified public standalone import schema retrieved; no invented ROSS1000 file |
 | Puglia: tourist rentals using SPOT Easy | SPOT Easy | PS / Alloggiati TXT | Official 2025 manual [11] pp. 3, 15, 19–20: enable Carica file PS, then add residence and confirm after import. Export covers selected arrival dates, includes already-filed police records |
-| Puglia: SPOT Online / Completo | SPOT | Manual-entry reference CSV | Different XML interface, not the SPOT Easy PS file; [11] distinguishes services. Public exact current XML specification not retrieved |
+| Puglia: accommodation businesses using SPOT Online | SPOT Online | Native XML (XSD 0.6) | Official spec v1.0 and public XSDs rechecked 20 October 2026; see docs/spot/README.md. Startup optional; every day reviewed. SPOT Completo users must switch to Online in DMS. First real portal upload unverified |
 | Umbria | Turismatica | One ASCII C/59 TXT per day (ZIP for multiple days) | [12] links exact record layout, example and provenance codes. Italian provenance is residence province; foreign provenance uses regional country/aggregation codes |
 | Trentino: licensed accommodation using STU | STU | One daily C59 TXT on movement days (ZIP for multiple days) | [13] technical manual: IDOBJ+DDMMYYYY.txt, leading comma/header, provincial TARGA codes. Province requires PMS congruence checks/approval: verify with APT before using importer. Does not imply WelcomeBnB accreditation |
 | Trentino: DTU Alloggi private rentals | DTU Alloggi | Manual-entry reference CSV | [14] distinguishes DTU/STU. No verified DTU file-import schema retrieved; STU TXT must not be presented as DTU format |
@@ -38,7 +38,7 @@ It groups actual individual guests by country/province of residence, with daily
 arrivals, departures, guest nights and host-reviewed availability. It contains no
 names, documents or contact details. These reference downloads are partial support,
 not native integration for the listed systems. File-import support for WebTur,
-Sicilia, SPOT XML and non-ROSS Toscana needs the authority's current specification.
+Sicilia and non-ROSS Toscana needs the authority's current specification.
 External provider approval/connectivity is outside this file-download release.
 
 ## Serializer rules
@@ -104,6 +104,10 @@ by XSD and described by the specification's startup section.
 XML contains only stable anonymous guest codes and required statistics, with
 no inferred residence or invented qualitative fields. Explicit `_bedOccupancy`
 review values are mandatory. Legacy exports remain byte-identical.
-The serializer is ready; Phase 3 wires the review inputs and download into the UI.
+The host review includes explicit bed occupancy, age at arrival, optional startup,
+carry-over code guidance, sequential dates and capacity review. Download never
+changes filing status. The file must include every guest at the property.
+Upload on DMS → SPOT → Carica movimentazione, fix red rows, then click Invia
+movimentazione by the 10th of the following month.
 **Not yet verified on the live portal**: the first real upload requires a host's
 SPID login. No request for XSD files is now needed.

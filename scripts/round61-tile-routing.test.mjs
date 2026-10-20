@@ -19,8 +19,8 @@ assert.ok(
   'tile reads ctx.property.regional_service',
 );
 assert.ok(
-  /svc\s*===\s*['"]spot_online['"]\s*\?\s*['"]SPOT Online CSV['"]/.test(regional),
-  'spot_online label is "SPOT Online CSV" (interim until Phase 2 XML)',
+  /svc\s*===\s*['"]spot_online['"]\s*\?\s*['"]SPOT Online XML['"]/.test(regional),
+  'spot_online label is "SPOT Online XML" (Round 61 native XML)',
 );
 assert.ok(
   /svc\s*===\s*['"]spot_easy['"]\s*\?\s*['"]SPOT Easy TXT['"]/.test(regional),
@@ -54,8 +54,8 @@ assert.ok(
   'edit handler checks for data-persist-service',
 );
 assert.ok(
-  /svc\s*=\s*t\.value===['"]ps['"]\?['"]spot_easy['"]\s*:\s*t\.value===['"]summary['"]\?['"]spot_online['"]/.test(regional),
-  'edit handler maps ps→spot_easy and summary→spot_online',
+  /svc\s*=\s*t\.value===['"]ps['"]\?['"]spot_easy['"]\s*:\s*t\.value===['"]spot_online['"]\?['"]spot_online['"]/.test(regional),
+  'edit handler maps ps→spot_easy and spot_online→spot_online',
 );
 assert.ok(
   /ctx2\.sb\.from\('properties'\)\.update\(\{regional_service:svc\}\)\.eq\('id',ctx2\.property\.id\)/.test(regional),

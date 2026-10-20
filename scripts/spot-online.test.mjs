@@ -22,6 +22,8 @@ assert.equal(JSON.stringify(fixture),original,'no input mutation');
 fs.writeFileSync(path.join(dir,'fixture.json'),JSON.stringify(fixture));
 execFileSync('python',['-c',String.raw`
 import xml.etree.ElementTree as E, json, sys, datetime
+from lxml import etree
+schema=etree.XMLSchema(etree.parse('docs/spot/movimentogiornaliero-0.6.xsd'))
 from pathlib import Path
 p=Path(sys.argv[1]); f=json.loads((p/'fixture.json').read_text()); guests=f['rows']
 def code(row):
@@ -32,7 +34,9 @@ def code(row):
  return ('W'+(s or '0')).upper()[:20]
 bycode={code(g):g for g in guests}
 for startup in (False,True):
- root=E.parse(p/('startup.xml' if startup else 'normal.xml')).getroot()
+ file=p/('startup.xml' if startup else 'normal.xml')
+ schema.assertValid(etree.parse(str(file)))
+ root=E.parse(file).getroot()
  assert root.tag=='movimenti' and root.attrib=={'vendor':'WelcomeBnB'}
  moves=root.findall('movimento'); dates=[m.attrib['data'] for m in moves]
  first=datetime.date.fromisoformat(f['start'])-datetime.timedelta(days=int(startup))
@@ -59,7 +63,7 @@ for startup in (False,True):
    assert dep.text in known; g=bycode[dep.text]; expanded.add(dep.text)
    members=[x for x in guests if x['booking_code']==g['booking_code'] and x['guest_type'] in ('member','group_member')]
    separate=g['guest_type'] in ('head','group') and any(x['departure_date']>date for x in members)
-   assert dep.attrib==({'partenzacapogrupposeparata':'SI'} if separate else {})
+   assert dep.attrib==({'partenzacapogrupposeparata':'si'} if separate else {})
    if g['guest_type'] in ('head','group') and not separate:
     expanded.update(code(x) for x in members if x['departure_date']==date)
   assert expanded=={code(g) for g in guests if g['departure_date']==date},date
@@ -97,7 +101,7 @@ const empty=make({rows:[],startup:true});for(const d of Object.values(empty.dail
 const carryMember=make({start:'2026-05-07',end:'2026-05-08'});carryMember.rows=fixture.rows.filter(r=>r.id==='late-member');carryMember.contextRows=fixture.rows;assert.deepEqual(R.generate(carryMember).errors,[]);assert.ok(!R.generate(carryMember).files[0].content.includes('<arrivi>'));carryMember.startup=true;assert.ok(R.generate(carryMember).errors.some(e=>e.field==='startup'));
 const sharedBed=make();sharedBed.daily['2026-05-01'].beds=2;sharedBed.daily['2026-05-02'].beds=2;assert.deepEqual(R.generate(sharedBed).errors,[],'child sharing a bed does not consume a third bed');
 const separate=make();separate.rows.push({...separate.rows.find(r=>r.id==='late-member'),id:'same-as-early-head',departure_date:'2026-05-06'});
-const separateResult=R.generate(separate);assert.deepEqual(separateResult.errors,[]);const departureDay=separateResult.files[0].content.split('data="2026-05-06"')[1].split('</movimento>')[0];assert.ok(departureDay.includes(R.idFor({id:'same-as-early-head'})),'member leaving with an early head must have an individual departure');assert.ok(departureDay.includes('partenzacapogrupposeparata="SI"'));
+const separateResult=R.generate(separate);assert.deepEqual(separateResult.errors,[]);const departureDay=separateResult.files[0].content.split('data="2026-05-06"')[1].split('</movimento>')[0];assert.ok(departureDay.includes(R.idFor({id:'same-as-early-head'})),'member leaving with an early head must have an individual departure');assert.ok(departureDay.includes('partenzacapogrupposeparata="si"'));
 bad(i=>{i.rows[0].id='Aa';i.rows[1].id='B@';},'id','collision');
 // Compare every existing serializer byte-for-byte with the exact pre-phase source.
 const legacyHashes=JSON.parse(fs.readFileSync(new URL('./golden/synthetic/spot-online-legacy-hashes.json',import.meta.url))); 
@@ -106,4 +110,4 @@ for(const format of ['ross','ps','umbria','trento','summary']){
  const result=R.generate(i);assert.deepEqual(result.errors,[]);assert.equal(createHash('sha256').update(JSON.stringify(result)).digest('hex'),legacyHashes[format],format+' unchanged');
 }
 
-console.log('PASS SPOT Online draft: independent XML ledger + startup goldens, group departures, residence/capacity/bed review gates, privacy, scope and unchanged legacy bytes');
+console.log('PASS SPOT Online: independent XML ledger + startup goldens, group departures, residence/capacity/bed review gates, privacy, scope and unchanged legacy bytes');

@@ -91,37 +91,19 @@ opening/closure changes remain a separate portal/APT operation.
 18. Sicilia official FAQ: https://osservatorioturistico.regione.sicilia.it/public/info ; current document list https://osservatorioturistico.regione.sicilia.it/public/documents returned 0 documents; public API landing https://osservatorioturistico.regione.sicilia.it/webapi . No authenticated records or endpoints used.
 19. Campania official API procedure: https://www.regione.campania.it/assets/documents/modalita-operative-per-la-trasmissione-della-movimentazione-turistica-via-web-api-tramite-software-gestionali.pdf ; current public user-guide link returned 404. No verified standalone import format retrieved.
 
-## Round 61 SPOT Online draft (19 October 2026)
+## Round 61 SPOT Online (20 October 2026)
 
-The pending `spot_online` serializer is an internal draft based on the approved
-format summary in `PLAN_round61_spot_online_xml.md`, attributed there to
-InnovaPuglia, *Modalità Online – Specifiche del sistema*, v1.0, 13 February 2020:
-https://dms.puglia.it/portal/documents/10180/4890175/Spot%20online%20specifiche .
-The current manual is listed at
-https://info.ect.regione.puglia.it/wp-content/uploads/2025/10/Manuale-di-utilizzo-di-SPOT-Online_2025-vers.1_09_25-1.pdf .
+The `spot_online` serializer follows official specification v1.0, rechecked via
+ARET's public document library. Both XSD 0.6 files are public and committed under
+`docs/spot/`; source URLs, retrieval date, prefix normalization and decisions are
+recorded in `docs/spot/README.md`. Ordinary and startup goldens validate with lxml.
+The XSD requires lowercase `si` for separate-head departures (the prose says SI).
+Capacity is included on every ordinary day and omitted on startup, as permitted
+by XSD and described by the specification's startup section.
 
-**Verification status:** the official PDF request was denied by this executor's
-network proxy (CONNECT 403). Neither the PDF nor `movimentogiornaliero-0.6.xsd`
-and `datatype-0.6.xsd` could be rechecked. This is an access failure, not evidence
-that the schemas are unavailable publicly. No XSD or live-portal validation is
-claimed. Do not describe this draft as independently confirmed against the
-current official specification. It is not routed into the host download UI;
-the Puglia Online reference CSV remains the current delivered output.
-
-The draft emits daily MP/NM/EC records, nested family/group members, stable guest
-codes, separate early-head departures and optional startup arrivals. It requires
-an explicit download-only `_bedOccupancy` value (`si` or `no`) on every guest;
-`startup` is a boolean input. It uses Italian residence comune codes or foreign
-country codes, with no residence inference from citizenship or birthplace.
-It includes `datistruttura` on every ordinary day, including NM/EC; startup
-records omit capacity, following the examples as described in the approved plan.
-This ambiguity still needs comparison with the official schema. Startup group
-snapshots with an absent head or no remaining members are blocked rather than
-inventing a replacement head/type. No names, booking codes, document details,
-contacts, or room IDs enter the XML.
-
-Synthetic ordinary/startup XML goldens have an independent ElementTree parse and
-guest ledger check. Legacy-output SHA-256 baselines were calculated from main
-`871cb93` using the same fictional fixture; the test requires successful outputs
-before comparing hashes for ROSS1000, SPOT Easy, Umbria, Trento and summary CSV.
-These checks demonstrate agreement with the plan, not acceptance by SPOT.
+XML contains only stable anonymous guest codes and required statistics, with
+no inferred residence or invented qualitative fields. Explicit `_bedOccupancy`
+review values are mandatory. Legacy exports remain byte-identical.
+The serializer is ready; Phase 3 wires the review inputs and download into the UI.
+**Not yet verified on the live portal**: the first real upload requires a host's
+SPID login. No request for XSD files is now needed.

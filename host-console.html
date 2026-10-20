@@ -1044,12 +1044,16 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
 /* ── TOAST ── */
 .toast {
-  position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+  position: fixed; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); right: 24px; z-index: 9999;
+  max-width: calc(100vw - 32px); overflow-wrap: anywhere;
   background: var(--ink); color: #fff; padding: 12px 20px;
   border-radius: var(--radius-s); font-size: 0.88rem;
   box-shadow: 0 8px 30px rgba(0,0,0,0.2);
   transform: translateY(80px); opacity: 0;
   transition: all 0.3s ease;
+}
+@media (max-width: 600px) {
+  #roomsCard .room-row { grid-template-columns: minmax(0,1fr) 80px !important; }
 }
 .toast.show { transform: translateY(0); opacity: 1; }
 
@@ -1639,8 +1643,6 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
       </div>
 
-      </fieldset>
-
       <!-- Round 60 Phase 3b — Rooms / Camere. One struttura can host
            2–6 private rooms (common Italian B&B shape). Zero or one
            room keeps the UI compact: the "Add room" entry point is
@@ -1658,6 +1660,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           <span id="roomsLimitHint" style="font-size:0.72rem;color:var(--ink-soft);" data-h="rooms_limit_hint">Max 6 rooms. Delete frees the name for re-use.</span>
         </div>
       </div>
+
+      </fieldset>
 
       <!-- Round 38 → moved to Dettagli Proprietà 2026-09-30 —
            the privacy-notice preview card lived in Impostazioni until
@@ -2372,7 +2376,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 
   </div>
 </div>
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <script src="/app-config.js"></script>
 <script src="/app-bootstrap.js"></script>
@@ -8242,6 +8246,7 @@ async function saveProperty(scope = 'property') {
   const idx = allProperties.findIndex(p => p.id === propertyId);
   if (idx > -1) allProperties[idx] = { ...allProperties[idx], ...structuredClone(update) };
   renderPropertySwitcher();
+  if (scope === 'property' && await saveRoomDraft() !== true) return false;
   toast(h('toast_property_saved'));
   track('save_property', { name: document.getElementById('propName').value });
 
@@ -8521,26 +8526,58 @@ function collectDomIcalFeedsIncludingBlank() {
 // ══════════════════════════════════════════════════════════════════════
 // Round 60 Phase 3b — Rooms CRUD.
 //
-// Inline per-row controls (no modal). Add/rename/beds/door_code/delete
-// each hit the DB as a single-row operation; the UI re-renders from
-// the fresh server state so a failed save never leaves a ghost row.
-//
-// Why no shared-form Save/Cancel: a Room is a tiny object (name, beds,
-// door_code, sort_order). The common host workflow is "add two rooms
-// at setup", not "edit five rooms at once". Rendering a modal per
-// row would be more clicks than inline. The Round 59 unsaved-forms
-// guard still protects the surrounding Property Details fieldset.
-//
-// Hard cap: 6 active rooms per property (PLAN_round60_bnb_rooms.md
-// scope "2-6 rooms"). An exceeded limit is caught locally before any
-// POST so the host sees a toast rather than a hosted error.
-// ══════════════════════════════════════════════════════════════════════
+// Rooms participate in Property Details View → Edit → Save/Cancel.
+// Keep committed rows in allRooms for calendars/feeds; only this card sees drafts.
 const ROOMS_LIMIT = 6;
+let roomDraft = null;
+
+function _roomsCanEdit() {
+  return propertyEditMode && !_propertySavePending && _consoleCanEdit() && roomDraft !== null;
+}
+
+async function saveRoomDraft() {
+  if (!roomDraft) return true;
+  const owner = propertyId;
+  // Advance committed state after each acknowledged row so retries never insert
+  // a room twice. Errors keep Edit mode and the remaining draft available.
+  async function write(query) {
+    const {data, error} = await query.select('id,name,beds,door_code,sort_order').single();
+    if (error) throw error;
+    if (!data || owner !== propertyId) throw Error(h('rooms_save_fail'));
+    return data;
+  }
+  try {
+    for (const room of [...allRooms]) {
+      if (roomDraft.some(r => r.id === room.id)) continue;
+      await write(sb.from('property_rooms').update({ deleted_at: new Date().toISOString() })
+        .eq('id', room.id).eq('property_id', owner));
+      allRooms = allRooms.filter(r => r.id !== room.id);
+    }
+    for (const room of roomDraft) {
+      const patch = {name: room.name.trim(), beds: room.beds, door_code: room.door_code || null, sort_order: room.sort_order};
+      const old = allRooms.find(r => r.id === room.id);
+      if (old && Object.keys(patch).every(k => (old[k] ?? null) === patch[k])) continue;
+      const data = await write(old
+        ? sb.from('property_rooms').update(patch).eq('id', room.id).eq('property_id', owner)
+        : sb.from('property_rooms').insert({...patch, id: room.id, property_id: owner}));
+      allRooms = old ? allRooms.map(r => r.id === room.id ? data : r) : [...allRooms, data];
+    }
+    allRooms.sort((a,b) => (a.sort_order - b.sort_order) || a.name.localeCompare(b.name));
+    if (document.getElementById('icalFeedsList')) renderIcalFeeds();
+    return true;
+  } catch (error) {
+    console.warn('[rooms] save failed:', error);
+    if (document.getElementById('icalFeedsList')) renderIcalFeeds();
+    toast((hostLang === 'it' ? 'Salvataggio incompleto. Riprova Salva: ' : 'Save incomplete. Retry Save: ') + (error.message || h('rooms_save_fail')));
+    return false;
+  }
+}
+
 
 function renderRoomsCard() {
   const body = document.getElementById('roomsListBody');
   if (!body) return;
-  const rooms = Array.isArray(allRooms) ? allRooms : [];
+  const rooms = roomDraft || (Array.isArray(allRooms) ? allRooms : []);
   if (rooms.length === 0) {
     body.innerHTML = `<div style="color:var(--ink-soft);font-size:0.82rem;padding:4px 0;">${_rsEscape(h('rooms_empty'))}</div>`;
     _updateRoomsLimitHint();
@@ -8557,7 +8594,7 @@ function _rsEscape(s) {
 function _renderRoomRow(r) {
   // 180px name · 70px beds · 150px door code · ~auto · delete button
   return `
-    <div class="room-row" data-room-id="${_rsEscape(r.id)}" style="display:grid;grid-template-columns:1fr 90px 160px auto;gap:8px;align-items:end;padding:10px;background:var(--cream);border:1px solid var(--border);border-radius:8px;">
+    <div class="room-row" data-room-id="${_rsEscape(r.id)}" style="display:grid;grid-template-columns:minmax(0,1fr) 90px minmax(0,160px) auto;gap:8px;align-items:end;padding:10px;background:var(--cream);border:1px solid var(--border);border-radius:8px;">
       <div class="form-group" style="margin:0;">
         <label class="form-label">${_rsEscape(h('rooms_name_label'))}</label>
         <input type="text" class="form-input room-name" value="${_rsEscape(r.name || '')}" maxlength="120" onchange="saveRoomField('${_rsEscape(r.id)}','name',this.value,this)">
@@ -8577,7 +8614,7 @@ function _renderRoomRow(r) {
 function _updateRoomsLimitHint() {
   const hint = document.getElementById('roomsLimitHint');
   if (!hint) return;
-  const count = Array.isArray(allRooms) ? allRooms.length : 0;
+  const count = (roomDraft || allRooms || []).length;
   const base = h('rooms_limit_hint');
   hint.textContent = count >= ROOMS_LIMIT
     ? h('rooms_limit_reached')
@@ -8585,114 +8622,44 @@ function _updateRoomsLimitHint() {
 }
 
 async function addRoom() {
-  if (!propertyId) {
-    toast(hostLang === 'it' ? 'Seleziona prima una proprietà.' : 'Select a property first.');
-    return;
-  }
-  if ((allRooms?.length || 0) >= ROOMS_LIMIT) {
-    toast(h('rooms_limit_reached'));
-    return;
-  }
-  // Default name: "Camera 1", "Camera 2", … / "Room 1", "Room 2", …
-  // Picks the lowest free integer so a delete-then-add doesn't reuse
-  // a name that collides with another active row.
+  if (!_roomsCanEdit() || !propertyId) return;
+  if (roomDraft.length >= ROOMS_LIMIT) { toast(h('rooms_limit_reached')); return; }
   const base = h('rooms_default_name');
-  const existing = new Set((allRooms || []).map(r => (r.name || '').toLowerCase()));
+  const existing = new Set(roomDraft.map(r => r.name.toLowerCase()));
   let n = 1, name;
   do { name = `${base} ${n++}`; } while (existing.has(name.toLowerCase()));
-  const sortOrder = Math.max(0, ...(allRooms || []).map(r => r.sort_order || 0)) + 10;
-  try {
-    const { data, error } = await sb.from('property_rooms')
-      .insert({ property_id: propertyId, name, beds: 1, sort_order: sortOrder })
-      .select('id,name,beds,door_code,sort_order')
-      .single();
-    if (error) throw error;
-    if (!data) { toast(h('rooms_save_fail')); return; }
-    allRooms = [...(allRooms || []), data].sort((a, b) =>
-      (a.sort_order - b.sort_order) || a.name.localeCompare(b.name));
-    renderRoomsCard();
-    // When crossing the 2+ threshold, the iCal feed rows gain a room
-    // selector and _computeReservationOverlap gets a roomId. Repaint
-    // the Settings feed list so the new selector shows up without
-    // a reload.
-    if (document.getElementById('icalFeedsList')) renderIcalFeeds();
-    toast(h('rooms_save_ok'));
-  } catch (e) {
-    console.warn('[rooms] insert failed:', e);
-    toast(h('rooms_save_fail') + (e?.message ? ': ' + e.message : ''));
-  }
+  roomDraft.push({id: crypto.randomUUID(), name, beds: 1, door_code: null,
+    sort_order: Math.max(0, ...roomDraft.map(r => r.sort_order || 0)) + 10});
+  renderRoomsCard();
 }
 
 async function saveRoomField(roomId, field, value, inputEl) {
-  if (!propertyId || !roomId) return;
-  const patch = { [field]: value };
+  if (!_roomsCanEdit() || !['name','beds','door_code'].includes(field)) return;
+  const room = roomDraft.find(r => r.id === roomId);
+  if (!room) return;
+  let error = '';
   if (field === 'name') {
-    const trimmed = String(value || '').trim();
-    if (!trimmed) {
-      toast(hostLang === 'it' ? 'Il nome è obbligatorio' : 'Name is required');
-      if (inputEl) {
-        const prev = (allRooms || []).find(r => r.id === roomId);
-        if (prev) inputEl.value = prev.name || '';
-      }
-      return;
-    }
-    patch.name = trimmed;
-    // Local duplicate check before the DB round-trip. The partial
-    // unique index on (property_id, lower(name)) WHERE deleted_at IS
-    // NULL enforces this server-side too, but a client-side guard
-    // avoids a confusing error toast.
-    const duplicate = (allRooms || []).some(r => r.id !== roomId &&
-      (r.name || '').toLowerCase() === trimmed.toLowerCase());
-    if (duplicate) {
-      toast(h('rooms_duplicate_name'));
-      if (inputEl) {
-        const prev = (allRooms || []).find(r => r.id === roomId);
-        if (prev) inputEl.value = prev.name || '';
-      }
-      return;
-    }
+    value = String(value || '').trim();
+    if (!value) error = hostLang === 'it' ? 'Il nome è obbligatorio' : 'Name is required';
+    else if (roomDraft.some(r => r.id !== roomId && r.name.toLowerCase() === value.toLowerCase())) error = h('rooms_duplicate_name');
   }
-  try {
-    const { data, error } = await sb.from('property_rooms')
-      .update(patch).eq('id', roomId)
-      .select('id,name,beds,door_code,sort_order').single();
-    if (error) throw error;
-    if (!data) { toast(h('rooms_save_fail')); return; }
-    allRooms = (allRooms || []).map(r => r.id === roomId ? { ...r, ...data } : r);
-    // Only re-render if the name changed (feed selectors show it) OR
-    // we need to update the "X/6" counter. For beds/door_code edits
-    // the field itself is already up to date on screen.
-    if (field === 'name' && document.getElementById('icalFeedsList')) renderIcalFeeds();
-    toast(h('rooms_save_ok'));
-  } catch (e) {
-    console.warn('[rooms] update failed:', e);
-    toast(h('rooms_save_fail') + (e?.message ? ': ' + e.message : ''));
+  if (field === 'beds' && (!Number.isInteger(value) || value < 1 || value > 20)) {
+    error = hostLang === 'it' ? 'Inserisci da 1 a 20 posti letto.' : 'Enter between 1 and 20 beds.';
   }
+  if (error) {
+    toast(error);
+    if (inputEl) inputEl.value = room[field] ?? '';
+    return;
+  }
+  room[field] = value;
+  if (inputEl) inputEl.value = value ?? '';
 }
 
 async function deleteRoom(roomId) {
-  if (!propertyId || !roomId) return;
+  if (!_roomsCanEdit() || !propertyId || !roomId) return;
   if (!confirm(h('rooms_delete_confirm'))) return;
-  try {
-    // Soft delete: deleted_at = now() so the partial unique index
-    // frees the name for re-use. The nullable room_id FK on
-    // ota_reservations / checkins is ON DELETE SET NULL at the DB
-    // level, so soft-deleting leaves existing assignments pointing
-    // at a soft-deleted row — the host sees "Unassigned" everywhere
-    // for those stays, as the PLAN says.
-    const { data, error } = await sb.from('property_rooms')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', roomId).select('id').single();
-    if (error) throw error;
-    if (!data) { toast(h('rooms_save_fail')); return; }
-    allRooms = (allRooms || []).filter(r => r.id !== roomId);
-    renderRoomsCard();
-    if (document.getElementById('icalFeedsList')) renderIcalFeeds();
-    toast(h('rooms_save_ok'));
-  } catch (e) {
-    console.warn('[rooms] delete failed:', e);
-    toast(h('rooms_save_fail') + (e?.message ? ': ' + e.message : ''));
-  }
+  roomDraft = roomDraft.filter(r => r.id !== roomId);
+  renderRoomsCard();
 }
 
 // Dashboard shortcut for syncing calendars. Same endpoint + auth flow
@@ -9171,12 +9138,14 @@ const propertyEditor = HostPropertyEditor.create({
 let _propertySavePending = null;
 function _consoleCanEdit() { return !(typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled); }
 const consoleDrafts = HostUnsavedChanges.create({lang: () => hostLang, canEdit: _consoleCanEdit, onError: error => toast((hostLang === 'it' ? 'Salvataggio fallito: ' : 'Save failed: ') + error.message)});
-consoleDrafts.register('property', {root: document.getElementById('propertyFormBody'), enabled: () => propertyEditMode, dirty: () => propertyEditor.dirty() || propertyEditor.pending(), pending: () => _propertySavePending, save: savePropertyEdit, discard: cancelPropertyEdit});
+consoleDrafts.register('property', {root: document.getElementById('propertyFormBody'), enabled: () => propertyEditMode, dirty: () => propertyEditor.dirty() || propertyEditor.pending() || (roomDraft !== null && JSON.stringify(roomDraft) !== JSON.stringify(allRooms)), pending: () => _propertySavePending, save: savePropertyEdit, discard: cancelPropertyEdit});
 consoleDrafts.register('settings', {root: document.getElementById('panel-settings'), snapshot: () => JSON.stringify([HostUnsavedChanges.values(document.getElementById('panel-settings'), '.settings-edit-fieldset input:not(#propTaxCopyFrom),.settings-edit-fieldset select:not(#propTaxCopyFrom),.settings-edit-fieldset textarea'), _taxRulesDraft, _taxDeclaredDraft]), save: saveSettingsEdit, discard: cancelSettingsEdit});
 async function leaveConsoleDrafts() { return consoleDrafts.leave(); }
 
 function startPropertyEdit() {
   if (_propertySavePending || (typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled)) return;
+  roomDraft = structuredClone(allRooms);
+  renderRoomsCard();
   propertyEditor.begin();
   propertyEditMode = true;
   _setPropertyEditControls(true);
@@ -9189,6 +9158,8 @@ function startPropertyEdit() {
 function cancelPropertyEdit() {
   if (_propertySavePending) return;
   propertyEditMode = false;
+  roomDraft = null;
+  renderRoomsCard();
   if (propertyData) {
     try { fillPropertyForm(propertyData); } catch (e) { console.warn('cancelPropertyEdit refill failed:', e); }
   }
@@ -9197,6 +9168,8 @@ function cancelPropertyEdit() {
 async function savePropertyEdit() {
   if (_propertySavePending) return _propertySavePending;
   if (typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled) return false;
+  const invalid = [...document.querySelectorAll('#propertyFormBody input')].find(e => !e.checkValidity());
+  if (invalid) { invalid.reportValidity(); return false; }
   const buttons = ['propertySaveBtn','propertyCancelBtn'];
   document.getElementById('propertyFormBody').disabled = true;
   buttons.forEach(id => {document.getElementById(id).disabled = true;});
@@ -9205,6 +9178,8 @@ async function savePropertyEdit() {
       const ok = await saveProperty();
       if (ok !== true) return false;
       propertyEditMode = false;
+      roomDraft = null;
+      renderRoomsCard();
       propertyEditor.reset(propertyData);
       _setPropertyEditControls(false);
       return true;
@@ -15142,7 +15117,7 @@ async function loadPropertyData() {
   if (_hostShareController && document.getElementById("panel-qrlink")?.classList.contains("active")) initQRPanel();
   if (!propertyId) return;
   // Reset per-property in-memory state so nothing leaks across a switch
-  rulesData = []; recoData = []; allCheckins = []; allChats = []; allRooms = [];
+  rulesData = []; recoData = []; allCheckins = []; allChats = []; allRooms = []; roomDraft = null;
   _calendarRoomFilter = null;
   dismissedBookingCodes = new Set();
 

@@ -23,15 +23,15 @@ try {for(const width of [390,1280])for(const lang of ['it','en']){
  const declaration=html.slice(html.indexOf('const propertyEditor ='),html.indexOf('function startPropertyEdit('));
  const funcs=['h','_i18nHydrateField','_i18nRenderPill','_i18nSetLang','_i18nCollect','_numOrNull','fillPropertyForm','_setPropertyEditControls','startPropertyEdit','cancelPropertyEdit','savePropertyEdit','saveProperty','startSettingsEdit','cancelSettingsEdit','saveSettingsEdit','_setSettingsEditControls','showPanel','switchProperty','handleCoverUpload','chooseCoverPhoto'].map(fn).join('\n');
  await page.addScriptTag({content:`
- var _regionalExportController=null,settingsEditMode=false,rulesEditMode=false,recosEditMode=false;
+ var allRooms=[];var _regionalExportController=null,settingsEditMode=false,rulesEditMode=false,recosEditMode=false;
  var hostLang=${JSON.stringify(lang)},propertyId='p1',propertyData={id:'p1',name:'Fictional farmhouse',city:'Roma',region:'Lazio',property_type:'villa',host_names:'Sample host',hero_image_url:'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600"><rect width="400" height="600" fill="#9d572e"/><rect x="400" width="400" height="600" fill="#83a880"/><rect x="800" width="400" height="600" fill="#6f94b5"/></svg>'),hero_image_layout:{zoom:1.2,x:40,y:60},welcome_message_it:'Benvenuti',welcome_message_en:'Welcome'},allProperties=[],propertyEditMode=false,_taxRulesDraft=[],_taxDeclaredDraft=[],IS_ADMIN_VIEW=false,_adminEditEnabled=false;
  allProperties=[propertyData,{id:'p2',name:'Second fixture',property_type:'apartment'}];
  window.writes=[];window.uploads=[];window.failSave=false;window.failUpload=false;window.zeroRows=false;window.saveDelay=0;window.notices=[];
- const sb={from(table){let update,id;const q={update(v){update=v;return q;},eq(k,v){id=v;return q;},select(){return q;},async maybeSingle(){await new Promise(r=>setTimeout(r,window.saveDelay));writes.push({table,id,update});return {data:window.zeroRows?null:{id},error:window.failSave?{message:'Fixture save failed'}:null};}};return q;},storage:{from(){return {async upload(path,file){uploads.push({path,type:file.type});return {error:window.failUpload?{message:'Fixture storage failed'}:null};},getPublicUrl(path){return {data:{publicUrl:'https://images.example.invalid/'+path}};}};}}};
+ const sb={from(table){let update,id;const q={update(v){update=v;return q;},insert(v){update=v;id=v.id;return q;},eq(k,v){if(k==='id')id=v;return q;},select(){return q;},async single(){await new Promise(r=>setTimeout(r,window.saveDelay));writes.push({table,id,update});window.roomAttempts=(window.roomAttempts||0)+1;return {data:window.zeroRoomRows?null:{id,...update},error:window.failRoomAt===window.roomAttempts?{message:'Room fixture failed'}:null};},async maybeSingle(){await new Promise(r=>setTimeout(r,window.saveDelay));writes.push({table,id,update});return {data:window.zeroRows?null:{id},error:window.failSave?{message:'Fixture save failed'}:null};}};return q;},storage:{from(){return {async upload(path,file){uploads.push({path,type:file.type});return {error:window.failUpload?{message:'Fixture storage failed'}:null};},getPublicUrl(path){return {data:{publicUrl:'https://images.example.invalid/'+path}};}};}}};
  const IT_REGIONS=['Lazio'];function _populatePropRegionOptions(){document.getElementById('propRegion').innerHTML='<option value=""></option><option value="Lazio">Lazio</option>';}function regionFromCity(){return '';}
  function refreshPayTouristLink(){}function onToggleRotatingLockbox(){}function renderIcalFeeds(){}function renderIcalExportCard(){}function loadAlloggiatiCard(){}function renderTaxConfigPanel(){}function renderDismissedList(){}function renderPropertySwitcher(){}function collectIcalFeeds(){return [];}function toast(msg){notices.push(msg);}function track(){}function panelSection(){return 'prop';}function _paintSidebarActive(){}function _renderSectionTabs(){}function _writeLastTab(){}function _writeLastSection(){}function trackPanelSwitch(){}function setHostLang(v){hostLang=v;}function refreshChatBadge(){}async function loadPropertyData(){}function setConsoleReadOnly(){}
  const titles={property:['Property',''],settings:['Settings','']};
- ${ht}\n${declaration}\n${funcs}
+ ${ht}\n${html.slice(html.indexOf('const ROOMS_LIMIT ='),html.indexOf('// Dashboard shortcut for syncing calendars.'))}\n${declaration}\n${funcs}
  fillPropertyForm(propertyData);document.getElementById('panel-property').classList.add('active');
  document.querySelectorAll('[data-h]').forEach(el=>{el.textContent=h(el.dataset.h);});
  `});
@@ -75,6 +75,68 @@ try {for(const width of [390,1280])for(const lang of ['it','en']){
  await page.evaluate(()=>{IS_ADMIN_VIEW=true;_adminEditEnabled=false;});assert.equal(await page.evaluate(()=>savePropertyEdit()),false,'read-only admin denied');await page.evaluate(()=>{IS_ADMIN_VIEW=false;cancelPropertyEdit();});
  assert.equal(await page.evaluate(()=>{const e=new Event('beforeunload',{cancelable:true});window.dispatchEvent(e);return e.defaultPrevented;}),false);
  await openEdit();await page.locator('#propName').fill('Unsaved');await navigate();await page.screenshot({path:path.join(out,`save-prompt-${width}-${lang}.png`),fullPage:true});await choose('stay');await page.locator('#propertyCancelBtn').click();await openEdit();await page.locator('#coverPhotoZone').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(out,`cover-editor-${width}-${lang}.png`)});
+
+ // Rooms use the actual global lifecycle and CRUD helpers with fictional transport.
+ await page.locator('#propertyCancelBtn').click();
+ const add=page.locator('#roomsCard [onclick="addRoom()"]');
+ assert.equal(await add.isDisabled(),true,'rooms default to view mode');
+ await page.evaluate(()=>addRoom());assert.equal(await page.evaluate(()=>allRooms.length),0,'view handler is guarded too');
+ await openEdit();await add.click();
+ assert.equal(await page.locator('.room-row').count(),1);
+ assert.equal(await page.evaluate(()=>writes.filter(w=>w.table==='property_rooms').length),0,'Add stages without writing');
+ assert.equal(await dirty(),true,'room additions join dirty guard');
+ await page.locator('.room-name').fill('Blue room');await page.locator('.room-beds').fill('2');
+ await page.locator('.room-door-code').fill('1234');await page.locator('.room-name').focus();
+ await page.locator('#propertyCancelBtn').click();
+ assert.equal(await page.locator('.room-row').count(),0,'Cancel discards additions');
+ await openEdit();await add.click();await page.locator('.room-name').fill('Blue room');
+ await page.locator('.room-beds').fill('2');await page.locator('.room-door-code').fill('1234');
+ await page.locator('#propertySaveBtn').click();await page.waitForFunction(()=>_propertySavePending===null);
+ assert.equal(await page.locator('.room-name').isDisabled(),true,'Save returns rooms to view');
+ assert.equal(await page.evaluate(()=>allRooms[0].name),'Blue room');
+ assert.equal(await page.evaluate(()=>allRooms[0].beds),2);
+ assert.equal(await page.evaluate(()=>allRooms[0].door_code),'1234');
+ await openEdit();await page.locator('.room-name').fill('Red room');await page.locator('.room-beds').focus();
+ await navigate();await choose('stay');assert.equal(await visible('property'),true,'room edits prompt before leaving');
+ await page.locator('#propertyCancelBtn').click();assert.equal(await page.locator('.room-name').inputValue(),'Blue room');
+ await openEdit();page.once('dialog',d=>d.accept());await page.locator('.room-row button').click();
+ assert.equal(await page.locator('.room-row').count(),0);assert.equal(await page.evaluate(()=>allRooms.length),1,'Delete is staged');
+ await page.locator('#propertyCancelBtn').click();assert.equal(await page.locator('.room-row').count(),1,'Cancel restores deletion');
+ await openEdit();await add.click();await add.click();
+ await page.evaluate(()=>{window.failRoomAt=(window.roomAttempts||0)+2;});
+ await page.locator('#propertySaveBtn').click();await page.waitForFunction(()=>_propertySavePending===null);
+ assert.equal(await add.isEnabled(),true,'failed room save keeps Edit available');
+ assert.equal(await page.evaluate(()=>allRooms.length),2,'acknowledged first insert retained');
+ await page.evaluate(()=>{window.failRoomAt=0;});
+ await page.locator('#propertySaveBtn').click();await page.waitForFunction(()=>_propertySavePending===null);
+ assert.equal(await page.evaluate(()=>allRooms.length),3,'retry creates only remaining room');
+ assert.equal(await page.evaluate(()=>new Set(allRooms.map(r=>r.id)).size),3,'no duplicate after retry');
+ await openEdit();await page.locator('.room-name').first().fill('Denied name');await page.locator('.room-beds').first().focus();
+ await page.evaluate(()=>{window.zeroRoomRows=true;});await page.locator('#propertySaveBtn').click();await page.waitForFunction(()=>_propertySavePending===null);
+ assert.equal(await add.isEnabled(),true,'zero-row room response is a failed save');
+ assert.equal(await page.evaluate(()=>allRooms[0].name),'Blue room');
+ await page.evaluate(()=>{window.zeroRoomRows=false;});await page.locator('#propertyCancelBtn').click();
+ await openEdit();
+ // Replacing a room with identical visible values still changes its identity/assignments.
+ await page.evaluate(()=>{roomDraft=structuredClone(allRooms);roomDraft[0].id=crypto.randomUUID();renderRoomsCard();});
+ assert.equal(await page.evaluate(()=>consoleDrafts.dirty('property')),true,'same-value room replacement is dirty');
+ await page.locator('#propertyCancelBtn').click();
+ await openEdit();page.once('dialog',d=>d.accept());await page.locator('.room-row button').first().click();
+ await page.locator('#propertySaveBtn').click();await page.waitForFunction(()=>_propertySavePending===null);
+ assert.equal(await page.evaluate(()=>allRooms.length),2,'Save commits soft deletion');
+ assert.ok(await page.evaluate(()=>writes.some(w=>w.table==='property_rooms'&&w.update.deleted_at)));
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'rooms fit mobile width');
+ // Use the actual support-widget CSS and actual toast markup, including mobile rules.
+ const onboarding=fs.readFileSync(new URL('../host-onboarding.js',import.meta.url),'utf8');
+ const cssStart=onboarding.indexOf('  function _css() {');
+ const supportCSS=onboarding.slice(cssStart,onboarding.indexOf('\n  }',cssStart)+4);
+ await page.addScriptTag({content:supportCSS+`;document.head.insertAdjacentHTML('beforeend','<style>'+_css()+'</style>');`});
+ await page.evaluate(()=>{document.body.insertAdjacentHTML('beforeend','<button class="obx-support-fab">? Help</button><div id="toast" class="toast show" role="status">Dettagli proprietà salvati! Property details saved!</div>');});
+ await page.waitForTimeout(350);
+ const geometry=await page.evaluate(()=>{const a=document.getElementById('toast').getBoundingClientRect(),b=document.querySelector('.obx-support-fab').getBoundingClientRect();return {clear:a.bottom+8<=b.top,fits:a.left>=0&&a.right<=innerWidth};});
+ assert.ok(geometry.clear,'saved toast clears Help button');assert.ok(geometry.fits,'toast stays inside viewport');
+ await page.screenshot({path:path.join(out,`rooms-saved-${width}-${lang}.png`)});
+ console.log(`PASS ${width}px ${lang}: room View/Edit, draft add/edit/delete, Cancel, dirty navigation, Save, zero-row denial, partial failure/retry and toast/Help geometry`);
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no mobile overflow');assert.deepEqual(errors,[]);
  await page.close();console.log(`PASS ${width}px ${lang}: actual form/router save, deny/failed/zero-row save, all prompt actions, bilingual dirtiness, property switch, keyboard framing, invalid/decode/upload failures, draft/cancel/retry, save concurrency, admin denial and unload guard`);
 }

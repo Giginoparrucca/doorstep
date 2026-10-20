@@ -36,7 +36,7 @@ try {for(const width of [390,1280])for(const lang of ['it','en']){
  const titles=Object.fromEntries(['property','settings','rules','recos','qrlink','export','dashboard','calendar','checkins'].map(k=>[k,[k,'']]));
  let share=null;async function initQRPanel(){share??=HostShare.create({root:document.getElementById('hostShareRoot'),context:()=>({propertyId,property:propertyData,lang:hostLang,origin:APP_ORIGIN,mode:'production',sb}),ensureCodes:async()=>{},drafts:consoleDrafts});await share.load();}
 
- ${ht}\n${declaration}\n${funcs}
+ ${ht}\n${html.slice(html.indexOf('const ROOMS_LIMIT ='),html.indexOf('// Dashboard shortcut for syncing calendars.'))}\n${declaration}\n${funcs}
  consoleDrafts.register('rules',{root:document.getElementById('panel-rules'),snapshot:()=>JSON.stringify(rulesData),save:saveRules,discard:()=>{rulesData=structuredClone(_rulesDraftOriginal);rulesEditMode=false;renderRules();}});
  consoleDrafts.register('recos',{root:document.getElementById('panel-recos'),snapshot:()=>JSON.stringify(recoData),save:saveRecos,discard:()=>{recoData=structuredClone(_recosDraftOriginal);recosEditMode=false;renderRecos();}});
  fillPropertyForm(propertyData);document.getElementById('panel-property').classList.add('active');

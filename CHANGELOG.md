@@ -16,6 +16,18 @@ Standing rule added 2026-10-18 (AGENTS.md "Full regression"): every phase gate r
 
 ### Current round — in-flight
 
+**Round 62 — Tourist-tax rates by date**
+
+Specification: `PLAN_round62_tax_date_rates.md`. Daniele confirmed 21 October 2026.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 1 — Date-rate settings and nightly calculation | in-progress — GPT-6 | Adjacent From/To dates, additional periods, validation, draft/save/cancel/copy, nightly calculation and synthetic tax goldens. Full regression before merge. |
+| 2 — Release verification | pending | Full browser matrix IT/EN at mobile/desktop, CI, main publication, production source verification and read-only live smoke. |
+
+### Previous round — Round 61 (completed)
+
+
 **Round 61 — Puglia SPOT Online XML export**
 
 Specification: `PLAN_round61_spot_online_xml.md`. Puglia hosts of real

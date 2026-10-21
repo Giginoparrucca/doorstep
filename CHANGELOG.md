@@ -22,8 +22,8 @@ Specification: `PLAN_round62_tax_date_rates.md`. Daniele confirmed 21 October 20
 
 | Phase | Status | Where / test gate |
 |---|---|---|
-| 1 — Date-rate settings and nightly calculation | in-progress — GPT-6 | Adjacent From/To dates, additional periods, validation, draft/save/cancel/copy, nightly calculation and synthetic tax goldens. Full regression before merge. |
-| 2 — Release verification | pending | Full browser matrix IT/EN at mobile/desktop, CI, main publication, production source verification and read-only live smoke. |
+| 1 — Date-rate settings and nightly calculation | shipped — PR #194 — GPT-6 | Adjacent From/To dates, additional periods, validation, draft/save/cancel/copy, nightly calculation and synthetic tax goldens. Full regression before merge. |
+| 2 — Release verification | in-progress — GPT-6 | Full browser matrix IT/EN at mobile/desktop, CI, main publication, production source verification and read-only live smoke. |
 
 ### Round 62 Phase 1 — date-specific tourist-tax rates (GPT-6, 2026-10-21)
 
@@ -33,7 +33,8 @@ Specification: `PLAN_round62_tax_date_rates.md`. Daniele confirmed 21 October 20
 - Corrected quarter start/end and night iteration to UTC calendar dates: previously hosts east of UTC could export the day before the quarter and omit its last day. Legacy IT/EN summary goldens remain byte-identical to pre-Round-62 main in UTC; other timezones now produce those same correct dates. Alloggiati, regional statistics and PayTourist goldens remain unchanged.
 - New synthetic IT/EN downloaded-summary goldens cover dated and legacy configuration. Unit checks cover mixed rates, inclusive boundaries, explicit zero/fallback, quarter clipping with carried caps, exemptions/reductions, overlapping/invalid dates, year change and leap day. Expanded actual Settings Chromium suite at 390/1280px in IT/EN covers load/edit/add/remove, save/cancel/copy, overlap/order rejection, failed/denied writes, unsaved navigation, preview and viewport fit; mobile screenshot visually inspected. Updated two existing browser extraction fixtures and the tax-normalizer isolation stub for the new state/helpers.
 - Final local full regression: **PASS 55 / FAIL 0 / SKIP 3**. Skips: hosted demo origin absent, private demo catalog JSON absent, pglast 7.7 absent. Initial local run exposed missing QR test dependencies in a reused dependency folder and an outdated tax-normalizer test stub; corrected the local dependency setup and extended the fixture contract, then reran the complete suite successfully. No skipped check is claimed as a pass.
-- Added explicit read-only `TAX_SMOKE_ORIGIN` post-deployment test: compare three public assets with tested source, execute the deployed tax engine and compare exact IT/EN summary goldens. CI/merge/deployment evidence pending; no live production write/guest-data test is claimed.
+- PR #194 merged as `3e07473cd6e6a15d3fe8759abcf4bd11b6bfcbe4`. Required CI run `39580593080`, job `119156924444`: **test:all PASS 55 / FAIL 0 / SKIP 3**; **test:live PASS 1 / FAIL 0 / SKIP 3** (production schema-drift passed; demo origin and explicit post-deploy origins absent). Timezone goldens also pass under America/New_York and Pacific/Auckland.
+- Added explicit read-only `TAX_SMOKE_ORIGIN` post-deployment test: compare three public assets with tested source, execute the deployed tax engine and compare exact IT/EN summary goldens. Production deployment/source/golden verification continues in Phase 2; no live production write/guest-data test is claimed.
 
 ### Previous round — Round 61 (completed)
 

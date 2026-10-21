@@ -1,0 +1,53 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const html=fs.readFileSync(new URL('../host-console.html',import.meta.url),'utf8');
+function fn(name){const start=html.indexOf('function '+name+'(');assert.ok(start>=0,name);return html.slice(start,html.indexOf('\n}\n',start)+2);}
+const ctx=vm.createContext({console});
+vm.runInContext(fs.readFileSync(new URL('../lib/tax-date-rates.js',import.meta.url),'utf8'),ctx);
+for(const name of ['_ageAtArrival','_normalizeTaxCfg','computeGuestTax','_seasonMatches','_nightsInsideQuarter','_groupSizeFor','_ruleLabel','exportCityTax'])vm.runInContext(fn(name),ctx);
+const rule=(from,to,rate,main=false)=>({id:main?'_rate_period_base':'fixture_period',when:{night_from:from,night_to:to},effect:{type:'rate_period',value:rate}});
+const guest={id:'SYNTHETIC',property_id:'SYNTHETIC',surname:'Fixture',name:'Adult',date_of_birth:'1980-01-01',arrival_date:'2026-06-29',departure_date:'2026-07-04',is_test:false};
+const property={id:'SYNTHETIC',name:'Fictional tax property',tax_rate_eur:2,tax_rules:[rule('2026-07-01','2026-08-31',4)]};
+const calc=(p,g=guest,c={})=>ctx.computeGuestTax(g,ctx._normalizeTaxCfg(p),{nightsInPeriod:5,groupSize:1,declaredFlags:[],...c});
+assert.equal(calc(property).amount,16,'two nights at 2 + three nights at 4');
+assert.equal(calc(property).taxable_nights,5);
+assert.equal(calc({...property,tax_max_nights:3}).amount,8,'cap does not restart on rate change');
+assert.equal(calc({...property,tax_max_total_eur:9}).amount,9);
+assert.equal(calc(property,guest,{periodStart:'2026-07-01',periodEnd:'2026-09-30',nightsInPeriod:3}).amount,12);
+assert.equal(calc({...property,tax_max_nights:3},guest,{periodStart:'2026-07-01',periodEnd:'2026-09-30',nightsInPeriod:3}).amount,4,'earlier quarter already consumed two capped nights');
+assert.equal(calc({...property,tax_max_total_eur:9},guest,{periodStart:'2026-07-01',periodEnd:'2026-09-30',nightsInPeriod:3}).amount,5,'euro cap also carried across quarters');
+assert.equal(calc({...property,tax_max_nights:2,tax_max_nights_basis:'per_person_per_month'}).amount,12,'calendar month cap resets once, not at each rate');
+assert.equal(calc({...property,tax_rules:[rule('2026-07-01','2026-07-02',2,true)]}).amount,4,'dated main has zero outside');
+assert.equal(calc({...property,tax_rules:[rule('2026-07-01','2026-07-02',0)]}).amount,6,'zero dated override excludes July 1/2');
+assert.equal(calc({...property,tax_rate_eur:0}).amount,12,'zero fallback remains zero');
+assert.equal(calc({...property,tax_exempt_under_age:15},{...guest,date_of_birth:'2016-01-01'}).amount,0);
+assert.equal(calc({...property,tax_declared_exemptions:[{id:'resident',requires_documentation:true}]},guest,{declaredFlags:['resident']}).requires_documentation,true);
+const reduction={id:'young',when:{age_max:50,nights_min:5},effect:{type:'percent_off',value:50}};
+assert.equal(calc({...property,tax_rules:[...property.tax_rules,reduction]}).amount,8,'reductions applied after the scheduled base, minimum stay remains five');
+assert.equal(ctx._normalizeTaxCfg(property).rules.length,0,'period entries never enter reduction selection');
+const v=ctx.TaxDateRates.validate;
+assert.equal(v([{rate:2,main:true,from:'',to:''},{rate:3,from:'2026-01-01',to:'2026-01-02'}]),null);
+assert.equal(v([{rate:2,main:true,from:'2026-01-01',to:'2026-01-02'},{rate:3,from:'2026-01-02',to:'2026-01-03'}]),'overlap');
+assert.equal(v([{rate:2,main:true,from:'2026-01-03',to:'2026-01-02'}]),'order');
+assert.equal(v([{rate:2,from:'2026-02-30',to:'2026-03-01'}]),'date');
+assert.equal(v([{rate:'',from:'2026-02-01',to:'2026-03-01'}]),'rate');
+assert.equal(v([{rate:-1,from:'2026-02-01',to:'2026-03-01'}]),'rate');
+assert.equal(v([{rate:2,from:'',to:'2026-03-01'}]),'dates_required');
+assert.equal(v([{rate:2,main:true,from:'2026-02-01',to:''}]),null);
+assert.equal(v([{rate:2,from:'2028-02-29',to:'2028-02-29'}]),null);
+assert.throws(()=>calc({...property,tax_rules:[rule('2026-07-01','2026-07-31',3),rule('2026-07-10','2026-07-20',4)]}),/overlap/);
+const winter={...property,tax_rules:[rule('2026-12-31','2027-01-01',3)]};
+assert.equal(calc(winter,{...guest,arrival_date:'2026-12-30',departure_date:'2027-01-03'},{nightsInPeriod:4}).amount,10);
+const leap={...property,tax_rules:[rule('2028-02-29','2028-02-29',5)]};
+assert.equal(calc(leap,{...guest,arrival_date:'2028-02-28',departure_date:'2028-03-02'},{nightsInPeriod:3}).amount,9);
+// Compare the exact downloaded declaration bytes with committed fictional goldens.
+ctx.allCheckins=[guest];ctx.propertyData=property;ctx.prompt=()=> '2026-3';ctx.alert=()=>{};ctx.track=()=>{};ctx.toast=()=>{};
+let output;ctx.downloadFile=(name,text)=>{output={name,text};};
+for(const lang of ['en','it']){ctx.hostLang=lang;ctx.exportCityTax();assert.equal(output.name,'citytax_2026-Q3.txt');assert.match(output.text,lang==='it'?/IMPORTO DOVUTO: € 12.00/:/AMOUNT DUE: € 12.00/);
+const file=new URL('./golden/synthetic/tax-date-rates-'+lang+'.txt',import.meta.url);
+if(process.env.UPDATE_TAX_GOLDENS==='1')fs.writeFileSync(file,output.text);
+assert.equal(output.text,fs.readFileSync(file,'utf8'));}
+ctx.propertyData={...property,tax_rules:[]};
+for(const lang of ['en','it']){ctx.hostLang=lang;ctx.exportCityTax();const file=new URL('./golden/synthetic/tax-legacy-'+lang+'.txt',import.meta.url);if(process.env.UPDATE_TAX_GOLDENS==='1')fs.writeFileSync(file,output.text);assert.equal(output.text,fs.readFileSync(file,'utf8'));}
+console.log('PASS date-rate tax: boundaries, crossing stays/quarters/years, caps, exemptions, zero, validation, leap day and exact IT/EN declaration goldens');

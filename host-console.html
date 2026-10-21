@@ -1172,6 +1172,11 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 .cover-frame-controls{margin-top:16px;display:grid;gap:8px}.cover-frame-controls[hidden]{display:none}.cover-frame-controls input{width:100%;min-width:0}.cover-frame-controls label{font-size:.8rem}.cover-frame-controls output{float:right}.property-leave-actions{display:flex;gap:8px;flex-wrap:wrap}.property-leave-dialog{position:fixed;inset:0;margin:auto;width:min(520px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;border:1px solid var(--border);border-radius:14px;padding:24px;max-width:min(520px,calc(100vw - 32px));color:var(--ink);background:var(--white)}.property-leave-dialog::backdrop{background:rgba(6,26,61,.45)}.property-leave-dialog h2{margin-top:0;font-size:1.2rem}.property-leave-dialog p{margin:12px 0 20px;font-size:.88rem;line-height:1.5}.property-leave-dialog .btn{white-space:normal}
 
 .regional-dialog{width:min(1000px,calc(100vw - 32px));max-height:90vh;overflow:auto;border:1px solid var(--border);border-radius:14px;padding:24px;color:var(--ink);background:var(--white)}.regional-dialog::backdrop{background:rgba(6,26,61,.5)}.regional-dialog-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.regional-dialog h2{font-size:1.2rem}.regional-dialog h3{font-size:1rem;margin-top:20px}.regional-dialog p{font-size:.82rem;line-height:1.5}.regional-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:12px;margin:12px 0;align-items:end}.regional-field{display:grid;gap:5px;font-size:.78rem;min-width:0}.regional-dialog input,.regional-dialog select{min-width:0;width:100%}.regional-dialog input[type=checkbox]{width:auto}.regional-dialog details{border:1px solid var(--border);border-radius:8px;padding:10px;margin:8px 0}.regional-dialog summary{cursor:pointer;font-size:.82rem;font-weight:500}.regional-guests{max-height:45vh;overflow:auto}.regional-table-wrap{overflow-x:auto}.regional-days{min-width:760px;width:100%}.regional-days th{white-space:normal;font-size:.7rem}.regional-days td{padding:5px}.regional-days th:last-child,.regional-days td:last-child{position:static;box-shadow:none;background:transparent}.regional-days th{letter-spacing:0;text-transform:none}.regional-days input,.regional-days select{min-width:90px}.regional-bed-table{width:100%;font-size:.8rem}.regional-bed-table th{white-space:normal;letter-spacing:0;text-transform:none}.regional-bed-table td{padding:6px}.regional-bed-table .form-select{min-width:70px}.regional-confirm{display:flex;gap:8px;font-size:.84rem;margin:18px 0;align-items:flex-start}.regional-dialog [data-errors]{white-space:pre-line;color:var(--red)}.regional-dialog .btn{white-space:normal}.regional-note{color:var(--ink-soft)}@media(max-width:540px){.regional-dialog{padding:14px}.regional-dialog h2{font-size:1.05rem}}
+  .tax-rate-row { display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) auto;gap:10px;align-items:end;min-width:0; }
+  .tax-rate-row > div { min-width:0; }
+  .tax-rate-row input { min-width:0;width:100%;box-sizing:border-box; }
+  #propTaxRatePeriods .tax-rate-row { margin-top:12px; }
+  @media(max-width:600px) { .tax-rate-row { grid-template-columns:minmax(0,1fr) minmax(0,1fr); } .tax-rate-row > div:first-child { grid-column:1/-1; } }
 </style>
 <style>
 .share-actions,.share-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
@@ -1739,9 +1744,19 @@ tr:hover td { background: rgba(250,246,240,0.6); }
              basis), exempt-under-age and optional per-person euro cap.
              Most comuni finish here. -->
         <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label" data-h="prop_tax_rate">Rate (€ per person per night)</label>
-            <input class="form-input" type="number" min="0" step="0.01" placeholder="e.g., 2.00" id="propTaxRate" oninput="_taxCfgLivePreview()">
+          <div class="form-group" style="grid-column:1/-1;min-width:0;">
+            <div class="tax-rate-row">
+              <div><label class="form-label" for="propTaxRate" data-h="prop_tax_rate">Rate (€ per person per night)</label>
+                <input class="form-input" type="number" min="0" step="0.01" placeholder="e.g., 2.00" id="propTaxRate" oninput="_taxCfgLivePreview()"></div>
+              <div><label class="form-label" for="propTaxFrom" data-h="prop_tax_from">From date</label>
+                <input class="form-input" type="date" id="propTaxFrom" oninput="_taxCfgLivePreview()"></div>
+              <div><label class="form-label" for="propTaxTo" data-h="prop_tax_to">To date</label>
+                <input class="form-input" type="date" id="propTaxTo" oninput="_taxCfgLivePreview()"></div>
+            </div>
+            <div id="propTaxRatePeriods"></div>
+            <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;" onclick="addTaxRatePeriod()" data-h="prop_tax_add_period">+ Add period</button>
+            <div class="form-hint" data-h="prop_tax_dates_hint">Dates include both nights. Blank main dates set the year-round rate; dated periods override it. Without a year-round rate, nights outside the periods are not charged.</div>
+            <div id="propTaxPeriodError" role="alert" style="color:#b03939;font-size:0.82rem;margin-top:6px;"></div>
           </div>
           <div class="form-group">
             <label class="form-label" data-h="prop_tax_max_nights">Max taxable nights</label>
@@ -2450,6 +2465,7 @@ observePageToolbarHeader();
 <script src="/lib/onboarding-readiness.js"></script>
 <script src="/lib/calendar-roundtrip.js"></script>
 <!-- Round 61 Phase 1 — CIN parser + B+D service detection cascade. -->
+<script src="/lib/tax-date-rates.js?v=62.1"></script>
 <script src="/lib/cin.js?v=61.1"></script>
 <script src="/host-onboarding.js"></script>
 <script src="/host-share.js?v=59.1"></script>
@@ -4321,6 +4337,10 @@ const HT = {
     page_view_scope: 'Viewing · Entire page', page_edit_scope: 'Editing · Entire page',
     prop_header_hint:  'View mode',
     btn_split_langs: '✂ Split existing content by language',
+    prop_tax_from: 'From date',
+    prop_tax_to: 'To date',
+    prop_tax_add_period: '+ Add period',
+    prop_tax_dates_hint: 'Dates include both nights. Blank main dates set the year-round rate; dated periods override it. Without a year-round rate, nights outside the periods are not charged.',
     prop_tax_rate: 'Rate (€ per person per night)',
     prop_tax_max_nights: 'Max taxable nights',
     prop_tax_max_nights_hint: 'Many comuni only charge the first N nights per stay (or per person per month).',
@@ -4896,6 +4916,10 @@ const HT = {
     page_view_scope: 'Visualizzazione · Tutta la pagina', page_edit_scope: 'Modifica · Tutta la pagina',
     prop_header_hint:  'Modalità visualizzazione',
     btn_split_langs: '✂ Dividi il contenuto per lingua',
+    prop_tax_from: 'Dal',
+    prop_tax_to: 'Al',
+    prop_tax_add_period: '+ Aggiungi periodo',
+    prop_tax_dates_hint: 'Le date includono entrambe le notti. Le date principali vuote impostano la tariffa annuale, sostituita dai periodi datati. Senza tariffa annuale, le notti fuori dai periodi non sono addebitate.',
     prop_tax_rate: 'Tariffa (€ per persona a notte)',
     prop_tax_max_nights: 'Notti max tassabili',
     prop_tax_basis_stay: 'per soggiorno',
@@ -8251,7 +8275,7 @@ async function saveProperty(scope = 'property') {
     tax_max_nights_basis: (document.getElementById('propTaxMaxNightsBasis')?.value || 'per_stay'),
     tax_max_total_eur: _numOrNull(document.getElementById('propTaxMaxTotalEur')?.value),
     tax_exempt_under_age: _numOrNull(document.getElementById('propTaxExemptAge')?.value),
-    tax_rules: Array.isArray(_taxRulesDraft) ? _taxRulesDraft : [],
+    tax_rules: _taxCfgRulesForSave(),
     tax_declared_exemptions: Array.isArray(_taxDeclaredDraft) ? _taxDeclaredDraft : [],
     tax_source_note: (document.getElementById('propTaxSourceNote')?.value || '').trim() || null,
     tax_verified_at: (document.getElementById('propTaxVerifiedAt')?.value || '').trim() || null,
@@ -8278,6 +8302,7 @@ async function saveProperty(scope = 'property') {
   if (typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled) return false;
   const settingsKeys = new Set(['tax_rate_eur','tax_max_nights','tax_max_nights_basis','tax_max_total_eur','tax_exempt_under_age','tax_rules','tax_declared_exemptions','tax_source_note','tax_verified_at','ical_feeds','reminder_email','timezone']);
   for (const key of Object.keys(update)) if (settingsKeys.has(key) !== (scope === 'settings')) delete update[key];
+  if (scope === 'settings' && !_taxCfgValidatePeriods()) return false;
   if (scope === 'property') Object.assign(update, await propertyEditor.prepareCover(sb, propertyId));
   const { data: saved, error } = await sb.from('properties').update(update).eq('id', propertyId).select('id').maybeSingle();
   if (!error && !saved) { toast(hostLang === 'it' ? 'Salvataggio non consentito.' : 'Save not permitted.'); return false; }
@@ -9179,7 +9204,7 @@ let _propertySavePending = null;
 function _consoleCanEdit() { return !(typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled); }
 const consoleDrafts = HostUnsavedChanges.create({lang: () => hostLang, canEdit: _consoleCanEdit, onError: error => toast((hostLang === 'it' ? 'Salvataggio fallito: ' : 'Save failed: ') + error.message)});
 consoleDrafts.register('property', {root: document.getElementById('propertyFormBody'), enabled: () => propertyEditMode, dirty: () => propertyEditor.dirty() || propertyEditor.pending() || (roomDraft !== null && JSON.stringify(roomDraft) !== JSON.stringify(allRooms)), pending: () => _propertySavePending, save: savePropertyEdit, discard: cancelPropertyEdit});
-consoleDrafts.register('settings', {root: document.getElementById('panel-settings'), snapshot: () => JSON.stringify([HostUnsavedChanges.values(document.getElementById('panel-settings'), '.settings-edit-fieldset input:not(#propTaxCopyFrom),.settings-edit-fieldset select:not(#propTaxCopyFrom),.settings-edit-fieldset textarea'), _taxRulesDraft, _taxDeclaredDraft]), save: saveSettingsEdit, discard: cancelSettingsEdit});
+consoleDrafts.register('settings', {root: document.getElementById('panel-settings'), snapshot: () => JSON.stringify([HostUnsavedChanges.values(document.getElementById('panel-settings'), '.settings-edit-fieldset input:not(#propTaxCopyFrom),.settings-edit-fieldset select:not(#propTaxCopyFrom),.settings-edit-fieldset textarea'), _taxRulesDraft, _taxRatePeriodsDraft, _taxDeclaredDraft]), save: saveSettingsEdit, discard: cancelSettingsEdit});
 async function leaveConsoleDrafts() { return consoleDrafts.leave(); }
 
 function startPropertyEdit() {
@@ -9268,7 +9293,7 @@ function cancelSettingsEdit() {
   _setSettingsEditControls(false); consoleDrafts.end('settings');
 }
 async function saveSettingsEdit() {
-  if (!_consoleCanEdit()) return false;
+  if (!_consoleCanEdit() || !_taxCfgValidatePeriods()) return false;
   const invalid = [...document.querySelectorAll('#panel-settings .settings-edit-fieldset input')].find(e => !e.checkValidity());
   if (invalid) { invalid.reportValidity(); return false; }
   return consoleDrafts.run('settings', async () => {
@@ -11042,7 +11067,7 @@ function _ageAtArrival(c) {
 // resolution is a single map access downstream.
 function _normalizeTaxCfg(propertyData) {
   const p = propertyData || {};
-  const baseRate = Number(p.tax_rate_eur);
+  const baseRate = p.tax_rate_eur == null || p.tax_rate_eur === '' ? NaN : Number(p.tax_rate_eur);
   const cap = (p.tax_max_nights == null || p.tax_max_nights === 0)
     ? null : Math.max(0, Math.floor(Number(p.tax_max_nights)));
   const basis = (typeof p.tax_max_nights_basis === 'string' && p.tax_max_nights_basis)
@@ -11074,7 +11099,11 @@ function _normalizeTaxCfg(propertyData) {
     cap,
     basis,
     totalCap: Number.isFinite(totalCap) ? totalCap : null,
-    rules: implicitRules.concat(hostRules),
+    rules: implicitRules.concat(hostRules.filter(r => r?.effect?.type !== 'rate_period')),
+    ratePeriods: hostRules.filter(r => r?.effect?.type === 'rate_period').map(r => ({
+      main: r.id === '_rate_period_base', from: r.when?.night_from || '', to: r.when?.night_to || '',
+      rate: r.id === '_rate_period_base' ? p.tax_rate_eur : r.effect.value,
+    })),
     declared: declaredList,
     declaredById,
     sourceNote: p.tax_source_note || null,
@@ -11104,6 +11133,7 @@ function _normalizeTaxCfg(propertyData) {
 //   4. Optional totalCap (tax_max_total_eur) is applied to the final
 //      amount as a per-person ceiling for this period.
 function computeGuestTax(checkin, cfg, context) {
+  if (cfg?.ratePeriods?.length) return TaxDateRates.compute(checkin || {}, cfg, context || {}, computeGuestTax);
   const c = checkin || {};
   const ctx = context || {};
   const guestName = `${(c.surname || '').trim()} ${(c.name || '').trim()}`.trim() || '—';
@@ -11162,7 +11192,7 @@ function computeGuestTax(checkin, cfg, context) {
     if (w.group_size_min != null && groupSize < w.group_size_min) continue;
     if (w.group_size_max != null && groupSize > w.group_size_max) continue;
     // Minimum nights (of the whole stay in-period).
-    if (w.nights_min != null && nightsInPeriod < Number(w.nights_min)) continue;
+    if (w.nights_min != null && (ctx.ruleNights ?? nightsInPeriod) < Number(w.nights_min)) continue;
     // Season band — MM-DD range, wraps across the new year.
     if (w.date_from && w.date_to) {
       if (!arrivalISO) continue;
@@ -11230,7 +11260,7 @@ function _nightsInsideQuarter(c, qStartStr, qEndStr) {
   if (nights <= 0) return 0;
   let inQuarter = 0;
   for (let i = 0; i < nights; i++) {
-    const night = new Date(a); night.setDate(night.getDate() + i);
+    const night = new Date(a); night.setUTCDate(night.getUTCDate() + i);
     const ns = night.toISOString().slice(0, 10);
     if (ns >= qStartStr && ns <= qEndStr) inQuarter++;
   }
@@ -11301,6 +11331,7 @@ async function toggleTaxDeclaredFlag(inputEl) {
 // reads a sentence, not JSON. Every input mutates the draft in place
 // and triggers _taxCfgLivePreview.
 let _taxRulesDraft = [];
+let _taxRatePeriodsDraft = [];
 let _taxDeclaredDraft = [];
 
 function _taxCfgSafe(s) {
@@ -11579,6 +11610,76 @@ function downloadHostPrivacyNotice() {
   }
 }
 
+// Rate periods are stored alongside reductions in tax_rules, but edited separately.
+function _taxCfgRulesForSave() {
+  const from = document.getElementById('propTaxFrom')?.value || '';
+  const to = document.getElementById('propTaxTo')?.value || '';
+  const periods = _taxRatePeriodsDraft.map((p,i)=>({id:'_rate_period_'+i,
+    when:{night_from:p.from || '',night_to:p.to || ''},effect:{type:'rate_period',value:p.rate === '' ? null : Number(p.rate)}}));
+  if (from || to) periods.unshift({id:'_rate_period_base',when:{night_from:from,night_to:to},effect:{type:'rate_period',value:_numOrNull(document.getElementById('propTaxRate')?.value)}});
+  return [..._taxRulesDraft, ...periods];
+}
+function _taxCfgHydratePeriods(data) {
+  const rules = JSON.parse(JSON.stringify(Array.isArray(data.tax_rules) ? data.tax_rules : []));
+  _taxRulesDraft = rules.filter(r=>r?.effect?.type !== 'rate_period');
+  const base = rules.find(r=>r?.effect?.type === 'rate_period' && r.id === '_rate_period_base');
+  const from = document.getElementById('propTaxFrom'), to = document.getElementById('propTaxTo');
+  if (from) from.value = base?.when?.night_from || '';
+  if (to) to.value = base?.when?.night_to || '';
+  _taxRatePeriodsDraft = rules.filter(r=>r?.effect?.type === 'rate_period' && r.id !== '_rate_period_base')
+    .map(r=>({from:r.when?.night_from || '',to:r.when?.night_to || '',rate:r.effect.value ?? ''}));
+}
+function _taxCfgValidatePeriods() {
+  const rate = document.getElementById('propTaxRate')?.value ?? '';
+  const from = document.getElementById('propTaxFrom')?.value || '', to = document.getElementById('propTaxTo')?.value || '';
+  const periods = [..._taxRatePeriodsDraft];
+  if (from || to || rate !== '') periods.unshift({main:true,from,to,rate});
+  const code = TaxDateRates.validate(periods);
+  const it = hostLang === 'it';
+  const messages = it ? {
+    rate:'Inserisci una tariffa valida, pari o superiore a zero, per ogni periodo.',
+    date:'Inserisci date valide.', dates_required:'Inserisci Dal e Al per ogni periodo aggiuntivo.',
+    order:'La data Al deve essere uguale o successiva alla data Dal.',
+    overlap:'I periodi datati non possono sovrapporsi: le date Dal e Al sono incluse.',
+  } : {
+    rate:'Enter a valid rate of zero or more for each period.', date:'Enter valid dates.',
+    dates_required:'Enter From and To dates for each additional period.',
+    order:'The To date must be on or after the From date.',
+    overlap:'Dated periods cannot overlap: From and To nights are included.',
+  };
+  const el = document.getElementById('propTaxPeriodError');
+  if (el) el.textContent = code ? messages[code] : '';
+  return !code;
+}
+function _taxCfgRenderPeriods() {
+  const el = document.getElementById('propTaxRatePeriods');
+  if (!el) return;
+  const it = hostLang === 'it';
+  el.innerHTML = _taxRatePeriodsDraft.map((p,i)=>`<div class="tax-rate-row">
+    <div><label class="form-label" for="taxPeriodRate${i}">${_taxCfgSafe(h('prop_tax_rate'))}</label><input id="taxPeriodRate${i}" class="form-input" type="number" min="0" step="0.01" required data-rate-period="${i}" data-field="rate" value="${_taxCfgSafe(p.rate)}" oninput="_taxCfgOnPeriodInput(this)"></div>
+    <div><label class="form-label" for="taxPeriodFrom${i}">${_taxCfgSafe(h('prop_tax_from'))}</label><input id="taxPeriodFrom${i}" class="form-input" type="date" required data-rate-period="${i}" data-field="from" value="${_taxCfgSafe(p.from)}" oninput="_taxCfgOnPeriodInput(this)"></div>
+    <div><label class="form-label" for="taxPeriodTo${i}">${_taxCfgSafe(h('prop_tax_to'))}</label><input id="taxPeriodTo${i}" class="form-input" type="date" required data-rate-period="${i}" data-field="to" value="${_taxCfgSafe(p.to)}" oninput="_taxCfgOnPeriodInput(this)"></div>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="removeTaxRatePeriod(${i})" aria-label="${it ? 'Rimuovi periodo' : 'Remove period'} ${i+1}">✕</button>
+  </div>`).join('');
+}
+function addTaxRatePeriod() {
+  if (!settingsEditMode || !_consoleCanEdit() || consoleDrafts.busy()) return;
+  _taxRatePeriodsDraft.push({rate:'',from:'',to:''});
+  _taxCfgRenderPeriods(); _taxCfgLivePreview();
+  document.getElementById('taxPeriodRate'+(_taxRatePeriodsDraft.length-1))?.focus();
+}
+function removeTaxRatePeriod(i) {
+  if (!settingsEditMode || !_consoleCanEdit() || consoleDrafts.busy()) return;
+  _taxRatePeriodsDraft.splice(i,1); _taxCfgRenderPeriods(); _taxCfgLivePreview();
+}
+function _taxCfgOnPeriodInput(el) {
+  if (!settingsEditMode || !_consoleCanEdit() || consoleDrafts.busy()) return;
+  const p = _taxRatePeriodsDraft[Number(el.dataset.ratePeriod)];
+  if (!p || !['rate','from','to'].includes(el.dataset.field)) return;
+  p[el.dataset.field] = el.value;
+  _taxCfgLivePreview();
+}
+
 function renderTaxConfigPanel() {
   const list = document.getElementById('propTaxRulesList');
   const decList = document.getElementById('propTaxDeclaredList');
@@ -11588,6 +11689,7 @@ function renderTaxConfigPanel() {
   const l3Details = document.getElementById('propTaxLayer3Details');
   const it = hostLang === 'it';
 
+  _taxCfgRenderPeriods();
   if (list) list.innerHTML = _taxRulesDraft.map((r, i) => _taxCfgRenderRule(r, i, it)).join('');
   if (decList) decList.innerHTML = _taxDeclaredDraft.map((d, i) => _taxCfgRenderDeclared(d, i, it)).join('');
   if (l2Count) l2Count.textContent = _taxRulesDraft.length ? `(${_taxRulesDraft.length})` : '';
@@ -11749,15 +11851,16 @@ function _taxCfgLivePreview() {
   const dd = String(now.getDate()).padStart(2, '0');
   const dobAt = (age) => `${yy - age}-${mm}-${dd}`;
   const cfg = _normalizeTaxCfg({
-    tax_rate_eur:         Number(document.getElementById('propTaxRate')?.value) || null,
+    tax_rate_eur:         _numOrNull(document.getElementById('propTaxRate')?.value),
     tax_max_nights:       (() => { const v = document.getElementById('propTaxMaxNights')?.value; return v === '' ? null : Number(v); })(),
     tax_max_nights_basis: document.getElementById('propTaxMaxNightsBasis')?.value || 'per_stay',
     tax_max_total_eur:    (() => { const v = document.getElementById('propTaxMaxTotalEur')?.value; return v === '' ? null : Number(v); })(),
     tax_exempt_under_age: (() => { const v = document.getElementById('propTaxExemptAge')?.value; return v === '' ? null : Number(v); })(),
-    tax_rules:            _taxRulesDraft,
+    tax_rules:            _taxCfgRulesForSave(),
     tax_declared_exemptions: _taxDeclaredDraft,
   });
-  if (cfg.baseRate == null || cfg.baseRate === 0) {
+  if (!_taxCfgValidatePeriods()) { body.textContent = ''; return; }
+  if (cfg.baseRate == null && !cfg.ratePeriods.length) {
     body.innerHTML = `<em>${_taxCfgSafe(it ? 'Aggiungi una tariffa per vedere il preview.' : 'Set a rate to see the preview.')}</em>`;
     return;
   }
@@ -11809,7 +11912,7 @@ function copyTaxConfigFromSelected() {
   if (el('propTaxExemptAge'))    el('propTaxExemptAge').value    = (src.tax_exempt_under_age ?? '');
   if (el('propTaxSourceNote'))   el('propTaxSourceNote').value   = (src.tax_source_note ?? '');
   if (el('propTaxVerifiedAt'))   el('propTaxVerifiedAt').value   = (src.tax_verified_at ?? '');
-  _taxRulesDraft    = Array.isArray(src.tax_rules) ? JSON.parse(JSON.stringify(src.tax_rules)) : [];
+  _taxCfgHydratePeriods(src);
   _taxDeclaredDraft = Array.isArray(src.tax_declared_exemptions) ? JSON.parse(JSON.stringify(src.tax_declared_exemptions)) : [];
   renderTaxConfigPanel();
   toast(it ? '✓ Copiato — ricorda di salvare' : '✓ Copied — remember to save');
@@ -11943,7 +12046,8 @@ function exportCityTax() {
   const exportCheckins = allCheckins.filter(c => c.is_test === false && !c.deleted_at);
   if (exportCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato' : 'No data!'); return; }
   const cfg = _normalizeTaxCfg(propertyData);
-  if (cfg.baseRate == null) {
+  if (cfg.ratePeriods.length && TaxDateRates.validate(cfg.ratePeriods)) { toast(hostLang === 'it' ? 'Correggi i periodi della tassa in Impostazioni.' : 'Correct the tax periods in Settings.'); return; }
+  if (cfg.baseRate == null && !cfg.ratePeriods.length) {
     toast(hostLang === 'it'
       ? '⚠ Imposta la configurazione imposta di soggiorno in Dettagli Proprietà'
       : '⚠ Set the Tourist Tax Configuration in Property Details');
@@ -11959,8 +12063,8 @@ function exportCityTax() {
   const qm = input.match(/^(\d{4})-([1-4])$/);
   if (!qm) { if (input !== '') toast(hostLang === 'it' ? 'Formato non valido' : 'Invalid format'); return; }
   const qy = Number(qm[1]); const q = Number(qm[2]);
-  const qStart = new Date(qy, (q - 1) * 3, 1);
-  const qEnd = new Date(qy, q * 3, 0);
+  const qStart = new Date(Date.UTC(qy, (q - 1) * 3, 1));
+  const qEnd = new Date(Date.UTC(qy, q * 3, 0));
   const qStartStr = qStart.toISOString().slice(0, 10);
   const qEndStr = qEnd.toISOString().slice(0, 10);
   const it = hostLang === 'it';
@@ -11977,6 +12081,7 @@ function exportCityTax() {
     const r = computeGuestTax(c, cfg, {
       nightsInPeriod: inQuarter, groupSize, declaredFlags: declared,
       arrivalISO: (c.arrival_date || '').split('T')[0] || null,
+      periodStart: qStartStr, periodEnd: qEndStr,
     });
     rows.push(r);
     taxableNights   += r.taxable_nights;
@@ -12000,7 +12105,12 @@ function exportCityTax() {
   lines.push(`${it ? 'Struttura' : 'Property'}: ${propertyData?.name || ''}`);
   lines.push(`${it ? 'Trimestre' : 'Quarter'}: ${qy}-Q${q}  (${qStartStr} → ${qEndStr})`);
   lines.push('');
-  lines.push(`${it ? 'Tariffa' : 'Rate'}: € ${cfg.baseRate.toFixed(2)} ${it ? 'per persona/notte' : 'per person/night'}`);
+  if (cfg.ratePeriods.length) {
+    lines.push(it ? 'Tariffe per notte (date incluse):' : 'Nightly rates (inclusive dates):');
+    if (!cfg.ratePeriods.some(p=>p.main)) lines.push(`${it ? 'Tariffa annuale' : 'Year-round rate'}: € ${(cfg.baseRate ?? 0).toFixed(2)}`);
+    for (const p of cfg.ratePeriods) lines.push(`${p.from || '…'} → ${p.to || '…'}: € ${Number(p.rate).toFixed(2)}`);
+    if (cfg.ratePeriods.some(p=>p.main)) lines.push(it ? 'Fuori dai periodi: € 0.00' : 'Outside periods: € 0.00');
+  } else lines.push(`${it ? 'Tariffa' : 'Rate'}: € ${cfg.baseRate.toFixed(2)} ${it ? 'per persona/notte' : 'per person/night'}`);
   lines.push(`${it ? 'Notti max tassabili' : 'Max taxable nights'}: ${cfg.cap == null ? (it ? 'nessun limite' : 'no cap') : `${cfg.cap} (${basisTxt})`}`);
   if (propertyData?.tax_exempt_under_age != null && propertyData?.tax_exempt_under_age !== '') {
     lines.push(`${it ? 'Esenti sotto i' : 'Exempt under age'}: ${propertyData.tax_exempt_under_age}`);
@@ -12046,7 +12156,7 @@ function exportCityTax() {
       r.over_cap_nights,
       r.rule_exempt_nights,
       label,
-      Number(r.effective_rate).toFixed(2),
+      r.rate_breakdown ? r.rate_breakdown.map(b=>`${b.from}→${b.to}: ${b.nights} × €${b.rate.toFixed(2)}${b.over_cap ? (it ? ' (oltre soglia)' : ' (over cap)') : ''}`).join('; ') : Number(r.effective_rate).toFixed(2),
       Number(r.amount).toFixed(2),
       r.requires_documentation ? '⚠' : '',
     ].join(' | '));
@@ -15312,7 +15422,7 @@ function fillPropertyForm(data) {
   if (el('propTaxVerifiedAt')) el('propTaxVerifiedAt').value = (data.tax_verified_at ?? '');
   // Round 37 (redux) — drafts back to arrays so edit → cancel restores
   // cleanly. renderTaxConfigPanel repaints from these on every call.
-  _taxRulesDraft   = Array.isArray(data.tax_rules) ? JSON.parse(JSON.stringify(data.tax_rules)) : [];
+  _taxCfgHydratePeriods(data);
   _taxDeclaredDraft = Array.isArray(data.tax_declared_exemptions) ? JSON.parse(JSON.stringify(data.tax_declared_exemptions)) : [];
   if (typeof renderTaxConfigPanel === 'function') renderTaxConfigPanel();
   // Round 38 — recompute the privacy-notice empty-field warning after

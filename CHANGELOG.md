@@ -23,7 +23,15 @@ Specification: `PLAN_round62_tax_date_rates.md`. Daniele confirmed 21 October 20
 | Phase | Status | Where / test gate |
 |---|---|---|
 | 1 — Date-rate settings and nightly calculation | shipped — PR #194 — GPT-6 | Adjacent From/To dates, additional periods, validation, draft/save/cancel/copy, nightly calculation and synthetic tax goldens. Full regression before merge. |
-| 2 — Release verification | in-progress — GPT-6 | Full browser matrix IT/EN at mobile/desktop, CI, main publication, production source verification and read-only live smoke. |
+| 2 — Release verification | shipped — PR #194 + release record — GPT-6 | Full browser matrix IT/EN at mobile/desktop, CI, main publication, production source verification and read-only live smoke. |
+
+### Round 62 — release closed (GPT-6, 2026-10-21)
+
+- Both phases complete. Implementation shipped in PR #194, merge `3e07473cd6e6a15d3fe8759abcf4bd11b6bfcbe4`; the release-verification phase records the operational checks and final changelog/plan publication. No database migration or owner action is needed.
+- Phase 2 repeated the complete local regression: **PASS 55 / FAIL 0 / SKIP 3**, including all eight actual Chromium suites. Skips remain the absent hosted demo origin, private demo catalog JSON and pglast prerequisite. Phase 1 PR CI run `39580593080`, job `119156924444`, independently passed 55/0/3 and the protected production schema-drift check.
+- Production deployment **`dpl_7LcT681hZD8SBPJzkFfbgjMWJ6Xt` READY**, project `prj_YKcEpRmd5OmVSkLGzBrTDs4gP751` (`welcomebnb`), correct main merge and `app.welcomebnb.it` alias verified. Exact public host-console, date-rate engine and guide source match the tested files.
+- Post-deployment `NODE_USE_ENV_PROXY=1 TAX_SMOKE_ORIGIN=https://app.welcomebnb.it SPOT_SMOKE_ORIGIN=https://app.welcomebnb.it npm run test:live`: **PASS 2 / FAIL 0 / SKIP 2**. Hosted tax engine generated both exact fictional IT/EN declaration goldens; existing deployed SPOT XML serializer generated its unchanged normal/startup goldens. No real guest data read or writes. Local skips: hosted demo origin and service-role key; the production schema check passed with the protected CI key.
+- Final release record changes only CHANGELOG and the Round plan; application assets are identical to the verified production build. Existing date-independent tax outputs match pre-change UTC baselines; timezone-correct quarter boundaries, dated rates and nightly caps are covered. No outstanding blocker.
 
 ### Round 62 Phase 1 — date-specific tourist-tax rates (GPT-6, 2026-10-21)
 

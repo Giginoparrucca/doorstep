@@ -1,0 +1,22 @@
+TOURIST TAX SUMMARY — to enter in CityTax++
+Property: Fictional tax property
+Quarter: 2026-Q3  (2026-07-01 → 2026-09-30)
+
+Nightly rates (inclusive dates):
+Year-round rate: € 2.00
+2026-07-01 → 2026-08-31: € 4.00
+Max taxable nights: no cap
+
+Guests in quarter: 1
+TAXABLE overnights: 3
+Rule-exempt overnights: 0
+Over-cap overnights: 0
+
+AMOUNT DUE: € 12.00
+
+── PER-GUEST BREAKDOWN ──
+Guest | Nights | Taxable | Over cap | Rule-exempt | Rule / exemption | Rate € | Amount € | Doc
+Fixture Adult | 3 | 3 | 0 | 0 | full rate | 2026-07-01→2026-07-03: 3 × €4.00 | 12.00 | 
+
+
+⚠ Always verify against your comune's resolution before filing the declaration.

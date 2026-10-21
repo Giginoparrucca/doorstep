@@ -24,7 +24,7 @@ const context=vm.createContext({console,Date,Map,Set,allCheckins:[base,test],hos
   buildBatch:rows=>({lines:rows.map(c=>c.name),warnings:[],rowMeta:[],groupCount:rows.length}),
   _ross1000Idswh:c=>c.id,_xmlEsc:s=>s,_ymd:s=>s?.replaceAll('-',''),_ross1000Arrivo:c=>c.name,
   _ruleLabel:()=>null, _groupSizeFor:()=>1,
-  _normalizeTaxCfg:()=>({baseRate:1.5,cap:null,basis:'per_stay',rules:[],declared:[]}),_nightsInsideQuarter:()=>1,
+  _normalizeTaxCfg:()=>({baseRate:1.5,cap:null,basis:'per_stay',rules:[],ratePeriods:[],declared:[]}),_nightsInsideQuarter:()=>1,
   computeGuestTax:c=>({guest:c.name,nights_in_period:1,taxable_nights:1,over_cap_nights:0,rule_exempt_nights:0,amount:1.5,requires_documentation:false}),
 });
 // Round 58 moved ROSS1000 behind exportRegionalFile; see regional-exports.test.mjs

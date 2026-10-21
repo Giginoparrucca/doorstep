@@ -22,7 +22,7 @@ The normalizer separates rate periods from reductions. Compute each stay night
 in UTC; exclude checkout; apply its rate before existing reductions/exemptions.
 Quarter clipping passes exact bounds. Preserve night/euro caps across period
 boundaries; never reset them for each rate segment. Legacy configurations keep
-identical output. Invalid saved period data blocks calculation/export.
+identical output in UTC; quarter boundaries are corrected for other timezones. Invalid saved period data blocks calculation/export.
 No Alloggiati, regional-export or payment-export format changes.
 
 ## Phase 1 — settings and engine

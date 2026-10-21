@@ -1,0 +1,22 @@
+RIEPILOGO IMPOSTA DI SOGGIORNO — da inserire in CityTax++
+Struttura: Fictional tax property
+Trimestre: 2026-Q3  (2026-07-01 → 2026-09-30)
+
+Tariffe per notte (date incluse):
+Tariffa annuale: € 2.00
+2026-07-01 → 2026-08-31: € 4.00
+Notti max tassabili: nessun limite
+
+Ospiti nel trimestre: 1
+Pernottamenti TASSABILI: 3
+Pernottamenti esenti per regola: 0
+Pernottamenti oltre soglia: 0
+
+IMPORTO DOVUTO: € 12.00
+
+── DETTAGLIO PER OSPITE ──
+Ospite | Notti trim. | Tassabili | Oltre soglia | Esente per regola | Regola / esenzione | Tariffa € | Importo € | Doc
+Fixture Adult | 3 | 3 | 0 | 0 | tariffa piena | 2026-07-01→2026-07-03: 3 × €4.00 | 12.00 | 
+
+
+⚠ Verifica sempre contro la delibera del tuo comune prima di depositare la dichiarazione.

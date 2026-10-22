@@ -1861,7 +1861,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           </div>
         </fieldset>
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-          <button type="button" class="btn btn-primary" onclick="syncIcalNow()" data-h="ical_sync_now" data-guide="ical-sync">🔄 Sync now</button>
+          <button type="button" class="btn btn-primary" id="icalSyncSettingsBtn" onclick="syncIcalNow()" data-h="ical_sync_now" data-guide="ical-sync">🔄 Sync now</button>
           <span id="icalLastSynced" style="font-size:0.74rem;color:var(--ink-soft);"></span>
         </div>
         <div id="icalSyncResult" style="margin-top:10px;font-size:0.82rem;color:var(--ink-soft);"></div>
@@ -2082,6 +2082,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
           <div style="font-family:'Playfair Display',serif;font-weight:600;font-size:1rem;" data-h="cal_header_title">Calendar</div>
           <div style="font-size:0.72rem;color:var(--ink-soft);" data-h="cal_header_hint">Direct bookings + OTA syncs</div>
         </div>
+        <button type="button" class="btn btn-secondary btn-sm" id="calendarSyncBtn" onclick="syncIcalNow()" data-h="ical_sync_now">🔄 Sync now</button>
+        <span id="calendarSyncResult" role="status" aria-live="polite" style="font-size:0.75rem;color:var(--ink-soft);"></span>
         <button class="btn btn-secondary btn-sm" onclick="openReservationForm({ mode: 'block' })" data-h="btn_block_dates" data-guide="direct-block">🚫 Block dates</button>
         <button class="btn btn-primary btn-sm" onclick="openReservationForm({ mode: 'reservation' })" data-h="btn_new_reservation" data-guide="direct-new">+ New booking</button>
       </div>
@@ -8788,8 +8790,10 @@ async function syncCalendarsFromDashboard(btn) {
 async function syncIcalNow() {
   console.log('[iCal] Sync now clicked. propertyId=', propertyId);
   if (!propertyId) { toast(h('ical_save_first')); return; }
-  const resEl = document.getElementById('icalSyncResult');
-  const btn = document.querySelector('button[onclick="syncIcalNow()"]');
+  const onCalendar = document.querySelector('.panel.active')?.id === 'panel-calendar';
+  const resEl = document.getElementById(onCalendar ? 'calendarSyncResult' : 'icalSyncResult');
+  const btn = document.getElementById(onCalendar ? 'calendarSyncBtn' : 'icalSyncSettingsBtn') ||
+    document.querySelector('button[onclick="syncIcalNow()"]');
   if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
   if (resEl) resEl.textContent = h('ical_syncing');
 
@@ -8860,8 +8864,9 @@ async function syncIcalNow() {
         renderIcalFeeds();
       }
     } catch (_) { /* non-fatal */ }
-    // Re-render the dashboard's upcoming panel with fresh data
-    renderDashboard();
+    // Refresh whichever calendar is visible after the imported rows change.
+    if (onCalendar) await renderCalendarPanel();
+    else renderDashboard();
   } catch (e) {
     if (resEl) resEl.textContent = h('ical_sync_failed') + ': ' + (e?.message || e);
   } finally {

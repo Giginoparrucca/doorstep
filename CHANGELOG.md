@@ -20,6 +20,11 @@ Newest entries at the top of each section.
 - The generic third-party iCal classifier previously recognized only English unavailable/block summaries; extended it to common Italian labels such as `Bloccato`, `Non disponibile`, `Date bloccate`, `Chiuso` while leaving Booking.com's opaque `CLOSED - Not available` handling unchanged. Regression cases added to `scripts/ical-sync-parse.test.mjs`.
 - Source-feed event content for blocked dates has not yet been verified: if Bed-and-Breakfast.it does not export availability blocks, application-side classification cannot recreate them. A future sync will apply the new classifier, but verification against known OTA blocked dates remains required. No production reservation data was modified.
 
+### Calendar manual OTA sync button (2026-10-22)
+
+- Added a localized Sync now action to Ospiti → Calendario alongside Block dates / New booking. Reuses Settings' existing authenticated `syncIcalNow()` endpoint and feedback; after success refreshes the visible calendar immediately. The Settings sync still keeps its original behavior. Commit `bebf822`. No schema change.
+- Follow-up to 7contrade incident: manual sync now accessible without leaving calendar; whether the external feeds actually export their blocked periods remains under investigation.
+
 ### Planned rounds (not started)
 
 | Round | Scope | Specification | Status |

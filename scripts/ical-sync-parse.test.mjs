@@ -149,6 +149,16 @@ const ECHO = [
   assert.equal(row.raw.origin_uid, 'direct-booking-xyz');
 }
 
+// ── Third-party Italian calendars: explicit blocked dates ──────────
+for (const summary of ['Bloccato', 'Non disponibile', 'Date bloccate', 'Chiuso']) {
+  const row = vEventToRow({ UID: 'block-' + summary, SUMMARY: summary,
+    DTSTART: { value: '20261105' }, DTEND: { value: '20261108' } }, 'prop-1', 'other');
+  assert.equal(row.entry_type, 'block', summary + ' must remain a block');
+}
+assert.equal(vEventToRow({ UID: 'reservation', SUMMARY: 'Mario Rossi (Booking.com: 1234)',
+  DTSTART: { value: '20261105' }, DTEND: { value: '20261108' } }, 'prop-1', 'other').entry_type,
+  'reservation', 'third-party confirmed booking stays a reservation');
+
 // ── icsDateToISO: DATE vs DATETIME forms ───────────────────────────
 assert.equal(icsDateToISO({ value: '20260215' }), '2026-02-15');
 assert.equal(icsDateToISO({ value: '20260215T120000Z' }), '2026-02-15');

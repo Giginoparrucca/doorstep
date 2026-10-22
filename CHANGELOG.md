@@ -11,7 +11,8 @@ Newest entries at the top of each section.
 
 - Fixed room chips in Ospiti → Calendario: selecting a specific room now shows only its assigned reservations; All shows all and Unassigned shows bookings without a room. Previously room chips also included every unassigned OTA reservation, making selections appear ineffective.
 - Added an explicit static regression assertion in `scripts/rooms-calendar-static.test.mjs` so room-specific filters cannot silently include unassigned reservations again.
-- Changes committed directly to `main`: `7fa9165` (UI filter) and `0809600` (test). Production deployment and runtime smoke test not yet verified.
+- Follow-up root-cause fix: room chip `onclick` had nested double quotes (`JSON.stringify` inside a double-quoted HTML attribute), so clicks did not invoke the handler, including in admin editing mode. Use single-quoted HTML attribute, preserving JSON-quoted JS argument. Commit `e0ed11e`; regression assertion `2312e1b`. The earlier exclusive filter fix remains in place.
+- Published directly to `main`; Vercel production rollout is automatic. Authenticated interactive admin-view smoke test remains outstanding.
 
 ### Planned rounds (not started)
 

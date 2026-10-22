@@ -7245,7 +7245,7 @@ async function _renderUpcomingCalendarBody(buildHeader) {
     const chip = (val, lbl, active) => {
       const bg = active ? 'background:var(--warm);color:#fff;border-color:var(--warm);' : 'background:var(--white);color:var(--ink);border-color:var(--border);';
       const value = val == null ? '' : String(val);
-      return `<button type="button" onclick="_setCalendarRoomFilter(${JSON.stringify(value)})" style="padding:4px 10px;border:1px solid var(--border);border-radius:999px;font-size:0.76rem;cursor:pointer;${bg}">${safe(lbl)}</button>`;
+      return `<button type="button" onclick='_setCalendarRoomFilter(${JSON.stringify(value)})' style="padding:4px 10px;border:1px solid var(--border);border-radius:999px;font-size:0.76rem;cursor:pointer;${bg}">${safe(lbl)}</button>`;
     };
     const chips = [chip('', h('cal_room_filter_all'), !_calendarRoomFilter)]
       .concat(rooms.map(r => chip(r.id, r.name, _calendarRoomFilter === r.id)))

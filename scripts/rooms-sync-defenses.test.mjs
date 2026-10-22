@@ -29,6 +29,15 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const Round = require('../lib/calendar-roundtrip.js');
 
+// Regression: legacy iReservation adoption uses room-category IDs from
+// UID/feed URLs only when the match is unique across configured feeds.
+import fs from 'node:fs';
+const syncSource = fs.readFileSync(new URL('../api/ical-sync.js', import.meta.url), 'utf8');
+assert.match(syncSource, /const matchingFeeds = feeds\.filter\(/);
+assert.match(syncSource, /String\(originalUid\)\.split\('-'\)\.includes\(category\)/);
+assert.match(syncSource, /matchingFeeds\.length === 1 && matchingFeeds\[0\] === feed/);
+assert.match(syncSource, /samePlatformFeeds !== 1 && !uniqueIresMatch/);
+
 const roomA = '11111111-1111-4111-8111-111111111111';
 const roomB = '22222222-2222-4222-8222-222222222222';
 

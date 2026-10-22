@@ -827,7 +827,7 @@ function vEventToRow(ev, propertyId, platform) {
   // or similar for host-set blocks), so keep the regex behaviour there.
   const isBlock = platform === 'booking'
     ? false
-    : /not available|blocked|closed - not available|closed \(/i.test(summary);
+    : /not available|unavailable|blocked|block(?:ed|ed dates)?|closed - not available|closed \\(|non disponibile|non disponibili|indisponibil[ei]|bloccato|bloccata|bloccati|bloccate|date bloccate|chiuso|chiusa|chiusura/i.test(summary);
   const entry_type = isBlock ? 'block' : 'reservation';
   const status = /^CANCELLED$/i.test(ev.STATUS || '') ? 'cancelled' : 'active';
 

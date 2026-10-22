@@ -345,7 +345,23 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
             (feedRoomId && !r.room_id && r.uid === originalUid)));
         if (!legacy.length) continue;
         const samePlatformFeeds = feeds.filter(f => normalizePlatform(f.platform) === platform).length;
-        if (legacy.length !== 1 || (!legacy[0].raw?.welcomebnb_feed_source && samePlatformFeeds !== 1)) {
+        // For iReservation only, a legacy UID embeds the room-category ID.
+        // Permit adoption only if it identifies this feed and no sibling feed.
+        const roomCategory = f => {
+          try {
+            const u = new URL(f.url);
+            return u.hostname === 'www.bed-and-breakfast.it' && u.pathname === '/export_calendar_ires.cfm'
+              ? u.searchParams.get('idroomcategory') : null;
+          } catch (_) { return null; }
+        };
+        const matchingFeeds = feeds.filter(f => {
+          const category = roomCategory(f);
+          return category && String(originalUid).split('-').includes(category);
+        });
+        const uniqueIresMatch = /-IRES$/i.test(originalUid) &&
+          roomCategory(feed) && matchingFeeds.length === 1 && matchingFeeds[0] === feed;
+
+        if (legacy.length !== 1 || (!legacy[0].raw?.welcomebnb_feed_source && samePlatformFeeds !== 1 && !uniqueIresMatch)) {
           throw new Error('Existing unassigned reservation has ambiguous feed ownership');
         }
         const update = { uid: row.uid, room_id: feedRoomId, raw: { ...(legacy[0].raw || {}), ...row.raw } };

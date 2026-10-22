@@ -7095,14 +7095,14 @@ async function _renderUpcomingCalendarBody(buildHeader) {
       .order('checkin_date', { ascending: true });
     if (error) { console.warn('Calendar reservations load failed:', error.message); }
     else rows = data || [];
-  // Round 60 Phase 3c — apply the room filter (null = all). When a
-  // specific room is picked, keep rows in that room AND unassigned
-  // (so the host still sees stays they haven't labelled yet). When
-  // _calendarRoomFilter === '__unassigned__' keep only unassigned.
+  // Room filters must be mutually exclusive. Previously a selected room
+  // also included every unassigned booking, making the buttons appear
+  // ineffective when most OTA imports had no room_id.
+  // Hosts can inspect those bookings via the dedicated Unassigned chip.
   if (_calendarRoomFilter) {
     rows = (_calendarRoomFilter === '__unassigned__')
       ? rows.filter(r => !r.room_id)
-      : rows.filter(r => r.room_id === _calendarRoomFilter || !r.room_id);
+      : rows.filter(r => r.room_id === _calendarRoomFilter);
   }
   } catch (e) {
     console.warn('Calendar reservations exception:', e);
@@ -7238,10 +7238,8 @@ async function _renderUpcomingCalendarBody(buildHeader) {
 
   // Round 60 Phase 3c — room filter chip row. Only painted when the
   // property has 2+ rooms. "All" (default), each active room, then
-  // "Unassigned". Clicking a chip sets _calendarRoomFilter and
-  // re-renders. Picking a specific room includes unassigned stays
-  // (so the host doesn't lose sight of a booking they haven't
-  // labelled yet); the Unassigned chip shows only unassigned.
+  // "Unassigned". Each room chip shows only bookings assigned to
+  // that room. All and Unassigned explicitly cover everything else.
   const rooms = Array.isArray(allRooms) ? allRooms : [];
   const chipsRow = (rooms.length >= 2) ? (() => {
     const chip = (val, lbl, active) => {

@@ -45,6 +45,13 @@ assert.match(html, /if \(_calendarRoomFilter\)/,
 assert.match(html, /'__unassigned__'/,
   'unassigned-only sentinel defined');
 
+// Room selection is exclusive: unassigned bookings must not leak into
+// room-specific results (otherwise most OTA calendars seem unchanged).
+assert.match(html, /rows\.filter\(r => r\.room_id === _calendarRoomFilter\)/,
+  'individual room filter includes only that room');
+assert.doesNotMatch(html, /r\.room_id === _calendarRoomFilter \|\| !r\.room_id/,
+  'individual room filter does not include unassigned bookings');
+
 // SELECT pulls room_id so the filter + bar prefix have it.
 assert.match(html, /from\('ota_reservations'\)[\s\S]{0,400}room_id/,
   'calendar SELECT includes room_id');

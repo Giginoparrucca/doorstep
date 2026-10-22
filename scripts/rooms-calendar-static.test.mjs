@@ -52,6 +52,13 @@ assert.match(html, /rows\.filter\(r => r\.room_id === _calendarRoomFilter\)/,
 assert.doesNotMatch(html, /r\.room_id === _calendarRoomFilter \|\| !r\.room_id/,
   'individual room filter does not include unassigned bookings');
 
+// Inline handler must use single-quoted HTML attribute; JSON.stringify emits
+// double-quoted JavaScript string literals, so double-quoted HTML breaks clicks.
+assert.match(html, /onclick='_setCalendarRoomFilter\(\$\{JSON\.stringify\(value\)\}\)'/,
+  'room chips preserve their JavaScript argument inside the onclick attribute');
+assert.doesNotMatch(html, /onclick="_setCalendarRoomFilter\(\$\{JSON\.stringify\(value\)\}\)"/,
+  'broken double-quoted inline handler must not return');
+
 // SELECT pulls room_id so the filter + bar prefix have it.
 assert.match(html, /from\('ota_reservations'\)[\s\S]{0,400}room_id/,
   'calendar SELECT includes room_id');

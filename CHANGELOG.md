@@ -7,6 +7,12 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Calendar Rooms filter hotfix (2026-10-22)
+
+- Fixed room chips in Ospiti → Calendario: selecting a specific room now shows only its assigned reservations; All shows all and Unassigned shows bookings without a room. Previously room chips also included every unassigned OTA reservation, making selections appear ineffective.
+- Added an explicit static regression assertion in `scripts/rooms-calendar-static.test.mjs` so room-specific filters cannot silently include unassigned reservations again.
+- Changes committed directly to `main`: `7fa9165` (UI filter) and `0809600` (test). Production deployment and runtime smoke test not yet verified.
+
 ### Planned rounds (not started)
 
 | Round | Scope | Specification | Status |

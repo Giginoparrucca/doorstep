@@ -14,6 +14,12 @@ Newest entries at the top of each section.
 - Follow-up root-cause fix: room chip `onclick` had nested double quotes (`JSON.stringify` inside a double-quoted HTML attribute), so clicks did not invoke the handler, including in admin editing mode. Use single-quoted HTML attribute, preserving JSON-quoted JS argument. Commit `e0ed11e`; regression assertion `2312e1b`. The earlier exclusive filter fix remains in place.
 - Published directly to `main`; Vercel production rollout is automatic. Authenticated interactive admin-view smoke test remains outstanding.
 
+### 7contrade OTA blocked dates investigation (2026-10-22)
+
+- Confirmed production property 7contrade has three Bed-and-Breakfast.it iCal feeds (Battaglia, Bellatrase, Capitignano), recorded last sync 2026-10-21 17:28 UTC, and eight active imported reservations but **no active blocked-date entries**. This rules out a pure calendar visual filter as the only cause.
+- The generic third-party iCal classifier previously recognized only English unavailable/block summaries; extended it to common Italian labels such as `Bloccato`, `Non disponibile`, `Date bloccate`, `Chiuso` while leaving Booking.com's opaque `CLOSED - Not available` handling unchanged. Regression cases added to `scripts/ical-sync-parse.test.mjs`.
+- Source-feed event content for blocked dates has not yet been verified: if Bed-and-Breakfast.it does not export availability blocks, application-side classification cannot recreate them. A future sync will apply the new classifier, but verification against known OTA blocked dates remains required. No production reservation data was modified.
+
 ### Planned rounds (not started)
 
 | Round | Scope | Specification | Status |

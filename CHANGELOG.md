@@ -25,6 +25,11 @@ Newest entries at the top of each section.
 - Added a localized Sync now action to Ospiti → Calendario alongside Block dates / New booking. Reuses Settings' existing authenticated `syncIcalNow()` endpoint and feedback; after success refreshes the visible calendar immediately. The Settings sync still keeps its original behavior. Commit `bebf822`. No schema change.
 - Follow-up to 7contrade incident: manual sync now accessible without leaving calendar; whether the external feeds actually export their blocked periods remains under investigation.
 
+### 2026-10-22 — iReservation room-adoption hotfix
+
+- Room-category identifiers in older reservation UIDs now allow safe adoption when they uniquely match one configured feed. Ambiguous matches still fail closed.
+- Regression guard added; manual production re-sync and verification remain pending. Zero-availability blocks must be checked separately against provider feed contents.
+
 ### Planned rounds (not started)
 
 | Round | Scope | Specification | Status |

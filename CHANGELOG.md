@@ -63,6 +63,12 @@ Newest entries at the top of each section.
 - Fixed a race where the guest Home welcome message was rendered before the localized property values were assigned, leaving Italian text on screen while English was selected. After the property loads, the message now re-renders from the active language, retaining safe clickable URLs and mobile wrapping.
 - Added static regression coverage for the post-load localization path. Application commit `489be6d`.
 
+### 2026-10-23 — Guest welcome language gateway fix
+
+- Root cause confirmed: Antica Torre has distinct saved Italian and English welcome messages, but `api/guest.js` omitted both `welcome_message_it` and `welcome_message_en` from `PROPERTY_PUBLIC_FIELDS`. The guest browser received only the Italian legacy value even when EN was selected.
+- Gateway now returns both public localized message fields. The existing guest language selector and safe URL renderer use them. Added regression assertion in `scripts/guest-links-static.test.mjs`. No database changes.
+- Application commit `7b9a8d8`, test `c99523d`.
+
 ### Planned rounds (not started)
 
 | Round | Scope | Specification | Status |

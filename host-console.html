@@ -5556,7 +5556,7 @@ function _hgEnsurePill(panelId) {
 // English platform placeholders when the console is in Italian.
 // Returns a cleaned name or null so the caller can pick a localised
 // fallback.
-function _cleanOtaGuestName(raw) {
+function _cleanOtaGuestName(raw, roomId = null) {
   if (raw == null) return null;
   const v = String(raw).trim();
   if (!v) return null;
@@ -5566,7 +5566,11 @@ function _cleanOtaGuestName(raw) {
   // "Airbnb - Not available", "Airbnb (Not available)", "Booking.com — reserved"
   if (/\bnot\s+available\b/i.test(v)) return null;
   if (/^(airbnb|booking\.com|booking|vrbo)\b\s*[-–—(]/i.test(v) && /(not\s+available|reserved|blocked|closed)/i.test(s)) return null;
-  return v;
+  // OTA labels such as "Camera 1" identify a channel-manager slot, not
+  // necessarily the host's named room. Never display it as the room.
+  const base = v.replace(/\s*[-–—]\s*(?:Camera|Room|Chambre|Zimmer)\s*\d+\s*$/i, '').trim();
+  const room = roomId && Array.isArray(allRooms) ? allRooms.find(x => x.id === roomId) : null;
+  return room?.name ? base + ' · ' + room.name : base;
 }
 
 let dashboardRenderVersion = 0;
@@ -5711,7 +5715,7 @@ async function renderDashboard() {
     // echo linked to a direct booking doesn't produce a second phantom
     // "Awaiting check-in" tile for the same stay.
     const { data: activeRes } = await sb.from('ota_reservations')
-      .select('id, platform, guest_name, checkin_date, checkout_date, booking_code').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
+      .select('id, platform, guest_name, room_id, checkin_date, checkout_date, booking_code').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
       .eq('property_id', propertyId)
       .eq('entry_type', 'reservation')
       .eq('status', 'active')
@@ -5731,7 +5735,7 @@ async function renderDashboard() {
         const n = Math.round((new Date(departureISO + 'T00:00:00') - new Date(arrivalISO + 'T00:00:00')) / 86400000);
         nights = Number.isFinite(n) && n > 0 ? n : null;
       }
-      const cleaned = _cleanOtaGuestName(r.guest_name);
+      const cleaned = _cleanOtaGuestName(r.guest_name, r.room_id);
       const guestName = cleaned
         || (hostLang === 'it' ? 'Ospite (check-in non completato)' : 'Guest (check-in not completed)');
       const synthSummary = {
@@ -6291,7 +6295,7 @@ function _renderReservationCard(r, todayISO) {
     count = grp.length;
     checkedIn = true;
   } else {
-    name = _cleanOtaGuestName(r.guest_name);
+    name = _cleanOtaGuestName(r.guest_name, r.room_id);
   }
 
   const n = nightsOf(r.checkin_date, r.checkout_date);

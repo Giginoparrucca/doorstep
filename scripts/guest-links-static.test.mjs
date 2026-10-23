@@ -10,4 +10,10 @@ for (const text of [
   'guestLinkedText(ciInst)',
   'guestLinkedText(coInst)',
 ]) assert.ok(html.includes(text), 'guest-facing URL support missing: ' + text);
+assert.match(html, /el\.innerHTML = guestLinkedText\(T\[lang\]\[key\]\)/,
+  'language switching retains clickable Home welcome links');
+assert.match(html, /hostMsg'\)\.innerHTML = guestLinkedText\(welcomeMsg\)/,
+  'initial Home welcome message contains clickable links');
+assert.match(html, /#hostMsg, \.rule-desc, \.reco-desc[\s\S]*?overflow-wrap: anywhere/,
+  'long Home links wrap on mobile');
 console.log('PASS guest links static: links open in new tab, protocols restricted, four guest-facing surfaces covered');

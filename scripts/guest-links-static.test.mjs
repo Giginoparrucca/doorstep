@@ -12,8 +12,8 @@ for (const text of [
 ]) assert.ok(html.includes(text), 'guest-facing URL support missing: ' + text);
 assert.match(html, /el\.innerHTML = guestLinkedText\(T\[lang\]\[key\]\)/,
   'language switching retains clickable Home welcome links');
-assert.match(html, /hostMsg'\)\.innerHTML = guestLinkedText\(welcomeMsg\)/,
-  'initial Home welcome message contains clickable links');
+assert.match(html, /hostMsg'\)\) el\('hostMsg'\)\.innerHTML = guestLinkedText\(welcomeMsg \|\| ''\)/,
+  'initial Home welcome message contains clickable links even when empty');
 assert.match(html, /#hostMsg, \.rule-desc, \.reco-desc[\s\S]*?overflow-wrap: anywhere/,
   'long Home links wrap on mobile');
 assert.match(html, /guestLinkedText\(T\[lang\]\.host_msg \|\| ''\)/,

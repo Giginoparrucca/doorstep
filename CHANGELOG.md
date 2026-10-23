@@ -48,6 +48,11 @@ Newest entries at the top of each section.
 - Host Currently Staying and calendar reservation displays now strip generic OTA suffixes such as "Camera 1" from guest labels. When a reservation has a mapped `room_id`, the display appends the real room name from `property_rooms` instead. Room mapping and underlying booking data remain unchanged.
 - Dashboard synthetic awaiting-check-in query now loads `room_id` for the correct display. Commit `241102c`.
 
+### 2026-10-23 — Clickable host-entered guest links
+
+- Guest app turns http(s) and www URLs in rule descriptions, recommendation descriptions, transport text and check-in/out instructions into clickable links opening in a new tab with rel=noopener noreferrer.
+- Text is HTML-escaped first; non-web protocols and injected markup are never interpreted as trusted HTML. Static regression script: `scripts/guest-links-static.test.mjs`. Shipped directly to main.
+
 ### Planned rounds (not started)
 
 | Round | Scope | Specification | Status |

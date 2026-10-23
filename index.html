@@ -828,6 +828,19 @@ body.tab-chat .powered-by {
   .nav-bar { max-width: 480px; left: 50%; transform: translateX(-50%); }
 }
 </style>
+<style id="guest-host-links-wrap">
+  #hostMsg, .rule-desc, .reco-desc, #transportInfoText,
+  #checkinInstructionsText, #checkoutInstructionsText {
+    overflow-wrap: anywhere;
+    word-break: normal;
+    min-width: 0;
+  }
+  #hostMsg a, .rule-desc a, .reco-desc a,
+  #transportInfoText a, #checkinInstructionsText a, #checkoutInstructionsText a {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+</style>
 </head>
 <body>
 
@@ -2199,7 +2212,7 @@ function setLang(l) {
     // `white-space: pre-wrap` renders them. All other keys are UI strings
     // that may legitimately contain markup (e.g. welcome_title's <br><em>).
     if (key === 'host_msg') {
-      el.textContent = T[lang][key];
+      el.innerHTML = guestLinkedText(T[lang][key]);
     } else {
       el.innerHTML = T[lang][key];
     }
@@ -5067,7 +5080,7 @@ async function init() {
       // pre-migration properties still work). _propTextLang() is the
       // helper the rest of this block uses.
       const welcomeMsg = _propTextLang(d, 'welcome_message', lang);
-      if (el('hostMsg') && welcomeMsg) el('hostMsg').textContent = welcomeMsg;
+      if (el('hostMsg') && welcomeMsg) el('hostMsg').innerHTML = guestLinkedText(welcomeMsg);
       // Round 41 Task 3.2 — Emergency card. The number used to be jammed
       // into one line with the host name, which the compact half-width
       // grid clipped mid-digit ("112 · Daniele: +6-8…"). A number the

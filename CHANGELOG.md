@@ -69,6 +69,10 @@ Newest entries at the top of each section.
 - Gateway now returns both public localized message fields. The existing guest language selector and safe URL renderer use them. Added regression assertion in `scripts/guest-links-static.test.mjs`. No database changes.
 - Application commit `7b9a8d8`, test `c99523d`.
 
+### 2026-10-23 — Regression CI repair
+
+- Regression #118 isolated to an outdated `guest-links-static.test.mjs` assertion after the welcome message gained an empty-string fallback. Updated the assertion to match the actual safe HTML rendering; the other 57 tests passed in that run, with 3 prerequisite skips. Commit `6ff6107`. Awaiting green confirmation of the subsequent CI run.
+
 ### Planned rounds (not started)
 
 | Round | Scope | Specification | Status |

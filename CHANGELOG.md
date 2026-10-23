@@ -53,6 +53,11 @@ Newest entries at the top of each section.
 - Guest app turns http(s) and www URLs in rule descriptions, recommendation descriptions, transport text and check-in/out instructions into clickable links opening in a new tab with rel=noopener noreferrer.
 - Text is HTML-escaped first; non-web protocols and injected markup are never interpreted as trusted HTML. Static regression script: `scripts/guest-links-static.test.mjs`. Shipped directly to main.
 
+### 2026-10-23 — Guest Home welcome-message links and mobile overflow
+
+- Fixed the guest Home welcome message, which had remained plain text despite earlier URL linking elsewhere. The host's welcome text now uses the safe http(s)/www link formatter on initial render and language switches.
+- Explicit overflow wrapping for long links on narrow viewports, without horizontal page scrolling. Regression coverage added to `scripts/guest-links-static.test.mjs`; no schema changes. Code `cc99f37`, test `06943cd`.
+
 ### Planned rounds (not started)
 
 | Round | Scope | Specification | Status |

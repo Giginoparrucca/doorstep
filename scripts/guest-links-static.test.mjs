@@ -18,4 +18,7 @@ assert.match(html, /#hostMsg, \.rule-desc, \.reco-desc[\s\S]*?overflow-wrap: any
   'long Home links wrap on mobile');
 assert.match(html, /guestLinkedText\(T\[lang\]\.host_msg \|\| ''\)/,
   'after property data arrives the host message follows selected language');
+const gateway = fs.readFileSync(new URL('../api/guest.js', import.meta.url), 'utf8');
+assert.match(gateway, /'welcome_message_it', 'welcome_message_en'/,
+  'guest gateway must return both localized welcome-message fields');
 console.log('PASS guest links static: links open in new tab, protocols restricted, four guest-facing surfaces covered');

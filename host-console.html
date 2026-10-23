@@ -4510,7 +4510,7 @@ const HT = {
     ical_never_synced: 'Never synced',
     ical_syncing: 'Syncing…',
     ical_sync_failed: 'Sync failed',
-    ical_sync_ok: 'Synced {n} reservation(s) across {feeds} feed(s). Cancelled: {c}.',
+    ical_sync_ok: 'Synced {n} reservation(s) across {feeds} feed(s) (all dates). Cancelled: {c}.',
     ical_save_first: 'Save the property first, then click Sync now.',
     // Round 32 — arrival reminders (single-line values; applyLang collapses newlines)
     reminder_title: 'Arrival reminders',
@@ -5081,7 +5081,7 @@ const HT = {
     ical_never_synced: 'Mai sincronizzato',
     ical_syncing: 'Sincronizzazione in corso…',
     ical_sync_failed: 'Sincronizzazione fallita',
-    ical_sync_ok: 'Sincronizzate {n} prenotazioni su {feeds} feed. Annullate: {c}.',
+    ical_sync_ok: 'Sincronizzate {n} prenotazioni su {feeds} feed (tutte le date). Annullate: {c}.',
     ical_save_first: 'Salva prima la proprietà, poi clicca Sincronizza ora.',
     // Round 32 — promemoria arrivi
     reminder_title: 'Promemoria arrivi',
@@ -8809,9 +8809,11 @@ async function syncIcalNow() {
     // "Save Property Details" for. Otherwise the endpoint reads whatever
     // is currently in properties.ical_feeds — usually [] — and the sync
     // silently returns synced=0.
-    const currentFeeds = collectIcalFeeds();
+    // Calendar sync must use server-saved feeds. Hidden Settings inputs can
+    // be stale and must never overwrite newer room assignments here.
+    const currentFeeds = onCalendar ? [] : collectIcalFeeds();
     const savedFeeds   = Array.isArray(propertyData?.ical_feeds) ? propertyData.ical_feeds : [];
-    const feedsChanged = JSON.stringify(currentFeeds) !== JSON.stringify(savedFeeds);
+    const feedsChanged = !onCalendar && JSON.stringify(currentFeeds) !== JSON.stringify(savedFeeds);
     if (feedsChanged) {
       console.log('[iCal] Persisting DOM feeds before sync:', currentFeeds);
       const { data: persisted, error: pErr } = await sb.from('properties')
@@ -8827,7 +8829,7 @@ async function syncIcalNow() {
       propertyData = { ...(propertyData || {}), ical_feeds: currentFeeds };
     }
 
-    if (currentFeeds.length === 0) {
+    if (!onCalendar && currentFeeds.length === 0) {
       if (resEl) resEl.innerHTML =
         `<div style="color:#9a6b00;">⚠ ${_icalEscape(hostLang === 'it' ? 'Aggiungi almeno un feed prima di sincronizzare.' : 'Add at least one feed before syncing.')}</div>`;
       return;

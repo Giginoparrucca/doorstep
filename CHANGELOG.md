@@ -43,6 +43,11 @@ Newest entries at the top of each section.
 - Room-category identifiers in older reservation UIDs now allow safe adoption when they uniquely match one configured feed. Ambiguous matches still fail closed.
 - Regression guard added; manual production re-sync and verification remain pending. Zero-availability blocks must be checked separately against provider feed contents.
 
+### 2026-10-23 — OTA room names on host dashboard
+
+- Host Currently Staying and calendar reservation displays now strip generic OTA suffixes such as "Camera 1" from guest labels. When a reservation has a mapped `room_id`, the display appends the real room name from `property_rooms` instead. Room mapping and underlying booking data remain unchanged.
+- Dashboard synthetic awaiting-check-in query now loads `room_id` for the correct display. Commit `241102c`.
+
 ### Planned rounds (not started)
 
 | Round | Scope | Specification | Status |

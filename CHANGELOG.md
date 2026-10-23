@@ -58,6 +58,11 @@ Newest entries at the top of each section.
 - Fixed the guest Home welcome message, which had remained plain text despite earlier URL linking elsewhere. The host's welcome text now uses the safe http(s)/www link formatter on initial render and language switches.
 - Explicit overflow wrapping for long links on narrow viewports, without horizontal page scrolling. Regression coverage added to `scripts/guest-links-static.test.mjs`; no schema changes. Code `cc99f37`, test `06943cd`.
 
+### 2026-10-23 — Guest welcome language correction
+
+- Fixed a race where the guest Home welcome message was rendered before the localized property values were assigned, leaving Italian text on screen while English was selected. After the property loads, the message now re-renders from the active language, retaining safe clickable URLs and mobile wrapping.
+- Added static regression coverage for the post-load localization path. Application commit `489be6d`.
+
 ### Planned rounds (not started)
 
 | Round | Scope | Specification | Status |

@@ -5080,7 +5080,7 @@ async function init() {
       // pre-migration properties still work). _propTextLang() is the
       // helper the rest of this block uses.
       const welcomeMsg = _propTextLang(d, 'welcome_message', lang);
-      if (el('hostMsg') && welcomeMsg) el('hostMsg').innerHTML = guestLinkedText(welcomeMsg);
+      if (el('hostMsg')) el('hostMsg').innerHTML = guestLinkedText(welcomeMsg || '');
       // Round 41 Task 3.2 — Emergency card. The number used to be jammed
       // into one line with the host name, which the compact half-width
       // grid clipped mid-digit ("112 · Daniele: +6-8…"). A number the
@@ -5136,6 +5136,9 @@ async function init() {
       T.it.wifi_pass = `Password: ${d.wifi_password || '—'}`;
       T.en.host_msg = _propTextLang(d, 'welcome_message', 'en') || T.en.host_msg;
       T.it.host_msg = _propTextLang(d, 'welcome_message', 'it') || T.it.host_msg;
+      // A property can finish loading after the language toggle was painted.
+      // Keep the host message synchronized with the currently selected language.
+      if (el('hostMsg')) el('hostMsg').innerHTML = guestLinkedText(T[lang].host_msg || '');
       // Round 41 Task 4 — chat h2 uses the message icon from the sprite
       // instead of 🏠. innerHTML path in applyI18n() lets us embed SVG.
       T.en.chat_h2 = `<svg class="ic" aria-hidden="true" style="margin-right:6px;"><use href="#ic-message"/></svg> ${d.name} Concierge`;

@@ -364,7 +364,7 @@ async function recordUsage(row) {
 // Keep in sync with index.html's propData.* reads (survey date 2026-10-05).
 const PROPERTY_PUBLIC_FIELDS = [
   'id', 'name', 'city', 'region', 'address', 'zip', 'hero_image_url', 'hero_image_layout',
-  'maps_link', 'welcome_message',
+  'maps_link', 'welcome_message', 'welcome_message_it', 'welcome_message_en',
   'host_names', 'host_phone',
   'checkin_time', 'checkout_time',
   'access_method',

@@ -1,9 +1,9 @@
 # Continue Round 63 — developer / Claude / GPT guide
 
-**As of 24 October 2026: Phase 1 backend in progress. Native integration is not live.**
+**As of 24 October 2026: Phase 1 verified; Phase 2 in progress. Native imports are not live.**
 Start at [the plan](../../PLAN_round63_ireservation_native_api.md),
 [provider facts](API_REFERENCE.md), [sanitized schema](schema.snapshot.json) and
-[operations](OPERATIONS.md). Phase 1 is partial (see implementation checkpoint); Phases 2–6 are pending. Availability phase
+[operations](OPERATIONS.md). Phase 1 is complete (latest verification below); Phase 2 is in progress; Phases 3–6 remain pending. Availability phase
 5 is provider-blocked. Documentation publication is not an API smoke test.
 
 ## First actions in the next implementation session
@@ -11,7 +11,7 @@ Start at [the plan](../../PLAN_round63_ireservation_native_api.md),
 1. Read repository AGENTS.md and CHANGELOG top-to-bottom; fetch remote main and
    inspect current in-flight ownership. Preserve earlier tables/attribution.
    Daniele confirmed Round 63 implementation on 24 October; it is now open.
-   Do not request that confirmation again. Continue the owned Phase 1 from the
+   Do not request that confirmation again. Continue the owned Phase 2 from the
    checkpoint below; later phases start only after its actual gates pass.
 2. Inspect the local calendar/security entry points below. Use the repository's
    established server/database/auth boundaries; plan new tables and routes only
@@ -180,3 +180,17 @@ projects/environments/calendars, returns only counts, never modifies reservation
 and keeps the deployed runtime gate false. Turn the build-probe flag off after
 verification so ordinary builds do not make partner requests. Record the actual
 provider result/deployment before marking Phase 1 complete.
+
+
+### Phase 1 completed — protected real provider read
+
+PR #196 merged as 1a08e70fbc9fae6dd5254222c41e7b5ff2c223ec after CI passed
+full regression 60/0/3 and protected schema lookup (CI live 1/0/4). Production
+build dpl_nisyTTsZJHphA1tqN5fMsSXMSXMe actually ran the shared client with the
+approved test credentials: **7 rooms, 5 distributors**, 3 accounted requests.
+No guest/reservation/calendar writes, zero property connections, one encrypted
+partner token record. The one-time build flag is false again; runtime and writes
+remain false. Production gate returns integration_disabled. Local post-deploy
+smoke 2/0/3; its standalone provider skip is separate from the passing real build
+probe. The earlier 403/provisioning blockers are resolved. Phase 2 is now owned
+by GPT-6; build mapping/comparison only, not cutover.

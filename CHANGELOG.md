@@ -7,12 +7,19 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
-### Round 63 Phase 1b — secure provisioning and provider read gate (GPT-6, 2026-10-24)
+### Round 63 Phase 2 — room mapping and read-only comparison opened (GPT-6, 2026-10-24)
 
-- In progress — GPT-6; Daniele approved storing the supplied partner/test credentials and generated encryption key as production Secrets in Vercel project welcomebnb. Team access is now authorized; the earlier 403 blocker is resolved. The initial automatic-review rejection was followed by explicit destination-specific approval before retrying. No secret values are included in this record.
+- Claimed after Phase 1 local/CI/database/deployment/provider gates passed. Build explicit mappings and a shadow comparison UI/report without changing ota_reservations, booking codes or check-ins. Provider date/completeness and multi-unit semantics remain activation blockers for the later cutover.
+
+### Round 63 Phase 1b — secure provisioning and provider read gate passed (GPT-6, 2026-10-24)
+
+- Completed — GPT-6; Daniele approved storing the supplied partner/test credentials and generated encryption key as production Secrets in Vercel project welcomebnb. Team access is now authorized; the earlier 403 blocker is resolved. The initial automatic-review rejection was followed by explicit destination-specific approval before retrying. No secret values are included in this record.
 - Production-only secret/configuration setup succeeded. Native sync and writes remain explicitly disabled. The first rebuild picked up configuration but its project-level build-command override did not execute the provider probe because repository config is authoritative; no live-provider pass is claimed from deployment readiness. Added the shared production/test-calendar-only probe and an explicit build-gate opt-in; real provider execution remains to be verified. A 0600 ignored local recovery copy contains only the generated encryption key, not partner/test passwords.
 
 - Phase 1b full regression: **PASS 60 / FAIL 0 / SKIP 3**, including all eight Chromium suites. Skips: demo origin, private demo catalog and pglast prerequisite. New probe tests cover production/project/test-calendar restrictions, encrypted transient credentials, count-only output and unchanged runtime gate. No authenticated provider pass is claimed until the protected build actually runs the probe. No migration or host calendar change in this subphase.
+
+- Published [PR #196](https://github.com/Giginoparrucca/doorstep/pull/196), head `56a469b7708061f895bcf75ac9b630a5f041f75e`, main merge `1a08e70fbc9fae6dd5254222c41e7b5ff2c223ec`. PR CI run `40078433681`, job `120826714592`: **test:all PASS 60 / FAIL 0 / SKIP 3**; **test:live PASS 1 / FAIL 0 / SKIP 4** (production schema-drift passed; demo origin/provider opt-in/SPOT origin/tax origin skipped).
+- Actual protected production build `dpl_nisyTTsZJHphA1tqN5fMsSXMSXMe` at the tested merge ran the shared client against approved calendar 330 and logged **PASS: 7 rooms, 5 distributors**, without guest/reservation/calendar writes. Database recheck: zero property connections, one encrypted partner token record, three reserved API requests (auth + rooms + distributors). The build-probe flag was cleared to false immediately afterward. Production route still returns only HTTP 503 `integration_disabled`; native imports/writes remain off. Post-deploy local read-only smoke **PASS 2 / FAIL 0 / SKIP 3** (demo origin/local service-role key/standalone provider opt-in skipped); the separate real protected provider read passed, not skipped. Phase 1 is complete; later functionality is not shipped by this gate.
 
 ### Round 63 Phase 1a — secure foundation published; live gate blocked (GPT-6, 2026-10-24)
 
@@ -118,8 +125,8 @@ Daniele confirmed implementation on 24 October 2026 after the plain-language rec
 | Phase | Status | Where / test gate |
 |---|---|---|
 | 0 — Plan and handover | documentation complete — GPT-6 | Published source-grounded contract and handover; earlier evidence above. |
-| 1 — Secure connection and API client | partial — backend Phase 1a published in PR #195 — GPT-6; provisioning/live gate blocked | Tenant-bound encrypted storage, server-only client, shared auth/rate/quota controls and synthetic security tests; live property-330 reads only after secure provisioning. |
-| 2 — Mapping and comparison | pending | Room/inventory identity, shadow report, zero calendar writes. |
+| 1 — Secure connection and API client | shipped — PR #195 + #196 — GPT-6 | Tenant-bound encrypted storage, server-only client, shared auth/rate/quota controls and synthetic security tests; live property-330 reads only after secure provisioning. |
+| 2 — Mapping and comparison | in-progress — GPT-6 | Room/inventory identity, shadow report, zero calendar writes. |
 | 3 — Controlled read cutover | pending | Scoped single writer; stable links; cancellation/rollback tests. |
 | 4 — Operational release | pending | Fair polling/health/observability; full regression, live checks and rollback drill. |
 | 5 — Availability blocks | pending — provider-blocked | No published availability endpoint; separate future gate. |

@@ -10,6 +10,8 @@ only recorded implementation/test/deployment evidence establishes a live feature
 - [Complete nonsecret API contract and source register](ireservation/API_REFERENCE.md)
 - [Credential setup, storage, rotation and operational rollback](ireservation/OPERATIONS.md)
 - [Developer / Claude / GPT continuation guide](ireservation/CONTINUATION.md)
+- [Real-property pilot checklist and private evidence template](ireservation/PILOT.md)
+- [Provider clarification draft — not sent](ireservation/PROVIDER_QUESTIONS.md)
 - [Sanitized official schema snapshot](ireservation/schema.snapshot.json)
 
 Status: Phase 1 secure provisioning and real test-property reads verified. Phase 2 shipped in PR #197 and

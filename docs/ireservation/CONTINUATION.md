@@ -243,3 +243,17 @@ then mappings and discrepancies reviewed. Do not put test330 credentials on a
 real property or claim date completeness from test counts. Unknown API semantics
 and absence of published availability remain explicit blockers. No secrets belong
 in this guide, source examples, scripts, logs, issues or CHANGELOG.
+
+
+### Phase 3 preparation resumed — 24 October
+
+GPT-6 claimed Phase 3 after Daniele requested return to this Round. A fresh
+read-only production check still finds no configured real-property connection.
+The owner must first select/configure the pilot property via the secure UI.
+[Pilot checklist](PILOT.md) contains the smallest owner action, private evidence
+template and unimplemented cutover acceptance requirements. The concrete
+[Italian provider-question draft](PROVIDER_QUESTIONS.md) is ready for review and
+has not been sent. No provider answers or pilot success have been inferred.
+No native writer, migration, scheduler, routing change or real booking mutation
+was introduced by this documentation checkpoint. Phase 3 is in progress, with
+activation still blocked on the named owner/provider gates; it is not shipped.

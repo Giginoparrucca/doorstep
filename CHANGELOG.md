@@ -9,7 +9,7 @@ Newest entries at the top of each section.
 
 ### Round 63 Phase 3 — pilot/cutover preparation resumed (GPT-6, 2026-10-24)
 
-- Resumed after the tax-season follow-up at Daniele's request. Claiming Phase 3 before further work; secure manual comparison remains the only enabled native behavior. Read-only production state check confirms no configured real-property connection, mapping or pilot comparison yet. Preparing concrete provider questions and owner setup/pilot checklist; no cutover, native booking write or provider message authorized by this checkpoint.
+- Resumed after the tax-season follow-up at Daniele's request. Claiming Phase 3 before further work; secure manual comparison remains the only enabled native behavior. Read-only production state check confirms no configured real-property connection, mapping or pilot comparison yet. Prepared `docs/ireservation/PROVIDER_QUESTIONS.md` (reviewable Italian draft, not sent) and `PILOT.md` (owner setup, immutable comparison review, private evidence template and single-writer/cancellation/rollback gates). Indexed in docs/README and continuation. Awaiting selected pilot property and owner setup; provider contract answers still required before activation. No native writer, migration, scheduler, routing change or booking mutation in this checkpoint. Documentation links/secret scan and main publication verification only; prior shipped runtime test evidence remains unchanged, no new runtime test pass claimed. Phase 3 is not shipped.
 
 ### Round 62 Phase 2 follow-up — recurring tax seasons (shipped — PR #198 — GPT-6, 2026-10-24)
 

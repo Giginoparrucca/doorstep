@@ -12,7 +12,7 @@ only recorded implementation/test/deployment evidence establishes a live feature
 - [Developer / Claude / GPT continuation guide](ireservation/CONTINUATION.md)
 - [Sanitized official schema snapshot](ireservation/schema.snapshot.json)
 
-Status: Phase 1 secure provisioning and real test-property reads verified. Phase 2
+Status: Phase 1 secure provisioning and real test-property reads verified. Phase 2 shipped in PR #197 and
 adds owner-only connection, explicit room mapping and manual comparison; release
 evidence is in CHANGELOG. Calendar imports/cutover remain gated. Provider availability
 reads are not currently available. Supplied secrets/private calendar links and

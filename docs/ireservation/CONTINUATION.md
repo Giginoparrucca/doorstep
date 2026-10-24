@@ -1,9 +1,9 @@
 # Continue Round 63 — developer / Claude / GPT guide
 
-**As of 24 October 2026: Phase 1 verified; Phase 2 in progress. Native imports are not live.**
+**As of 24 October 2026: Phases 1–2 verified; manual comparison shipped. Native imports are not live.**
 Start at [the plan](../../PLAN_round63_ireservation_native_api.md),
 [provider facts](API_REFERENCE.md), [sanitized schema](schema.snapshot.json) and
-[operations](OPERATIONS.md). Phase 1 is complete (latest verification below); Phase 2 is in progress; Phases 3–6 remain pending. Availability phase
+[operations](OPERATIONS.md). Phases 1–2 are complete (latest verification below); Phases 3–6 remain gated. Availability phase
 5 is provider-blocked. Documentation publication is not an API smoke test.
 
 ## First actions in the next implementation session
@@ -11,8 +11,8 @@ Start at [the plan](../../PLAN_round63_ireservation_native_api.md),
 1. Read repository AGENTS.md and CHANGELOG top-to-bottom; fetch remote main and
    inspect current in-flight ownership. Preserve earlier tables/attribution.
    Daniele confirmed Round 63 implementation on 24 October; it is now open.
-   Do not request that confirmation again. Continue the owned Phase 2 from the
-   checkpoint below; later phases start only after its actual gates pass.
+   Do not request that confirmation again. Phase 2 shipped in PR #197. Phase 3 needs the real-property pilot and provider
+   contract evidence below before cutover; do not silently activate it.
 2. Inspect the local calendar/security entry points below. Use the repository's
    established server/database/auth boundaries; plan new tables and routes only
    after checking current runtime/function limits and release configuration.
@@ -21,7 +21,7 @@ Start at [the plan](../../PLAN_round63_ireservation_native_api.md),
    echo them into shell commands or save request/response dumps. Never copy a
    raw correspondence export or original PDF into Git. Missing secure access is
    a named blocker; continue with synthetic client/tenant-isolation tests.
-4. Build Phase 1 with synthetic transport and test access first. Provision only
+4. Reuse the verified Phase 1 client and its tests; do not redo provisioning. Provision only
    in the appropriate environment; preview/demo must not inherit production
    property credentials. The demo integration restrictions remain mandatory.
    Secure test property 330 reads must be explicitly recorded, never inferred
@@ -182,7 +182,7 @@ verification so ordinary builds do not make partner requests. Record the actual
 provider result/deployment before marking Phase 1 complete.
 
 
-### Phase 1 completed — protected real provider read
+### Phase 1 completed — protected real provider read (historical gate)
 
 PR #196 merged as 1a08e70fbc9fae6dd5254222c41e7b5ff2c223ec after CI passed
 full regression 60/0/3 and protected schema lookup (CI live 1/0/4). Production
@@ -225,3 +225,21 @@ activate from the test calendar counts. Prepare provider questions, but do not
 send them without authorization. Availability remains provider-blocked; outbound
 I/U/D is future independent work. Keep can_cutover=false until the recorded pilot,
 identity adoption, single-writer and rollback gates actually pass.
+
+
+### Phase 2 verified release — 24 October
+
+PR #197 / merge `8620372c45e804e43574484b629e257e3fce8c4b`; CI run40082742907
+passed full62/0/3 and production drift (live1/0/4). Local full62/0/3 and post-deploy
+live2/0/3; exact skips and SQL fingerprint evidence are in CHANGELOG. Production
+`dpl_2vvhznxunAddc2TVtBqHbGhQZrHo` READY, exact public UI bytes verified. Real
+protected provider probe:7 rooms/5 distributors/8 reservations; no calendar writes.
+Runtime manual comparison enabled; build probe off; provider writes off. No real
+property connection or mapping exists yet. No authenticated owner pilot claimed.
+
+Continue at the named Phase 3 owner/provider gate, not a new Round. The existing
+real property's private credentials must be entered through the secure owner form,
+then mappings and discrepancies reviewed. Do not put test330 credentials on a
+real property or claim date completeness from test counts. Unknown API semantics
+and absence of published availability remain explicit blockers. No secrets belong
+in this guide, source examples, scripts, logs, issues or CHANGELOG.

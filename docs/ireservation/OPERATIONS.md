@@ -1,6 +1,6 @@
 # iReservation credentials, operations and rollback
 
-**Phase 1 secure provisioning and test-property reads verified; Phase 2 manual comparison is being released.** Start with the
+**Phase 1 secure provisioning and test-property reads verified; Phase 2 manual comparison shipped in PR #197.** Start with the
 [Round 63 plan](../../PLAN_round63_ireservation_native_api.md) and
 [API contract](API_REFERENCE.md). No secret values are stored in this handover.
 
@@ -214,8 +214,9 @@ serialized in the database across workers. Unknown provider 429 reset causes a
 conservative 24-hour shared pause. Global auth failures pause auth attempts; a
 60-second lease with a unique holder and CAS prevents stale worker commits.
 Server-only state access is through `public.ireservation_state`; browser roles
-cannot execute it or access its private tables. The safe connection form is still
-a future UI task; no host-facing behavior or live source switch has shipped.
+cannot execute it or access its private tables. The Phase 1 checkpoint had no
+form; Phase 2 now supplies owner-only manual comparison controls. No live source
+switch has shipped.
 
 
 Provisioning evidence (24 October): partner username/password/API key, dedicated
@@ -223,7 +224,8 @@ key and test password stored as Production-only sensitive variables following
 explicit user approval. No preview/development values were created. A recovery
 copy of the generated key is in this machine's ignored `.env.local`, mode 0600;
 partner/test passwords are not stored locally. Preserve recovery before key
-rotation or a machine move. The runtime and write gates stay false while testing.
+rotation or a machine move. During Phase 1 the runtime and write gates stayed false. Phase 2 enables only
+manual comparison; writes remain false.
 
 
 ## Phase 2 manual comparison operations

@@ -1,9 +1,9 @@
 # Round 63 — iReservation Native API Integration
 
 Plan and developer handover prepared 24 October 2026 at Daniele's explicit
-request. **Phase 1 secure connection verified; Phase 2 in progress; native imports are not enabled.**
+request. **Phases 1–2 shipped: secure connection and manual comparison; native imports are not enabled.**
 Implementation confirmed by Daniele on 24 October 2026 after the host-impact recap.
-Phase 1 passed its gates in PRs #195/#196. Phase 2 is in progress; later phases are gated.
+Phase 1 passed its gates in PRs #195/#196; Phase 2 in PR #197. Later phases are gated.
 Preserve the current Round and all earlier phase ownership in CHANGELOG.
 
 ## Purpose and boundaries
@@ -48,7 +48,7 @@ settings and policy below are WelcomeBnB design decisions, not provider features
 
 ## Phases and mandatory test gates
 
-Phase 0 documentation is complete. Phase 1 is complete; Phase 2 is in progress; Phases 3–6 remain pending. Before
+Phase 0 documentation is complete. Phases 1–2 are complete; Phases 3–6 remain gated. Before
 starting a runtime phase, claim it in CHANGELOG and commit using the repository's
 phase-prefix convention. Every implementation phase runs **npm run test:all** plus
 its specific tests; record pass/fail/skip totals and reasons. Red tests block

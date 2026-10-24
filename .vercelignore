@@ -33,3 +33,6 @@ scripts/demo-schema-parse.test.py
 # Round 55 tracked database migrations are never served.
 supabase/
 scripts/share-preferences-rls.sql
+
+# Round 63 transactional database test; never serve internal probes.
+scripts/ireservation-state-probe.sql

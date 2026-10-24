@@ -1,3 +1,4 @@
+import { handleConnection } from './_ireservation.js';
 import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, rejectDemoIntegration } from './_environment.js';
 import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
@@ -90,6 +91,7 @@ function sourceFeedIdentity(feed) {
 function roomFeedUid(feedKey, uid) { return 'wbnb-feed:' + feedKey + ':' + uid; }
 
 export default async function handler(req, res) {
+  if (req.query?.integration === 'ireservation') return handleConnection(req, res);
   if (rejectInvalidEnvironment(res)) return;
   if (rejectDemoIntegration(res, 'ota')) return;
   res.setHeader('Access-Control-Allow-Origin', '*');

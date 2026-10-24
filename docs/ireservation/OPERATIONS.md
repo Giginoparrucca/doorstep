@@ -1,6 +1,6 @@
 # iReservation credentials, operations and rollback
 
-**Proposed configuration, not installed infrastructure.** Start with the
+**Phase 1 backend implemented; secret provisioning and live verification pending.** Start with the
 [Round 63 plan](../../PLAN_round63_ireservation_native_api.md) and
 [API contract](API_REFERENCE.md). No secret values are stored in this handover.
 
@@ -34,7 +34,8 @@ provider test inventory: use a bounded isolated test window and track cleanup.
 
 ## Proposed environment variables
 
-These names are a design contract for future work; **none is asserted present**.
+These names are consumed by the Phase 1 backend unless marked future/test.
+**None is asserted provisioned on Vercel.**
 Server runtime only, with separate Production/Preview/Test values. Never use
 `VITE_`, `NEXT_PUBLIC_`, browser config or build-time string substitution for
 secrets. Avoid per-host env vars: tenant credentials belong in encrypted rows.
@@ -49,11 +50,11 @@ secrets. Avoid per-host env vars: tenant credentials belong in encrypted rows.
 | `IRESERVATION_ENC_KEY_ID` | Nonsecret active key version, initially `v1` |
 | `IRESERVATION_ENC_KEY_V2` | Future secret rotation key; keep v1 until every dependent row/token backup is migrated |
 | `IRESERVATION_ENABLED` | Nonsecret global gate, initially `false`; server-enforced |
-| `IRESERVATION_WRITES_ENABLED` | Independent nonsecret write gate, initially `false`; never implied by reads |
+| `IRESERVATION_WRITES_ENABLED` | Future independent write gate, initially `false`; no write method is implemented in Phase 1 |
 | `IRESERVATION_DAILY_BUDGET` | Nonsecret local ceiling, initially 4500, always below/equal provider 5000; reserve 500 for recovery/manual operations |
 | `IRESERVATION_RATE_PER_SECOND` | Nonsecret ceiling, at most 5 globally |
 | `IRESERVATION_BURST` | Nonsecret ceiling, at most 10 globally |
-| `IRESERVATION_POLL_INTERVAL_MINUTES` | Nonsecret scheduling input; compute from cohort/window cost before activation, not a delivery guarantee |
+| `IRESERVATION_POLL_INTERVAL_MINUTES` | Future nonsecret scheduling input; compute from cohort/window cost before activation, not a delivery guarantee |
 | `IRESERVATION_TEST_CALENDAR_ID` | Test-runner-only nonsecret 330 |
 | `IRESERVATION_TEST_PROPERTY_USERNAME` | Test-runner-only nonsecret testtesttest |
 | `IRESERVATION_TEST_PROPERTY_PASSWORD` | Secret in test secret store only; never a public fixture or normal production global default |
@@ -89,7 +90,8 @@ Follow [Supabase RLS guidance](https://supabase.com/docs/guides/database/postgre
 and existing `api/alloggiati.js` / `api/_alloggiati-crypto.js` for local patterns,
 but review rather than copying their crypto unchanged (Round 63 requires AAD).
 New schema needs migrations, explicit grants/RLS tests and production drift
-verification. No tables or policies are created by this handover.
+verification. Phase 1 now creates private state through its tracked migration; see the continuation checkpoint.
+The original Phase 0 handover itself created no tables.
 
 Safe form/API response: connected flag, calendarId, masked username if needed,
 mode, credential version, last verified/success time and actionable safe error.
@@ -191,3 +193,23 @@ staging and run journals; persist minimal counters, not raw PII indefinitely.
   source resolves them; never silently reopen nights based on a failed read.
 - Deployment rollback follows [RELEASE.md](../../RELEASE.md), but source rollback
   alone does not reverse database state, routing modes, secrets or remote writes.
+
+
+### Phase 1 operating notes
+
+The read client retries a data request only once after a coordinated token refresh
+for 401. Other failures return safe classifications; there are no automatic 500
+or transport retries yet. Invalid partner authentication latches auth_blocked for
+that credential version. An operator investigates before resuming; credential
+rotation changes the private auth scope while the stable partner quota scope
+continues accounting, so key rotation cannot reset the daily budget. Invalid
+property credentials can also produce a data-read 401; one token refresh is
+attempted, then the property remains unverified. No raw upstream messages surface.
+
+The independent request budget uses a rolling 24-hour ledger and a token bucket,
+serialized in the database across workers. Unknown provider 429 reset causes a
+conservative 24-hour shared pause. Global auth failures pause auth attempts; a
+60-second lease with a unique holder and CAS prevents stale worker commits.
+Server-only state access is through `public.ireservation_state`; browser roles
+cannot execute it or access its private tables. The safe connection form is still
+a future UI task; no host-facing behavior or live source switch has shipped.

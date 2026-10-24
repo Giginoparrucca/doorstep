@@ -7,6 +7,10 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Round 63 Phase 3 — pilot/cutover preparation resumed (GPT-6, 2026-10-24)
+
+- Resumed after the tax-season follow-up at Daniele's request. Claiming Phase 3 before further work; secure manual comparison remains the only enabled native behavior. Read-only production state check confirms no configured real-property connection, mapping or pilot comparison yet. Preparing concrete provider questions and owner setup/pilot checklist; no cutover, native booking write or provider message authorized by this checkpoint.
+
 ### Round 62 Phase 2 follow-up — recurring tax seasons (shipped — PR #198 — GPT-6, 2026-10-24)
 
 - Daniele requested day/month periods that repeat every year, rather than recreating exact-year dates. Correcting the existing tax-period feature as a scoped follow-up; Round 63 phase ownership/history remains unchanged. Preserve existing exact-date configuration until explicit conversion, support winter/year boundaries and leap dates, update IT/EN inputs/guides, full regression/CI/deployment gates before release.
@@ -154,7 +158,7 @@ Daniele confirmed implementation on 24 October 2026 after the plain-language rec
 | 0 — Plan and handover | documentation complete — GPT-6 | Published source-grounded contract and handover; earlier evidence above. |
 | 1 — Secure connection and API client | shipped — PR #195 + #196 — GPT-6 | Tenant-bound encrypted storage, server-only client, shared auth/rate/quota controls and synthetic security tests; live property-330 reads only after secure provisioning. |
 | 2 — Mapping and comparison | shipped — PR #197 — GPT-6 | Owner-only manual connection/mapping/comparison, coverage unverified, zero calendar writes; 62/0/3 local and CI; real test read 7 rooms/5 distributors/8 reservations. |
-| 3 — Controlled read cutover | pending — pilot/provider blocked | Real owner credentials and confirmed physical mapping, pilot review, provider range/completeness/timezone/inventory answers required before single-writer cutover. |
+| 3 — Controlled read cutover | in-progress — GPT-6; activation pilot/provider blocked | Real owner credentials and confirmed physical mapping, pilot review, provider range/completeness/timezone/inventory answers required before single-writer cutover. |
 | 4 — Operational release | pending | Fair polling/health/observability; full regression, live checks and rollback drill. |
 | 5 — Availability blocks | pending — provider-blocked | No published availability endpoint; separate future gate. |
 | 6 — Future direct two-way sync | pending | Direct-only outbox/reconciliation; independent write gate. |

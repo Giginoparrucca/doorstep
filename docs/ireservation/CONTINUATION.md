@@ -1,19 +1,18 @@
 # Continue Round 63 — developer / Claude / GPT guide
 
-**As of 24 October 2026: plan and handover only. Native integration is not live.**
+**As of 24 October 2026: Phase 1 backend in progress. Native integration is not live.**
 Start at [the plan](../../PLAN_round63_ireservation_native_api.md),
 [provider facts](API_REFERENCE.md), [sanitized schema](schema.snapshot.json) and
-[operations](OPERATIONS.md). Runtime phases 1–6 are pending; availability phase
+[operations](OPERATIONS.md). Phase 1 is partial (see implementation checkpoint); Phases 2–6 are pending. Availability phase
 5 is provider-blocked. Documentation publication is not an API smoke test.
 
 ## First actions in the next implementation session
 
 1. Read repository AGENTS.md and CHANGELOG top-to-bottom; fetch remote main and
    inspect current in-flight ownership. Preserve earlier tables/attribution.
-   Round 63 documentation is authorized; do not interpret it as an already-open
-   runtime Round. Follow the new-Round recap/confirmation rule before starting
-   implementation. Once confirmed, archive the completed current table visibly,
-   open Round 63's phase table, claim Phase 1 and commit before code.
+   Daniele confirmed Round 63 implementation on 24 October; it is now open.
+   Do not request that confirmation again. Continue the owned Phase 1 from the
+   checkpoint below; later phases start only after its actual gates pass.
 2. Inspect the local calendar/security entry points below. Use the repository's
    established server/database/auth boundaries; plan new tables and routes only
    after checking current runtime/function limits and release configuration.
@@ -115,3 +114,43 @@ CI/deployment/live evidence where applicable; secret provisioning status without
 values; provider questions resolved/unresolved; last complete comparison and
 rollback status; smallest next action. A paused/blocked capability must be stated
 explicitly, not buried in an implementation summary.
+
+## Implementation checkpoint — 24 October 2026
+
+Daniele approved starting Round 63 after the host-impact recap. Phase 1 is now
+in progress. Implemented backend scope (Phase 1a): `api/_ireservation-core.js`
+(AAD encryption and read-only partner client), `_ireservation-store.js` (durable
+state gateway), `_ireservation.js` (owner-only connection actions). Routed through
+`POST /api/ical-sync?integration=ireservation&action=status|save|verify|disconnect`
+to retain the existing 12-function budget. No host form, mapping, scheduler,
+calendar import, availability read or provider reservation-write method yet.
+The global `IRESERVATION_ENABLED` gate defaults off. Preview/demo are rejected.
+
+`supabase/migrations/20261024074843_round63_ireservation_secure_state.sql` adds
+private connections, encrypted partner tokens, rolling request accounting and a
+service-only RPC with ownership rechecks, compare-and-swap and refresh leases.
+`ireservation_private` has no schema/table grants for browser or service roles;
+only the narrow service-only definer RPC accesses it. RLS with no policies is
+intentional default deny, not an invitation to grant browser access. Synthetic
+state/permission probes in `scripts/ireservation-state-probe.sql` passed against
+demo and production, in transactions that roll back. The protected CI schema
+lookup must still pass before publication can be described as shipped.
+
+Connection requests carry property_id. Save/verify/disconnect also require the
+current `version` returned by status (`none` for first save). Save takes integer
+`calendar_id`, `propertyUsername`, `propertyPassword`; empty password retains the
+existing value only for the same calendar. All successful browser responses are
+masked; verification returns only status and room count. Disconnect clears the
+ciphertext and rotates version; transferred ownership fails closed pending
+operator re-onboarding. Only property owners can configure this first backend;
+admin view alone gives no credential access.
+
+No partner secrets were provisioned by this phase; existing deployment values could
+not be inspected. No authenticated provider probe is
+claimed. Vercel team access currently returns 403; a consent link was offered to
+Daniele. Resume with that scope authorized, provision secrets through the secure
+operations workflow, and run the opt-in `scripts/ireservation-read.test.live.mjs`
+against test calendar 330. It requires `IRESERVATION_LIVE_PROBE=true`, the documented
+test identifiers/password and partner/storage keys. It prints counts only and
+never saves reservations. The normal live runner skips this test unless opted
+in; do not interpret a skip as a live API pass. Finish Phase 1 before Phase 2.

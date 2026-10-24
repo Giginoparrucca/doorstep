@@ -1,8 +1,9 @@
 # Round 63 — iReservation Native API Integration
 
 Plan and developer handover prepared 24 October 2026 at Daniele's explicit
-request. **Documentation delivered; integration not implemented or enabled.**
-This is the next planned Round, not a claim that runtime phases have shipped.
+request. **Phase 1 secure backend in progress; live integration is not enabled.**
+Implementation confirmed by Daniele on 24 October 2026 after the host-impact recap.
+Phase 1 is in progress; later phases are gated. No runtime phase is yet shipped.
 Preserve the current Round and all earlier phase ownership in CHANGELOG.
 
 ## Purpose and boundaries
@@ -15,7 +16,7 @@ Existing guest links, check-ins, reminders, compliance outputs and unrelated OTA
 feeds must continue working. Hosts initially see nothing new; later they get a
 connection, explicit room mapping, connection health and a controlled switch.
 
-This delivery changes documentation only. It does not configure secrets, create
+The original Phase 0 delivery changed documentation only. It does not configure secrets, create
 infrastructure/migrations, send provider messages, authenticate to the API, alter
 production reservations, enable a scheduler or activate writes. Runtime work needs
 the normal new-Round recap/confirmation in AGENTS.md. Publishing this requested
@@ -47,7 +48,7 @@ settings and policy below are WelcomeBnB design decisions, not provider features
 
 ## Phases and mandatory test gates
 
-Phase 0 is the requested documentation work. Phases 1–6 remain pending. Before
+Phase 0 documentation is complete. Phase 1 is in progress; Phases 2–6 remain pending. Before
 starting a runtime phase, claim it in CHANGELOG and commit using the repository's
 phase-prefix convention. Every implementation phase runs **npm run test:all** plus
 its specific tests; record pass/fail/skip totals and reasons. Red tests block

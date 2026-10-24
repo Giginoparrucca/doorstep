@@ -7,6 +7,16 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Round 63 Phase 1 — implementation opened (GPT-6, 2026-10-24)
+
+- Confirmed by Daniele; Phase 1 claimed before code. Building secure client/storage before any host calendar change. Later phases remain gated.
+- Phase 1a backend foundation implemented: dedicated AES-256-GCM/AAD with key-version rotation; owner-only status/save/verify/disconnect actions routed through existing `api/ical-sync` without adding a thirteenth function; masked responses, CAS credential versions, disconnect fencing, origin checks and preview/demo/global-disabled gates. The internal client supports room/distributor reads only, coordinates token refresh via durable leases/CAS, preserves omitted refresh tokens, sanitizes provider/transport/storage errors and counts auth plus data attempts. Quota scope survives partner secret rotation; independent token scope changes with credentials. There is no provider reservation-save method, host UI, scheduler, comparison import or calendar switch.
+- Migration `20261024074843_round63_ireservation_secure_state.sql` generated using the official CLI and applied to demo and production. `public.list_applied_migrations()` returns production name `round63_ireservation_secure_state`, version `20261024075944`. Private schema/table grants are revoked from anon/authenticated/service_role; only the service-only definer gateway can access state and independently rechecks property ownership. Rolling 24-hour attempts, atomic 5/sec/burst-10 token bucket and global 429 pause are enforced in PostgreSQL. Schema advisory INFO “RLS enabled, no policy” is intentional default-deny for these inaccessible private tables ([advisor explanation](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)); no permissive policies were added.
+- Transactional synthetic database probe passed independently on demo and production: actual anon/authenticated EXECUTE denial, tenant ownership denial, first-save/stale-version/disconnect behavior, error allowlist, rolling quota/rate/429 pause and refresh-lease holder/expiry/CAS checks. All probe state rolled back; production recheck found zero connection/partner records. Existing reservations, guest links and check-ins were not modified.
+- New executable `scripts/ireservation-security.test.mjs` joins the whole suite: environment/origin/config gates, AAD swap/tamper/key rotation, simultaneous independent-client auth, expiry/401 refresh, omitted refresh-token retention, auth-failure latch, quota refusal before transport, nonzero/500/malformed/null response handling, redacted errors and tenant/anonymous denial for all four actions. `scripts/ireservation-read.test.live.mjs` is a securely configured, opt-in test-calendar-330 probe; absent access is a skip, never a pass. Final full regression: **PASS 59 / FAIL 0 / SKIP 3**, including all eight Chromium suites; skips are demo origin, private demo catalog and pglast prerequisite. Read-only live smoke: **PASS 2 / FAIL 0 / SKIP 3**; skips are demo origin, local service-role key and the deliberately unconfigured iReservation provider probe. Deployed synthetic tax/SPOT goldens passed. Protected CI schema lookup/publication evidence will follow.
+- Phase 1 remains **partial**, pending secure Vercel provisioning and the authenticated provider test gate. Do not advance to Phase 2 or describe the integration as operational. No partner credential, test property password or private calendar URL was written to source/logs. The provider probe has not been run.
+- Vercel environment metadata access returns team-scope 403; the team-authorization link was offered to Daniele. Continue independent implementation/tests; production secret provisioning and authenticated live API probe cannot be claimed until access is available.
+
 ### Round 63 Phase 0 — iReservation native API plan and handover (GPT-6, 2026-10-24)
 
 - Documentation complete; runtime integration not implemented or enabled. Explicitly requested plan publication; Round 63 remains in Planned rounds and the completed Round 62 phase table/attribution is preserved. Phases 1–6 are pending; Phase 5 availability reads depend on a provider endpoint not currently available.
@@ -87,11 +97,26 @@ Newest entries at the top of each section.
 
 | Round | Scope | Specification | Status |
 |---|---|---|---|
-| 63 | iReservation native API: secure connection, comparison-first reservations, controlled cutover; future availability blocks and direct two-way writes separately gated | [Plan](PLAN_round63_ireservation_native_api.md) · [Developer handover](docs/ireservation/CONTINUATION.md) | pending implementation — Phase 0 documentation complete; Phases 1–6 pending; Phase 5 provider-blocked |
 
 Standing rule added 2026-10-18 (AGENTS.md "Full regression"): every phase gate runs the whole suite, not only plan-listed tests.
 
 ### Current round — in-flight
+
+**Round 63 — iReservation Native API Integration**
+
+Daniele confirmed implementation on 24 October 2026 after the plain-language recap. Specification: `PLAN_round63_ireservation_native_api.md`. Existing iCal remains authoritative until comparison/cutover gates pass.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 0 — Plan and handover | documentation complete — GPT-6 | Published source-grounded contract and handover; earlier evidence above. |
+| 1 — Secure connection and API client | in-progress — GPT-6 | Tenant-bound encrypted storage, server-only client, shared auth/rate/quota controls and synthetic security tests; live property-330 reads only after secure provisioning. |
+| 2 — Mapping and comparison | pending | Room/inventory identity, shadow report, zero calendar writes. |
+| 3 — Controlled read cutover | pending | Scoped single writer; stable links; cancellation/rollback tests. |
+| 4 — Operational release | pending | Fair polling/health/observability; full regression, live checks and rollback drill. |
+| 5 — Availability blocks | pending — provider-blocked | No published availability endpoint; separate future gate. |
+| 6 — Future direct two-way sync | pending | Direct-only outbox/reconciliation; independent write gate. |
+
+### Previous round — Round 62 (completed)
 
 **Round 62 — Tourist-tax rates by date**
 

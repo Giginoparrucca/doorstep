@@ -12,7 +12,8 @@ only recorded implementation/test/deployment evidence establishes a live feature
 - [Developer / Claude / GPT continuation guide](ireservation/CONTINUATION.md)
 - [Sanitized official schema snapshot](ireservation/schema.snapshot.json)
 
-Status: documentation delivered; runtime phases pending. Provider availability
+Status: Phase 1 backend foundation implemented with live access disabled;
+secure provisioning/provider verification pending, later phases gated. Provider availability
 reads are not currently available. Supplied secrets/private calendar links and
 raw credential-bearing source examples must never enter this public repository.
 

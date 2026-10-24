@@ -7,6 +7,12 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Round 63 Phase 0 — iReservation API documentation (GPT-6, 2026-10-24)
+
+- Status: in-progress — GPT-6; documentation preparation authorized explicitly in this session. Runtime phases are not started; the completed Round 62 table remains unchanged.
+- Scope: source-grounded native API plan, sanitized schema reference, credential operations and developer continuation guide. No credentials or private calendar URLs may be published.
+- Gate: document/source review, secret scan, full regression and remote commit verification before delivery.
+
 ### Calendar sync — all-date count and stale Settings protection (GPT-6, 2026-10-23)
 
 - The reported four synced reservations are dated December 2026, July 2027 and August 2027; only the retained 19–22 October stay belongs in the screenshot's October view. Sync counts events in the current provider response across all dates, not bookings visible in the selected month. Added explicit all-dates wording in IT/EN.

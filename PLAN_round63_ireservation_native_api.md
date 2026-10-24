@@ -2,7 +2,8 @@
 
 Plan and developer handover prepared 24 October 2026 at Daniele's explicit
 request. **Documentation delivered; integration not implemented or enabled.**
-This is the next planned Round, not a claim that runtime phases have shipped.
+Implementation confirmed by Daniele on 24 October 2026 after the host-impact recap.
+Phase 1 is in progress; later phases are gated. No runtime phase is yet shipped.
 Preserve the current Round and all earlier phase ownership in CHANGELOG.
 
 ## Purpose and boundaries

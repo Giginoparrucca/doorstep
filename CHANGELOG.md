@@ -7,6 +7,11 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Round 63 Phase 1 — implementation opened (GPT-6, 2026-10-24)
+
+- Confirmed by Daniele; Phase 1 claimed before code. Building secure client/storage before any host calendar change. Later phases remain gated.
+- Vercel environment metadata access returns team-scope 403; no team-authorization tool is advertised. Continue independent implementation/tests; production secret provisioning and authenticated live API probe cannot be claimed until access is available.
+
 ### Round 63 Phase 0 — iReservation native API plan and handover (GPT-6, 2026-10-24)
 
 - Documentation complete; runtime integration not implemented or enabled. Explicitly requested plan publication; Round 63 remains in Planned rounds and the completed Round 62 phase table/attribution is preserved. Phases 1–6 are pending; Phase 5 availability reads depend on a provider endpoint not currently available.
@@ -87,11 +92,26 @@ Newest entries at the top of each section.
 
 | Round | Scope | Specification | Status |
 |---|---|---|---|
-| 63 | iReservation native API: secure connection, comparison-first reservations, controlled cutover; future availability blocks and direct two-way writes separately gated | [Plan](PLAN_round63_ireservation_native_api.md) · [Developer handover](docs/ireservation/CONTINUATION.md) | pending implementation — Phase 0 documentation complete; Phases 1–6 pending; Phase 5 provider-blocked |
 
 Standing rule added 2026-10-18 (AGENTS.md "Full regression"): every phase gate runs the whole suite, not only plan-listed tests.
 
 ### Current round — in-flight
+
+**Round 63 — iReservation Native API Integration**
+
+Daniele confirmed implementation on 24 October 2026 after the plain-language recap. Specification: `PLAN_round63_ireservation_native_api.md`. Existing iCal remains authoritative until comparison/cutover gates pass.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 0 — Plan and handover | documentation complete — GPT-6 | Published source-grounded contract and handover; earlier evidence above. |
+| 1 — Secure connection and API client | in-progress — GPT-6 | Tenant-bound encrypted storage, server-only client, shared auth/rate/quota controls and synthetic security tests; live property-330 reads only after secure provisioning. |
+| 2 — Mapping and comparison | pending | Room/inventory identity, shadow report, zero calendar writes. |
+| 3 — Controlled read cutover | pending | Scoped single writer; stable links; cancellation/rollback tests. |
+| 4 — Operational release | pending | Fair polling/health/observability; full regression, live checks and rollback drill. |
+| 5 — Availability blocks | pending — provider-blocked | No published availability endpoint; separate future gate. |
+| 6 — Future direct two-way sync | pending | Direct-only outbox/reconciliation; independent write gate. |
+
+### Previous round — Round 62 (completed)
 
 **Round 62 — Tourist-tax rates by date**
 

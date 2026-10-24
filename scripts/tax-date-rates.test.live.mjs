@@ -20,3 +20,7 @@ ctx.allCheckins=[{id:'SYNTHETIC',property_id:'SYNTHETIC',surname:'Fixture',name:
 ctx.prompt=()=> '2026-3';ctx.alert=()=>{};ctx.track=()=>{};ctx.toast=()=>{};let output;ctx.downloadFile=(_,text)=>output=text;
 for(const lang of ['en','it']){ctx.hostLang=lang;ctx.exportCityTax();assert.equal(output,fs.readFileSync(new URL('./golden/synthetic/tax-date-rates-'+lang+'.txt',import.meta.url),'utf8'));}
 console.log('PASS tax production smoke: three public assets match tested source; deployed nightly calculation generates both exact IT/EN declaration goldens. No real guest reads or writes.');
+
+ctx.propertyData.tax_rules[0].when={night_from:'07-01',night_to:'08-31'};
+for(const lang of ['it','en']){ctx.hostLang=lang;ctx.exportCityTax();assert.equal(output,fs.readFileSync(new URL('./golden/synthetic/tax-annual-'+lang+'.txt',import.meta.url),'utf8'));}
+console.log('PASS deployed recurring-season engine reproduces IT/EN annual tax goldens');

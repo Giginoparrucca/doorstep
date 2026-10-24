@@ -51,3 +51,22 @@ assert.equal(output.text,fs.readFileSync(file,'utf8'));}
 ctx.propertyData={...property,tax_rules:[]};
 for(const lang of ['en','it']){ctx.hostLang=lang;ctx.exportCityTax();const file=new URL('./golden/synthetic/tax-legacy-'+lang+'.txt',import.meta.url);if(process.env.UPDATE_TAX_GOLDENS==='1')fs.writeFileSync(file,output.text);assert.equal(output.text,fs.readFileSync(file,'utf8'));}
 console.log('PASS date-rate tax: boundaries, crossing stays/quarters/years, caps, exemptions, zero, validation, leap day and exact IT/EN declaration goldens');
+
+// Recurring seasons have no year, work across future years, and preserve legacy dates.
+const summer={...property,tax_rules:[rule('07-01','08-31',4)]};
+for(const year of [2026,2027,2028,2038])assert.equal(calc(summer,{...guest,arrival_date:year+'-06-29',departure_date:year+'-07-04'}).amount,16);
+assert.equal(calc(property,{...guest,arrival_date:'2027-06-29',departure_date:'2027-07-04'}).amount,10,'legacy exact dates do not silently recur');
+assert.equal(calc({...property,tax_rules:[rule('12-20','01-10',3)]},{...guest,arrival_date:'2030-12-30',departure_date:'2031-01-03'},{nightsInPeriod:4}).amount,12);
+assert.equal(calc({...property,tax_rules:[rule('02-29','02-29',5)]},{...guest,arrival_date:'2028-02-28',departure_date:'2028-03-02'},{nightsInPeriod:3}).amount,9);
+assert.equal(calc({...property,tax_rules:[rule('02-29','02-29',5)]},{...guest,arrival_date:'2027-02-28',departure_date:'2027-03-02'},{nightsInPeriod:2}).amount,4);
+assert.equal(v([{rate:3,from:'12-20',to:'01-10'},{rate:2,from:'01-10',to:'02-01'}]),'overlap');
+assert.equal(v([{rate:3,from:'12-20',to:'01-10'},{rate:2,from:'01-11',to:'02-01'}]),null);
+assert.equal(v([{rate:3,from:'07-01',to:'08-31'},{rate:2,from:'2028-08-01',to:'2028-09-01'}]),'overlap');
+assert.equal(v([{rate:3,from:'02-29',to:'02-29'},{rate:2,from:'2097-01-01',to:'2105-01-01'}]),'overlap','century leap-day gap');
+assert.equal(v([{rate:3,from:'02-29',to:'02-29'},{rate:2,from:'2097-01-01',to:'2103-12-31'}]),null);
+assert.equal(v([{rate:3,from:'02-30',to:'03-01'}]),'date');
+assert.equal(v([{rate:3,from:'07-01',to:'2028-08-31'}]),'date');
+assert.equal(ctx.TaxDateRates.parseInput('01/07'),'07-01');assert.equal(ctx.TaxDateRates.inputValue('07-01'),'01/07');
+ctx.propertyData=summer;
+for(const lang of ['en','it']){ctx.hostLang=lang;ctx.exportCityTax();const file=new URL('./golden/synthetic/tax-annual-'+lang+'.txt',import.meta.url);if(process.env.UPDATE_TAX_GOLDENS==='1')fs.writeFileSync(file,output.text);assert.equal(output.text,fs.readFileSync(file,'utf8'));}
+console.log('PASS yearly recurrence across future years, winter wrapping, leap/century dates, overlap and unchanged legacy exact-date history; annual IT/EN goldens');

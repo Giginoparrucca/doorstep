@@ -4,20 +4,27 @@ Confirmed by Daniele on 21 October 2026 after the recap in chat.
 
 ## Host behavior
 
-Rate, From date and To date sit together in Settings. Dates are inclusive nights,
-not checkout dates. Blank main dates retain the year-round fallback. A dated main
-rate applies only within its bounds (blank endpoint means unbounded). Add period
-creates further dated rates, including zero rates. Additional periods need both
-dates. Dated periods cannot overlap (shared endpoints count as overlap). A dated
-rate overrides the undated fallback; uncovered nights without fallback cost zero.
-Dates include the year so historical rates remain available. Existing MM-DD
-arrival-based reduction rules retain their semantics and remain separate.
+Rate, From and To sit together in Settings. New bounds use day/month (DD/MM),
+without a year, and repeat every year. Both bounds include their nights; checkout
+is excluded. December–January periods wrap across New Year. February 29 applies
+only when that night exists. Blank main bounds retain the year-round fallback;
+a bounded main rate is zero outside its season. Additional periods require both
+bounds, cannot overlap, and override an undated fallback. Zero rates are allowed.
+
+The original 21 October delivery used exact-year dates. The 24 October correction
+preserves those saved historical limits until an explicit owner conversion via
+Make saved dates repeat every year / Ripeti ogni anno le date salvate. Conversion
+is a draft, needs Save Settings, and warns that calculations for other years change.
+Cancel restores the exact dates; resulting duplicate/overlapping seasons must be
+resolved before saving. Existing arrival-based reduction rules remain separate.
 
 ## Storage and calculation
 
 Use the existing properties.tax_rules JSONB for explicitly typed rate_period
 entries, with one base entry marking main-row bounds and further entries carrying
-their own amount. tax_rate_eur remains the main amount. No schema migration.
+their own amount. New seasons store MM-DD; existing YYYY-MM-DD bounds remain
+exact. Mixed recurring/exact periods must not overlap on any actual night.
+tax_rate_eur remains the main amount. No schema migration.
 The normalizer separates rate periods from reductions. Compute each stay night
 in UTC; exclude checkout; apply its rate before existing reductions/exemptions.
 Quarter clipping passes exact bounds. Preserve night/euro caps across period
@@ -55,3 +62,13 @@ No external messages or real guest writes.
   key; offline skips are demo origin/private catalog/pglast.
 - Final documentation publication does not alter the verified application assets.
   Both phases complete. No migration or owner-only task.
+
+
+## 24 October correction — yearly seasons
+
+Requested directly by Daniele as a correction to the shipped feature. GPT-6 owns
+this Round 62 Phase 2 follow-up; Round 63 remains separate and unchanged. Tests
+cover future years, winter wrapping, leap days/century gaps, mixed/annual overlaps,
+legacy history, conversion/cancel/copy/save failures and real IT/EN mobile/desktop.
+Separate annual declaration goldens join the unchanged exact-date/legacy goldens.
+Mandatory full local/CI regression and deployed source/golden smoke before ship.

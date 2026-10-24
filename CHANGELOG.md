@@ -7,6 +7,10 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Round 62 Phase 2 follow-up — recurring tax seasons (in-progress — GPT-6, 2026-10-24)
+
+- Daniele requested day/month periods that repeat every year, rather than recreating exact-year dates. Correcting the existing tax-period feature as a scoped follow-up; Round 63 phase ownership/history remains unchanged. Preserve existing exact-date configuration until explicit conversion, support winter/year boundaries and leap dates, update IT/EN inputs/guides, full regression/CI/deployment gates before release.
+
 ### Round 63 Phase 2 — production verification and next gate (GPT-6, 2026-10-24)
 
 - Published [PR #197](https://github.com/Giginoparrucca/doorstep/pull/197), tested head `01c1d1fab2d55b6339b82610bdb54306f57c67bf`, main merge `8620372c45e804e43574484b629e257e3fce8c4b`. Remote tree exactly matches the locally tested tree `4d8a4167ab9880b271e2394fbf925c60aa9fbbab`. CI run `40082742907`, job `120839465130`: full regression **62/0/3**, protected live **1/0/4**, including passing production schema-drift lookup. Local skips: demo origin/private demo catalog/pglast; CI live skips demo origin, standalone provider opt-in, SPOT origin and tax origin.

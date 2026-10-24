@@ -183,8 +183,8 @@ blocks and unaffected OTA blocks survive outages, partial reads and rollback.
 
 ## Readiness and release evidence
 
-First unblock Phase 1 with securely provisioned partner credentials and test
-property access, without pasting any values into an issue or chat. In Phase 2,
+Phase 1 secure provisioning and test-property read gates passed. Phase 2 adds
+manual, bounded comparison with coverage explicitly unverified. Before cutover,
 resolve query range/completeness, timestamp and multi-room semantics with provider
 confirmation or recorded safe contract probes. Native-read activation requires
 no unresolved identity/mapping duplicates in the selected pilot scope and an

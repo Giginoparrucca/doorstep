@@ -158,6 +158,13 @@ export function createReadClient({ store, env = process.env, transport = fetch, 
       if (!Array.isArray(data.results) || data.results.some(r => !Number.isInteger(r.id) || !['room','property'].includes(r.type) || typeof r.name !== 'string')) fail('provider_response_invalid');
       return data.results.map(({ id, type, name }) => ({ id, type, name }));
     },
+    async reservations(connection, range) {
+      const { windowRange, normalizeReservations } = await import('./_ireservation-compare.js');
+      const dates = windowRange(range.fromDate, range.toDate);
+      const credentials = unseal(connection.secret, connectionContext(connection, config), env);
+      const data = await read('/reservations', { calendarId: connection.calendar_id, ...credentials, ...dates });
+      return normalizeReservations(data.results?.reservations);
+    },
     async distributors() {
       const data = await read('/distributors');
       if (!Array.isArray(data.results) || data.results.some(r => !Number.isInteger(r.idDistributor) || typeof r.nameDistributor !== 'string')) fail('provider_response_invalid');

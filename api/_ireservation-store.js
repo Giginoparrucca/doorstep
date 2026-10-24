@@ -1,10 +1,10 @@
 // Service-only gateway to a private schema. It never logs database error bodies.
 import { IresError } from './_ireservation-core.js';
-export function createStore({ url, serviceKey, transport = fetch }) {
-  if (!url || !serviceKey) throw new IresError('storage_unavailable');
+export function createStore({ url, serviceKey, transport = fetch, rpc = 'ireservation_state' }) {
+  if (!['ireservation_state','ireservation_compare_state'].includes(rpc) || !url || !serviceKey) throw new IresError('storage_unavailable');
   return { async call(operation, payload) {
     let response;
-    try { response = await transport(`${url}/rest/v1/rpc/ireservation_state`, {
+    try { response = await transport(`${url}/rest/v1/rpc/${rpc}`, {
       method: 'POST', headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ p_operation: operation, p_payload: payload }), signal: AbortSignal.timeout(12000), redirect: 'error' });
       if (!response.ok) throw new Error();

@@ -1,6 +1,6 @@
 # iReservation credentials, operations and rollback
 
-**Phase 1 backend implemented; secret provisioning and live verification pending.** Start with the
+**Phase 1 secure provisioning and test-property reads verified; Phase 2 manual comparison is being released.** Start with the
 [Round 63 plan](../../PLAN_round63_ireservation_native_api.md) and
 [API contract](API_REFERENCE.md). No secret values are stored in this handover.
 
@@ -224,3 +224,44 @@ explicit user approval. No preview/development values were created. A recovery
 copy of the generated key is in this machine's ignored `.env.local`, mode 0600;
 partner/test passwords are not stored locally. Preserve recovery before key
 rotation or a machine move. The runtime and write gates stay false while testing.
+
+
+## Phase 2 manual comparison operations
+
+Owner path: Settings → iReservation → Connect → Save connection → Check connection
+→ Match rooms → Save room mapping → Compare bookings. Admin view cannot configure
+credentials. Use the real property's channel-manager calendar/username/password;
+test calendar 330 is for isolated provider probes, never a real property's setup.
+Passwords are write-only; edit requires the username again. Blank password keeps
+the saved password only for the same calendar. Saving rotates the connection
+version, clears verification and invalidates mappings/reports until reviewed.
+Disconnect deletes the stored connection ciphertext and fences stale work.
+
+`IRESERVATION_ENABLED=true` enables owner-triggered **manual comparison only** in
+this release. There is no native import scheduler or reservation writer in the
+client. `IRESERVATION_WRITES_ENABLED=false` remains explicit; future code must
+honor a separate write gate. Set ENABLED=false and redeploy to disable all native
+controls; existing iCal and local bookings continue. Preview/demo stay rejected.
+
+Reports strip provider guest names, email, phone, nationality, prices and raw
+payloads. Only IDs, distributor, status, dates, mapped room IDs, minimal reasons,
+counts and generation time are retained. Private reports retain the latest 20
+per property. They always say coverage=unverified and can_cutover=false. Dates
+are a bounded request (maximum 31-day span), not proof of provider completeness.
+The local comparison uses stay overlap and at most 1000 records; truncation is
+explicit. Names/dates are hints, never sufficient identity proof. Editable OTA
+raw JSON is not accepted as a verified native binding. No missing-row deletion.
+
+Gateway: existing POST /api/ical-sync?integration=ireservation, actions catalog,
+save_mapping and compare, with property_id, connection version, and mapping_version
+for writes/comparisons. Compare adds fromDate/toDate. Request max16KB, provider
+response max2MB, max5000 fetched reservations; larger/invalid results fail closed.
+Every remote request uses the shared limiter/quota. Manual comparisons fetch
+rooms, reservations and distributors; avoid repeated clicks during quota pauses.
+Only narrow service-only RPCs access private mapping/report tables. CAS and final
+ownership/room-validity checks reject edits, deletion, transfer or disconnect races.
+
+The protected build probe now also reads a seven-day window from test calendar
+330, prints counts only and saves no connection/reservation/report. Explicitly set
+BUILD_PROBE=true only for an authorized verification build, then false immediately.
+A passing count does not resolve missing pagination/date/ordering documentation.

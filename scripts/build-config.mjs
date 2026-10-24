@@ -28,7 +28,7 @@ if (process.env.IRESERVATION_BUILD_PROBE === 'true') {
   const { safeError } = await import('../api/_ireservation-core.js');
   try {
     const result = await runReadProbe({ ...process.env, IRESERVATION_LIVE_PROBE: 'true' });
-    console.log(`PASS iReservation authorized test-property reads: ${result.rooms} rooms, ${result.distributors} distributors; no reservation or calendar writes`);
+    console.log(`PASS iReservation authorized test-property reads: ${result.rooms} rooms, ${result.distributors} distributors, ${result.reservations} test reservations; no reservation or calendar writes`);
   } catch (error) {
     throw new Error('iReservation build probe failed: ' + safeError(error).code);
   }

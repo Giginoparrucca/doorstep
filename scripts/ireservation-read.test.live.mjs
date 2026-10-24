@@ -8,5 +8,5 @@ const required=['IRESERVATION_PARTNER_USERNAME','IRESERVATION_PARTNER_PASSWORD',
 if (required.some(k=>!process.env[k])) { console.error('SKIP iReservation secure test configuration incomplete'); process.exit(77); }
 try {
   const result=await runReadProbe(process.env);
-  console.log(`PASS iReservation authorized test-property reads: ${result.rooms} rooms, ${result.distributors} distributors; no reservations saved or calendar writes`);
+  console.log(`PASS iReservation authorized test-property reads: ${result.rooms} rooms, ${result.distributors} distributors, ${result.reservations} test reservations; no reservations saved or calendar writes`);
 } catch(error) { console.error('FAIL iReservation test-property read probe: '+safeError(error).code); process.exit(1); }

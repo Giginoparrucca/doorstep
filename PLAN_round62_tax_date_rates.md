@@ -72,3 +72,12 @@ cover future years, winter wrapping, leap days/century gaps, mixed/annual overla
 legacy history, conversion/cancel/copy/save failures and real IT/EN mobile/desktop.
 Separate annual declaration goldens join the unchanged exact-date/legacy goldens.
 Mandatory full local/CI regression and deployed source/golden smoke before ship.
+
+
+Correction shipped in PR #198, main `c0a381b25ebd0b24e38984edd52a3bacd049fd83`.
+Final full local and PR CI regression62/0/3; protected CI live1/0/4. Production
+`dpl_8eq9QrNQ4YPjkVXbjagjUjM3zEBe` READY; post-deployment live2/0/3 verifies exact
+public assets and both annual/exact-date IT/EN declaration goldens. Skip reasons,
+intermediate credentials-test timeout and successful reruns are in CHANGELOG.
+No migration, owner data mutation or new recurring setup task: seasons repeat
+annually once saved; old exact-date configuration requires explicit conversion.

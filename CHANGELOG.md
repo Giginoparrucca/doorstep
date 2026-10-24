@@ -7,11 +7,13 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
-### Round 63 Phase 0 — iReservation API documentation (GPT-6, 2026-10-24)
+### Round 63 Phase 0 — iReservation native API plan and handover (GPT-6, 2026-10-24)
 
-- Status: in-progress — GPT-6; documentation preparation authorized explicitly in this session. Runtime phases are not started; the completed Round 62 table remains unchanged.
-- Scope: source-grounded native API plan, sanitized schema reference, credential operations and developer continuation guide. No credentials or private calendar URLs may be published.
-- Gate: document/source review, secret scan, full regression and remote commit verification before delivery.
+- Documentation complete; runtime integration not implemented or enabled. Explicitly requested plan publication; Round 63 remains in Planned rounds and the completed Round 62 phase table/attribution is preserved. Phases 1–6 are pending; Phase 5 availability reads depend on a provider endpoint not currently available.
+- Added `PLAN_round63_ireservation_native_api.md` and `docs/ireservation/` with source/page provenance, every nonsecret published schema field, sanitized official schema snapshot, credential retrieval/configuration/rotation, proposed server-only env names, tenant-bound encryption/storage/authorization, comparison-first adoption, stable IDs and multi-room mapping, I/U/D status handling, scoped iCal/API cutover without duplicates, safe outbox/idempotency, quota/observability, rollback and continuation/test gates. Updated developer docs index, permanent guide pointer and release guide. Existing host UI/guides are unchanged; future bilingual guide requirements are documented.
+- Grounded in the uploaded 11-page API 1.3.0 PDF, 3-page English integration guide, Salvatore correspondence and official external endpoint schemas retrieved 24 October. Documented the old refresh hostname conflict and insert-example ID contradiction. No supplied partner username/password/API key, test property password, private iCal URL/token or raw PDF examples included. No credential provisioning, authenticated API call, provider message or production mutation performed.
+- Full regression (the exact `test:all` runner invoked with the bundled Node because npm is absent from this shell): **PASS 58 / FAIL 0 / SKIP 3**, including all eight Chromium suites. Skips: demo origin, private demo catalog, pglast prerequisite. Initial restricted-environment run was 48/10/3 due to missing Python alias, SDK network access and sandbox browser launch; corrected runtime PATH, used the existing test SDK-file override and allowed browser launch, then reran the whole suite successfully. No application/test code changed.
+- Documentation checks: JSON parses; sanitized snapshot matches all seven public source definitions after removal of example/examples/default keys; local links/repository entry points and whitespace checked; staged content and new commit history scanned for secret values and private calendar URLs. 27 local documentation links and all seven sanitized definitions passed validation. Read-only production live smoke: **PASS 2 / FAIL 0 / SKIP 2** (demo origin and service-role schema key absent; no migration added); exact deployed tax/SPOT source and synthetic goldens verified. Publication/remote verification will be recorded after push. Next runtime action: new-Round recap/confirmation, then Phase 1 secure client/credentials with synthetic tests and privately provisioned test access.
 
 ### Calendar sync — all-date count and stale Settings protection (GPT-6, 2026-10-23)
 
@@ -83,6 +85,7 @@ Newest entries at the top of each section.
 
 | Round | Scope | Specification | Status |
 |---|---|---|---|
+| 63 | iReservation native API: secure connection, comparison-first reservations, controlled cutover; future availability blocks and direct two-way writes separately gated | [Plan](PLAN_round63_ireservation_native_api.md) · [Developer handover](docs/ireservation/CONTINUATION.md) | pending implementation — Phase 0 documentation complete; Phases 1–6 pending; Phase 5 provider-blocked |
 
 Standing rule added 2026-10-18 (AGENTS.md "Full regression"): every phase gate runs the whole suite, not only plan-listed tests.
 
@@ -982,6 +985,7 @@ Fix shipped in a single PR:
 Things we've discussed but haven't built. Roughly ordered by leverage.
 
 ### High value, ready to build
+- **Round 63 — iReservation Native API Integration**: next planned native reservation integration; comparison-first, tenant-secure credentials and iCal duplicate prevention. See `PLAN_round63_ireservation_native_api.md` and `docs/ireservation/CONTINUATION.md`. Documentation only delivered; availability reads are not yet offered by provider and outbound direct writes remain separately gated. The authoritative ordering is the Planned rounds table above.
 - **Round 50 — Demo environment and host onboarding** _(planned 2026-10-09)_: isolated projects, fictional fixtures, guarded/simulated integrations, repeatable reset and an Italian onboarding script/PDF. The English plan assigns all technical work to GPT or Claude, with mandatory tests between phases; Daniele acts only when strictly necessary. Specification: `PLAN_round50_demo_onboarding.md`; script: `docs/DEMO_ONBOARDING_IT.md`. Implementation phases remain pending until completed and verified.
 - **Multi-language for host free-text content** _(scoped Round 23, building next)_
   **Decision made**: JSONB-per-field architecture (`{"en": "...", "it": "...", "de": "..."}` in one column per translatable field — welcome message, check-in/checkout instructions, transport info, reco descriptions), so adding a language never needs a schema migration. Guest app reads `field[guestLang] || field[hostDefaultLang]`. Plus an optional **"suggest translation"** button per field that pre-fills a language via the Anthropic API for the host to review/edit — **never auto-published**, especially for safety-critical check-in instructions. Migration: convert existing TEXT columns to JSONB, back-filling current content under the host's default language key. Guest + host render/save paths updated to read/write the active language key. **This is the agreed next round.**

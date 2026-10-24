@@ -1,0 +1,853 @@
+{
+  "kind": "sanitized-provider-schema-reference",
+  "retrievedOn": "2026-10-24",
+  "providerVersion": "1.3.0",
+  "notice": "Reference bundle, not executable OpenAPI. All example/examples/default keys recursively removed. Retains original external refs and nonstandard security syntax. No supplied credentials or PDF password examples included. Read API_REFERENCE.md for prose-required/default rules and contradictions.",
+  "files": {
+    "openapi.json": {
+      "sourceUrl": "https://www.ireservation.it/docs/conf/openapi.json",
+      "sourceSha256": "274809dd9288eea08da740f83a5896c76bfb1a9d01cb148987d1224cca3e5ad4",
+      "definition": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "iReservation.it API",
+          "version": "1.3.0",
+          "description": "This API allows partners to seamlessly integrate with the iReservation.it platform, enabling access to data about reservations and rooms of a property.\n\n### 🚀 To get started:\n1. **Request your credentials** by contacting us at [info@ireservation.it](mailto:info@ireservation.it).\n2. **Authenticate** using the `/v1/oauth2/authorizations` endpoint to obtain your access token.\n3. **Use apis** ensure you include your API key in every request using the `x-api-key` header, and authenticate with the `Authorization: Bearer {token}` header.\n\n➡️ **[Download the API guide - IT version (PDF)](https://www.ireservation.it/docs/integration_guide_it.pdf)**\n\n➡️ **[Download the API guide - EN version (PDF)](https://www.ireservation.it/docs/integration_guide_en.pdf)**\n\nHappy coding!"
+        },
+        "servers": [
+          {
+            "url": "https://api.ireservation.it"
+          }
+        ],
+        "paths": {
+          "/v1/oauth2/authorizations": {
+            "$ref": "./openapi_authorizations.json"
+          },
+          "/distributors": {
+            "$ref": "./openapi_distributors.json"
+          },
+          "/rooms": {
+            "$ref": "./openapi_rooms.json"
+          },
+          "/reservations": {
+            "$ref": "./openapi_reservations.json"
+          },
+          "/reservations/save": {
+            "$ref": "./openapi_reservations_save.json"
+          }
+        },
+        "components": {
+          "securitySchemes": {
+            "Bearer": {
+              "type": "http",
+              "scheme": "bearer",
+              "bearerFormat": "JWT"
+            },
+            "ApiKey": {
+              "type": "apiKey",
+              "in": "header",
+              "name": "x-api-key"
+            }
+          }
+        }
+      }
+    },
+    "openapi_authorizations.json": {
+      "sourceUrl": "https://www.ireservation.it/docs/conf/openapi_authorizations.json",
+      "sourceSha256": "93b8776e5e5aa577775c8b4955413356e70bbc586800f7899514b41a8dbfc318",
+      "definition": {
+        "post": {
+          "summary": "Get an access token",
+          "description": "OAuth2 authentication to obtain an access token using username and password, or to refresh the token after expiration.",
+          "tags": [
+            "Authorization"
+          ],
+          "operationId": "authorizeUser",
+          "parameters": [],
+          "security": {
+            "ApiKey": []
+          },
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "username": {
+                          "type": "string"
+                        },
+                        "password": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "username",
+                        "password"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "refreshToken": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "refreshToken"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Token successfully obtained",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "code": {
+                        "type": "integer"
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "result": {
+                        "type": "object",
+                        "properties": {
+                          "expiresIn": {
+                            "type": "integer"
+                          },
+                          "token": {
+                            "type": "string"
+                          },
+                          "refreshToken": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "$ref": "./openapi_exceptions.json#/UnauthorizedError"
+            },
+            "429": {
+              "$ref": "./openapi_exceptions.json#/TooManyRequestsError"
+            },
+            "500": {
+              "$ref": "./openapi_exceptions.json#/InternalServerError"
+            }
+          }
+        }
+      }
+    },
+    "openapi_distributors.json": {
+      "sourceUrl": "https://www.ireservation.it/docs/conf/openapi_distributors.json",
+      "sourceSha256": "c31a870ab131188688810f01dacf8fd333a6d69fe930e66e90feb2b65312b90a",
+      "definition": {
+        "get": {
+          "summary": "Distributors listing",
+          "description": "Returns the list of the distributors managed by iReservation. The code returned can be used to map the idDistributor of a reservation.",
+          "tags": [
+            "Distributors"
+          ],
+          "operationId": "distributors",
+          "parameters": [],
+          "security": {
+            "Bearer": [],
+            "ApiKey": []
+          },
+          "responses": {
+            "200": {
+              "description": "Distributors listing",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "code": {
+                        "type": "integer"
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "results": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "idDistributor": {
+                              "type": "integer"
+                            },
+                            "nameDistributor": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "$ref": "./openapi_exceptions.json#/UnauthorizedError"
+            },
+            "429": {
+              "$ref": "./openapi_exceptions.json#/TooManyRequestsError"
+            },
+            "500": {
+              "$ref": "./openapi_exceptions.json#/InternalServerError"
+            }
+          }
+        }
+      }
+    },
+    "openapi_rooms.json": {
+      "sourceUrl": "https://www.ireservation.it/docs/conf/openapi_rooms.json",
+      "sourceSha256": "faeaeb8f3b6b746751ac3e1a35e988c7aa173b0b5927caaaaa3482b0ebf48a15",
+      "definition": {
+        "post": {
+          "summary": "Rooms listing",
+          "description": "Returns the list of the rooms in a property.",
+          "tags": [
+            "Rooms"
+          ],
+          "operationId": "rooms",
+          "parameters": [],
+          "security": {
+            "Bearer": [],
+            "ApiKey": []
+          },
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "lang": {
+                      "type": "string",
+                      "enum": [
+                        "en",
+                        "it",
+                        "fr",
+                        "de",
+                        "es"
+                      ]
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "calendarId": {
+                          "type": "integer"
+                        },
+                        "propertyUsername": {
+                          "type": "string"
+                        },
+                        "propertyPassword": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Rooms listing",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "code": {
+                        "type": "integer"
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "results": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "room",
+                                "property"
+                              ]
+                            },
+                            "name": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "$ref": "./openapi_exceptions.json#/UnauthorizedError"
+            },
+            "429": {
+              "$ref": "./openapi_exceptions.json#/TooManyRequestsError"
+            },
+            "500": {
+              "$ref": "./openapi_exceptions.json#/InternalServerError"
+            }
+          }
+        }
+      }
+    },
+    "openapi_reservations.json": {
+      "sourceUrl": "https://www.ireservation.it/docs/conf/openapi_reservations.json",
+      "sourceSha256": "9319b99e9e4c934709cc8d988a5c850d48604ba576ab651054663ed9d648e652",
+      "definition": {
+        "post": {
+          "summary": "Reservartion list",
+          "description": "Returns the list of the reservations of a property for a range.",
+          "tags": [
+            "Reservations"
+          ],
+          "operationId": "reservations",
+          "parameters": [],
+          "security": {
+            "Bearer": [],
+            "ApiKey": []
+          },
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "lang": {
+                      "type": "string",
+                      "enum": [
+                        "en",
+                        "it",
+                        "fr",
+                        "de",
+                        "es"
+                      ]
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "calendarId": {
+                          "type": "integer"
+                        },
+                        "propertyUsername": {
+                          "type": "string"
+                        },
+                        "propertyPassword": {
+                          "type": "string"
+                        },
+                        "fromDate": {
+                          "type": "string",
+                          "format": "date",
+                          "description": "The format is: 'YYYY-MM-DD'"
+                        },
+                        "toDate": {
+                          "type": "string",
+                          "format": "date",
+                          "nullable": true,
+                          "description": "The format is: 'YYYY-MM-DD'"
+                        },
+                        "idReservation": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "The idReservation field can be used with idDistributor to retrieve a single reservation. This parameter will override fromDate and toDate parameters if provided."
+                        },
+                        "idDistributor": {
+                          "type": "integer",
+                          "nullable": true,
+                          "description": "The idDistributor field can be used with idReservation to retrieve a single reservation. You can find the list of all distributors to the /distributors endpoint. This parameter can be used also to filter only the reservations of a specific distributor if idReservation parameter is missing."
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Reservations list",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "code": {
+                        "type": "integer"
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "results": {
+                        "properties": {
+                          "reservations": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "idReservation": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string",
+                                  "enum": [
+                                    "I",
+                                    "U",
+                                    "D"
+                                  ],
+                                  "description": "I = Inserted, U = Updated, D = Deleted"
+                                },
+                                "guestFirstName": {
+                                  "type": "string"
+                                },
+                                "guestLastName": {
+                                  "type": "string"
+                                },
+                                "guestEmail": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "guestPhoneNumber": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "guestCountry": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "description": "Country of the guest in ISO-3166 format"
+                                },
+                                "guestLanguage": {
+                                  "type": "string",
+                                  "nullable": true,
+                                  "description": "Language of the guest in two letter format"
+                                },
+                                "dateCheckIn": {
+                                  "type": "string",
+                                  "format": "date",
+                                  "description": "The format is: 'YYYY-MM-DD'"
+                                },
+                                "dateCheckOut": {
+                                  "type": "string",
+                                  "format": "date",
+                                  "description": "The format is: 'YYYY-MM-DD'"
+                                },
+                                "dateTimeLastUpdate": {
+                                  "type": "string",
+                                  "format": "date",
+                                  "description": "The last time the reservation has been updated. It could be the same datetime the reservation has been created. The format is: 'YYYY-MM-DD HH:mm:ss'"
+                                },
+                                "numberAdults": {
+                                  "type": "integer"
+                                },
+                                "numberChildren": {
+                                  "type": "integer",
+                                  "description": "Guests less than 18 years old"
+                                },
+                                "price": {
+                                  "type": "number"
+                                },
+                                "priceBreakdown": {
+                                  "type": "object",
+                                  "properties": {
+                                    "onlyRooms": {
+                                      "type": "number"
+                                    },
+                                    "touristTax": {
+                                      "type": "number"
+                                    },
+                                    "petFee": {
+                                      "type": "number"
+                                    },
+                                    "cleaningFee": {
+                                      "type": "number"
+                                    },
+                                    "otherFee": {
+                                      "type": "number"
+                                    }
+                                  }
+                                },
+                                "idDistributor": {
+                                  "type": "integer"
+                                },
+                                "nameDistributor": {
+                                  "type": "string"
+                                },
+                                "rooms": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "integer"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "$ref": "./openapi_exceptions.json#/UnauthorizedError"
+            },
+            "429": {
+              "$ref": "./openapi_exceptions.json#/TooManyRequestsError"
+            },
+            "500": {
+              "$ref": "./openapi_exceptions.json#/InternalServerError"
+            }
+          }
+        }
+      }
+    },
+    "openapi_reservations_save.json": {
+      "sourceUrl": "https://www.ireservation.it/docs/conf/openapi_reservations_save.json",
+      "sourceSha256": "5fa044d5a9648f50bee51963e896a7466aa87bca5edb8b3b6d0d7bc0117ce32e",
+      "definition": {
+        "post": {
+          "summary": "Reservation save",
+          "description": "Creates, updates or deletes a direct reservation (idDistributor = 0) on the calendar of a property.\n\nThe operation to perform is selected with the `action` field:\n* `I` insert a new reservation. The `idReservation` field must be omitted.\n* `U` update an existing reservation. The `idReservation` field is required and the reservation is fully replaced with the data provided in the request.\n* `D` delete an existing reservation. Only the `idReservation` field is required, every other reservation field is ignored.\n\nThe `id` of each room must be one of the ids returned by the /rooms endpoint. The availability of the calendar is decreased automatically for every night of the stay, and it is restored when the reservation is updated or deleted. If one of the requested rooms has no availability the whole request is rejected and nothing is saved.\n\nThe endpoint is available only for the properties whose channel manager is active.",
+          "tags": [
+            "Reservations"
+          ],
+          "operationId": "reservationsSave",
+          "parameters": [],
+          "security": {
+            "Bearer": [],
+            "ApiKey": []
+          },
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "lang": {
+                      "type": "string",
+                      "enum": [
+                        "en",
+                        "it",
+                        "fr",
+                        "de",
+                        "es"
+                      ]
+                    },
+                    "parameters": {
+                      "type": "object",
+                      "required": [
+                        "calendarId",
+                        "propertyUsername",
+                        "propertyPassword",
+                        "action"
+                      ],
+                      "properties": {
+                        "calendarId": {
+                          "type": "integer"
+                        },
+                        "propertyUsername": {
+                          "type": "string"
+                        },
+                        "propertyPassword": {
+                          "type": "string"
+                        },
+                        "action": {
+                          "type": "string",
+                          "enum": [
+                            "I",
+                            "U",
+                            "D"
+                          ],
+                          "description": "I = Insert, U = Update, D = Delete"
+                        },
+                        "idReservation": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "Required when action is 'U' or 'D'. It must be the idReservation returned by the /reservations endpoint. It must be omitted when action is 'I'."
+                        },
+                        "guestFirstName": {
+                          "type": "string",
+                          "description": "Required when action is 'I' or 'U'."
+                        },
+                        "guestLastName": {
+                          "type": "string",
+                          "description": "Required when action is 'I' or 'U'."
+                        },
+                        "guestEmail": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "guestPhoneNumber": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "dateCheckIn": {
+                          "type": "string",
+                          "format": "date",
+                          "description": "Required when action is 'I' or 'U'. The format is: 'YYYY-MM-DD'"
+                        },
+                        "dateCheckOut": {
+                          "type": "string",
+                          "format": "date",
+                          "description": "Required when action is 'I' or 'U'. It must be later than dateCheckIn and the stay cannot be longer than 30 nights. The format is: 'YYYY-MM-DD'"
+                        },
+                        "hostNotes": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "Private notes of the property, they are never shown to the guest."
+                        },
+                        "rooms": {
+                          "type": "array",
+                          "description": "Required when action is 'I' or 'U'. The same room can be sent more than once to book more than one unit of the same room type.",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "description": "The id of the room, as returned by the /rooms endpoint."
+                              },
+                              "numberAdults": {
+                                "type": "integer"
+                              },
+                              "numberChildren": {
+                                "type": "integer",
+                                "description": "Guests less than 18 years old"
+                              },
+                              "price": {
+                                "type": "number",
+                                "description": "Total price of the room for the whole stay. The price of the reservation is the sum of the prices of its rooms."
+                              }
+                            }
+                          }
+                        },
+                        "idDistributor": {
+                          "type": "integer",
+                          "nullable": true,
+                          "description": "Only direct reservations can be managed with this endpoint, so the only accepted value is 0. If omitted it defaults to 0."
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "The saved reservation",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "code": {
+                        "type": "integer"
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "results": {
+                        "properties": {
+                          "reservation": {
+                            "type": "object",
+                            "properties": {
+                              "idReservation": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "I",
+                                  "U",
+                                  "D"
+                                ],
+                                "description": "I = Inserted, U = Updated, D = Deleted"
+                              },
+                              "guestFirstName": {
+                                "type": "string"
+                              },
+                              "guestLastName": {
+                                "type": "string"
+                              },
+                              "guestEmail": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "guestPhoneNumber": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "guestCountry": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "Country of the guest in ISO-3166 format"
+                              },
+                              "guestLanguage": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "Language of the guest in two letter format"
+                              },
+                              "dateCheckIn": {
+                                "type": "string",
+                                "format": "date",
+                                "description": "The format is: 'YYYY-MM-DD'"
+                              },
+                              "dateCheckOut": {
+                                "type": "string",
+                                "format": "date",
+                                "description": "The format is: 'YYYY-MM-DD'"
+                              },
+                              "dateTimeLastUpdate": {
+                                "type": "string",
+                                "format": "date",
+                                "description": "The last time the reservation has been updated. It could be the same datetime the reservation has been created. The format is: 'YYYY-MM-DD HH:mm:ss'"
+                              },
+                              "numberAdults": {
+                                "type": "integer"
+                              },
+                              "numberChildren": {
+                                "type": "integer",
+                                "description": "Guests less than 18 years old"
+                              },
+                              "price": {
+                                "type": "number"
+                              },
+                              "priceBreakdown": {
+                                "type": "object",
+                                "properties": {
+                                  "onlyRooms": {
+                                    "type": "number"
+                                  },
+                                  "touristTax": {
+                                    "type": "number"
+                                  },
+                                  "petFee": {
+                                    "type": "number"
+                                  },
+                                  "cleaningFee": {
+                                    "type": "number"
+                                  },
+                                  "otherFee": {
+                                    "type": "number"
+                                  }
+                                }
+                              },
+                              "idDistributor": {
+                                "type": "integer"
+                              },
+                              "nameDistributor": {
+                                "type": "string"
+                              },
+                              "rooms": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "integer"
+                                    },
+                                    "name": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "$ref": "./openapi_exceptions.json#/UnauthorizedError"
+            },
+            "429": {
+              "$ref": "./openapi_exceptions.json#/TooManyRequestsError"
+            },
+            "500": {
+              "$ref": "./openapi_exceptions.json#/InternalServerError"
+            }
+          }
+        }
+      }
+    },
+    "openapi_exceptions.json": {
+      "sourceUrl": "https://www.ireservation.it/docs/conf/openapi_exceptions.json",
+      "sourceSha256": "c69b9fae5634ddd0972910f8b2effdd792ff094146e33bc1bdc4527c56476894",
+      "definition": {
+        "UnauthorizedError": {
+          "description": "Invalid credentials",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./openapi_exceptions_schema.json#/ErrorResponse401"
+              }
+            }
+          }
+        },
+        "TooManyRequestsError": {
+          "description": "Too many requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./openapi_exceptions_schema.json#/ErrorResponse429"
+              }
+            }
+          }
+        },
+        "InternalServerError": {
+          "description": "Generic error",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./openapi_exceptions_schema.json#/ErrorResponse500"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

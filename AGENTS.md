@@ -124,3 +124,12 @@ integration restrictions and reset authorization server-side. Never copy real
 PII, documents, Vault or credentials into demo, and never weaken production
 controls to enable simulations/reset. Every phase must pass its documented tests
 before the next starts.
+
+## Round 63 — iReservation developer handover
+
+For iReservation work, start with `PLAN_round63_ireservation_native_api.md`,
+`docs/ireservation/API_REFERENCE.md`, `docs/ireservation/OPERATIONS.md` and
+`docs/ireservation/CONTINUATION.md`. Phase 0 is documentation only; runtime phases
+remain pending. Never publish partner username/password/API key, test property
+password, bearer/refresh tokens or private iCal URLs/tokens. Retrieve secrets via
+the restricted process in OPERATIONS; do not copy correspondence/PDF examples.

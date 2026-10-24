@@ -221,3 +221,19 @@ to touch the database.
 
 When in doubt: rolling back code is safe; rolling back the database needs a
 deliberate reverse-migration. Most of the time you only need the former.
+
+
+## Round 63 — planned native API release gate
+
+The [iReservation plan](PLAN_round63_ireservation_native_api.md) and
+[operations/rollback guide](docs/ireservation/OPERATIONS.md) govern future native
+sync releases. This documentation does not activate the integration. Each runtime
+phase retains the full regression, CI and post-deploy live gates above. Verify
+new production migrations through the schema-drift test before claiming applied.
+
+Before read cutover, prove comparison makes no calendar changes, room/native
+identities are resolved, existing guest links survive and exactly one source
+writer/cancellation sweep owns the scope. Exercise the rollback manifest. Keep
+native availability and writes disabled until their separate phase gates pass.
+Deployment rollback alone cannot reverse external writes, credentials or routing
+state. Document remote write outcomes and reconcile uncertain operations.

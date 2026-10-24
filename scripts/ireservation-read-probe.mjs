@@ -1,5 +1,5 @@
 // Explicit, production-server-only probe against the provider's approved test
-// calendar. No guest/reservation records are read or written; output is counts.
+// calendar. Reservation reads are limited to test calendar 330; output is counts only.
 import { randomUUID } from 'node:crypto';
 import { createReadClient, connectionContext, seal, IresError } from '../api/_ireservation-core.js';
 import { createStore } from '../api/_ireservation-store.js';
@@ -18,5 +18,8 @@ export async function runReadProbe(env = process.env, dependencies = {}) {
     calendar_id: 330, version: randomUUID() };
   row.secret = seal({ propertyUsername: env.IRESERVATION_TEST_PROPERTY_USERNAME, propertyPassword: env.IRESERVATION_TEST_PROPERTY_PASSWORD }, connectionContext(row, client.config), probeEnv);
   const rooms = await client.rooms(row), distributors = await client.distributors();
-  return { passed: true, calendarId: 330, rooms: rooms.length, distributors: distributors.length };
+  const start = new Date().toISOString().slice(0,10);
+  const end = new Date(Date.parse(start) + 7 * 86400000).toISOString().slice(0,10);
+  const reservations = await client.reservations(row, { fromDate: start, toDate: end });
+  return { passed: true, calendarId: 330, rooms: rooms.length, distributors: distributors.length, reservations: reservations.length };
 }

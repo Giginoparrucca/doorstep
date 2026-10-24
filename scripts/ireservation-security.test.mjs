@@ -119,7 +119,7 @@ async function route(action,body={},headers={authorization:'Bearer fixture-sessi
  return res;
 }
 assert.equal((await route('status')).body.configured,true);
-for(const action of ['status','save','verify','disconnect']){
+for(const action of ['status','save','verify','disconnect','catalog','save_mapping','compare']){
  assert.equal((await route(action,{},{})).statusCode,401);
  actor=other;assert.equal((await route(action)).statusCode,403);actor=owner;
  anon=true;assert.equal((await route(action)).statusCode,401);anon=false;

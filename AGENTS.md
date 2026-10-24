@@ -130,6 +130,6 @@ before the next starts.
 For iReservation work, start with `PLAN_round63_ireservation_native_api.md`,
 `docs/ireservation/API_REFERENCE.md`, `docs/ireservation/OPERATIONS.md` and
 `docs/ireservation/CONTINUATION.md`. Phase 0 was documentation only. Daniele confirmed implementation on 24 October
-2026; Phase 1 is in progress with live access disabled until its gates pass. Never publish partner username/password/API key, test property
+2026; Phase 1 is verified; Phase 2 adds owner-only manual comparison. Native calendar imports remain disabled until the cutover gates pass. Never publish partner username/password/API key, test property
 password, bearer/refresh tokens or private iCal URLs/tokens. Retrieve secrets via
 the restricted process in OPERATIONS; do not copy correspondence/PDF examples.

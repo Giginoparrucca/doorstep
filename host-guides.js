@@ -958,6 +958,25 @@ const GUIDES = {
     ],
   },
 
+  settings: {
+    page: {it:'Impostazioni',en:'Settings'},
+    title: {it:'Confrontare iReservation',en:'Compare iReservation'},
+    purpose: {it:'Collega la struttura e verifica le differenze senza modificare il calendario iCal.',en:'Connect the property and review differences without changing the iCal calendar.'},
+    when: {it:'Durante la preparazione della connessione nativa.',en:'When preparing the native connection.'},
+    steps: [
+      {it:'In iReservation premi «Connetti», inserisci Calendar ID e credenziali della struttura, poi «Salva connessione».',en:'Under iReservation press “Connect”, enter the calendar ID and property credentials, then “Save connection”.',target:'ireservation-settings',art:'pr1'},
+      {it:'Premi «Verifica connessione». Solo il proprietario può gestire queste credenziali.',en:'Press “Check connection”. Only the property owner can manage these credentials.',target:'ireservation-settings',art:'pr2'},
+      {it:'Premi «Associa camere», scegli ogni corrispondenza e conferma una singola unità fisica. Non deduciamo le associazioni dai nomi.',en:'Press “Match rooms”, choose each match and confirm one physical unit. Names do not automatically establish a match.',target:'ireservation-settings',art:'pr3'},
+      {it:'Premi «Confronta prenotazioni» e scegli un intervallo fino a 31 giorni. Il rapporto non importa o annulla prenotazioni.',en:'Press “Compare bookings” and choose a range up to 31 days. The report does not import or cancel bookings.',target:'ireservation-settings',art:'pr4'},
+    ],
+    warn: {it:'iCal continua a gestire il calendario. La copertura API è ancora da verificare e le chiusure di disponibilità non sono disponibili dal provider.',en:'iCal still manages the calendar. API coverage needs verification and the provider does not yet offer availability closures.'},
+    faq: [
+      {q_it:'Dove trovo le credenziali?',a_it:'Nell’area gestori Bed-and-Breakfast.it, apri il channel manager e «Configura». Usa credenziali della struttura diverse dall’accesso all’area riservata.',q_en:'Where do I find the credentials?',a_en:'In the Bed-and-Breakfast.it host area, open the channel manager and “Configura”. Use property credentials distinct from the reserved-area login.'},
+      {q_it:'Perché il calendario non cambia?',a_it:'Questa fase produce soltanto un confronto. Non cambiare o eliminare i feed iCal: il passaggio alla nuova sorgente richiede verifiche separate.',q_en:'Why does the calendar not change?',a_en:'This stage only produces a comparison. Keep the iCal feeds: switching sources requires separate verification.'},
+      {q_it:'Come cambio o rimuovo la password?',a_it:'«Modifica connessione» salva una nuova password. Una password vuota conserva quella esistente solo per lo stesso calendario. «Disconnetti» rimuove le credenziali native e lascia iCal attivo.',q_en:'How do I change or remove the password?',a_en:'“Edit connection” saves a replacement password. A blank password keeps the existing one only for the same calendar. “Disconnect” removes native credentials and leaves iCal active.'},
+    ],
+  },
+
   property: {
     page: { it: 'Dettagli Proprietà', en: 'Property Details' },
     title: { it: 'Compilare la tua casa', en: 'Filling in your property' },
@@ -1565,7 +1584,7 @@ window.HG = {
   closeGuide,
   checkGuides,
   guides: GUIDES,       // read-only reference for tests
-  version: '53.1',
+  version: '63.2',
 };
 // Alias for the console-side dev command name the spec asks for.
 window.__checkGuides = checkGuides;

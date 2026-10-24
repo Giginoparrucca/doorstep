@@ -1867,6 +1867,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div id="icalSyncResult" style="margin-top:10px;font-size:0.82rem;color:var(--ink-soft);"></div>
       </div>
 
+      <div class="form-card" id="ireservationSettings" data-guide="ireservation-settings"></div>
+
       <!-- Round 45 Step 4.5 — outbound iCal feed. Hosts paste this URL
            into Airbnb / Booking / Vrbo's "Import calendar" so their
            direct bookings and blocks propagate to those OTAs. The URL
@@ -2471,6 +2473,7 @@ observePageToolbarHeader();
 <script src="/lib/cin.js?v=61.1"></script>
 <script src="/host-onboarding.js"></script>
 <script src="/host-share.js?v=59.1"></script>
+<script src="/host-ireservation.js?v=63.2"></script>
 <script src="/lib/cover-layout.js?v=57.1"></script>
 <script src="/host-unsaved-changes.js?v=59.1"></script>
 <script src="/host-property-editor.js?v=59.1"></script>
@@ -5203,6 +5206,7 @@ function setHostLang(l) {
   if (authToggle) {
     authToggle.innerHTML = '';
   }
+  if (typeof _ireservationController !== 'undefined' && _ireservationController) _ireservationController.repaint();
   // Relabel cached onboarding immediately, without another network round trip.
   if (window.HostOnboarding) window.HostOnboarding.repaint();
   const dashboardBody = document.getElementById('dashboardContent');
@@ -5471,6 +5475,7 @@ async function showPanel(id, btn) {
   }
   if (id === 'guestanalytics') loadGuestAnalytics();
   if (id === 'contacts') loadMarketingContacts();
+  if (id === 'settings' && typeof renderIreservationPanel === 'function') void renderIreservationPanel(true);
   if (id === 'calendar') renderCalendarPanel(); // Round 40 T5
   // Round 43 — "Come funziona" pill next to the panel title. Uses a
   // lightweight loader pill until host-guides.js is lazy-loaded on
@@ -5489,7 +5494,7 @@ async function showPanel(id, btn) {
 const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','settings','rules','recos','qrlink'];
 // Bump on every host-guides.js change so browsers never see a stale
 // copy even if their cache is aggressive.
-const _HG_VERSION = '61.3';
+const _HG_VERSION = '63.2';
 let _hgLoadPromise = null;
 function _hgLoad() {
   if (window.HG) return Promise.resolve();
@@ -8592,6 +8597,32 @@ function collectDomIcalFeedsIncludingBlank() {
     out.push(entry);
   });
   return out;
+}
+
+// Round 63: isolated security dialogs and read-only native comparison.
+let _ireservationController = null;
+let _ireservationOwner = null;
+async function renderIreservationPanel(reload = false) {
+  const root = document.getElementById('ireservationSettings');
+  if (!root || !window.IreservationPanel || !document.getElementById('panel-settings')?.classList.contains('active')) return;
+  if (!_ireservationController) _ireservationController = window.IreservationPanel.create({
+    root, context: () => ({propertyId, lang: hostLang, readOnly: !!IS_ADMIN_VIEW || !propertyData || propertyData.owner_id !== _hostUserId}),
+    request: async (action, data, owner) => {
+      const {data: auth} = await sb.auth.getSession();
+      const token = auth?.session?.access_token;
+      if (!token) { const error = new Error('authentication_required'); error.code = 'authentication_required'; throw error; }
+      const response = await fetch('/api/ical-sync?integration=ireservation&action=' + encodeURIComponent(action), {
+        method:'POST', headers:{'Content-Type':'application/json', Authorization:'Bearer ' + token},
+        body:JSON.stringify({...data,property_id:owner}), signal:AbortSignal.timeout(30000),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) { const error = new Error('integration_request_failed'); error.code = result.code || 'integration_unavailable'; throw error; }
+      return result;
+    },
+  });
+  if (reload || _ireservationOwner !== propertyId) {
+    _ireservationOwner = propertyId; await _ireservationController.load();
+  } else _ireservationController.repaint();
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -15275,6 +15306,7 @@ function _setTabDot(id, on) {
 async function loadPropertyData() {
   if (_hostShareController && document.getElementById("panel-qrlink")?.classList.contains("active")) initQRPanel();
   if (!propertyId) return;
+  if (typeof renderIreservationPanel === 'function') void renderIreservationPanel(true);
   // Reset per-property in-memory state so nothing leaks across a switch
   rulesData = []; recoData = []; allCheckins = []; allChats = []; allRooms = []; roomDraft = null;
   _calendarRoomFilter = null;

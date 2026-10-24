@@ -103,8 +103,8 @@ all-date counts vs current month; last attempt vs last successful complete sync;
 stale/auth/quota/mapping error recovery; iCal source handover and no immediate
 real-time guarantee. Explain that current reservation reads do not import owner
 availability closures. Do not advertise native availability or two-way writes
-until the corresponding phase has separately passed its gates. Existing runtime
-host guides are deliberately unchanged in this documentation-only delivery.
+until the corresponding phase has separately passed its gates. The Phase 2 Settings guide is now bilingual and names the actual connection,
+mapping and comparison controls; do not advertise later sync controls.
 
 ## Handoff checklist
 
@@ -194,3 +194,34 @@ remain false. Production gate returns integration_disabled. Local post-deploy
 smoke 2/0/3; its standalone provider skip is separate from the passing real build
 probe. The earlier 403/provisioning blockers are resolved. Phase 2 is now owned
 by GPT-6; build mapping/comparison only, not cutover.
+
+
+## Phase 2 implementation checkpoint
+
+Owner-only Settings UI is in `host-ireservation.js`, loaded by host-console.
+`api/_ireservation-compare.js` normalizes and minimizes reservation reads;
+`_ireservation-comparison-actions.js` orchestrates the explicit mapping and shadow
+report through service-only `ireservation_compare_state`. The CLI-generated
+`20261024084140_round63_ireservation_comparison.sql` stores private mappings and
+20 latest reports, never edits OTA/check-in data. No import/scheduler/cutover.
+The earlier Phase 1 paragraphs are historical checkpoints, superseded by its
+completed gate and the latest CHANGELOG evidence.
+
+Tests: comparison normalization/mapping/status/conflicts/no cancellation and full
+action→client→provider fixture→final-CAS integration; all new actions deny tenant/
+anonymous misuse. New real Chromium suite covers IT/EN at390/1280px, save errors,
+dirty cancel, mapping confirmation, malicious label/reference text, late responses
+on property change, owner/admin gates and actual Settings guide missingTargets=[].
+`scripts/ireservation-comparison-probe.sql` independently exercises database
+ownership/CAS/grants/range/rotation/deleted-room/report constraints in a rollback
+transaction, comparing OTA, check-in and booking-link-related fingerprints.
+
+Next cutover gate: an owner must configure the real property's distinct channel-
+manager credentials in the secure form and explicitly confirm physical room
+mappings. A real-property pilot discrepancy review and provider answers about
+range overlap/completeness/pagination, timezone/order and multi-unit allocation
+are still missing. Do not guess these or switch off iCal. Phase 3 cannot safely
+activate from the test calendar counts. Prepare provider questions, but do not
+send them without authorization. Availability remains provider-blocked; outbound
+I/U/D is future independent work. Keep can_cutover=false until the recorded pilot,
+identity adoption, single-writer and rollback gates actually pass.

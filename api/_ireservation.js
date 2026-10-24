@@ -4,13 +4,14 @@ import { applyCors } from './_cors.js';
 import { rejectInvalidEnvironment, rejectDemoIntegration, SUPABASE_URL, SUPABASE_ANON_KEY } from './_environment.js';
 import { configuration, seal, connectionContext, createReadClient, IresError, safeError } from './_ireservation-core.js';
 import { createStore } from './_ireservation-store.js';
+import { comparisonAction } from './_ireservation-comparison-actions.js';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const bad = (code, status = 400) => { throw new IresError(code, status); };
 function status(row) {
   return { configured: !!row?.secret, calendar_id: row?.calendar_id ?? null, version: row?.version ?? 'none',
-    mode: 'disabled', verified_at: row?.verified_at ?? null, last_error: row?.last_error ?? null };
+    mode: row?.verified_at ? 'compare' : 'disabled', verified_at: row?.verified_at ?? null, last_error: row?.last_error ?? null };
 }
-export function createConnectionHandler({ env = process.env, transport = fetch, store: suppliedStore } = {}) {
+export function createConnectionHandler({ env = process.env, transport = fetch, store: suppliedStore, comparisonStore } = {}) {
   return async function handle(req, res) {
     res.setHeader('Cache-Control', 'no-store');
     if (rejectInvalidEnvironment(res) || rejectDemoIntegration(res, 'ireservation')) return;
@@ -23,7 +24,7 @@ export function createConnectionHandler({ env = process.env, transport = fetch, 
       const body = req.body;
       if (!body || typeof body !== 'object' || Array.isArray(body) || JSON.stringify(body).length > 16384) bad('request_invalid');
       const action = req.query?.action;
-      if (!['status','save','verify','disconnect'].includes(action)) bad('action_invalid');
+      if (!['status','save','verify','disconnect','catalog','save_mapping','compare'].includes(action)) bad('action_invalid');
       const propertyId = body.property_id;
       if (typeof propertyId !== 'string' || !UUID.test(propertyId)) bad('property_invalid');
       const header = req.headers?.authorization || req.headers?.Authorization;
@@ -38,6 +39,7 @@ export function createConnectionHandler({ env = process.env, transport = fetch, 
       const row = await store.call('connection_get', identity);
       if (action === 'status') return res.status(200).json(status(row));
       if (body.version !== (row.version || 'none')) bad('connection_changed', 409);
+      if (['catalog','save_mapping','compare'].includes(action)) return res.status(200).json(await comparisonAction({action,body,row,identity,store,env,transport,comparisonStore}));
       if (action === 'disconnect') {
         const saved = await store.call('connection_disconnect', { ...identity, expected: body.version, version: randomUUID() });
         return res.status(200).json(status(saved));

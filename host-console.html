@@ -1169,7 +1169,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
 }
 .photo-upload-zone:hover .photo-upload-overlay { opacity: 1; }
 @media(max-width:720px){#panel-property>.panel-header-actions>div:first-child{flex:0 0 100%!important}#propertySaveBtn{white-space:normal;overflow:visible}}
-.cover-frame-controls{margin-top:16px;display:grid;gap:8px}.cover-frame-controls[hidden]{display:none}.cover-frame-controls input{width:100%;min-width:0}.cover-frame-controls label{font-size:.8rem}.cover-frame-controls output{float:right}.property-leave-actions{display:flex;gap:8px;flex-wrap:wrap}.property-leave-dialog{position:fixed;inset:0;margin:auto;width:min(520px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;border:1px solid var(--border);border-radius:14px;padding:24px;max-width:min(520px,calc(100vw - 32px));color:var(--ink);background:var(--white)}.property-leave-dialog::backdrop{background:rgba(6,26,61,.45)}.property-leave-dialog h2{margin-top:0;font-size:1.2rem}.property-leave-dialog p{margin:12px 0 20px;font-size:.88rem;line-height:1.5}.property-leave-dialog .btn{white-space:normal}
+.cover-frame-controls{margin-top:16px;display:grid;gap:8px}.cover-frame-controls[hidden],#propTaxMakeAnnual[hidden]{display:none}.cover-frame-controls input{width:100%;min-width:0}.cover-frame-controls label{font-size:.8rem}.cover-frame-controls output{float:right}.property-leave-actions{display:flex;gap:8px;flex-wrap:wrap}.property-leave-dialog{position:fixed;inset:0;margin:auto;width:min(520px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;border:1px solid var(--border);border-radius:14px;padding:24px;max-width:min(520px,calc(100vw - 32px));color:var(--ink);background:var(--white)}.property-leave-dialog::backdrop{background:rgba(6,26,61,.45)}.property-leave-dialog h2{margin-top:0;font-size:1.2rem}.property-leave-dialog p{margin:12px 0 20px;font-size:.88rem;line-height:1.5}.property-leave-dialog .btn{white-space:normal}
 
 .regional-dialog{width:min(1000px,calc(100vw - 32px));max-height:90vh;overflow:auto;border:1px solid var(--border);border-radius:14px;padding:24px;color:var(--ink);background:var(--white)}.regional-dialog::backdrop{background:rgba(6,26,61,.5)}.regional-dialog-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.regional-dialog h2{font-size:1.2rem}.regional-dialog h3{font-size:1rem;margin-top:20px}.regional-dialog p{font-size:.82rem;line-height:1.5}.regional-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:12px;margin:12px 0;align-items:end}.regional-field{display:grid;gap:5px;font-size:.78rem;min-width:0}.regional-dialog input,.regional-dialog select{min-width:0;width:100%}.regional-dialog input[type=checkbox]{width:auto}.regional-dialog details{border:1px solid var(--border);border-radius:8px;padding:10px;margin:8px 0}.regional-dialog summary{cursor:pointer;font-size:.82rem;font-weight:500}.regional-guests{max-height:45vh;overflow:auto}.regional-table-wrap{overflow-x:auto}.regional-days{min-width:760px;width:100%}.regional-days th{white-space:normal;font-size:.7rem}.regional-days td{padding:5px}.regional-days th:last-child,.regional-days td:last-child{position:static;box-shadow:none;background:transparent}.regional-days th{letter-spacing:0;text-transform:none}.regional-days input,.regional-days select{min-width:90px}.regional-bed-table{width:100%;font-size:.8rem}.regional-bed-table th{white-space:normal;letter-spacing:0;text-transform:none}.regional-bed-table td{padding:6px}.regional-bed-table .form-select{min-width:70px}.regional-confirm{display:flex;gap:8px;font-size:.84rem;margin:18px 0;align-items:flex-start}.regional-dialog [data-errors]{white-space:pre-line;color:var(--red)}.regional-dialog .btn{white-space:normal}.regional-note{color:var(--ink-soft)}@media(max-width:540px){.regional-dialog{padding:14px}.regional-dialog h2{font-size:1.05rem}}
   .tax-rate-row { display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr) auto;gap:10px;align-items:end;min-width:0; }
@@ -1748,14 +1748,15 @@ tr:hover td { background: rgba(250,246,240,0.6); }
             <div class="tax-rate-row">
               <div><label class="form-label" for="propTaxRate" data-h="prop_tax_rate">Rate (€ per person per night)</label>
                 <input class="form-input" type="number" min="0" step="0.01" placeholder="e.g., 2.00" id="propTaxRate" oninput="_taxCfgLivePreview()"></div>
-              <div><label class="form-label" for="propTaxFrom" data-h="prop_tax_from">From date</label>
-                <input class="form-input" type="date" id="propTaxFrom" oninput="_taxCfgLivePreview()"></div>
-              <div><label class="form-label" for="propTaxTo" data-h="prop_tax_to">To date</label>
-                <input class="form-input" type="date" id="propTaxTo" oninput="_taxCfgLivePreview()"></div>
+              <div><label class="form-label" for="propTaxFrom" data-h="prop_tax_from">From (day/month)</label>
+                <input class="form-input" type="text" placeholder="DD/MM" maxlength="5" id="propTaxFrom" oninput="_taxCfgLivePreview()"></div>
+              <div><label class="form-label" for="propTaxTo" data-h="prop_tax_to">To (day/month)</label>
+                <input class="form-input" type="text" placeholder="DD/MM" maxlength="5" id="propTaxTo" oninput="_taxCfgLivePreview()"></div>
             </div>
             <div id="propTaxRatePeriods"></div>
             <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;" onclick="addTaxRatePeriod()" data-h="prop_tax_add_period">+ Add period</button>
-            <div class="form-hint" data-h="prop_tax_dates_hint">Dates include both nights. Blank main dates set the year-round rate; dated periods override it. Without a year-round rate, nights outside the periods are not charged.</div>
+            <div class="form-hint" data-h="prop_tax_dates_hint">Enter day/month (DD/MM), without a year: periods repeat every year, including across New Year. Both nights are included. Blank main dates keep the year-round rate; outside a bounded main period the rate is zero. Previously saved dates with a year stay exact until converted.</div>
+            <button type="button" id="propTaxMakeAnnual" class="btn btn-secondary btn-sm" hidden onclick="makeTaxPeriodsAnnual()" data-h="prop_tax_make_annual">Make saved dates repeat every year</button>
             <div id="propTaxPeriodError" role="alert" style="color:#b03939;font-size:0.82rem;margin-top:6px;"></div>
           </div>
           <div class="form-group">
@@ -2469,7 +2470,7 @@ observePageToolbarHeader();
 <script src="/lib/onboarding-readiness.js"></script>
 <script src="/lib/calendar-roundtrip.js"></script>
 <!-- Round 61 Phase 1 — CIN parser + B+D service detection cascade. -->
-<script src="/lib/tax-date-rates.js?v=62.1"></script>
+<script src="/lib/tax-date-rates.js?v=62.2"></script>
 <script src="/lib/cin.js?v=61.1"></script>
 <script src="/host-onboarding.js"></script>
 <script src="/host-share.js?v=59.1"></script>
@@ -4342,10 +4343,11 @@ const HT = {
     page_view_scope: 'Viewing · Entire page', page_edit_scope: 'Editing · Entire page',
     prop_header_hint:  'View mode',
     btn_split_langs: '✂ Split existing content by language',
-    prop_tax_from: 'From date',
-    prop_tax_to: 'To date',
+    prop_tax_from: 'From (day/month)',
+    prop_tax_to: 'To (day/month)',
     prop_tax_add_period: '+ Add period',
-    prop_tax_dates_hint: 'Dates include both nights. Blank main dates set the year-round rate; dated periods override it. Without a year-round rate, nights outside the periods are not charged.',
+    prop_tax_make_annual: 'Make saved dates repeat every year',
+    prop_tax_dates_hint: 'Enter day/month (DD/MM), without a year: periods repeat every year, including across New Year. Both nights are included. Blank main dates keep the year-round rate; outside a bounded main period the rate is zero. Previously saved dates with a year stay exact until converted.',
     prop_tax_rate: 'Rate (€ per person per night)',
     prop_tax_max_nights: 'Max taxable nights',
     prop_tax_max_nights_hint: 'Many comuni only charge the first N nights per stay (or per person per month).',
@@ -4921,10 +4923,11 @@ const HT = {
     page_view_scope: 'Visualizzazione · Tutta la pagina', page_edit_scope: 'Modifica · Tutta la pagina',
     prop_header_hint:  'Modalità visualizzazione',
     btn_split_langs: '✂ Dividi il contenuto per lingua',
-    prop_tax_from: 'Dal',
-    prop_tax_to: 'Al',
+    prop_tax_from: 'Dal (giorno/mese)',
+    prop_tax_to: 'Al (giorno/mese)',
     prop_tax_add_period: '+ Aggiungi periodo',
-    prop_tax_dates_hint: 'Le date includono entrambe le notti. Le date principali vuote impostano la tariffa annuale, sostituita dai periodi datati. Senza tariffa annuale, le notti fuori dai periodi non sono addebitate.',
+    prop_tax_make_annual: 'Ripeti ogni anno le date salvate',
+    prop_tax_dates_hint: 'Inserisci giorno/mese (GG/MM), senza anno: i periodi si ripetono ogni anno, anche a cavallo di Capodanno. Entrambe le notti sono incluse. Le date principali vuote mantengono la tariffa annuale; fuori dal periodo principale delimitato la tariffa è zero. Le date già salvate con anno restano esatte fino alla conversione.',
     prop_tax_rate: 'Tariffa (€ per persona a notte)',
     prop_tax_max_nights: 'Notti max tassabili',
     prop_tax_basis_stay: 'per soggiorno',
@@ -5494,7 +5497,7 @@ async function showPanel(id, btn) {
 const _HG_PANELS = ['dashboard','calendar','chat','guestanalytics','contacts','checkins','export','compliance','property','settings','rules','recos','qrlink'];
 // Bump on every host-guides.js change so browsers never see a stale
 // copy even if their cache is aggressive.
-const _HG_VERSION = '63.2';
+const _HG_VERSION = '63.3';
 let _hgLoadPromise = null;
 function _hgLoad() {
   if (window.HG) return Promise.resolve();
@@ -11652,8 +11655,8 @@ function downloadHostPrivacyNotice() {
 
 // Rate periods are stored alongside reductions in tax_rules, but edited separately.
 function _taxCfgRulesForSave() {
-  const from = document.getElementById('propTaxFrom')?.value || '';
-  const to = document.getElementById('propTaxTo')?.value || '';
+  const from = TaxDateRates.parseInput(document.getElementById('propTaxFrom')?.value || '');
+  const to = TaxDateRates.parseInput(document.getElementById('propTaxTo')?.value || '');
   const periods = _taxRatePeriodsDraft.map((p,i)=>({id:'_rate_period_'+i,
     when:{night_from:p.from || '',night_to:p.to || ''},effect:{type:'rate_period',value:p.rate === '' ? null : Number(p.rate)}}));
   if (from || to) periods.unshift({id:'_rate_period_base',when:{night_from:from,night_to:to},effect:{type:'rate_period',value:_numOrNull(document.getElementById('propTaxRate')?.value)}});
@@ -11664,25 +11667,28 @@ function _taxCfgHydratePeriods(data) {
   _taxRulesDraft = rules.filter(r=>r?.effect?.type !== 'rate_period');
   const base = rules.find(r=>r?.effect?.type === 'rate_period' && r.id === '_rate_period_base');
   const from = document.getElementById('propTaxFrom'), to = document.getElementById('propTaxTo');
-  if (from) from.value = base?.when?.night_from || '';
-  if (to) to.value = base?.when?.night_to || '';
+  const exact = [base?.when?.night_from,base?.when?.night_to].some(v=>/^\d{4}-/.test(v || ''));
+  for (const [input,value] of [[from,base?.when?.night_from],[to,base?.when?.night_to]]) if(input) {
+    input.type=exact?'date':'text';input.maxLength=exact?10:5;input.placeholder=hostLang==='it'?'GG/MM':'DD/MM';
+    input.value=TaxDateRates.inputValue(value || '');
+  }
   _taxRatePeriodsDraft = rules.filter(r=>r?.effect?.type === 'rate_period' && r.id !== '_rate_period_base')
     .map(r=>({from:r.when?.night_from || '',to:r.when?.night_to || '',rate:r.effect.value ?? ''}));
 }
 function _taxCfgValidatePeriods() {
   const rate = document.getElementById('propTaxRate')?.value ?? '';
-  const from = document.getElementById('propTaxFrom')?.value || '', to = document.getElementById('propTaxTo')?.value || '';
+  const from = TaxDateRates.parseInput(document.getElementById('propTaxFrom')?.value || ''), to = TaxDateRates.parseInput(document.getElementById('propTaxTo')?.value || '');
   const periods = [..._taxRatePeriodsDraft];
   if (from || to || rate !== '') periods.unshift({main:true,from,to,rate});
   const code = TaxDateRates.validate(periods);
   const it = hostLang === 'it';
   const messages = it ? {
     rate:'Inserisci una tariffa valida, pari o superiore a zero, per ogni periodo.',
-    date:'Inserisci date valide.', dates_required:'Inserisci Dal e Al per ogni periodo aggiuntivo.',
+    date:'Inserisci giorno/mese valido (GG/MM); per le vecchie date conserva il formato completo.', dates_required:'Inserisci Dal e Al per ogni periodo aggiuntivo.',
     order:'La data Al deve essere uguale o successiva alla data Dal.',
     overlap:'I periodi datati non possono sovrapporsi: le date Dal e Al sono incluse.',
   } : {
-    rate:'Enter a valid rate of zero or more for each period.', date:'Enter valid dates.',
+    rate:'Enter a valid rate of zero or more for each period.', date:'Enter valid day/month (DD/MM); keep the full format for existing exact dates.',
     dates_required:'Enter From and To dates for each additional period.',
     order:'The To date must be on or after the From date.',
     overlap:'Dated periods cannot overlap: From and To nights are included.',
@@ -11695,13 +11701,27 @@ function _taxCfgRenderPeriods() {
   const el = document.getElementById('propTaxRatePeriods');
   if (!el) return;
   const it = hostLang === 'it';
+  const convert=document.getElementById('propTaxMakeAnnual');
+  if(convert)convert.hidden=![_taxRatePeriodsDraft.flatMap(p=>[p.from,p.to]),[document.getElementById('propTaxFrom')?.value,document.getElementById('propTaxTo')?.value]].flat().some(v=>/^\d{4}-/.test(v || ''));
   el.innerHTML = _taxRatePeriodsDraft.map((p,i)=>`<div class="tax-rate-row">
     <div><label class="form-label" for="taxPeriodRate${i}">${_taxCfgSafe(h('prop_tax_rate'))}</label><input id="taxPeriodRate${i}" class="form-input" type="number" min="0" step="0.01" required data-rate-period="${i}" data-field="rate" value="${_taxCfgSafe(p.rate)}" oninput="_taxCfgOnPeriodInput(this)"></div>
-    <div><label class="form-label" for="taxPeriodFrom${i}">${_taxCfgSafe(h('prop_tax_from'))}</label><input id="taxPeriodFrom${i}" class="form-input" type="date" required data-rate-period="${i}" data-field="from" value="${_taxCfgSafe(p.from)}" oninput="_taxCfgOnPeriodInput(this)"></div>
-    <div><label class="form-label" for="taxPeriodTo${i}">${_taxCfgSafe(h('prop_tax_to'))}</label><input id="taxPeriodTo${i}" class="form-input" type="date" required data-rate-period="${i}" data-field="to" value="${_taxCfgSafe(p.to)}" oninput="_taxCfgOnPeriodInput(this)"></div>
+    <div><label class="form-label" for="taxPeriodFrom${i}">${_taxCfgSafe(h('prop_tax_from'))}</label><input id="taxPeriodFrom${i}" class="form-input" type="${/^\d{4}-/.test(p.from || p.to)?'date':'text'}" placeholder="${it?'GG/MM':'DD/MM'}" required data-rate-period="${i}" data-field="from" value="${_taxCfgSafe(TaxDateRates.inputValue(p.from))}" oninput="_taxCfgOnPeriodInput(this)"></div>
+    <div><label class="form-label" for="taxPeriodTo${i}">${_taxCfgSafe(h('prop_tax_to'))}</label><input id="taxPeriodTo${i}" class="form-input" type="${/^\d{4}-/.test(p.from || p.to)?'date':'text'}" placeholder="${it?'GG/MM':'DD/MM'}" required data-rate-period="${i}" data-field="to" value="${_taxCfgSafe(TaxDateRates.inputValue(p.to))}" oninput="_taxCfgOnPeriodInput(this)"></div>
     <button type="button" class="btn btn-secondary btn-sm" onclick="removeTaxRatePeriod(${i})" aria-label="${it ? 'Rimuovi periodo' : 'Remove period'} ${i+1}">✕</button>
   </div>`).join('');
 }
+function makeTaxPeriodsAnnual() {
+  if (!settingsEditMode || !_consoleCanEdit() || consoleDrafts.busy()) return;
+  if (!confirm(hostLang==='it'?'Convertire tutte le date salvate in periodi che si ripetono ogni anno? Dopo Salva impostazioni cambieranno anche i calcoli per gli altri anni.':'Convert all saved dates to periods that repeat every year? After Save Settings, calculations for other years will also change.')) return;
+  const annual=value=>/^\d{4}-\d{2}-\d{2}$/.test(value || '')?value.slice(5):value;
+  for(const id of ['propTaxFrom','propTaxTo']) {
+    const input=document.getElementById(id);if(!input)continue;
+    const value=annual(TaxDateRates.parseInput(input.value));input.type='text';input.maxLength=5;input.placeholder=hostLang==='it'?'GG/MM':'DD/MM';input.value=TaxDateRates.inputValue(value);
+  }
+  _taxRatePeriodsDraft=_taxRatePeriodsDraft.map(p=>({...p,from:annual(p.from),to:annual(p.to)}));
+  _taxCfgRenderPeriods();_taxCfgLivePreview();
+}
+
 function addTaxRatePeriod() {
   if (!settingsEditMode || !_consoleCanEdit() || consoleDrafts.busy()) return;
   _taxRatePeriodsDraft.push({rate:'',from:'',to:''});
@@ -11716,7 +11736,7 @@ function _taxCfgOnPeriodInput(el) {
   if (!settingsEditMode || !_consoleCanEdit() || consoleDrafts.busy()) return;
   const p = _taxRatePeriodsDraft[Number(el.dataset.ratePeriod)];
   if (!p || !['rate','from','to'].includes(el.dataset.field)) return;
-  p[el.dataset.field] = el.value;
+  p[el.dataset.field] = el.dataset.field==='rate'?el.value:TaxDateRates.parseInput(el.value);
   _taxCfgLivePreview();
 }
 
@@ -12148,7 +12168,7 @@ function exportCityTax() {
   if (cfg.ratePeriods.length) {
     lines.push(it ? 'Tariffe per notte (date incluse):' : 'Nightly rates (inclusive dates):');
     if (!cfg.ratePeriods.some(p=>p.main)) lines.push(`${it ? 'Tariffa annuale' : 'Year-round rate'}: € ${(cfg.baseRate ?? 0).toFixed(2)}`);
-    for (const p of cfg.ratePeriods) lines.push(`${p.from || '…'} → ${p.to || '…'}: € ${Number(p.rate).toFixed(2)}`);
+    for (const p of cfg.ratePeriods) lines.push(`${TaxDateRates.inputValue(p.from) || '…'} → ${TaxDateRates.inputValue(p.to) || '…'}${TaxDateRates.annual(p) ? (it ? ' (ogni anno)' : ' (every year)') : ''}: € ${Number(p.rate).toFixed(2)}`);
     if (cfg.ratePeriods.some(p=>p.main)) lines.push(it ? 'Fuori dai periodi: € 0.00' : 'Outside periods: € 0.00');
   } else lines.push(`${it ? 'Tariffa' : 'Rate'}: € ${cfg.baseRate.toFixed(2)} ${it ? 'per persona/notte' : 'per person/night'}`);
   lines.push(`${it ? 'Notti max tassabili' : 'Max taxable nights'}: ${cfg.cap == null ? (it ? 'nessun limite' : 'no cap') : `${cfg.cap} (${basisTxt})`}`);

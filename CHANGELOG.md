@@ -7,6 +7,11 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Round 63 Phase 1b — secure provisioning and provider read gate (GPT-6, 2026-10-24)
+
+- In progress — GPT-6; Daniele approved storing the supplied partner/test credentials and generated encryption key as production Secrets in Vercel project welcomebnb. Team access is now authorized; the earlier 403 blocker is resolved. The initial automatic-review rejection was followed by explicit destination-specific approval before retrying. No secret values are included in this record.
+- Production-only secret/configuration setup succeeded. Native sync and writes remain explicitly disabled. The first rebuild picked up configuration but its project-level build-command override did not execute the provider probe because repository config is authoritative; no live-provider pass is claimed from deployment readiness. Add an explicit opt-in probe to the existing build gate, validate it, then run the real test-property read.
+
 ### Round 63 Phase 1a — secure foundation published; live gate blocked (GPT-6, 2026-10-24)
 
 - Confirmed by Daniele; Phase 1 claimed before code. Building secure client/storage before any host calendar change. Later phases remain gated.

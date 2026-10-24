@@ -133,8 +133,7 @@ service-only RPC with ownership rechecks, compare-and-swap and refresh leases.
 only the narrow service-only definer RPC accesses it. RLS with no policies is
 intentional default deny, not an invitation to grant browser access. Synthetic
 state/permission probes in `scripts/ireservation-state-probe.sql` passed against
-demo and production, in transactions that roll back. The protected CI schema
-lookup must still pass before publication can be described as shipped.
+demo and production, in transactions that roll back. PR #195 CI subsequently passed the protected production schema-drift lookup.\nBackend Phase 1a was published as merge a2332048b27e47a09e6313285b5efc6f2221a54f;\nthe full Phase 1 remains partial until secure provisioning and live API checks pass.
 
 Connection requests carry property_id. Save/verify/disconnect also require the
 current `version` returned by status (`none` for first save). Save takes integer
@@ -154,3 +153,5 @@ against test calendar 330. It requires `IRESERVATION_LIVE_PROBE=true`, the docum
 test identifiers/password and partner/storage keys. It prints counts only and
 never saves reservations. The normal live runner skips this test unless opted
 in; do not interpret a skip as a live API pass. Finish Phase 1 before Phase 2.
+
+Publication evidence: PR #195; full local and PR CI regression 59 passed / 0 failed / 3 prerequisite skips. PR CI live suite 1/0/4 includes a passing production schema-drift check. Post-deployment public route reports integration_disabled (503); local production smoke 2/0/3. The authenticated provider probe remains skipped, not passed. See CHANGELOG for exact run/deployment IDs and skip reasons.

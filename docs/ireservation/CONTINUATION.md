@@ -133,7 +133,9 @@ service-only RPC with ownership rechecks, compare-and-swap and refresh leases.
 only the narrow service-only definer RPC accesses it. RLS with no policies is
 intentional default deny, not an invitation to grant browser access. Synthetic
 state/permission probes in `scripts/ireservation-state-probe.sql` passed against
-demo and production, in transactions that roll back. PR #195 CI subsequently passed the protected production schema-drift lookup.\nBackend Phase 1a was published as merge a2332048b27e47a09e6313285b5efc6f2221a54f;\nthe full Phase 1 remains partial until secure provisioning and live API checks pass.
+demo and production, in transactions that roll back. PR #195 CI subsequently passed the protected production schema-drift lookup.
+Backend Phase 1a was published as merge a2332048b27e47a09e6313285b5efc6f2221a54f;
+the full Phase 1 remains partial until secure provisioning and live API checks pass.
 
 Connection requests carry property_id. Save/verify/disconnect also require the
 current `version` returned by status (`none` for first save). Save takes integer
@@ -155,3 +157,26 @@ never saves reservations. The normal live runner skips this test unless opted
 in; do not interpret a skip as a live API pass. Finish Phase 1 before Phase 2.
 
 Publication evidence: PR #195; full local and PR CI regression 59 passed / 0 failed / 3 prerequisite skips. PR CI live suite 1/0/4 includes a passing production schema-drift check. Post-deployment public route reports integration_disabled (503); local production smoke 2/0/3. The authenticated provider probe remains skipped, not passed. See CHANGELOG for exact run/deployment IDs and skip reasons.
+
+
+### Phase 1b provisioning checkpoint
+
+Vercel team access was authorized, followed by Daniele's explicit approval to
+store partner/test credentials and a generated encryption key as production
+Secrets in project welcomebnb. The variables are now provisioned for Production
+only; `IRESERVATION_ENABLED=false` and `IRESERVATION_WRITES_ENABLED=false` remain.
+A recovery copy of the generated encryption key is held locally in ignored
+`.env.local` with owner-only permissions (0600); no partner/test password was
+written there. Never print or commit that file. Use approved private recovery
+storage when moving development machines.
+
+The repository's `vercel.mjs` config takes precedence over a deployment-level
+build command. The first rebuild therefore did not execute the probe; READY was
+not counted as a provider test pass. `scripts/build-config.mjs` now has an
+explicit `IRESERVATION_BUILD_PROBE=true` opt-in to the shared test-property-only
+`scripts/ireservation-read-probe.mjs`. It uses the existing server role in the
+protected production build without exporting that key. The probe refuses other
+projects/environments/calendars, returns only counts, never modifies reservations,
+and keeps the deployed runtime gate false. Turn the build-probe flag off after
+verification so ordinary builds do not make partner requests. Record the actual
+provider result/deployment before marking Phase 1 complete.

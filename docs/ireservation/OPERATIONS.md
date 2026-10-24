@@ -35,7 +35,8 @@ provider test inventory: use a bounded isolated test window and track cleanup.
 ## Proposed environment variables
 
 These names are consumed by the Phase 1 backend unless marked future/test.
-**None is asserted provisioned on Vercel.**
+Production provisioning was explicitly approved and completed on 24 October;
+verify current metadata without decrypting values before any future changes.
 Server runtime only, with separate Production/Preview/Test values. Never use
 `VITE_`, `NEXT_PUBLIC_`, browser config or build-time string substitution for
 secrets. Avoid per-host env vars: tenant credentials belong in encrypted rows.
@@ -47,6 +48,8 @@ secrets. Avoid per-host env vars: tenant credentials belong in encrypted rows.
 | `IRESERVATION_PARTNER_PASSWORD` | Secret partner initial-auth password |
 | `IRESERVATION_API_KEY` | Secret partner header key |
 | `IRESERVATION_ENC_KEY` | Secret dedicated base64 32-byte AES-256 key for v1; never reuse Alloggiati's key |
+| `IRESERVATION_BUILD_PROBE` | Nonsecret, temporary opt-in for the protected production build; leave `false` after verifying the test property |
+| `IRESERVATION_LIVE_PROBE` | Explicit standalone test-runner opt-in; never globally enables runtime sync |
 | `IRESERVATION_ENC_KEY_ID` | Nonsecret active key version, initially `v1` |
 | `IRESERVATION_ENC_KEY_V2` | Future secret rotation key; keep v1 until every dependent row/token backup is migrated |
 | `IRESERVATION_ENABLED` | Nonsecret global gate, initially `false`; server-enforced |
@@ -213,3 +216,11 @@ conservative 24-hour shared pause. Global auth failures pause auth attempts; a
 Server-only state access is through `public.ireservation_state`; browser roles
 cannot execute it or access its private tables. The safe connection form is still
 a future UI task; no host-facing behavior or live source switch has shipped.
+
+
+Provisioning evidence (24 October): partner username/password/API key, dedicated
+key and test password stored as Production-only sensitive variables following
+explicit user approval. No preview/development values were created. A recovery
+copy of the generated key is in this machine's ignored `.env.local`, mode 0600;
+partner/test passwords are not stored locally. Preserve recovery before key
+rotation or a machine move. The runtime and write gates stay false while testing.

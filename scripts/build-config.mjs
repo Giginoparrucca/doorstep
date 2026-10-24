@@ -21,3 +21,15 @@ if (process.env.ROUND51_HOST_GATE_ORIGIN) {
     ...result, sourceCommit: process.env.VERCEL_GIT_COMMIT_SHA, checkedAt: new Date().toISOString(),
   }));
 }
+// Explicit Round 63 provider probe, run only by an authorized production build.
+// Keep runtime integration disabled; never write secrets/provider payloads to output.
+if (process.env.IRESERVATION_BUILD_PROBE === 'true') {
+  const { runReadProbe } = await import('./ireservation-read-probe.mjs');
+  const { safeError } = await import('../api/_ireservation-core.js');
+  try {
+    const result = await runReadProbe({ ...process.env, IRESERVATION_LIVE_PROBE: 'true' });
+    console.log(`PASS iReservation authorized test-property reads: ${result.rooms} rooms, ${result.distributors} distributors; no reservation or calendar writes`);
+  } catch (error) {
+    throw new Error('iReservation build probe failed: ' + safeError(error).code);
+  }
+}

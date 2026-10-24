@@ -10,7 +10,9 @@ Newest entries at the top of each section.
 ### Round 63 Phase 1b — secure provisioning and provider read gate (GPT-6, 2026-10-24)
 
 - In progress — GPT-6; Daniele approved storing the supplied partner/test credentials and generated encryption key as production Secrets in Vercel project welcomebnb. Team access is now authorized; the earlier 403 blocker is resolved. The initial automatic-review rejection was followed by explicit destination-specific approval before retrying. No secret values are included in this record.
-- Production-only secret/configuration setup succeeded. Native sync and writes remain explicitly disabled. The first rebuild picked up configuration but its project-level build-command override did not execute the provider probe because repository config is authoritative; no live-provider pass is claimed from deployment readiness. Add an explicit opt-in probe to the existing build gate, validate it, then run the real test-property read.
+- Production-only secret/configuration setup succeeded. Native sync and writes remain explicitly disabled. The first rebuild picked up configuration but its project-level build-command override did not execute the provider probe because repository config is authoritative; no live-provider pass is claimed from deployment readiness. Added the shared production/test-calendar-only probe and an explicit build-gate opt-in; real provider execution remains to be verified. A 0600 ignored local recovery copy contains only the generated encryption key, not partner/test passwords.
+
+- Phase 1b full regression: **PASS 60 / FAIL 0 / SKIP 3**, including all eight Chromium suites. Skips: demo origin, private demo catalog and pglast prerequisite. New probe tests cover production/project/test-calendar restrictions, encrypted transient credentials, count-only output and unchanged runtime gate. No authenticated provider pass is claimed until the protected build actually runs the probe. No migration or host calendar change in this subphase.
 
 ### Round 63 Phase 1a — secure foundation published; live gate blocked (GPT-6, 2026-10-24)
 

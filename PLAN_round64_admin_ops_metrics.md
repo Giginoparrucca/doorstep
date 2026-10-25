@@ -17,3 +17,7 @@ Fetch minimal columns through existing admin-authenticated Supabase reads; fully
 ## Phase 1
 
 Implement helper/query loader and table, executable synthetic regressions (deduplication, tenant isolation, cohort/period boundaries, cancellation/blocks, filed/error semantics, pagination and read failure), browser desktop/mobile table and support actions. Run test:all, publish PR, require green CI, merge, verify served assets and test:live. No schema, filing behavior, host or guest UI changes. No owner configuration required. Record real blockers and skips. Roll back via previous deployment/source.
+
+## Release evidence — complete
+
+PR #199 merged as `45f2863fee36412a085fe15ef598fce828fef7f7`. Local and PR CI full regression 64/0/3; all ten browser suites passed. Protected CI live 1/0/4 (production schema-drift passed). Production `dpl_EK1oZUVf1fxPxkGkChrgBEXa19SZ` READY, correct main source and app.welcomebnb.it alias. Admin/helper public assets match tested source exactly and deployed helper passed the fictional 1/1/0 + 1/2 usage case. Local post-release live 2/0/3 with SPOT/tax source and goldens passing. Named skips and limitations are in CHANGELOG. No schema or production data mutations. Phase shipped; final release record is documentation only.

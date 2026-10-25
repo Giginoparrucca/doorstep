@@ -24,6 +24,7 @@ This focused admin Round runs alongside the preserved Round 63 pilot/provider ga
 | Phase | Status | Test gate |
 |---|---|---|
 | 1 — Define, implement and release Ops metrics | shipped — PR #199 — GPT-6 | Synthetic aggregation/loading and browser checks, whole regression, green PR CI, deployment and read-only live smoke. |
+| 2 — Sort and filter Hosts & Properties | in-progress — GPT-6 | User-requested follow-up; keyboard-accessible column sorting, text/city/operational filters, browser/full regression, green PR CI and production verification. |
 
 ### Round 63 Phase 3 — pilot/cutover preparation resumed (GPT-6, 2026-10-24)
 

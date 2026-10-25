@@ -354,6 +354,7 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
 
 <script src="/app-config.js"></script>
 <script src="/app-bootstrap.js"></script>
+<script src="/admin-ops-metrics.js?v=64.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
@@ -364,6 +365,8 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, APP_CONFIG.mode ===
 
 let allEvents = [];
 let allProperties = [];
+let opsMetricsData = null;
+let dataLoadGeneration = 0;
 // Round 33 — api_usage aggregated per property for the current calendar
 // month. Populated by loadData(); read by renderView() to draw the
 // AI Usage card. Shape: { [property_id]: { input, output, chat, scan } }.
@@ -993,6 +996,8 @@ function adminRowClass(row) {
 }
 
 async function loadData() {
+  const generation = ++dataLoadGeneration;
+  const until = new Date().toISOString();
   const days = parseInt(document.getElementById('timeRange').value);
   const since = new Date(Date.now() - days * 86400000).toISOString();
 
@@ -1009,9 +1014,9 @@ async function loadData() {
     return q.is('deleted_at', null);
   };
 
-  let eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes, invitesRes;
+  let eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes, invitesRes, opsRes;
   try {
-    [eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes, invitesRes] = await Promise.all([
+    [eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes, invitesRes, opsRes] = await Promise.all([
       applyHiddenFilter(sb.from('analytics_events').select('*').gte('created_at', since)).order('created_at', { ascending: false }).limit(10000),
       applyHiddenFilter(sb.from('properties').select('*')).order('name'),
       applyHiddenFilter(sb.from('checkins').select('id, property_id, booking_code, surname, name, guest_type, submitted_at, arrival_date, departure_date, nights, is_test, deleted_at')),
@@ -1023,6 +1028,7 @@ async function loadData() {
       sb.from('pilot_hosts').select('*').order('created_at').then(r => r, err => ({ data: [], error: err })),
       // Round 38 — pilot_invites for the invite-only Ops panel.
       sb.from('pilot_invites').select('*').order('invited_at', { ascending: false }).then(r => r, err => ({ data: [], error: err })),
+      AdminOpsMetrics.load(sb, { since, until, showHidden, showTestData }),
     ]);
   } catch (e) {
     console.error('loadData fatal:', e);
@@ -1030,6 +1036,8 @@ async function loadData() {
     return;
   }
 
+  if (generation !== dataLoadGeneration) return;
+  opsMetricsData = opsRes;
   if (eventsRes.error) { document.getElementById('content').innerHTML = `<div class="loading">Error: ${eventsRes.error.message}</div>`; return; }
   if (chatRes && chatRes.error) {
     console.warn('chat_messages query failed (non-fatal — Question Gaps and Concierge Upsell will be empty):', chatRes.error.message || chatRes.error);
@@ -1077,6 +1085,8 @@ async function loadData() {
       if (r.endpoint === 'scan') acc.scan += 1;
     });
   } catch (e) { console.warn('api_usage aggregate exception:', e); }
+
+  if (generation !== dataLoadGeneration) return;
 
   // Populate user dropdown
   const users = [...new Set(allEvents.filter(e => e.user_email).map(e => e.user_email))].sort();
@@ -3400,6 +3410,11 @@ async function deletePilotHost(id, email) {
 
 // ── Hosts & Properties table (support path — viewAsHost() must survive) ─
 function renderHostsPropertiesTable(userStats, userIdToEmail) {
+  const metrics = opsMetricsData ? AdminOpsMetrics.aggregate(opsMetricsData) : new Map();
+  const checkinsAvailable = Array.isArray(opsMetricsData?.checkins);
+  const usageAvailable = checkinsAvailable && Array.isArray(opsMetricsData?.reservations) && Array.isArray(opsMetricsData?.events);
+  const unavailable = '<span title="Metric data unavailable. Refresh to retry.">—</span>';
+
   const hostRowsExisting = allProperties.map(p => {
     const email = p.owner_id ? (userIdToEmail[p.owner_id] || null) : null;
     const stats = email ? (userStats[email] || { sessions: new Set(), events: 0, saves: 0, exports: 0, bookings: 0, firstSeen: null, lastSeen: null }) : { sessions: new Set(), events: 0, saves: 0, exports: 0, bookings: 0, firstSeen: null, lastSeen: null };
@@ -3409,12 +3424,17 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
   const orphanedUsers = Object.entries(userStats).filter(([email]) => !ownedEmails.has(email));
 
   return `<div class="section-title">Hosts &amp; Properties (${allProperties.length})</div>
-    <div style="overflow-x:auto;margin-bottom:24px;">
+    <p style="font-size:0.72rem;color:var(--ink-soft);margin-bottom:6px;">Selected period: ${opsMetricsData ? `${opsMetricsData.since.slice(0, 10)} – ${opsMetricsData.until.slice(0, 10)} (UTC)` : 'unavailable'}. Usage shows active / eligible bookings. Scroll horizontally for all metrics and actions.</p>
+    <details style="font-size:0.72rem;color:var(--ink-soft);line-height:1.6;margin-bottom:12px;"><summary style="cursor:pointer;">How these metrics are counted</summary><p>New metrics use the selected time range. Check-ins completed counts submitted guest records, including companions. Alloggiati sent counts recorded filed guest records, including host manual confirmations; it does not verify a receipt. Failed counts unresolved recorded automatic filing failures; manual failures are not recorded.
+      Guest app usage is bookings arriving in the period through today (UTC) with recorded guest activity in the period / eligible bookings, including those without check-ins. Cancelled bookings, blocks and linked echoes are excluded. Repeated visits count once. Reservations without booking codes count as unused; untracked or expired analytics cannot be measured. Guests remains the existing all-time guest-record count.</p></details>
+    ${!checkinsAvailable || !usageAvailable ? '<p role="status" style="color:var(--amber);font-size:0.75rem;">Some metric data is unavailable. A dash is shown instead of a zero; refresh to retry.</p>' : ''}
+    <div style="overflow-x:auto;margin-bottom:24px;" tabindex="0" role="region" aria-label="Hosts and properties metrics">
     <table class="data-table" style="width:100%;">
-      <thead><tr><th>Property</th><th>Host</th><th>City</th><th>Guests</th><th>Setup</th><th>Activity</th><th>Last Active</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Property</th><th>Host</th><th>City</th><th>Guests</th><th>Check-ins completed</th><th>Alloggiati sent</th><th>Alloggiati failed</th><th>Guest app usage</th><th>Setup</th><th>Activity</th><th>Last Active</th><th>Actions</th></tr></thead>
       <tbody>
         ${hostRowsExisting.sort((a, b) => (b._stats.lastSeen || '').localeCompare(a._stats.lastSeen || '')).map(p => {
           const s = p._stats;
+          const m = metrics.get(p.id) || { completed: 0, sent: 0, failed: 0, used: 0, bookings: 0 };
           const setupScore = [p.wifi_name, p.host_names, p.host_phone, p.address, p.cir_code].filter(Boolean).length;
           const setupPct = Math.round(setupScore / 5 * 100);
           const setupColor = setupPct >= 80 ? 'var(--green)' : setupPct >= 40 ? 'var(--amber)' : 'var(--red)';
@@ -3423,6 +3443,10 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
             <td>${p._email ? `<strong>${p._email.split('@')[0]}</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">${p._email}</span>` : `${p.host_names || '—'}<br><span style="font-size:0.65rem;color:var(--ink-soft)">${p.host_phone || 'No account'}</span>`}</td>
             <td>${p.city || '—'}${p.region ? '<br><span style="font-size:0.65rem;color:var(--ink-soft)">' + p.region + '</span>' : ''}</td>
             <td style="text-align:center;font-weight:600;">${p._checkin_count}</td>
+            <td style="text-align:center;">${checkinsAvailable ? m.completed : unavailable}</td>
+            <td style="text-align:center;">${checkinsAvailable ? m.sent : unavailable}</td>
+            <td style="text-align:center;color:${m.failed ? 'var(--red)' : 'inherit'};">${checkinsAvailable ? m.failed : unavailable}</td>
+            <td style="text-align:center;white-space:nowrap;">${usageAvailable ? (m.bookings ? `<strong>${Math.round(m.used / m.bookings * 100)}%</strong><br><span style="font-size:0.65rem;color:var(--ink-soft);">${m.used} / ${m.bookings} bookings</span>` : '<span title="No eligible bookings arriving in this period">—</span>') : unavailable}</td>
             <td style="text-align:center;"><span style="color:${setupColor};font-weight:600;">${setupPct}%</span></td>
             <td style="font-size:0.72rem;">${s.sessions.size || 0} sess · ${s.saves || 0} saves · ${s.exports || 0} exp</td>
             <td style="font-size:0.72rem;color:var(--ink-soft);">${s.lastSeen ? new Date(s.lastSeen).toLocaleDateString() : '—'}</td>
@@ -3433,11 +3457,11 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
               ${adminRowActions('properties', p)}
             </div></td>
           </tr>`;
-        }).join('') || '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--ink-soft);">No properties yet.</td></tr>'}
+        }).join('') || '<tr><td colspan="12" style="text-align:center;padding:20px;color:var(--ink-soft);">No properties yet.</td></tr>'}
         ${orphanedUsers.map(([email, s]) => `<tr style="opacity:0.55;">
           <td style="font-style:italic;color:var(--ink-soft);">No property</td>
           <td><strong>${email.split('@')[0]}</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">${email}</span></td>
-          <td>—</td><td style="text-align:center;">0</td><td>—</td>
+          <td>—</td><td style="text-align:center;">0</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
           <td style="font-size:0.72rem;">${s.sessions.size} sess · ${s.saves} saves</td>
           <td style="font-size:0.72rem;color:var(--ink-soft);">${new Date(s.lastSeen).toLocaleDateString()}</td>
           <td><button onclick="document.getElementById('userFilter').value='${email}';setActiveTab('deepdive');" style="padding:4px 8px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.65rem;cursor:pointer;color:var(--warm);">📊</button></td>

@@ -21,3 +21,9 @@ Implement helper/query loader and table, executable synthetic regressions (dedup
 ## Release evidence — complete
 
 PR #199 merged as `45f2863fee36412a085fe15ef598fce828fef7f7`. Local and PR CI full regression 64/0/3; all ten browser suites passed. Protected CI live 1/0/4 (production schema-drift passed). Production `dpl_EK1oZUVf1fxPxkGkChrgBEXa19SZ` READY, correct main source and app.welcomebnb.it alias. Admin/helper public assets match tested source exactly and deployed helper passed the fictional 1/1/0 + 1/2 usage case. Local post-release live 2/0/3 with SPOT/tax source and goldens passing. Named skips and limitations are in CHANGELOG. No schema or production data mutations. Phase shipped; final release record is documentation only.
+
+## Phase 2 — Sort and filter Hosts & Properties
+
+Requested directly by Daniele after Phase 1 release. Add ascending/descending sorting on every data column (Actions excluded), with numeric/date sorting and missing values last. Preserve default newest-activity-first order. Add search by property/host/city/id, city filter and operational filters for filing failures, no/low guest usage, incomplete setup, missing metrics and accounts without properties. Compose filters, show visible/total row counts and a clear empty state, provide Reset. Preserve table state across tab switches, refresh and period/test/hidden changes within the page session; do not refetch data while sorting/filtering. Keep support actions and mobile horizontal scrolling. Keyboard-accessible buttons and aria-sort expose sort direction. Reuse existing data only; no database or filing changes.
+
+Gate: synthetic sort/filter regressions plus desktop/mobile actual-renderer interactions, including null vs zero, numeric ordering, combined filters, no-property rows, safe search, reset, refresh persistence and Console action. Full test:all, green PR CI, exact production source verification and read-only test:live before marking shipped.

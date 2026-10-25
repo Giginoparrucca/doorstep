@@ -355,6 +355,7 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
 <script src="/app-config.js"></script>
 <script src="/app-bootstrap.js"></script>
 <script src="/admin-ops-metrics.js?v=64.1"></script>
+<script src="/admin-ops-table.js?v=64.2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
@@ -3061,6 +3062,7 @@ function renderOpsTab() {
     renderOpsEventLog();
 
   document.getElementById('content').innerHTML = html;
+  AdminOpsTable.mount(document.getElementById('content'));
 
   // Deferred subview loaders (same pattern the deep-dive tab uses).
   setTimeout(loadRetentionLog, 0);
@@ -3413,6 +3415,9 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
   const metrics = opsMetricsData ? AdminOpsMetrics.aggregate(opsMetricsData) : new Map();
   const checkinsAvailable = Array.isArray(opsMetricsData?.checkins);
   const usageAvailable = checkinsAvailable && Array.isArray(opsMetricsData?.reservations) && Array.isArray(opsMetricsData?.events);
+  const attrs = row => ` data-ops-row="${escapeHtml(JSON.stringify(row))}"`;
+  const timestamp = value => Number.isFinite(Date.parse(value)) ? Date.parse(value) : null;
+  const heading = (key, label) => `<th scope="col" aria-sort="none"><button type="button" data-ops-sort="${key}" style="border:0;background:transparent;color:inherit;font:inherit;text-transform:inherit;letter-spacing:inherit;cursor:pointer;padding:0;text-align:inherit;">${label}<span data-ops-arrow aria-hidden="true"> ↕</span></button></th>`;
   const unavailable = '<span title="Metric data unavailable. Refresh to retry.">—</span>';
 
   const hostRowsExisting = allProperties.map(p => {
@@ -3423,14 +3428,24 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
   const ownedEmails = new Set(hostRowsExisting.map(h => h._email).filter(Boolean));
   const orphanedUsers = Object.entries(userStats).filter(([email]) => !ownedEmails.has(email));
 
-  return `<div class="section-title">Hosts &amp; Properties (${allProperties.length})</div>
+  return `<section id="opsHostsProperties" aria-label="Hosts and properties">
+    <div class="section-title">Hosts &amp; Properties (${allProperties.length})</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:10px;font-size:0.75rem;">
+      <label style="display:grid;gap:4px;flex:1 1 220px;">Search<input data-ops-search type="search" placeholder="Property, host, city or ID" style="font:inherit;padding:8px;min-width:0;border:1px solid var(--border);border-radius:6px;"></label>
+      <label style="display:grid;gap:4px;">City<select data-ops-city aria-label="City" style="font:inherit;padding:8px;max-width:100%;border:1px solid var(--border);border-radius:6px;"><option value="all">All cities</option></select></label>
+      <label style="display:grid;gap:4px;">Show<select data-ops-filter aria-label="Show" style="font:inherit;padding:8px;max-width:100%;border:1px solid var(--border);border-radius:6px;">
+        <option value="all">All rows</option><option value="failures">Alloggiati failures</option><option value="no_usage">No guest app usage (0%)</option><option value="low_usage">Low guest app usage (&lt;50%)</option><option value="no_bookings">No eligible bookings</option><option value="setup">Incomplete setup (&lt;80%)</option><option value="unavailable">Metrics unavailable</option><option value="no_property">Accounts without properties</option>
+      </select></label>
+      <button type="button" data-ops-reset style="font:inherit;padding:8px 12px;border:1px solid var(--border);border-radius:6px;cursor:pointer;">Reset</button>
+    </div>
+    <p data-ops-count aria-live="polite" style="font-size:0.72rem;color:var(--ink-soft);"></p>
     <p style="font-size:0.72rem;color:var(--ink-soft);margin-bottom:6px;">Selected period: ${opsMetricsData ? `${opsMetricsData.since.slice(0, 10)} – ${opsMetricsData.until.slice(0, 10)} (UTC)` : 'unavailable'}. Usage shows active / eligible bookings. Scroll horizontally for all metrics and actions.</p>
     <details style="font-size:0.72rem;color:var(--ink-soft);line-height:1.6;margin-bottom:12px;"><summary style="cursor:pointer;">How these metrics are counted</summary><p>New metrics use the selected time range. Check-ins completed counts submitted guest records, including companions. Alloggiati sent counts recorded filed guest records, including host manual confirmations; it does not verify a receipt. Failed counts unresolved recorded automatic filing failures; manual failures are not recorded.
       Guest app usage is bookings arriving in the period through today (UTC) with recorded guest activity in the period / eligible bookings, including those without check-ins. Cancelled bookings, blocks and linked echoes are excluded. Repeated visits count once. Reservations without booking codes count as unused; untracked or expired analytics cannot be measured. Guests remains the existing all-time guest-record count.</p></details>
     ${!checkinsAvailable || !usageAvailable ? '<p role="status" style="color:var(--amber);font-size:0.75rem;">Some metric data is unavailable. A dash is shown instead of a zero; refresh to retry.</p>' : ''}
     <div style="overflow-x:auto;margin-bottom:24px;" tabindex="0" role="region" aria-label="Hosts and properties metrics">
     <table class="data-table" style="width:100%;">
-      <thead><tr><th>Property</th><th>Host</th><th>City</th><th>Guests</th><th>Check-ins completed</th><th>Alloggiati sent</th><th>Alloggiati failed</th><th>Guest app usage</th><th>Setup</th><th>Activity</th><th>Last Active</th><th>Actions</th></tr></thead>
+      <thead><tr>${[['property','Property'],['host','Host'],['city','City'],['guests','Guests'],['completed','Check-ins completed'],['sent','Alloggiati sent'],['failed','Alloggiati failed'],['usage','Guest app usage'],['setup','Setup'],['activity','Activity (sessions)'],['lastActive','Last Active']].map(([key, label]) => heading(key, label)).join('')}<th scope="col">Actions</th></tr></thead>
       <tbody>
         ${hostRowsExisting.sort((a, b) => (b._stats.lastSeen || '').localeCompare(a._stats.lastSeen || '')).map(p => {
           const s = p._stats;
@@ -3438,7 +3453,7 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
           const setupScore = [p.wifi_name, p.host_names, p.host_phone, p.address, p.cir_code].filter(Boolean).length;
           const setupPct = Math.round(setupScore / 5 * 100);
           const setupColor = setupPct >= 80 ? 'var(--green)' : setupPct >= 40 ? 'var(--amber)' : 'var(--red)';
-          return `<tr class="${adminRowClass(p)}">
+          return `<tr class="${adminRowClass(p)}"${attrs({propertyId:p.id,property:p.name || 'Unnamed',host:p._email || p.host_names || null,city:p.city || null,guests:p._checkin_count ?? 0,completed:checkinsAvailable ? m.completed : null,sent:checkinsAvailable ? m.sent : null,failed:checkinsAvailable ? m.failed : null,usage:usageAvailable && m.bookings ? m.used / m.bookings : null,hasBookings:usageAvailable ? m.bookings > 0 : null,setup:setupPct,activity:s.sessions.size || 0,lastActive:timestamp(s.lastSeen),missingMetrics:!checkinsAvailable || !usageAvailable,search:[p.name,p.id,p._email,p.host_names,p.host_phone,p.city,p.region].filter(Boolean).join(' ')})}>
             <td><strong>${p.name || 'Unnamed'}</strong><br>${copyableId(p.id, 'Property id')}</td>
             <td>${p._email ? `<strong>${p._email.split('@')[0]}</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">${p._email}</span>` : `${p.host_names || '—'}<br><span style="font-size:0.65rem;color:var(--ink-soft)">${p.host_phone || 'No account'}</span>`}</td>
             <td>${p.city || '—'}${p.region ? '<br><span style="font-size:0.65rem;color:var(--ink-soft)">' + p.region + '</span>' : ''}</td>
@@ -3457,8 +3472,8 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
               ${adminRowActions('properties', p)}
             </div></td>
           </tr>`;
-        }).join('') || '<tr><td colspan="12" style="text-align:center;padding:20px;color:var(--ink-soft);">No properties yet.</td></tr>'}
-        ${orphanedUsers.map(([email, s]) => `<tr style="opacity:0.55;">
+        }).join('')}
+        ${orphanedUsers.map(([email, s]) => `<tr style="opacity:0.55;"${attrs({propertyId:null,property:'No property',host:email,city:null,guests:0,completed:null,sent:null,failed:null,usage:null,hasBookings:null,setup:null,activity:s.sessions.size,lastActive:timestamp(s.lastSeen),search:email+' No property'})}>
           <td style="font-style:italic;color:var(--ink-soft);">No property</td>
           <td><strong>${email.split('@')[0]}</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">${email}</span></td>
           <td>—</td><td style="text-align:center;">0</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
@@ -3466,8 +3481,9 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
           <td style="font-size:0.72rem;color:var(--ink-soft);">${new Date(s.lastSeen).toLocaleDateString()}</td>
           <td><button onclick="document.getElementById('userFilter').value='${email}';setActiveTab('deepdive');" style="padding:4px 8px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.65rem;cursor:pointer;color:var(--warm);">📊</button></td>
         </tr>`).join('')}
+        <tr data-ops-empty hidden><td colspan="12" style="text-align:center;padding:20px;color:var(--ink-soft);">No hosts or properties match these filters.</td></tr>
       </tbody>
-    </table></div>`;
+    </table></div></section>`;
 }
 
 function renderRetentionSection() {

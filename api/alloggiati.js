@@ -1,3 +1,4 @@
+import { handleAlloggiatiSupport, redactSupport } from './_alloggiati-support.js';
 import { runTestCleanup } from './send-arrival-reminders.js';
 import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, rejectDemoIntegration, IS_DEMO } from './_environment.js';
 // api/alloggiati.js — Round 44 Phase 0.5
@@ -539,7 +540,7 @@ async function processPropertyAutofile(prop) {
         propertyId: prop.id, trigger: 'autofile',
         checkinIds: batchCheckinIds, outcome: 'test_rejected',
         errorCode: 'validation_failed',
-        errorDetail: (testOutcome.perRow || []).filter(r => !r.ok).slice(0, 5).map(r => r.erroreDes || r.code).join(' | '),
+        errorDetail: redactSupport((testOutcome.perRow || []).map((r, i) => ({ ...r, checkinId: batchCheckinIds[i] })).filter(r => !r.ok).slice(0, 5).map(r => [r.checkinId, r.erroreDes || r.code, r.erroreDet].filter(Boolean).join(': ')).join(' | '), toFile.map(row => row.document_number)),
       });
       summary.errors += batchCheckinIds.length;
       return summary;
@@ -1039,6 +1040,8 @@ export default async function handler(req, res) {
   const body = req.body || {};
   const propertyId = String(body.property_id || '').trim();
 
+  if (action.startsWith('support_')) return await handleAlloggiatiSupport(req, res, { url: SUPABASE_URL, anonKey: SUPABASE_ANON_KEY, serviceKey: SERVICE_KEY, get: sbGet, allog: AllogRecords, decrypt: decryptCredentials, generateToken, authenticationTest, test: soapTest });
+
   const owner = await resolveHostAndProperty(req, propertyId);
   if (owner.error) return res.status(owner.error.status).json(owner.error.body);
 
@@ -1318,7 +1321,7 @@ export default async function handler(req, res) {
         ok: false,
         error_code: r.code,
         errore_cod: r.erroreCod,
-        error_message: r.erroreDes || 'Row rejected',
+        error_message: r.erroreDes || 'Row rejected', error_detail: r.erroreDet || '',
       };
     });
 
@@ -1420,12 +1423,17 @@ export default async function handler(req, res) {
 
     // ── Mint a fresh token ───────────────────────────────────────
     let token;
+    const recordHostFailure = async (outcome, errorCode, detail) => logFiling({
+      propertyId, trigger: 'host', checkinIds: checkinIdsFlat, outcome,
+      errorCode, errorDetail: redactSupport(detail, [creds.utente, creds.password, creds.wskey, token, ...lines.map(line => line.slice(139, 159).trim())]), actor: owner.hostId,
+    });
     try {
       const t = await generateToken(creds);
       token = t.token;
     } catch (e) {
       const portalMsg = e.message || 'Alloggiati portal rejected the credentials';
       console.warn('[alloggiati] send: GenerateToken failed:', e.code, portalMsg);
+      await recordHostFailure('generate_token_failed', e.code || 'portal_error', portalMsg);
       return res.status(200).json({ ok: false, error: portalMsg, error_code: e.code || 'portal_error' });
     }
 
@@ -1436,19 +1444,21 @@ export default async function handler(req, res) {
     } catch (e) {
       const portalMsg = e.message || 'Alloggiati Test failed';
       console.warn('[alloggiati] send: Test failed:', e.code, portalMsg);
+      await recordHostFailure('test_transport_error', e.code || 'portal_error', portalMsg);
       return res.status(200).json({ ok: false, error: portalMsg, error_code: e.code || 'portal_error' });
     }
     const failedInTest = (testOutcome.perRow || [])
       .map((r, i) => ({ idx: i + 1, r }))
       .filter(x => !x.r.ok);
     if (failedInTest.length > 0) {
+      await recordHostFailure('test_rejected', 'validation_failed', failedInTest.slice(0, 5).map(({idx,r}) => [rowsIn[idx - 1].checkin_ids.join(','), r.erroreDes || r.code, r.erroreDet].filter(Boolean).join(': ')).join(' | '));
       return res.status(200).json({
         ok: false,
         error: 'One or more rows would be rejected by Alloggiati — nothing was filed.',
         error_code: 'validation_failed',
         per_row: (testOutcome.perRow || []).map((r, i) => r.ok
           ? { idx: i + 1, ok: true }
-          : { idx: i + 1, ok: false, error_code: r.code, errore_cod: r.erroreCod, error_message: r.erroreDes || 'Row rejected' }),
+          : { idx: i + 1, ok: false, error_code: r.code, errore_cod: r.erroreCod, error_message: r.erroreDes || 'Row rejected', error_detail: r.erroreDet || '' }),
       });
     }
 
@@ -1459,6 +1469,7 @@ export default async function handler(req, res) {
     } catch (e) {
       const portalMsg = e.message || 'Alloggiati Send failed';
       console.warn('[alloggiati] send: Send failed:', e.code, portalMsg);
+      await recordHostFailure('send_transport_error', e.code || 'portal_error', portalMsg);
       return res.status(200).json({ ok: false, error: portalMsg, error_code: e.code || 'portal_error' });
     }
     // If overall Send failed OR any row was rejected (shouldn't
@@ -1466,6 +1477,7 @@ export default async function handler(req, res) {
     // calls), do NOT stamp any check-ins — the batch is in an
     // ambiguous state and the host needs to check the portal.
     if (!sendOutcome.overall.ok) {
+      await recordHostFailure('send_rejected', sendOutcome.overall.code || 'portal_error', [sendOutcome.overall.erroreDes, sendOutcome.overall.erroreDet].filter(Boolean).join(': '));
       return res.status(200).json({
         ok: false,
         error: sendOutcome.overall.erroreDes || 'Alloggiati Send rejected the batch',
@@ -1474,6 +1486,7 @@ export default async function handler(req, res) {
     }
     const sendFailures = (sendOutcome.perRow || []).filter(r => !r.ok);
     if (sendFailures.length > 0) {
+      await recordHostFailure('send_partial', 'send_partial', sendFailures.slice(0, 5).map(r => [r.erroreDes || r.code, r.erroreDet].filter(Boolean).join(': ')).join(' | '));
       console.error('[alloggiati] send: post-Test per-row failure — batch left un-stamped for manual review', sendFailures);
       return res.status(200).json({
         ok: false,
@@ -1481,7 +1494,7 @@ export default async function handler(req, res) {
         error_code: 'send_partial',
         per_row: (sendOutcome.perRow || []).map((r, i) => r.ok
           ? { idx: i + 1, ok: true }
-          : { idx: i + 1, ok: false, error_code: r.code, errore_cod: r.erroreCod, error_message: r.erroreDes || 'Row rejected' }),
+          : { idx: i + 1, ok: false, error_code: r.code, errore_cod: r.erroreCod, error_message: r.erroreDes || 'Row rejected', error_detail: r.erroreDet || '' }),
       });
     }
 

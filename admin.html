@@ -356,6 +356,7 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
 <script src="/app-bootstrap.js"></script>
 <script src="/admin-ops-metrics.js?v=64.1"></script>
 <script src="/admin-ops-table.js?v=64.2"></script>
+<script src="/admin-alloggiati-support.js?v=64.3"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
@@ -3411,6 +3412,12 @@ async function deletePilotHost(id, email) {
 }
 
 // ── Hosts & Properties table (support path — viewAsHost() must survive) ─
+async function showAlloggiatiSupport(propertyId) {
+  const property = allProperties.find(row => row.id === propertyId);
+  if (!property) return;
+  await AdminAlloggiatiSupport.open({ propertyId, name: property.name, client: sb, onConsole: viewAsHost });
+}
+
 function renderHostsPropertiesTable(userStats, userIdToEmail) {
   const metrics = opsMetricsData ? AdminOpsMetrics.aggregate(opsMetricsData) : new Map();
   const checkinsAvailable = Array.isArray(opsMetricsData?.checkins);
@@ -3440,7 +3447,7 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
     </div>
     <p data-ops-count aria-live="polite" style="font-size:0.72rem;color:var(--ink-soft);"></p>
     <p style="font-size:0.72rem;color:var(--ink-soft);margin-bottom:6px;">Selected period: ${opsMetricsData ? `${opsMetricsData.since.slice(0, 10)} – ${opsMetricsData.until.slice(0, 10)} (UTC)` : 'unavailable'}. Usage shows active / eligible bookings. Scroll horizontally for all metrics and actions.</p>
-    <details style="font-size:0.72rem;color:var(--ink-soft);line-height:1.6;margin-bottom:12px;"><summary style="cursor:pointer;">How these metrics are counted</summary><p>New metrics use the selected time range. Check-ins completed counts submitted guest records, including companions. Alloggiati sent counts recorded filed guest records, including host manual confirmations; it does not verify a receipt. Failed counts unresolved recorded automatic filing failures; manual failures are not recorded.
+    <details style="font-size:0.72rem;color:var(--ink-soft);line-height:1.6;margin-bottom:12px;"><summary style="cursor:pointer;">How these metrics are counted</summary><p>New metrics use the selected time range. Check-ins completed counts submitted guest records, including companions. Alloggiati sent counts recorded filed guest records, including host manual confirmations; it does not verify a receipt. Failed counts unresolved recorded automatic filing failures. Manual portal-stage failures appear in Alloggiati support history from the support release onward, but are not included in this counter.
       Guest app usage is bookings arriving in the period through today (UTC) with recorded guest activity in the period / eligible bookings, including those without check-ins. Cancelled bookings, blocks and linked echoes are excluded. Repeated visits count once. Reservations without booking codes count as unused; untracked or expired analytics cannot be measured. Guests remains the existing all-time guest-record count.</p></details>
     ${!checkinsAvailable || !usageAvailable ? '<p role="status" style="color:var(--amber);font-size:0.75rem;">Some metric data is unavailable. A dash is shown instead of a zero; refresh to retry.</p>' : ''}
     <div style="overflow-x:auto;margin-bottom:24px;" tabindex="0" role="region" aria-label="Hosts and properties metrics">
@@ -3460,12 +3467,13 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
             <td style="text-align:center;font-weight:600;">${p._checkin_count}</td>
             <td style="text-align:center;">${checkinsAvailable ? m.completed : unavailable}</td>
             <td style="text-align:center;">${checkinsAvailable ? m.sent : unavailable}</td>
-            <td style="text-align:center;color:${m.failed ? 'var(--red)' : 'inherit'};">${checkinsAvailable ? m.failed : unavailable}</td>
+            <td style="text-align:center;color:${m.failed ? 'var(--red)' : 'inherit'};">${checkinsAvailable ? (m.failed ? `<button type="button" onclick="showAlloggiatiSupport('${p.id}')" title="Diagnose Alloggiati failures" style="border:0;background:transparent;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;">${m.failed}</button>` : m.failed) : unavailable}</td>
             <td style="text-align:center;white-space:nowrap;">${usageAvailable ? (m.bookings ? `<strong>${Math.round(m.used / m.bookings * 100)}%</strong><br><span style="font-size:0.65rem;color:var(--ink-soft);">${m.used} / ${m.bookings} bookings</span>` : '<span title="No eligible bookings arriving in this period">—</span>') : unavailable}</td>
             <td style="text-align:center;"><span style="color:${setupColor};font-weight:600;">${setupPct}%</span></td>
             <td style="font-size:0.72rem;">${s.sessions.size || 0} sess · ${s.saves || 0} saves · ${s.exports || 0} exp</td>
             <td style="font-size:0.72rem;color:var(--ink-soft);">${s.lastSeen ? new Date(s.lastSeen).toLocaleDateString() : '—'}</td>
             <td><div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
+              <button type="button" onclick="showAlloggiatiSupport('${p.id}')" style="padding:4px 8px;background:#fff;color:#005BFF;border:1px solid #005BFF;border-radius:4px;font-size:0.65rem;cursor:pointer;">Alloggiati support</button>
               <button onclick="viewAsHost('${p.id}')" style="padding:4px 8px;background:#005BFF;color:#fff;border:none;border-radius:4px;font-size:0.65rem;cursor:pointer;white-space:nowrap;">👁 Console</button>
               <a href="${APP_CONFIG.appOrigin}/?p=${encodeURIComponent(p.id)}" target="_blank" style="padding:4px 8px;background:#6B7A90;color:#fff;border-radius:4px;font-size:0.65rem;text-decoration:none;white-space:nowrap;">👁 Guest app</a>
               ${p._email ? `<button onclick="document.getElementById('userFilter').value='${p._email}';setActiveTab('deepdive');" style="padding:4px 8px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.65rem;cursor:pointer;color:var(--warm);font-weight:500;white-space:nowrap;">📊</button>` : ''}

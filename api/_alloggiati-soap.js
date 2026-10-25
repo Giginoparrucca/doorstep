@@ -271,6 +271,7 @@ export async function test({ utente, token, rows }, opts = {}) {
       code: overallResult.code,
       erroreCod: overallResult.erroreCod,
       erroreDes: overallResult.erroreDes,
+      erroreDet: overallResult.erroreDet,
     },
     perRow,
   };
@@ -321,6 +322,7 @@ export async function send({ utente, token, rows }, opts = {}) {
       code: overallResult.code,
       erroreCod: overallResult.erroreCod,
       erroreDes: overallResult.erroreDes,
+      erroreDet: overallResult.erroreDet,
     },
     perRow,
   };
@@ -395,12 +397,14 @@ function extractDettaglio(xml) {
     const esito = pickTag(body, 'esito').toLowerCase();
     const erroreCod = parseInt(pickTag(body, 'ErroreCod') || '0', 10) || 0;
     const erroreDes = pickTag(body, 'ErroreDes');
+    const erroreDet = pickTag(body, 'ErroreDettaglio');
     const ok = esito === 'true' && erroreCod === 0;
     out.push({
       ok,
       code: KNOWN_CODES[erroreCod] || (ok ? 'ok' : 'row_rejected'),
       erroreCod,
       erroreDes,
+      erroreDet,
     });
   }
   return out;

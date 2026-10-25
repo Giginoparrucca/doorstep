@@ -7,6 +7,15 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Round 64 — Admin Ops metrics (confirmed 2026-10-25)
+
+Daniele approved the recap and implementation. Specification: `PLAN_round64_admin_ops_metrics.md`.
+This focused admin Round runs alongside the preserved Round 63 pilot/provider gate; its ownership and pending phases are unchanged.
+
+| Phase | Status | Test gate |
+|---|---|---|
+| 1 — Define, implement and release Ops metrics | in-progress — GPT-6 | Synthetic aggregation/loading and browser checks, whole regression, green PR CI, deployment and read-only live smoke. |
+
 ### Round 63 Phase 3 — pilot/cutover preparation resumed (GPT-6, 2026-10-24)
 
 - Resumed after the tax-season follow-up at Daniele's request. Claiming Phase 3 before further work; secure manual comparison remains the only enabled native behavior. Read-only production state check confirms no configured real-property connection, mapping or pilot comparison yet. Prepared `docs/ireservation/PROVIDER_QUESTIONS.md` (reviewable Italian draft, not sent) and `PILOT.md` (owner setup, immutable comparison review, private evidence template and single-writer/cancellation/rollback gates). Indexed in docs/README and continuation. Awaiting selected pilot property and owner setup; provider contract answers still required before activation. No native writer, migration, scheduler, routing change or booking mutation in this checkpoint. Documentation links/secret scan and main publication verification only; prior shipped runtime test evidence remains unchanged, no new runtime test pass claimed. Phase 3 is not shipped.

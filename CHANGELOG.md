@@ -17,7 +17,10 @@ This focused admin Round runs alongside the preserved Round 63 pilot/provider ga
 - Daniele requested this direct follow-up. Every data column now sorts ascending/descending via keyboard-accessible header buttons with aria-sort; numeric counts, raw usage ratios and activity timestamps sort by value, and unavailable metrics stay last in both directions. Actions remain available.
 - Added combined property/host/city/id search, city dropdown and operational filters for Alloggiati failures, zero/low usage, no eligible bookings, incomplete setup, missing metrics and accounts without properties. Visible/total row count, explicit empty state and Reset. Selections and sort survive refresh, period/visibility changes and tab switches within the page session. Filtering/sorting uses loaded rows and makes no additional requests or data mutations.
 - Pure selection regressions and actual admin-renderer/SDK browser checks at 390/1440px pass, including 12-vs-2 ordering, unknown-vs-zero, compound filters, safe search, keyboard Enter, reset, persistence, viewport fit and Console action. Screenshots reviewed. Final full local regression: **PASS 65 / FAIL 0 / SKIP 3**, including all ten browser suites. Skips: absent demo origin, private demo catalog and pglast prerequisite. During development, corrected a fixture tie-order expectation and made dropdown accessible names explicit after browser checks caught them; no failed check is claimed as passing.
-- PR CI, publication and production verification pending at this checkpoint. No schema, guest/host flow or metric-definition changes.
+- Released [PR #200](https://github.com/Giginoparrucca/doorstep/pull/200), tested head `1800a424673ada4c1f1e929bb741f5f6d084d706`, main merge `92ba95a37e85b573f5630c08781464d6f78845f0`. Connected GitHub publication preserves claim/implementation history; fresh main tree `6566fc3122378ec772cbd42a2b71419581e0f362` exactly matches tested source.
+- PR CI run `40183574082`, job `121139532459`: **test:all PASS 65 / FAIL 0 / SKIP 3**; protected **test:live PASS 1 / FAIL 0 / SKIP 4**, production schema-drift passed. CI live skips: absent demo origin, provider opt-in, SPOT origin, tax origin. No migration.
+- Production `dpl_rH8Qxsck2yYejcLFBZUqXR4NiVBS` READY at the main merge with `app.welcomebnb.it` alias verified. Public admin, metrics and new table-controller bytes exactly match tested source. The deployed controller passes fictional numeric ascending/descending, unknown-last, compound city/failure and zero-usage filters. No real production guest reads/writes or authenticated real-admin browser session was used.
+- Post-release read-only live suite **PASS 2 / FAIL 0 / SKIP 3**: deployed SPOT/tax source and goldens passed. Local skips: demo origin, service-role key, explicitly unconfigured provider probe; protected CI separately passed schema-drift. Phase shipped. Refresh Admin → Ops; click data headers, combine Search / City / Show, and use Reset to restore default last-active ordering. No schema, guest/host flow or metric-definition changes. Final release record changes only documentation.
 
 #### Phase 1 — metrics release (preserved)
 
@@ -34,7 +37,7 @@ This focused admin Round runs alongside the preserved Round 63 pilot/provider ga
 | Phase | Status | Test gate |
 |---|---|---|
 | 1 — Define, implement and release Ops metrics | shipped — PR #199 — GPT-6 | Synthetic aggregation/loading and browser checks, whole regression, green PR CI, deployment and read-only live smoke. |
-| 2 — Sort and filter Hosts & Properties | in-progress — GPT-6 | User-requested follow-up; keyboard-accessible column sorting, text/city/operational filters, browser/full regression, green PR CI and production verification. |
+| 2 — Sort and filter Hosts & Properties | shipped — PR #200 — GPT-6 | User-requested follow-up; keyboard-accessible column sorting, text/city/operational filters, browser/full regression, green PR CI and production verification. |
 
 ### Round 63 Phase 3 — pilot/cutover preparation resumed (GPT-6, 2026-10-24)
 

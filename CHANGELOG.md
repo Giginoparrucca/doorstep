@@ -7,6 +7,21 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Round 64 — Admin Ops metrics (confirmed 2026-10-25)
+
+Daniele approved the recap and implementation. Specification: `PLAN_round64_admin_ops_metrics.md`.
+This focused admin Round runs alongside the preserved Round 63 pilot/provider gate; its ownership and pending phases are unchanged.
+
+- Implemented per-property completed check-ins (submitted guest rows), sent (current recorded filed rows, including manual host confirmation), unresolved recorded automatic filing failures, and guest app usage with numerator/denominator. The selected period is explicit; booking cohort includes reservations without check-ins and standalone check-in codes. Cancelled bookings, blocks, covered echoes and future arrivals are excluded. Bookings without codes count as unused; repeated sessions/companions do not inflate usage. Manual submission failures are not persisted by the existing backend and are explicitly outside the recorded-failure figure.
+- Added minimal-column, stable-id paginated admin reads with existing test/hidden filters. Failed sources render unavailable dashes and a retry note instead of zero. Existing support actions remain; mobile table scrolls, counting definitions are collapsed. No schema, filing behavior, host/guest flow or production data mutation.
+- Synthetic unit/transport checks and actual browser SDK/table at 390/1440px pass, including failures and Console action; screenshots reviewed. Final full regression: **PASS 64 / FAIL 0 / SKIP 3**, all ten browser suites passed. Skips: hosted demo origin absent, private demo catalog absent, pglast prerequisite absent. Initial full run had a new fixture charset mismatch (fixed in test HTML) and an unrelated regional browser timeout; isolated regional rerun passed all four viewport/language cases and final whole suite passed. No failed run is claimed as passing.
+- Publication, green PR CI, production asset match and post-deployment live smoke remain pending at this checkpoint.
+
+
+| Phase | Status | Test gate |
+|---|---|---|
+| 1 — Define, implement and release Ops metrics | in-progress — GPT-6 | Synthetic aggregation/loading and browser checks, whole regression, green PR CI, deployment and read-only live smoke. |
+
 ### Round 63 Phase 3 — pilot/cutover preparation resumed (GPT-6, 2026-10-24)
 
 - Resumed after the tax-season follow-up at Daniele's request. Claiming Phase 3 before further work; secure manual comparison remains the only enabled native behavior. Read-only production state check confirms no configured real-property connection, mapping or pilot comparison yet. Prepared `docs/ireservation/PROVIDER_QUESTIONS.md` (reviewable Italian draft, not sent) and `PILOT.md` (owner setup, immutable comparison review, private evidence template and single-writer/cancellation/rollback gates). Indexed in docs/README and continuation. Awaiting selected pilot property and owner setup; provider contract answers still required before activation. No native writer, migration, scheduler, routing change or booking mutation in this checkpoint. Documentation links/secret scan and main publication verification only; prior shipped runtime test evidence remains unchanged, no new runtime test pass claimed. Phase 3 is not shipped.

@@ -1,0 +1,25 @@
+{
+  "overall": {
+    "ok": true,
+    "code": "ok",
+    "erroreCod": 0,
+    "erroreDes": "",
+    "erroreDet": ""
+  },
+  "perRow": [
+    {
+      "ok": false,
+      "code": "row_rejected",
+      "erroreCod": 12,
+      "erroreDes": "SCHEDINA_CAMPO_NON_CORRETTO",
+      "erroreDet": "Data di Arrivo Errata"
+    },
+    {
+      "ok": false,
+      "code": "row_rejected",
+      "erroreCod": 12,
+      "erroreDes": "SCHEDINA_CAMPO_NON_CORRETTO",
+      "erroreDet": "Data di Arrivo Errata"
+    }
+  ]
+}

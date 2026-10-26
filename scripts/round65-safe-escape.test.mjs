@@ -27,6 +27,8 @@ for(const name of ['index.html','admin.html']){
  assert.ok(changed?.includes('rel="noopener noreferrer"'));
 }
 const headers=deploymentConfig({}).headers;assert.ok(headers.some(r=>r.source==='/(.*)'&&JSON.stringify(r.headers)===JSON.stringify(securityHeaders)));
+assert.ok(deploymentConfig({}).rewrites.some(r=>r.source==='/api/csp-report'&&r.destination==='/api/guest?csp_report=1'));
+assert.ok(fs.readdirSync(new URL('../api/',import.meta.url)).filter(n=>n.endsWith('.js')&&!n.startsWith('_')).length<=12,'current hosting function budget');
 assert.ok(headers.some(r=>r.source==='/app-config.js'),'existing cache policy retained');
 assert.ok(resourcePolicy.includes('report-uri /api/csp-report'));assert.ok(resourcePolicy.includes('wss://*.supabase.co'));
 assert.ok(!securityHeaders.find(x=>x.key==='Content-Security-Policy').value.includes('script-src'),'resource restriction remains report-only');

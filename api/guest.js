@@ -1,4 +1,5 @@
 import { rejectInvalidEnvironment, SUPABASE_URL } from './_environment.js';
+import handleCspReport from './_csp-report.js';
 // api/guest.js — Round 34 chat gateway + Round 48 guest gateway.
 //
 // Round 48 Phase 2 renamed api/guest-chat.js → api/guest.js and
@@ -105,6 +106,9 @@ const HISTORY_LIMIT = 50;
 const POLL_LIMIT    = 5;
 
 export default async function handler(req, res) {
+  // Public, diagnostics-only rewrite; no guest action or database access.
+  // Share this function to stay within the current hosting function limit.
+  if (req.query?.csp_report === '1') return handleCspReport(req, res);
   if (rejectInvalidEnvironment(res)) return;
   // Origin / CORS — Round 34.2: shared api/_cors.js.
   const allowed = applyCors(req, res);

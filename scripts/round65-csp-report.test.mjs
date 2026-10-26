@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';import {Readable} from 'node:stream';
-import handler,{summarizeReport} from '../api/csp-report.js';
+import handler,{summarizeReport} from '../api/_csp-report.js';
+import guestHandler from '../api/guest.js';
 const report={'csp-report':{'document-uri':'https://app.welcomebnb.it/host-console.html?token=PRIVATE',
  'effective-directive':'script-src-elem','blocked-uri':'https://private.example.invalid/path?key=PRIVATE','script-sample':'PRIVATE guest detail'}};
 assert.deepEqual(summarizeReport(report),{page:'host',directive:'script-src-elem',resource:'external'});
@@ -14,6 +15,9 @@ async function call({method='POST',headers={},body=report,stream}={}){
 try{
  assert.equal(await call(),204);assert.equal(await call({body:JSON.stringify(report)}),204);
  assert.equal(await call({stream:[JSON.stringify(report)]}),204);
+ const res={status(code){this.code=code;return this},setHeader(){},end(){return this}};
+ await guestHandler({method:'POST',query:{csp_report:'1'},headers:{'content-type':'application/csp-report'},body:report},res);
+ assert.equal(res.code,204,'rewritten diagnostic path works without a guest token');
  for(const [opts,status]of [[{method:'GET'},405],[{headers:{'sec-fetch-site':'cross-site'}},403],
   [{headers:{origin:'https://foreign.invalid'}},403],[{headers:{'content-type':'text/plain'}},415],
   [{headers:{'content-length':'99999'}},413],[{body:'x'.repeat(4097)},413],[{stream:['x'.repeat(4097)]},413],

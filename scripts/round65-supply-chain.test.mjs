@@ -15,7 +15,7 @@ for(const name of ['index.html','host-console.html','admin.html','demo-launch.ht
 }
 const ci=read('.github/workflows/regression.yml');
 const uses=[...ci.matchAll(/uses:\s+(\S+)/g)].map(x=>x[1]);assert.equal(uses.length,2);assert.ok(uses.every(x=>/@[0-9a-f]{40}$/.test(x)));
-assert.match(ci,/run: npm ci/);assert.ok(!ci.includes('npm install'));assert.match(ci,/npx --no-install playwright install/);
+assert.match(ci,/run: npm ci/);assert.ok(!ci.includes('npm install'));assert.match(ci,/\.\/node_modules\/\.bin\/playwright install/);
 assert.ok(!read('.gitignore').split('\n').includes('package-lock.json'));
 const dependabot=read('.github/dependabot.yml');for(const ecosystem of ['npm','github-actions'])assert.ok(dependabot.includes('package-ecosystem: '+ecosystem));
 console.log('PASS exact direct/locked dependencies and registry integrity, all four self-hosted SDK/SRI entry points, immutable Actions, npm ci and Dependabot ecosystems');

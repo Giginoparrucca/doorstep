@@ -9,12 +9,29 @@ export function redactSupport(value, secrets = []) {
 }
 const RECORD_FIELDS = 'id,property_id,booking_code,guest_type,arrival_date,departure_date,submitted_at,alloggiati_status,filed_at,autofile_last_error,autofile_last_attempt_at,autofile_attempts,autofile_excluded,docs_status';
 const BUILD_FIELDS = RECORD_FIELDS + ',surname,name,sex,date_of_birth,citizenship,birth_country,birth_province,place_of_birth,document_type,document_number,doc_issue_place,nights';
+// Current-state leads only: never label them as the cause of an old portal rejection.
+export function currentBookingFindings(records) {
+  const identities = new Map(), findings = [];
+  const normalize = value => String(value || '').trim().toLocaleLowerCase('en');
+  for (const row of records) {
+    if (!normalize(row.name) || !normalize(row.surname) || !row.date_of_birth) continue;
+    const key = JSON.stringify([normalize(row.name), normalize(row.surname), row.date_of_birth]);
+    if (!identities.has(key)) identities.set(key, []);
+    identities.get(key).push(row.id);
+  }
+  for (const ids of identities.values()) if (ids.length > 1) findings.push({ code: 'possible_duplicate_guest', checkin_ids: ids, message: 'These current records have the same name and date of birth. Review for a duplicate submission; do not delete automatically.' });
+  for (const role of ['head', 'group']) {
+    const ids = records.filter(row => row.guest_type === role).map(row => row.id);
+    if (ids.length > 1) findings.push({ code: 'multiple_heads', checkin_ids: ids, message: 'This booking currently has more than one ' + (role === 'head' ? 'family' : 'group') + ' head. Review the intended guest grouping.' });
+  }
+  return findings;
+}
 export async function handleAlloggiatiSupport(req, res, deps) {
   const { url, anonKey, serviceKey, get, allog, decrypt, generateToken, authenticationTest, test } = deps;
   const fetcher = deps.fetch || globalThis.fetch;
   const respond = (code, body) => { res.setHeader?.('Cache-Control', 'no-store'); return res.status(code).json(body); };
   const action = req.query?.action;
-  if (!['support_status', 'support_verify', 'support_validate'].includes(action)) return respond(400, { error: 'Unknown support action' });
+  if (!['support_status', 'support_verify', 'support_validate', 'support_investigate'].includes(action)) return respond(400, { error: 'Unknown support action' });
   const propertyId = req.body?.property_id;
   if (typeof propertyId !== 'string' || !/^[0-9a-f-]{36}$/i.test(propertyId)) return respond(400, { error: 'Valid property_id required' });
   const jwt = /^Bearer (.+)$/.exec(req.headers.authorization || req.headers.Authorization || '')?.[1];
@@ -42,7 +59,7 @@ export async function handleAlloggiatiSupport(req, res, deps) {
       return respond(200, { property: { id: property.id, name: property.name, mode: property.alloggiati_autofile_mode || 'off' }, connection: { configured: !!connection, verified_at: connection?.verified_at || null, wskey_expires_at: connection?.wskey_expires_at || null, updated_at: connection?.updated_at || null, last_error: redactSupport(connection?.last_error) }, records: records.slice(0, 200).map(row => ({ ...row, autofile_last_error: redactSupport(row.autofile_last_error), past_automatic_window: allog.autofileDueAt(row, property, new Date()) === null })), history: history.slice(0, 50).map(row => ({ ...row, error_detail: redactSupport(row.error_detail) })), records_truncated: records.length > 200, history_truncated: history.length > 50 });
     }
     let records, batch;
-    if (action === 'support_validate') {
+    if (action === 'support_validate' || action === 'support_investigate') {
       const id = req.body?.checkin_id;
       if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) return respond(400, { error: 'Select a check-in record to validate' });
       const [target] = await get(`checkins?${scope}&id=eq.${encodeURIComponent(id)}&is_test=eq.false&deleted_at=is.null&select=id,booking_code&limit=1`);
@@ -51,6 +68,17 @@ export async function handleAlloggiatiSupport(req, res, deps) {
       records = await get(`checkins?${scope}&${bookingScope}&is_test=eq.false&deleted_at=is.null&select=${BUILD_FIELDS}&order=submitted_at.asc,id.asc&limit=201`);
       if (!records.length || records.length > 200) return respond(422, { error: 'Booking must contain 1–200 current guest records' });
       if (records.some(row => row.property_id !== propertyId || row.is_test || row.deleted_at)) return respond(403, { error: 'Check-in scope mismatch' });
+      if (action === 'support_investigate') {
+        const ids = records.map(row => row.id);
+        if (ids.some(value => !/^[0-9a-f-]{36}$/i.test(value))) return respond(503, { error: 'Invalid diagnostic record identifiers' });
+        const history = await get(`alloggiati_filing_log?${scope}&checkin_ids=ov.${encodeURIComponent('{'+ids.join(',')+'}')}&select=id,run_at,trigger,outcome,error_code,error_detail,checkin_ids&order=run_at.asc,id.asc&limit=51`);
+        const selected = new Set(ids), secrets = records.map(row => row.document_number);
+        return respond(200, { filed: false, stage: 'original_attempts', checked_at: new Date().toISOString(), booking_code: target.booking_code || null,
+          records: records.map(row => ({ id: row.id, submitted_at: row.submitted_at, arrival_date: row.arrival_date, guest_type: row.guest_type })),
+          findings: currentBookingFindings(records), history_truncated: history.length > 50,
+          history: history.slice(0, 50).map(row => ({ ...row, error_detail: redactSupport(row.error_detail, secrets), selected_checkin_ids: (row.checkin_ids || []).filter(id => selected.has(id)), other_guest_count: (row.checkin_ids || []).filter(id => !selected.has(id)).length })),
+          message: 'Historical entries describe entire batches. A rejected batch does not prove every guest was invalid. Current duplicate/group findings are leads, not proof of the original cause. Old attempts have no saved input snapshot; a new portal Test cannot reconstruct them.' });
+      }
       batch = allog.buildBatch(records);
       if (batch.warnings.length) return respond(200, { ok: false, filed: false, stage: 'local_validation', warnings: batch.warnings.map(w => redactSupport(w)), rows: [], message: 'Correct these guest fields in the host console before validating again.' });
     }

@@ -20,7 +20,7 @@ function fixture(changes={}) {
  async function run(action='support_status',body={}) {const req={query:{action},headers:changes.anonymous?{}:{authorization:'Bearer jwt'},body:{property_id:property,checkin_id:id,...body}};const res={setHeader(){},status(code){this.code=code;return this;},json(data){this.data=data;return this;}};await handleAlloggiatiSupport(req,res,deps);return res;}
  return {run,calls,get soapCalls(){return soapCalls;}};
 }
-for(const option of [{anonymous:true},{admin:false},{auth:false}]){const f=fixture(option),r=await f.run();assert.ok([401,403].includes(r.code));assert.equal(f.soapCalls,0);assert.ok(!f.calls.some(c=>c.query));}
+for(const option of [{anonymous:true},{admin:false},{auth:false}]){for(const action of ['support_status','support_verify','support_validate','support_investigate']){const f=fixture(option),r=await f.run(action);assert.ok([401,403].includes(r.code));assert.equal(f.soapCalls,0);assert.ok(!f.calls.some(c=>c.query));}}
 for(const option of [{testProperty:true},{deletedProperty:'2026-10-25'}]){const f=fixture(option),r=await f.run();assert.equal(r.code,404);assert.equal(f.soapCalls,0);}
 let f=fixture(),r=await f.run();assert.equal(r.code,200);assert.equal(r.data.connection.configured,true);assert.ok(r.data.records[0].past_automatic_window);assert.ok(!JSON.stringify(r.data).includes('OLDSECRET'));assert.ok(!JSON.stringify(r.data).includes('ENCRYPTEDSECRET'));assert.equal(f.soapCalls,0);
 f=fixture();r=await f.run('support_verify');assert.equal(r.data.ok,true);assert.equal(r.data.filed,false);assert.equal(f.soapCalls,2);assert.ok(!f.calls.some(c=>c.opts?.method==='PATCH'));

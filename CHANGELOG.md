@@ -51,6 +51,7 @@ This focused admin Round runs alongside the preserved Round 63 pilot/provider ga
 | 1 — Define, implement and release Ops metrics | shipped — PR #199 — GPT-6 | Synthetic aggregation/loading and browser checks, whole regression, green PR CI, deployment and read-only live smoke. |
 | 2 — Sort and filter Hosts & Properties | shipped — PR #200 — GPT-6 | User-requested follow-up; keyboard-accessible column sorting, text/city/operational filters, browser/full regression, green PR CI and production verification. |
 | 3 — Alloggiati support diagnostics | shipped — PR #201 — GPT-6 | Admin-only connection health/history, per-booking no-send validation and corrective guidance; synthetic auth/transport/browser gates, full regression, CI, deployed smoke. |
+| 4 — Correct SOAP empty-tag diagnostics | in-progress — GPT-6 | Screenshot-follow-up: bound empty/self-closing field parsing, operation result scope, arrival-date guidance and synthetic wire-response fixtures; full regression/CI/live gates. |
 
 ### Round 63 Phase 3 — pilot/cutover preparation resumed (GPT-6, 2026-10-24)
 

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';import fs from 'node:fs';import os from 
 const require=createRequire(import.meta.url);const {chromium}=require(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES?process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES+'/playwright':'playwright');
 const host=fs.readFileSync(new URL('../host-console.html',import.meta.url),'utf8'),admin=fs.readFileSync(new URL('../admin.html',import.meta.url),'utf8');
 function fn(source,name){let i=source.indexOf('function '+name+'(');assert.ok(i>=0);if(source.slice(i-6,i)==='async ')i-=6;return source.slice(i,source.indexOf('\n}\n',i)+2);}
-const sdk=process.env.SUPABASE_BROWSER_SDK?fs.readFileSync(process.env.SUPABASE_BROWSER_SDK,'utf8'):await (await fetch('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js')).text();
+const sdk=process.env.SUPABASE_BROWSER_SDK?fs.readFileSync(process.env.SUPABASE_BROWSER_SDK,'utf8'):fs.readFileSync(new URL('../vendor/supabase-2.118.0.js',import.meta.url),'utf8');
 const app='https://app.welcomebnb.it',backend='https://fixture.supabase.co';
 const styles=[...host.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m=>m[1]).join('\n');const doc=parseHTML(host).document;
 const authBlock=host.slice(host.indexOf('async function handleHostAuthEvent('),host.indexOf('// Round 38 — sign-up'));

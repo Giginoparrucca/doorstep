@@ -103,10 +103,11 @@ Three fixes:
 
 Four fixes:
 
-1. Pin Supabase JS to an exact version in all three HTML files. Download `@supabase/supabase-js@2.47.10` once, compute `sha384-…`, add `integrity="…" crossorigin="anonymous"`. Prefer: self-host under `/vendor/supabase-2.47.10.min.js`.
+1. Pin Supabase JS to an exact version in all four HTML entry points (including demo launch). Production's floating CDN resolved to **2.118.0** at implementation, so preserve that version rather than downgrade to the original 2.47.10 example. Verify npm archive SHA-512, self-host the unmodified UMD and license under `/vendor/`, compute SHA-384 and add `integrity`/`crossorigin`. Keep an exact SDK devDependency so Dependabot can track advisories; package updates must also refresh the vendored artifact/SRI and pass browser gates. Demo's older SDK is aligned with production and its actual launcher/config/reset-cancel boundary is browser-tested without real writes.
 2. Remove `package-lock.json` from `.gitignore`. Run `npm install` to generate it. Commit.
 3. Change CI `npm install` → `npm ci`. Change CI Playwright install from `npm install --no-save playwright@1.56.1` to a pinned devDependency and `npx playwright install --with-deps chromium`.
 4. New `.github/dependabot.yml` with weekly schedule for `npm` and `github-actions` ecosystems. Pin all GitHub Actions in `regression.yml` to full commit SHAs (today uses `@v4` tags).
+5. Pin direct dependencies, including development-only PGlite 0.3.14 so actual disposable-SQL role/grant tests run in CI instead of skipping. Playwright remains the existing CI version 1.56.1. Browser tests use the same committed SDK bytes and no longer depend on a floating CDN request.
 
 **Gate:**
 - CI runs on this PR with `npm ci` and asserts a clean install.

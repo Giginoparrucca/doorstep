@@ -8,7 +8,7 @@ const {chromium}=require(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES?process.
 const html=fs.readFileSync(new URL('../admin.html',import.meta.url),'utf8');
 const helper=fs.readFileSync(new URL('../admin-ops-metrics.js',import.meta.url),'utf8');
 const table=fs.readFileSync(new URL('../admin-ops-table.js',import.meta.url),'utf8');
-const sdk=process.env.SUPABASE_BROWSER_SDK?fs.readFileSync(process.env.SUPABASE_BROWSER_SDK,'utf8'):await (await fetch('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js')).text();
+const sdk=process.env.SUPABASE_BROWSER_SDK?fs.readFileSync(process.env.SUPABASE_BROWSER_SDK,'utf8'):fs.readFileSync(new URL('../vendor/supabase-2.118.0.js',import.meta.url),'utf8');
 function fn(name){const i=html.indexOf('function '+name+'(');assert.ok(i>=0);return html.slice(i,html.indexOf('\n}\n',i)+2);}
 const styles=[...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m=>m[1]).join('\n');
 const since='2026-10-01T00:00:00Z',until='2026-10-25T12:00:00Z';

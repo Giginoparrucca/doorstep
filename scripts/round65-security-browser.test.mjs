@@ -4,7 +4,7 @@ import {securityHeaders} from '../lib/security-headers.mjs';
 const require=createRequire(import.meta.url),{chromium}=require(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES?process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES+'/playwright':'playwright');
 const root=new URL('../',import.meta.url),source=fs.readFileSync(new URL('host-console.html',root),'utf8');
 const sdk=process.env.SUPABASE_BROWSER_SDK?fs.readFileSync(process.env.SUPABASE_BROWSER_SDK,'utf8'):
- await(await fetch('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js')).text();
+ fs.readFileSync(new URL('../vendor/supabase-2.118.0.js',import.meta.url),'utf8');
 const def=source.split('\n').find(line=>line.includes('const _alloggiatiSafe = s =>'));
 const safe=vm.runInNewContext(def+'\n_alloggiatiSafe');
 const tags=[...source.matchAll(/<button\b[^>]*>/g)].map(x=>x[0]).filter(t=>/data-(?:booking-code|reservation-id|receipt-path|date|guest-link)=/.test(t)&&/onclick=/.test(t));

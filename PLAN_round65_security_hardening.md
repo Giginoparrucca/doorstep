@@ -118,9 +118,9 @@ Four fixes:
 
 Three fixes:
 
-1. Add `SECURITY.md` with disclosure email `security@welcomebnb.it` (Daniele to create mailbox; see owner-only actions), 48 h acknowledgement SLA, 90-day disclosure window, scope statement (production app excluded demo project), safe harbor.
-2. Move `SUPABASE_SERVICE_ROLE_KEY` into a `production` GitHub Environment with required reviewers (`main` branch only). Rotate the key during the migration (Daniele owner-only step: generate new in Supabase, update Vercel env, update GitHub Environment secret, revoke old).
-3. Enable GitHub Private Vulnerability Reporting.
+1. Add `SECURITY.md` with verified GitHub private vulnerability reporting and the existing info@welcomebnb.it fallback, a 48-hour acknowledgement goal, 90-day coordinated disclosure window, production scope and good-faith research rules. Do not advertise security@welcomebnb.it as active until its mailbox/forwarding is verified.
+2. Existing GitHub Environment `Production` now requires owner Giginoparrucca review, disables administrator bypass and allows only main; verified after reload. It is still empty. Prepare a manual/main/readiness-gated production smoke using distinct Environment secret `SUPABASE_PRODUCTION_SERVICE_ROLE_KEY`, mapped to the normal runtime variable, so the old repository secret cannot be a fallback. Owner credential entry and a successful reviewed run are required before retiring the repository slot. Vercel server-key metadata already confirms sensitive/production-only scope, without decrypting its value. Coordinate key replacement separately: legacy JWT API keys/signing keys are coupled, so follow current Supabase migration guidance and verify all consumers before any revocation; do not blindly reset a signing secret.
+3. GitHub Private Vulnerability Reporting enabled by GPT and verified persisted after reload. Owner credential entry/mailbox and the protected live/key-migration gates remain pending; source/configuration delivery alone does not close Phase 7. See `docs/SECURITY_OPERATIONS.md`.
 
 **Gate:**
 - Workflow dry-run with the new environment-scoped secret proves the regression job can read it.
@@ -138,15 +138,15 @@ Three fixes:
 Non-blocking; agent proceeds, flags these to Daniele:
 
 1. **Create `security@welcomebnb.it`** inbox (Phase 7). Forwarded to Daniele's personal mail or shared with a trusted security consultant.
-2. **Rotate `SUPABASE_SERVICE_ROLE_KEY`** during Phase 7 (new key in Supabase dashboard → Settings → API → "Reset service_role key"; update Vercel env + GitHub Actions Environment secret; redeploy; delete old).
-3. **Create a `production` GitHub Environment** at Settings → Environments → New environment → protection rules: required reviewer = Daniele, deployment branches = `main` only.
-4. **Enable GitHub Private Vulnerability Reporting** at repo Settings → Code security and analysis → Enable.
+2. **Coordinate compatible server-key replacement** using the operations runbook and current Supabase guidance. Inventory consumers and complete staged verification before revoking a legacy credential; its anon/signing-key dependencies cannot be ignored. No rotation has yet been performed.
+3. **Enter the production credential** in the already-protected `Production` Environment under `SUPABASE_PRODUCTION_SERVICE_ROLE_KEY`, then manually approve the protected verification run. Environment/reviewer/main-only rules are already configured by GPT.
+4. **Private vulnerability reporting is enabled and verified** by GPT; no owner action remains for that toggle.
 5. **(Optional)** Subscribe to Dependabot alerts email digest.
 
 ## Risk register
 
 - **CSP migration risk:** the current host console uses many inline `onclick=` handlers. First-pass CSP keeps `'unsafe-inline'` on `script-src` to avoid breaking existing handlers. Removing inline handlers is a separate 1-day migration tracked as a Phase 5c follow-up. The report-only mode in 5a surfaces every violation before the enforce switch.
-- **Service-role key rotation risk:** Phase 7 drops the old key immediately. If any cron that reads `SUPABASE_SERVICE_ROLE_KEY` is mid-run during rotation, it fails with a bad-key error. Scheduled before rotation: check `data_purge_log`, `send-arrival-reminders` recent run times, confirm quiet window. If uncertain, do rotation during a documented maintenance window.
+- **Server-key migration:** preserve the old credential until all inventoried consumers and protected live checks pass. Confirm a quiet cron window and a rollback plan; coordinate owner credential entry and eventual revocation. Legacy JWT API/signing keys may affect public anon keys and sessions, so no automatic signing-secret reset is authorized by this implementation.
 - **False XSS claim risk:** CRIT-1's chat view uses `innerHTML` with `${m.message}`. Confirm the guest-side chat insert path through `api/chat.js` doesn't server-side sanitize — the fix must be on the host side regardless, but verify the attack is reproducible against production before claiming it fixed.
 
 ## Acceptance

@@ -1,8 +1,9 @@
 # Round 66 — Server integration contract and delivery inventory
 
-Checkpoint: **Phase 1 foundation only**, 26 October 2026. The isolated module
-`api/_entry-release-policy.js` is not imported by a production route. No setting,
-table, guest workflow, migration or override RPC is operational yet. Activation
+Checkpoint: **Phase 1 foundation and staged persistence**, 26 October 2026. The isolated
+policy and current-row validator are not imported by a production route. Roster,
+slot, binding and atomic override/audit SQL is tested in disposable PostgreSQL,
+but no setting, table, guest workflow, migration or override RPC is operational in production. Activation
 must remain unavailable. `PLAN_round66_checkin_access_release.md` remains the
 acceptance specification; none of its implementation phases is shipped here.
 
@@ -103,10 +104,83 @@ but preserves booking/session/read/tenant checks. Store audit instants in UTC.
 
 ## Remaining Phase 1 gate
 
-Implement persistence, transactional snapshot/validator, host authorization,
-atomic audit overrides, every handler projection and RPC grants. Add real
+Promote and apply the staged persistence after the sequencing gate; implement
+the transactional snapshot loader, guest submission binding/writes, audited
+admin-impersonation integration, every handler projection and final RPC grants. Add real
 handler/RPC/concurrency tests; pure policy tests cannot satisfy that gate.
 Generate any migration with the Supabase CLI, verify current docs, run advisors,
 serialize production application with Round 65 and prove schema-drift before
 calling a migration shipped. Then run complete regression on the integrated
 source. Phases 2/3 remain pending; no operational or live pass is claimed here.
+
+## Phase 1b staged persistence and actual record validation
+
+`staged-migrations/20261026072310_round66_entry_roster_audit.sql` was created
+with `supabase migration new round66_entry_roster_audit` in a scratch staging
+project. It is deliberately **outside `supabase/migrations`**, not registered,
+not applied, and not counted as deployed by schema-drift. Promote it through the
+normal migration/advisors/production drift gates only after Round 65 sequencing;
+if the migration order changes, recreate the final file with the CLI. Do not
+treat a green current production drift check as evidence that this draft exists
+in production.
+
+The candidate schema provides private `entry_access` booking contracts, stable
+numbered slots, scoped check-in bindings and immutable audit events. Owner RPCs
+confirm the roster and release/restore entry instructions. Direct table writes
+are unavailable to anon/authenticated/service roles. Service role gets read-only
+private data; public RPC execute is authenticated-only with an explicit current
+property owner check. Admin impersonation is intentionally still pending;
+`is_admin` or user metadata cannot bypass owner checks in this checkpoint.
+
+Roster confirmation cannot lower a known reservation count or hide an existing,
+cancelled/deleted/ambiguous reservation behind a standalone contract. It accepts
+standalone bookings explicitly confirmed by their owner. Repeated request IDs
+return the original acknowledgement without repeating writes; different
+requests reusing an ID fail. Optimistic versions reject stale edits. Reducing a
+roster retires slots; later growth creates fresh identities instead of reusing
+a removed guest. Date/reservation identity changes clear prior manual release
+and retire all old slots. Each mutation and its nonsecret audit acknowledgement
+commit or roll back together. Guest binding is constrained by tenant, booking,
+test scope, active slot and unique check-in/slot identity. This does not yet add
+the guest endpoint which writes those bindings.
+
+The existing `migration_round36_photo_retention.sql` hard-deletes old properties
+and reservations. Property deletion cascades the whole private contract,
+slots/bindings and its audit after the parent booking is gone; individual audit
+edits/deletes stay forbidden. Reservation deletion keeps its immutable UUID as
+an invalid reference rather than silently converting the contract to standalone.
+These behaviors have actual SQL tests. No existing retention function was edited.
+
+`api/_entry-submission-validation.js` revalidates current saved names, sex,
+dates, recognized countries/documents, main-guest document fields, booking stay,
+reopen state and applicable photo evidence. Family/group members and minors do
+not acquire document/photo requirements their current rules exempt. Photos
+are required only when the trusted slot rules say so. A storage proof must be
+constructed by the future server loader; `docs_status=complete`, a browser flag,
+an unverified storage path or portal success is not proof. The validator emits
+versioned evidence/hash and field-name errors without copying personal fields,
+photo paths or codes into that evidence. Valid unrelated corrections revalidate
+successfully; an invalid current document immediately makes policy composition
+return locked. No compliance builder/output was changed.
+
+`scripts/entry-release-storage.test.mjs` executes the actual SQL twice against
+disposable PostgreSQL 17.5 via pinned `@electric-sql/pglite@0.3.14`. It exercises
+grants/RLS, explicit owner boundaries, idempotency/version collisions, slot
+retirement, tenant/test binding, changed/cancelled/deleted reservations,
+append-only audit and injected audit failures with full transaction rollback.
+The optimistic competing-write test uses a queued single connection; it is
+**not** a multi-connection deadlock/advisory-lock test. Those and hosted RPC
+validation remain gates before shipping Phase 1.
+
+The dependency is separate from the product package while Round 65 owns package
+and lockfile work. To reproduce with a disposable dependency directory:
+
+```sh
+npm install --prefix /tmp/entry-db-tests --no-save --package-lock=false @electric-sql/pglite@0.3.14
+ENTRY_PGLITE_MODULE=/tmp/entry-db-tests/node_modules/@electric-sql/pglite/dist/index.js npm run test:all
+```
+
+The test joins automatic suite discovery and explicitly skips when that optional
+test dependency is absent. That skip is not a DB test pass. Current-row validator
+tests require no extra dependency and compose real evidence with the policy.
+No PGlite dependency or test database is part of the production runtime.

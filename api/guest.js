@@ -146,6 +146,7 @@ export default async function handler(req, res) {
     if (action === 'poll')             return await doPoll(res, propertyId, bookingCode, body);
     // Round 48 Phase 2 — guest-visible resources
     if (action === 'property')         return await doProperty(res, propertyId, bookingCode, isTest);
+    if (action === 'keybox')           return await doGuestKeybox(res, propertyId, bookingCode, isTest);
     if (action === 'checkin_list')     return await doCheckinList(res, propertyId, bookingCode, isTest);
     if (action === 'checkin_insert')   return await doCheckinInsert(res, propertyId, bookingCode, sessionId, body, isTest);
     if (action === 'checkin_update')   return await doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, isTest);
@@ -405,6 +406,31 @@ const CHECKIN_LOOKUP_HOURLY_LIMIT_PER_SESSION = 10;
 
 
 // ── action: property ──────────────────────────────────────────────────
+async function doGuestKeybox(res, propertyId, bookingCode, isTest) {
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('Vary', 'Authorization, Origin');
+  if (!bookingCode) return res.status(200).json({ code: null });
+  const prop = await pgrestGET(`properties?id=eq.${encodeURIComponent(propertyId)}`
+    + '&deleted_at=is.null&select=id,rotating_lockbox_enabled,use_per_guest_lockbox,show_rotating_lockbox_to_guest&limit=1');
+  if (!prop.ok) return res.status(503).json({ error: 'Access information unavailable' });
+  const properties = await prop.json();
+  if (!Array.isArray(properties) || properties.length !== 1) return res.status(404).json({ error: 'Property not found' });
+  const p = properties[0];
+  if (p.show_rotating_lockbox_to_guest === false
+      || !(p.rotating_lockbox_enabled === true || p.use_per_guest_lockbox === true)
+      || !await bookingHasCheckin(propertyId, bookingCode, isTest)) {
+    return res.status(200).json({ code: null });
+  }
+  const r = await pgrestGET(`ota_reservations?property_id=eq.${encodeURIComponent(propertyId)}`
+    + `&booking_code=eq.${encodeURIComponent(bookingCode)}&is_test=eq.${isTest === true ? 'true' : 'false'}`
+    + '&deleted_at=is.null&status=eq.active&entry_type=eq.reservation&select=keybox_code&limit=2');
+  if (!r.ok) return res.status(503).json({ error: 'Access information unavailable' });
+  const rows = await r.json();
+  if (!Array.isArray(rows) || rows.length > 1) return res.status(503).json({ error: 'Access information unavailable' });
+  const code = typeof rows[0]?.keybox_code === 'string' ? rows[0].keybox_code.trim() : null;
+  return res.status(200).json({ code });
+}
+
 async function doProperty(res, propertyId, bookingCode, isTest) {
   const r = await pgrestGET(
     `properties?id=eq.${encodeURIComponent(propertyId)}` +

@@ -2,6 +2,7 @@ import { handleConnection } from './_ireservation.js';
 import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, rejectDemoIntegration } from './_environment.js';
 import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
+import { fetchPublicIcal, feedErrorCode } from './_safe-ical-fetch.js';
 const CalendarRoundtrip = createRequire(import.meta.url)('../lib/calendar-roundtrip.js');
 // api/ical-sync.js — Round 26 iCal calendar sync (with Round 32.5 cron mode).
 //
@@ -151,13 +152,13 @@ async function handleUserSync(req, res, jwt) {
       SUPABASE_ANON_KEY, jwt,
     );
     if (!propRes.ok) {
-      return res.status(500).json({ error: 'Property lookup failed', detail: await propRes.text() });
+      return res.status(500).json({ error: 'database_error' });
     }
     const rows = await propRes.json();
     property = rows[0];
     if (!property) return res.status(403).json({ error: 'Property not found or not owned by caller' });
   } catch (e) {
-    return res.status(500).json({ error: 'Property lookup exception', detail: String(e) });
+    return res.status(500).json({ error: 'database_error' });
   }
 
   const feeds = Array.isArray(property.ical_feeds) ? property.ical_feeds : [];
@@ -185,11 +186,11 @@ async function handleCronSync(res) {
       auth[0], auth[1],
     );
     if (!r.ok) {
-      return res.status(500).json({ error: 'Load properties failed', detail: await r.text() });
+      return res.status(500).json({ error: 'database_error' });
     }
     props = await r.json();
   } catch (e) {
-    return res.status(500).json({ error: 'Load properties exception', detail: String(e) });
+    return res.status(500).json({ error: 'database_error' });
   }
 
   const withFeeds = (props || []).filter(p =>
@@ -209,7 +210,7 @@ async function handleCronSync(res) {
         errors: r.errors,
       });
     } catch (e) {
-      perProperty.push({ property_id: p.id, name: p.name, error: String(e) });
+      perProperty.push({ property_id: p.id, name: p.name, error: 'database_error' });
     }
   }
 
@@ -224,7 +225,7 @@ async function handleCronSync(res) {
 
 // ── Sync one property's feeds, given whichever auth pair to use ────────
 // Shared by USER (anon key + user JWT) and CRON (service_role for both).
-async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
+async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer, {fetchFeed = fetchPublicIcal} = {}) {
   const perFeed = [];
   const errors = [];
   const seenByPlatform = {}; // platform -> Set(uid)
@@ -290,7 +291,7 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
     // Absent or null = unassigned; the UI/dashboard surfaces that so a
     // host with rooms can set it later.
     const feedRoomId = _validUuidOrNull(feed?.room_id);
-    if (!url) { failedPlatforms.add(platform); errors.push({ platform, url, error: 'Empty URL' }); continue; }
+    if (!url) { failedPlatforms.add(platform); errors.push({ platform, url, error: 'blocked_private_network' }); continue; }
     // Round 60 Phase 3a — stable per-feed identity. feedKey drives the
     // UID prefix for room-enabled feeds; sourceKey marks the row's
     // origin URL (used to adopt legacy unassigned rows when the host
@@ -300,7 +301,7 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
     if (!scopes.has(platform)) scopes.set(platform, []);
     scopes.get(platform).push({ roomId: feedRoomId, feedKey });
     try {
-      const text = await fetchWithTimeout(url, FETCH_TIMEOUT_MS);
+      const text = await fetchFeed(url, FETCH_TIMEOUT_MS);
       if (!/^BEGIN:VCALENDAR\r?$/m.test(text) || !/^END:VCALENDAR\r?$/m.test(text)) {
         throw new Error('Invalid or incomplete iCal feed');
       }
@@ -490,12 +491,15 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
         const upsertRes = await pgrestUPSERT('ota_reservations', group, apikey, bearer);
         if (!upsertRes.ok) {
           failedPlatforms.add(platform);
-          errors.push({ platform, url, error: 'Upsert failed', detail: await upsertRes.text() });
+          errors.push({ platform, url, error: 'database_error' });
         }
       }
     } catch (e) {
       failedPlatforms.add(platform);
-      errors.push({ platform, url, error: String(e && e.message || e) });
+      const known = e?.message === 'Existing unassigned reservation has ambiguous feed ownership'
+        ? 'ambiguous_feed_ownership' : feedErrorCode(e);
+      console.warn('[ical-sync] feed failed', { platform, code: known });
+      errors.push({ platform, url, error: known });
     }
   }
 
@@ -574,7 +578,7 @@ async function syncOnePropertyFeeds(propertyId, feeds, apikey, bearer) {
         }
       }
     } catch (e) {
-      errors.push({ platform, error: 'Cancel sweep failed: ' + String(e) });
+      errors.push({ platform, error: 'database_error' });
     }
   }
 
@@ -755,23 +759,6 @@ function pgrestUPSERT(table, rows, apikey, bearer = apikey) {
     },
     body: JSON.stringify(rows),
   });
-}
-
-// ── HTTP with timeout ──────────────────────────────────────────────────
-async function fetchWithTimeout(url, ms) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), ms);
-  try {
-    const r = await fetch(url, {
-      signal: ctrl.signal,
-      redirect: 'follow',
-      headers: { 'User-Agent': 'WelcomeBnB-iCal-Sync/1 (+https://welcomebnb.app)' },
-    });
-    if (!r.ok) throw new Error(`Feed HTTP ${r.status}`);
-    return await r.text();
-  } finally {
-    clearTimeout(t);
-  }
 }
 
 // ── ICS parser (RFC 5545 subset) ───────────────────────────────────────

@@ -1,0 +1,154 @@
+# Round 65 — Security hardening sprint (30-day roadmap)
+
+**Companion document:** `docs/SECURITY_ASSESSMENT_2026-10.md` (5-domain audit, 2026-10-24, Claude Opus 4.7).
+
+## Why this Round exists
+
+The security assessment identified 2 CRITICAL findings (stored XSS on host chat, keybox RPC lacks owner check) and 14 HIGH findings any pentester will catch on day one. The 30-day roadmap in `docs/SECURITY_ASSESSMENT_2026-10.md` section 7 is the smallest coherent sprint that moves the product from "shippable to pilot customers" to "sellable to small B&Bs".
+
+This Round covers items 1–12 of that roadmap. Items 13–28 (90-day program: ROPA, DPA, BREACH_SOP, pentest) belong to a later Round once the technical fixes are in.
+
+## Zero-impact rule
+
+Non-security-sensitive behaviour must not regress. Every phase's gate includes the full regression suite (`npm run test:all`) and byte-identity checks on compliance outputs (Alloggiati .txt, SPOT Easy TXT, SPOT Online XML, ROSS1000 XML, Umbria TXT/ZIP, Trento STU TXT/ZIP, summary CSV, PayTourist CSV). The schema-drift live gate (Round 60b) runs on every phase that touches migrations.
+
+## Out of scope
+
+- 90-day program items (ROPA, DPA templates, DSAR self-service, BREACH SOP, admin audit log, log scrubbing, Vercel Firewall rate limits, backup drill, signed commits, pentest). These go to Round 66 "Security compliance paper trail" once Round 65 lands.
+- Any API surface change beyond the two CRITICAL fixes and the SSRF/error-folding fixes in `ical-sync.js`.
+- Service-role or anon-JWT rotation (coordinate with Daniele separately before touching).
+
+## Phases
+
+### Phase 1 — CRIT-1: escape chat innerHTML
+
+Fix the stored XSS in `host-console.html` chat view. Render guest-authored chat message bodies through a text node or escape via the same helper `index.html:4599` uses. The bot bubble's `**bold**` markdown must run *after* escaping.
+
+**Changes:**
+- `host-console.html` chat view (around lines 13606, 13611, 13616, 13619) — replace `${m.message}` interpolation.
+- Reuse existing `escape` / `guestLinkedText` helper or add a dedicated chat-safe renderer.
+
+**Gate:**
+- New `scripts/round65-chat-xss.test.mjs` posts `<svg onload=window._xss=1><script>alert(1)</script><img src=x onerror=1>` through `api/chat.js`, loads host console in Chromium, asserts no script executes (no global flag flipped, no alert fired) and the raw string is visible as text.
+- Full `npm run test:all` green. No change to committed goldens.
+
+### Phase 2 — CRIT-2: owner check on `get_reservation_keybox`
+
+Add owner check to the SECURITY DEFINER RPC. New migration `supabase/migrations/<timestamp>_round65_keybox_owner_check.sql` that `CREATE OR REPLACE FUNCTION` with:
+
+```sql
+IF NOT EXISTS (SELECT 1 FROM public.properties
+               WHERE id=p_property_id AND owner_id=auth.uid()) THEN
+  RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501';
+END IF;
+```
+
+Alternative considered: convert to `SECURITY INVOKER` and rely on `ota_reservations_host_select` RLS. Chose the explicit owner check so the function's contract matches its name ("get keybox for one of my reservations"); a reader doesn't need to trace RLS to verify safety.
+
+**Gate:**
+- New `scripts/round65-keybox-rpc.test.mjs` — behavioural probe via Supabase MCP: owner-of-property call succeeds; different-owner call raises 42501; anon call raises 42501 (already blocked by auth); migration applied to prod via MCP + schema_migrations row inserted before PR merges.
+- Full regression + schema-drift live gate (AGENTS.md rule 8).
+
+### Phase 3 — Database HIGHs: REVOKE anon on cron RPCs + lock down marketing_consents
+
+Three fixes in one migration:
+
+1. `REVOKE EXECUTE ON FUNCTION public.purge_old_id_photos(boolean,int,int,int), public.enqueue_orphan_documents(boolean,int) FROM PUBLIC, anon, authenticated; GRANT EXECUTE … TO service_role;`
+2. `REVOKE EXECUTE ON FUNCTION public.list_hosts_for_admin(…) FROM PUBLIC;` (keep GRANT to `authenticated` — admin UI calls as signed-in user).
+3. Replace `marketing_consents_anon_insert` policy's `with_check` from `(property_id IS NOT NULL)` to require an existence check:
+   ```sql
+   with_check: (property_id IS NOT NULL AND
+                EXISTS (SELECT 1 FROM properties p
+                        WHERE p.id = property_id AND p.deleted_at IS NULL))
+   ```
+   Rate-limit at the API layer in a Phase 4 companion change.
+
+**Gate:**
+- Behavioural probe (new `scripts/round65-grant-probes.test.live.mjs`, or extend an existing live test): anon call to `purge_old_id_photos`, `enqueue_orphan_documents`, `list_hosts_for_admin` all return `42501`. Service-role call to each succeeds. `marketing_consents` INSERT with a nonexistent `property_id` fails with policy violation.
+- Migration applied to prod; schema-drift live gate green.
+- Full regression.
+
+### Phase 4 — Backend HIGHs: SSRF guard + error-folding on ical-sync
+
+In `api/ical-sync.js`:
+
+1. New helper `_isSafeFeedUrl(url)` — require `https:`, resolve hostname via Node DNS, refuse private/link-local/loopback (RFC1918, 127.0.0.0/8, 169.254.0.0/16, ::1, fc00::/7, 100.64.0.0/10), cap redirects at 2, re-validate hostname after each redirect.
+2. Replace raw error strings in sync response with a short enum (`timeout`, `http_error`, `parse_error`, `unreachable`, `blocked_private_network`). Log raw strings server-side only.
+
+**Gate:**
+- New `scripts/round65-ical-ssrf.test.mjs` — pure Node test of `_isSafeFeedUrl` across: valid https public URL, http URL (reject), javascript:/file: (reject), `localhost`/`127.0.0.1`/`169.254.169.254`/`10.0.0.1`/`192.168.1.1`/`::1` (reject), successful public URL (accept). Second test exercises the error-folding by stubbing fetch failures.
+- Full regression; existing iCal sync golden tests byte-identical.
+
+### Phase 5 — Frontend HIGHs: safe() quote escape + CSP + clickjacking
+
+Three fixes:
+
+1. Extend every `safe()` helper in `host-console.html` to replace `'` → `&#39;` and `` ` `` → `&#96;`. Keep the behaviour change minimal (only expands the escape set).
+2. Add `vercel.json` with `headers`:
+   - `Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co https://api.resend.com; img-src 'self' blob: data: https://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self';`
+     (Reportedly needs `'unsafe-inline'` for `script-src` because the current host console uses inline event handlers extensively. First-pass CSP uses report-only in Phase 5a and switches to enforce in Phase 5b after a 7-day watch window.)
+   - `X-Frame-Options: DENY`
+   - `X-Content-Type-Options: nosniff`
+   - `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`
+   - `Referrer-Policy: strict-origin-when-cross-origin`
+   - `Permissions-Policy: camera=(self), microphone=(), geolocation=(self), payment=()`
+3. Add `rel="noopener noreferrer"` to the two `target="_blank"` sites (`admin.html:3431`, `index.html:1520`).
+
+**Gate:**
+- New `scripts/round65-safe-escape.test.mjs` — unit test for every `safe()` across the 7 characters (`& < > " ' ` /`). Fuzz with 100 random OTA guest names from a known-bad character set.
+- Live production test (new `scripts/round65-security-headers.test.live.mjs`): fetch `/`, `/host-console.html`, `/admin.html`, `/api/guest` and assert each response carries the expected headers.
+- Visual sanity: load host console in Chromium with CSP in report-only mode; confirm no console errors.
+- Full regression.
+
+### Phase 6 — Supply chain: pin + SRI Supabase JS, commit lockfile, Dependabot
+
+Four fixes:
+
+1. Pin Supabase JS to an exact version in all three HTML files. Download `@supabase/supabase-js@2.47.10` once, compute `sha384-…`, add `integrity="…" crossorigin="anonymous"`. Prefer: self-host under `/vendor/supabase-2.47.10.min.js`.
+2. Remove `package-lock.json` from `.gitignore`. Run `npm install` to generate it. Commit.
+3. Change CI `npm install` → `npm ci`. Change CI Playwright install from `npm install --no-save playwright@1.56.1` to a pinned devDependency and `npx playwright install --with-deps chromium`.
+4. New `.github/dependabot.yml` with weekly schedule for `npm` and `github-actions` ecosystems. Pin all GitHub Actions in `regression.yml` to full commit SHAs (today uses `@v4` tags).
+
+**Gate:**
+- CI runs on this PR with `npm ci` and asserts a clean install.
+- SRI hash integrity confirmed by browser request network inspection on the preview deployment.
+- Full regression.
+
+### Phase 7 — Secrets scoping + SECURITY.md
+
+Three fixes:
+
+1. Add `SECURITY.md` with disclosure email `security@welcomebnb.it` (Daniele to create mailbox; see owner-only actions), 48 h acknowledgement SLA, 90-day disclosure window, scope statement (production app excluded demo project), safe harbor.
+2. Move `SUPABASE_SERVICE_ROLE_KEY` into a `production` GitHub Environment with required reviewers (`main` branch only). Rotate the key during the migration (Daniele owner-only step: generate new in Supabase, update Vercel env, update GitHub Environment secret, revoke old).
+3. Enable GitHub Private Vulnerability Reporting.
+
+**Gate:**
+- Workflow dry-run with the new environment-scoped secret proves the regression job can read it.
+- `scripts/schema-drift.test.live.mjs` still PASS on CI after the secret move.
+
+### Phase 8 — Regression lock + release
+
+1. `npm run test:all` green on main.
+2. `npm run test:live` green against prod (with new key).
+3. CHANGELOG close with totals, PR list, prod deployment SHA, post-deploy screenshot of security headers from `curl -I https://app.welcomebnb.it/`.
+4. Delete `claude/welcomebnb-project-uhkkB` branch after merge; new branch for Round 66.
+
+## Owner-only actions for Daniele
+
+Non-blocking; agent proceeds, flags these to Daniele:
+
+1. **Create `security@welcomebnb.it`** inbox (Phase 7). Forwarded to Daniele's personal mail or shared with a trusted security consultant.
+2. **Rotate `SUPABASE_SERVICE_ROLE_KEY`** during Phase 7 (new key in Supabase dashboard → Settings → API → "Reset service_role key"; update Vercel env + GitHub Actions Environment secret; redeploy; delete old).
+3. **Create a `production` GitHub Environment** at Settings → Environments → New environment → protection rules: required reviewer = Daniele, deployment branches = `main` only.
+4. **Enable GitHub Private Vulnerability Reporting** at repo Settings → Code security and analysis → Enable.
+5. **(Optional)** Subscribe to Dependabot alerts email digest.
+
+## Risk register
+
+- **CSP migration risk:** the current host console uses many inline `onclick=` handlers. First-pass CSP keeps `'unsafe-inline'` on `script-src` to avoid breaking existing handlers. Removing inline handlers is a separate 1-day migration tracked as a Phase 5c follow-up. The report-only mode in 5a surfaces every violation before the enforce switch.
+- **Service-role key rotation risk:** Phase 7 drops the old key immediately. If any cron that reads `SUPABASE_SERVICE_ROLE_KEY` is mid-run during rotation, it fails with a bad-key error. Scheduled before rotation: check `data_purge_log`, `send-arrival-reminders` recent run times, confirm quiet window. If uncertain, do rotation during a documented maintenance window.
+- **False XSS claim risk:** CRIT-1's chat view uses `innerHTML` with `${m.message}`. Confirm the guest-side chat insert path through `api/chat.js` doesn't server-side sanitize — the fix must be on the host side regardless, but verify the attack is reproducible against production before claiming it fixed.
+
+## Acceptance
+
+Round 65 is "shipped" when every phase above closes shipped-PR-N, the full regression stays green, and the Phase 8 live-headers smoke confirms CSP + HSTS + X-Frame-Options on the production deployment. Items 13–28 of the 30-day roadmap are explicitly deferred to Round 66.

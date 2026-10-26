@@ -218,6 +218,7 @@ This focused admin Round runs alongside the preserved Round 63 pilot/provider ga
 
 | Round | Scope | Specification | Status |
 |---|---|---|---|
+| 65 | Security hardening sprint — 30-day roadmap: 2 CRITICAL fixes (chat XSS, keybox RPC), 14 HIGH fixes (database GRANTs, iCal SSRF, CSP, SRI, lockfile, Dependabot, SECURITY.md, service-role key scoping) | `PLAN_round65_security_hardening.md` (companion: `docs/SECURITY_ASSESSMENT_2026-10.md`) | pending — awaiting Daniele |
 
 Standing rule added 2026-10-18 (AGENTS.md "Full regression"): every phase gate runs the whole suite, not only plan-listed tests.
 

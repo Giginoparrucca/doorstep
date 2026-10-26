@@ -18,3 +18,10 @@ assert.ok(!/pull-requests: write|contents: write/.test(text));
 assert.ok(!text.includes('IRESERVATION_LIVE_PROBE'),'no provider calls implicitly enabled');
 assert.match(text,/npm run test:live/);
 console.log('PASS protected production workflow: manual/main/readiness gates, pinned checkout at invoking SHA, read-only token permissions and credential exposed only after install; missing credential fails closed');
+
+const regression=fs.readFileSync(new URL('../.github/workflows/regression.yml',import.meta.url),'utf8');
+assert.ok(!/secrets\.SUPABASE|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_PRODUCTION_SERVICE_ROLE_KEY/.test(regression),'PR regression must never receive a production server credential');
+assert.match(regression,/npm run test:all/,'keep whole offline and browser suite on PRs');
+assert.match(regression,/npm run test:live/,'keep public hosted and anonymous-denial probes');
+for(const origin of ['SPOT_SMOKE_ORIGIN','TAX_SMOKE_ORIGIN','SECURITY_SMOKE_ORIGIN'])assert.ok(regression.includes(origin));
+console.log('PASS PR regression has no production credential; full regression and public smoke retained, privileged gates remain owner-reviewed on main');

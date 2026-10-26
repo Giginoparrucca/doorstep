@@ -1,3 +1,4 @@
+import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, HOST_CONSOLE_URL, rejectDemoIntegration } from './_environment.js';
 // api/admin-invite-host.js — Round 38, invite-only host access.
 //
@@ -212,8 +213,7 @@ async function _callGenerateLink(body) {
   const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
     method: 'POST',
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
@@ -366,7 +366,7 @@ async function callerIsAdmin(jwt) {
 }
 async function gotrueGetJSON(path) {
   const r = await fetch(`${SUPABASE_URL}${path}`, {
-    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+    headers: { ...supabaseAuthHeaders(SERVICE_KEY) },
   });
   if (!r.ok) return null;
   return r.json().catch(() => null);
@@ -374,7 +374,7 @@ async function gotrueGetJSON(path) {
 async function gotrueRaw(method, path) {
   const r = await fetch(`${SUPABASE_URL}${path}`, {
     method,
-    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+    headers: { ...supabaseAuthHeaders(SERVICE_KEY) },
   });
   const text = await r.text().catch(() => '');
   return { ok: r.ok, status: r.status, text };
@@ -382,8 +382,7 @@ async function gotrueRaw(method, path) {
 async function pgrestGET(path) {
   const r = await fetch(`${SUPABASE_URL}${path}`, {
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       Accept: 'application/json',
     },
   });
@@ -394,8 +393,7 @@ async function pgrestPOST(path, body, extraHeaders) {
   const r = await fetch(`${SUPABASE_URL}${path}`, {
     method: 'POST',
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       'Content-Type': 'application/json',
       ...(extraHeaders || {}),
     },
@@ -408,8 +406,7 @@ async function pgrestPATCH(path, body) {
   const r = await fetch(`${SUPABASE_URL}${path}`, {
     method: 'PATCH',
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       'Content-Type': 'application/json',
       Prefer: 'return=minimal',
     },

@@ -1,3 +1,4 @@
+import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, rejectDemoIntegration } from './_environment.js';
 // api/telegram-link.js — Round 42.
 // Creates a short-lived link token and returns the t.me URL the host
@@ -72,8 +73,7 @@ export default async function handler(req, res) {
 async function pgrestGET(path) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       Accept: 'application/json',
     },
   });
@@ -84,8 +84,7 @@ async function pgrestPOST(path, body) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     method: 'POST',
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       'Content-Type': 'application/json',
       Prefer: 'return=minimal',
     },
@@ -97,8 +96,7 @@ async function pgrestDELETE(path) {
   await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     method: 'DELETE',
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       Prefer: 'return=minimal',
     },
   });

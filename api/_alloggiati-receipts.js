@@ -1,3 +1,4 @@
+import { supabaseAuthHeaders } from './_supabase-auth.js';
 // Round 52: receipt recovery only. No Test, Send, claims or notifications.
 import { assertLiveIntegration, SUPABASE_URL } from './_environment.js';
 import { decryptCredentials } from './_alloggiati-crypto.js';
@@ -28,7 +29,7 @@ export async function collectReceipts({ budgetMs = 12000, now = new Date() } = {
   const clock = deps.clock || Date.now;
   const deadline = clock() + Math.min(30000, Math.max(0, budgetMs));
   const summary = { dates_pending: 0, dates_attached: 0, rows_attached: 0, downloads: 0, errors: 0, deferred: 0 };
-  const headers = { apikey: key, Authorization: `Bearer ${key}` };
+  const headers = { ...supabaseAuthHeaders(key) };
   const timeout = () => {
     const remaining = deadline - clock();
     if (remaining <= 0) throw new Error('receipt_budget');

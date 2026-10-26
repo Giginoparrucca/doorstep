@@ -1,3 +1,4 @@
+import {supabaseAuthHeaders} from '../api/_supabase-auth.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -9,7 +10,7 @@ const insert = source.slice(source.indexOf('async function doCheckinInsert('),
 const helpers = source.slice(source.indexOf('function pickFields('));
 const fields = source.match(/const CHECKIN_WRITE_FIELDS = (\[[\s\S]*?\]);/)[1];
 let rows = [];
-const context = vm.createContext({
+const context = vm.createContext({supabaseAuthHeaders,
   SUPABASE_URL: 'https://database.invalid', SERVICE_KEY: 'test',
   CHECKIN_WRITE_FIELDS: vm.runInNewContext(fields),
   WALKIN_PREFIX: 'WB-', console, recordUsage: async () => {},

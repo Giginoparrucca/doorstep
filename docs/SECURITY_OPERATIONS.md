@@ -25,6 +25,8 @@ This readiness variable is a deployment gate, **not a substitute for protection 
 
 ## Coordinate server-key replacement
 
+See [SECURITY_KEY_ROTATION.md](SECURITY_KEY_ROTATION.md) for the source/production consumer inventory, header preparation, owner entry and rollback/legacy-key gates.
+
 The original plan's “reset service_role key” instruction is not a safe stand-alone rotation procedure. Legacy anon/service_role JWT keys share signing-key dependencies. Current Supabase guidance supports staged migration to publishable and secret keys, which can be managed independently. Read the current project/key state before choosing the procedure.
 
 Inventory Vercel handlers, trusted CI probes and any Supabase cron/webhook/Vault consumers. Verify how each sends `apikey` and bearer authorization; new secret keys are not JWTs, so do not blindly substitute one in a JWT-only path. Test the chosen replacement without revoking the old credential. Coordinate owner credential creation/entry and a quiet window; record consumer names and successful checks, never values.

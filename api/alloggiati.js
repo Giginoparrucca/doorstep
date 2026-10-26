@@ -1,3 +1,4 @@
+import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { handleAlloggiatiSupport, redactSupport } from './_alloggiati-support.js';
 import { createFilingEvidence } from './_alloggiati-evidence.js';
 import { runTestCleanup } from './send-arrival-reminders.js';
@@ -88,7 +89,7 @@ async function resolveHostAndProperty(req, propertyId) {
   try {
     const propRes = await fetch(
       `${SUPABASE_URL}/rest/v1/properties?id=eq.${encodeURIComponent(propertyId)}&select=id,owner_id&limit=1`,
-      { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } },
+      { headers: { ...supabaseAuthHeaders(SERVICE_KEY) } },
     );
     if (!propRes.ok) return { error: { status: 500, body: { error: 'Property lookup failed' } } };
     const rows = await propRes.json();
@@ -103,7 +104,7 @@ async function resolveHostAndProperty(req, propertyId) {
 
 async function sbGet(pathAndQuery) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${pathAndQuery}`, {
-    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, Accept: 'application/json' },
+    headers: { ...supabaseAuthHeaders(SERVICE_KEY), Accept: 'application/json' },
   });
   if (!res.ok) throw new Error(`sbGet ${res.status}: ${await res.text().catch(() => '')}`);
   return res.json();
@@ -114,7 +115,7 @@ async function sbUpsert(table, body, onConflict) {
     {
       method: 'POST',
       headers: {
-        apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+        ...supabaseAuthHeaders(SERVICE_KEY),
         'Content-Type': 'application/json',
         Prefer: 'resolution=merge-duplicates,return=representation',
       },
@@ -127,7 +128,7 @@ async function sbUpsert(table, body, onConflict) {
 async function sbDelete(pathAndQuery) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${pathAndQuery}`, {
     method: 'DELETE',
-    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+    headers: { ...supabaseAuthHeaders(SERVICE_KEY) },
   });
   if (!res.ok) throw new Error(`sbDelete ${res.status}: ${await res.text().catch(() => '')}`);
   return true;
@@ -141,7 +142,7 @@ async function sbPatch(pathAndQuery, body) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${pathAndQuery}`, {
     method: 'PATCH',
     headers: {
-      apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       'Content-Type': 'application/json',
       Prefer: 'return=minimal',
     },
@@ -514,7 +515,7 @@ async function processPropertyAutofile(prop) {
     const claimRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/claim_autofile_rows`, {
       method: 'POST',
       headers: {
-        apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+        ...supabaseAuthHeaders(SERVICE_KEY),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ p_property: prop.id, p_ids: okCheckinIds }),
@@ -665,7 +666,7 @@ async function _bumpAttempts(ids, lastError, detail) {
     const bumpRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/bump_autofile_attempts`, {
       method: 'POST',
       headers: {
-        apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+        ...supabaseAuthHeaders(SERVICE_KEY),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ p_ids: ids }),
@@ -927,7 +928,7 @@ async function logFiling({ propertyId, trigger, checkinIds, outcome, errorCode =
     const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/log_alloggiati_filing`, {
       method: 'POST',
       headers: {
-        apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+        ...supabaseAuthHeaders(SERVICE_KEY),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -1411,7 +1412,7 @@ export default async function handler(req, res) {
       const inList = idList.map(x => `"${x}"`).join(',');
       const ownRes = await fetch(
         `${SUPABASE_URL}/rest/v1/checkins?id=in.(${encodeURIComponent(inList)})&select=id,property_id,is_test,deleted_at`,
-        { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } },
+        { headers: { ...supabaseAuthHeaders(SERVICE_KEY) } },
       );
       if (!ownRes.ok) throw new Error(`checkins lookup ${ownRes.status}`);
       const found = await ownRes.json();

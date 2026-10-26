@@ -1,3 +1,4 @@
+import { supabaseAuthHeaders } from './_supabase-auth.js';
 // Admin support reads and explicit SOAP Test only. This module has no Send capability.
 import { parseFilingEvidence } from './_alloggiati-evidence.js';
 export function redactSupport(value, secrets = []) {
@@ -47,7 +48,7 @@ export async function handleAlloggiatiSupport(req, res, deps) {
     const [property] = await get(`properties?id=eq.${encodeURIComponent(propertyId)}&select=id,name,alloggiati_autofile_mode,checkin_time,is_test,deleted_at&limit=1`);
     if (!property || property.deleted_at || property.is_test) return respond(404, { error: 'Active non-test property not found' });
     // Existing audit table: view records identify the admin, property and time.
-    const audit = await fetcher(`${url}/rest/v1/admin_impersonation_log`, { method: 'POST', headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ admin_id: user.id, admin_email: user.email || null, property_id: propertyId, action: 'view' }) });
+    const audit = await fetcher(`${url}/rest/v1/admin_impersonation_log`, { method: 'POST', headers: { ...supabaseAuthHeaders(serviceKey), 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ admin_id: user.id, admin_email: user.email || null, property_id: propertyId, action: 'view' }) });
     if (!audit.ok) return respond(503, { error: 'Support audit unavailable. Retry before continuing.' });
     const scope = `property_id=eq.${encodeURIComponent(propertyId)}`;
     if (action === 'support_status') {

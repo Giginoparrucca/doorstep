@@ -7,10 +7,28 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Round 66 — Check-in-gated entry release (confirmed 2026-10-26)
+
+Daniele explicitly confirmed concurrent development alongside Claude's Round 65. GPT owns Round 66 on `codex/round66-checkin-access` in a separate checkout. Specification: `PLAN_round66_checkin_access_release.md`. Preserve Round 63 and Round 65 ownership. Round 65 retains keybox RPC/security configuration/dependency changes; Round 66 adds policy modules, uniquely named migration/tests, then integrates shared guest/host pages after inspecting the security changes. Do not overwrite one branch with another. Serialize production migrations and merges; rerun full regression on the combined source before release. Round 66 is the entry-release feature; Round 65's prose reference to a future security-paperwork “Round 66” is not an allocated security implementation round.
+
+| Phase | Status | Gate |
+|---|---|---|
+| 1 — Authoritative policy and protected delivery | in-progress — GPT | New server policy, trusted roster, time rules, audited override and protected projections; API/RPC, tenant, concurrency/error tests plus full suite. |
+| 2 — Host and guest interfaces | pending — GPT | Opt-in setup, release status/override, guest cards/refresh and IT/EN desktop/mobile browser gates plus full suite. |
+| 3 — Integrated release and guides | pending — GPT | Merge Round 65 security changes first where shared; AI/history/message/cache tests, guides, full regression/CI/schema-drift/live evidence. |
+
+Claim committed before implementation. Activation remains unavailable until all exposure paths are protected. No production database mutation or runtime pass claimed at this point.
+
+### Round 66 Phase 0 — Check-in-gated entry instructions plan (GPT, 2026-10-26)
+
+- Daniele approved the design and requested a round write-up. Published `PLAN_round66_checkin_access_release.md`; queued after the newly reserved Round 65 security sprint. Preserved all existing in-flight phases and ownership.
+- Specifies per-property opt-in (default OFF), all-required-guests completion independent of Alloggiati, optional property-local arrival release time, audited booking override, correct room/code precedence, and shared enforcement across APIs, AI, chat history and automated messages. Includes unknown-roster handling, existing-content review, cache controls and secure rollback.
+- Three implementation phases with full regression and phase-specific acceptance gates. Documentation only: no runtime/schema/host changes and no runtime test pass claimed. Plan/roadmap structure and numbering checked; publication read-back required. Next step: new-round recap/confirmation before implementation; coordinate with Round 65 security changes.
+
 ### Round 65 — Security hardening sprint (confirmed 2026-10-26)
 
 Daniele confirmed the recap on 2026-10-26 after the 5-domain security assessment at `docs/SECURITY_ASSESSMENT_2026-10.md` identified 2 CRITICAL (chat XSS, keybox RPC), 14 HIGH, 28 MEDIUM, 13 LOW findings. Specification: `PLAN_round65_security_hardening.md`.
-This Round runs alongside the preserved Round 63 iReservation pilot/provider gate and the shipped Round 64 admin Ops metrics; their ownership and pending phases are unchanged.
+This Round runs alongside the preserved Round 63 iReservation pilot/provider gate, the shipped Round 64 admin Ops metrics, and the newly opened Round 66 check-in-gated entry release; their ownership and pending phases are unchanged.
 
 | Phase | Status | Where / test gate |
 |---|---|---|
@@ -23,7 +41,7 @@ This Round runs alongside the preserved Round 63 iReservation pilot/provider gat
 | 7 — Secrets scoping + SECURITY.md + GitHub Environment | pending | Add `SECURITY.md` with `security@welcomebnb.it` disclosure. Move `SUPABASE_SERVICE_ROLE_KEY` into a `production` GitHub Environment with required reviewer + `main`-branch-only. Enable Private Vulnerability Reporting. **Owner-only steps** required: Daniele creates mailbox + rotates key + creates Environment + enables PVR. |
 | 8 — Regression lock + release | pending | `npm run test:all` green on main; `npm run test:live` green against prod with the environment-scoped key; CHANGELOG close with totals + PR list + prod deployment SHA + `curl -I https://app.welcomebnb.it/` showing CSP, HSTS, X-Frame-Options. |
 
-**Deferred to Round 66 (90-day paper trail):** ROPA, DPA template, BREACH_SOP, DSAR self-service, admin audit log, log scrubbing, Vercel Firewall rate limits, backup drill, signed commits, pentest. All documented in `docs/SECURITY_ASSESSMENT_2026-10.md` section 7.
+**Deferred 90-day paper trail (future round, number TBD after Round 66 lands):** ROPA, DPA template, BREACH_SOP, DSAR self-service, admin audit log, log scrubbing, Vercel Firewall rate limits, backup drill, signed commits, pentest. All documented in `docs/SECURITY_ASSESSMENT_2026-10.md` section 7.
 
 ### Round 64 — Admin Ops metrics (confirmed 2026-10-25)
 

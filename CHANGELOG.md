@@ -12,6 +12,12 @@ Newest entries at the top of each section.
 Daniele approved the recap and implementation. Specification: `PLAN_round64_admin_ops_metrics.md`.
 This focused admin Round runs alongside the preserved Round 63 pilot/provider gate; its ownership and pending phases are unchanged.
 
+#### Phase 5 — Original-attempt investigation (GPT-6, 2026-10-26)
+
+- Follow-up request: reconstruct the original failure rather than infer it from a present expired-date Test. Claimed this phase before implementation. Add a read-only per-booking oldest-attempt timeline, shared-batch impact and current duplicate/group checks, with explicit limits on historical evidence. No real portal Test/Send or guest changes.
+- Read-only incident investigation found first affected booking submissions on the arrival day and its first batch at the configured overnight schedule. Two current family-head rows have identical identity/document/stay fields; later batches also included other bookings. This is a concrete investigation lead, not proof of the original rejected field. Historical logs only retained generic descriptions; Vercel API confirms historical runtime logs are outside the account retention window. No secrets or guest identities are published.
+- Full regression, green CI, production source/auth/read-only smoke remain required before release.
+
 #### Phase 4 — SOAP empty-tag parsing and expired-arrival guidance (GPT-6, 2026-10-26)
 
 - User-provided validation screenshot exposed XML spill from self-closing overall ErroreDes/ErroreDettaglio fields into a later row. Bounded empty/paired/prefixed element extraction fixes the spill; operation-level status is scoped to its own result (GenerateToken retains its sibling result/TokenInfo split). Empty/missing status fails closed and nil row entries retain unknown positions. False/unknown row status can no longer be labelled code ok.
@@ -60,6 +66,7 @@ This focused admin Round runs alongside the preserved Round 63 pilot/provider ga
 | 2 — Sort and filter Hosts & Properties | shipped — PR #200 — GPT-6 | User-requested follow-up; keyboard-accessible column sorting, text/city/operational filters, browser/full regression, green PR CI and production verification. |
 | 3 — Alloggiati support diagnostics | shipped — PR #201 — GPT-6 | Admin-only connection health/history, per-booking no-send validation and corrective guidance; synthetic auth/transport/browser gates, full regression, CI, deployed smoke. |
 | 4 — Correct SOAP empty-tag diagnostics | shipped — PR #202 — GPT-6 | Bounded empty/self-closing SOAP parsing, operation result scope, factual arrival-date guidance and synthetic wire fixtures. Full regression 68/0/3, green PR CI, deployed source/auth checks and post-deploy live 2/0/3 verified. |
+| 5 — Investigate original attempts | in-progress — GPT-6 | Oldest booking history, shared-batch evidence and current duplicate/group warnings; no historical-cause inference from a new Test. |
 
 ### Round 63 Phase 3 — pilot/cutover preparation resumed (GPT-6, 2026-10-24)
 

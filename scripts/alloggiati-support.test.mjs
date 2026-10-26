@@ -41,7 +41,7 @@ const sendStart=api.indexOf("  if (action === 'send')");const mint=api.indexOf('
 for(const scenario of ['auth','test_transport','test_rejected','send_transport','send_rejected','send_partial','success']){
  const audit=[];let sent=0;
  const context=vm.createContext({console:{warn(){},error(){}},propertyId:property,checkinIdsFlat:[id],rowsIn:[{checkin_ids:[id]}],lines:['X'.repeat(168)],owner:{hostId:'owner'},creds:{utente:'USERSECRET',password:'PASSSECRET',wskey:'KEYSECRET'},redactSupport,
- logFiling:async item=>audit.push(item),
+ evidence:{run:async(_stage,operation)=>operation({}),redact:value=>value},logFiling:async item=>audit.push(item),
  generateToken:async()=>{if(scenario==='auth')throw Error('PASSSECRET');return {token:'TOKENSECRET'};},
  soapTest:async()=>{if(scenario==='test_transport')throw Error('PASSSECRET');return {overall:{ok:true},perRow:[{ok:scenario!=='test_rejected',erroreDes:'Bad field',erroreDet:'Data nascita non valida'}]};},
  soapSend:async()=>{sent++;if(scenario==='send_transport')throw Error('TOKENSECRET');return {overall:{ok:scenario!=='send_rejected',code:'rejected',erroreDes:'Rejected'},perRow:[{ok:scenario!=='send_partial',erroreDes:'Partial',erroreDet:'Check portal'}]};},

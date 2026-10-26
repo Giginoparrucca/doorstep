@@ -57,7 +57,7 @@ function pickTag(xml, tag) {
   return readElement(xml, tag)?.content || '';
 }
 
-async function postSoap({ soapAction, body, timeoutMs }) {
+async function postSoap({ soapAction, body, timeoutMs, onResponse }) {
   assertLiveIntegration('alloggiati');
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs || DEFAULT_TIMEOUT_MS);
@@ -85,6 +85,7 @@ async function postSoap({ soapAction, body, timeoutMs }) {
   }
   clearTimeout(t);
   const text = await res.text().catch(() => '');
+  if (onResponse) await onResponse({ status: res.status, body: text });
   if (!res.ok) {
     // SOAP faults come back as 500 with a <soap:Fault> body. Pick the
     // <faultstring> if there is one, otherwise report the status.
@@ -164,6 +165,7 @@ export async function generateToken({ utente, password, wskey }, opts = {}) {
     soapAction: `${SOAP_NS}/GenerateToken`,
     body,
     timeoutMs: opts.timeoutMs,
+    onResponse: opts.onResponse,
   });
   const r = interpretResult(xml, 'GenerateTokenResult');
   if (!r.ok) {
@@ -249,6 +251,7 @@ export async function test({ utente, token, rows }, opts = {}) {
     soapAction: `${SOAP_NS}/Test`,
     body,
     timeoutMs: opts.timeoutMs || 15000,
+    onResponse: opts.onResponse,
   });
   const overallResult = interpretResult(xml, 'TestResult');
   if (overallResult.shapeUnknown) {
@@ -304,6 +307,7 @@ export async function send({ utente, token, rows }, opts = {}) {
     // Send is comparable to Test in wall time but takes a bit longer
     // because it commits — give it more headroom.
     timeoutMs: opts.timeoutMs || 20000,
+    onResponse: opts.onResponse,
   });
   const overallResult = interpretResult(xml, 'SendResult');
   if (overallResult.shapeUnknown) {

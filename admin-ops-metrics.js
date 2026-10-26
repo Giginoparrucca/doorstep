@@ -66,7 +66,7 @@
       if (c.alloggiati_status === 'filed' && inPeriod(c.filed_at)) m.sent++;
       const err = String(c.autofile_last_error || '').split(':')[0];
       if (!['filed', 'filing'].includes(c.alloggiati_status) && inPeriod(c.autofile_last_attempt_at) &&
-          ['generate_token_failed', 'test_failed', 'test_rejected', 'test_transport_error', 'send_failed', 'send_rejected', 'send_transport_error'].includes(err)) m.failed++;
+          ['generate_token_failed', 'test_failed', 'test_rejected', 'test_transport_error', 'send_failed', 'send_rejected', 'send_transport_error', 'send_result_uncertain', 'send_result_requires_review', 'prior_send_requires_review'].includes(err)) m.failed++;
       const k = key(c);
       if (c.booking_code && !seenReservations.has(k) && !excluded.has(k) && arrived(c.arrival_date)) cohort.set(k, c.property_id);
     }

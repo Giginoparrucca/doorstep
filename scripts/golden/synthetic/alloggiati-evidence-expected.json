@@ -1,0 +1,225 @@
+[
+  {
+    "outcome": "evidence_started",
+    "evidence": {
+      "evidence_version": 1,
+      "attempt_id": "55555555-5555-4555-8555-555555555555",
+      "sequence": 1,
+      "stage": "test",
+      "event": "started",
+      "captured_at": "2026-10-26T03:00:00.000Z",
+      "code_version": "FICTIONAL_CODE_VERSION",
+      "parser_version": "64.6",
+      "request_sha256": "ec2e132cfc3c8572561a149f41fe57ec97a69834f9b84f801421a2683ceaf20b",
+      "rows": [
+        {
+          "idx": 1,
+          "checkin_ids": [
+            "33333333-3333-4333-8333-333333333333"
+          ],
+          "arrival_date": "04/05/2026",
+          "sha256": "0583504cc591ca55cebaebae6cc87c694ecf744fa9a06bf35e4ee13b3dc0429b"
+        },
+        {
+          "idx": 2,
+          "checkin_ids": [
+            "44444444-4444-4444-8444-444444444444"
+          ],
+          "arrival_date": "10/05/2026",
+          "sha256": "e5499def9a51570df59b8dfc2672bdebc8a7fba97c476d60bb0462daa8b470c3"
+        }
+      ],
+      "source": "application"
+    }
+  },
+  {
+    "outcome": "evidence_response",
+    "evidence": {
+      "evidence_version": 1,
+      "attempt_id": "55555555-5555-4555-8555-555555555555",
+      "sequence": 2,
+      "stage": "test",
+      "event": "response",
+      "captured_at": "2026-10-26T03:00:00.000Z",
+      "code_version": "FICTIONAL_CODE_VERSION",
+      "parser_version": "64.6",
+      "request_sha256": "ec2e132cfc3c8572561a149f41fe57ec97a69834f9b84f801421a2683ceaf20b",
+      "rows": [
+        {
+          "idx": 1,
+          "checkin_ids": [
+            "33333333-3333-4333-8333-333333333333"
+          ],
+          "arrival_date": "04/05/2026",
+          "sha256": "0583504cc591ca55cebaebae6cc87c694ecf744fa9a06bf35e4ee13b3dc0429b"
+        },
+        {
+          "idx": 2,
+          "checkin_ids": [
+            "44444444-4444-4444-8444-444444444444"
+          ],
+          "arrival_date": "10/05/2026",
+          "sha256": "e5499def9a51570df59b8dfc2672bdebc8a7fba97c476d60bb0462daa8b470c3"
+        }
+      ],
+      "source": "portal_response",
+      "http_status": 200,
+      "response_sha256": "9d7fa49bdb17c7d68424cbd8bff79748008af6e973b3441e5d512c6a027ddf82",
+      "diagnostic_fields": [
+        {
+          "field": "esito",
+          "value": "true"
+        },
+        {
+          "field": "ErroreCod",
+          "value": "0"
+        },
+        {
+          "field": "SchedineValide",
+          "value": "0"
+        },
+        {
+          "field": "esito",
+          "value": "false"
+        },
+        {
+          "field": "ErroreCod",
+          "value": "12"
+        },
+        {
+          "field": "ErroreDes",
+          "value": "SCHEDINA_CAMPO_NON_CORRETTO"
+        },
+        {
+          "field": "ErroreDettaglio",
+          "value": "Data di Arrivo Errata"
+        },
+        {
+          "field": "esito",
+          "value": "false"
+        },
+        {
+          "field": "ErroreCod",
+          "value": "12"
+        },
+        {
+          "field": "ErroreDes",
+          "value": "SCHEDINA_CAMPO_NON_CORRETTO"
+        },
+        {
+          "field": "ErroreDettaglio",
+          "value": "Data di Arrivo Errata"
+        }
+      ],
+      "response_elements": [
+        "soap:Envelope",
+        "soap:Body",
+        "TestResponse",
+        "TestResult",
+        "esito",
+        "esito",
+        "ErroreCod",
+        "ErroreCod",
+        "ErroreDes",
+        "ErroreDettaglio",
+        "TestResult",
+        "result",
+        "SchedineValide",
+        "SchedineValide",
+        "Dettaglio",
+        "EsitoOperazioneServizio",
+        "esito",
+        "esito",
+        "ErroreCod",
+        "ErroreCod",
+        "ErroreDes",
+        "ErroreDes",
+        "ErroreDettaglio",
+        "ErroreDettaglio",
+        "EsitoOperazioneServizio",
+        "EsitoOperazioneServizio",
+        "esito",
+        "esito",
+        "ErroreCod",
+        "ErroreCod",
+        "ErroreDes",
+        "ErroreDes",
+        "ErroreDettaglio",
+        "ErroreDettaglio",
+        "EsitoOperazioneServizio",
+        "Dettaglio",
+        "result",
+        "TestResponse",
+        "soap:Body",
+        "soap:Envelope"
+      ]
+    }
+  },
+  {
+    "outcome": "evidence_failure",
+    "evidence": {
+      "evidence_version": 1,
+      "attempt_id": "55555555-5555-4555-8555-555555555555",
+      "sequence": 3,
+      "stage": "test",
+      "event": "failure",
+      "captured_at": "2026-10-26T03:00:00.000Z",
+      "code_version": "FICTIONAL_CODE_VERSION",
+      "parser_version": "64.6",
+      "request_sha256": "ec2e132cfc3c8572561a149f41fe57ec97a69834f9b84f801421a2683ceaf20b",
+      "rows": [
+        {
+          "idx": 1,
+          "checkin_ids": [
+            "33333333-3333-4333-8333-333333333333"
+          ],
+          "arrival_date": "04/05/2026",
+          "sha256": "0583504cc591ca55cebaebae6cc87c694ecf744fa9a06bf35e4ee13b3dc0429b"
+        },
+        {
+          "idx": 2,
+          "checkin_ids": [
+            "44444444-4444-4444-8444-444444444444"
+          ],
+          "arrival_date": "10/05/2026",
+          "sha256": "e5499def9a51570df59b8dfc2672bdebc8a7fba97c476d60bb0462daa8b470c3"
+        }
+      ],
+      "source": "portal_rejection",
+      "error_code": "portal_rejected",
+      "overall": {
+        "ok": true,
+        "code": "ok",
+        "erroreCod": 0,
+        "erroreDes": "",
+        "erroreDet": ""
+      },
+      "response_count": 2,
+      "per_row": [
+        {
+          "idx": 1,
+          "checkin_ids": [
+            "33333333-3333-4333-8333-333333333333"
+          ],
+          "ok": false,
+          "code": "row_rejected",
+          "erroreCod": 12,
+          "erroreDes": "SCHEDINA_CAMPO_NON_CORRETTO",
+          "erroreDet": "Data di Arrivo Errata"
+        },
+        {
+          "idx": 2,
+          "checkin_ids": [
+            "44444444-4444-4444-8444-444444444444"
+          ],
+          "ok": false,
+          "code": "row_rejected",
+          "erroreCod": 12,
+          "erroreDes": "SCHEDINA_CAMPO_NON_CORRETTO",
+          "erroreDet": "Data di Arrivo Errata"
+        }
+      ],
+      "send_result_uncertain": false
+    }
+  }
+]

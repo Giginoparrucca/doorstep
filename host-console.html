@@ -13608,7 +13608,21 @@ async function loadHostChat() {
   // Name header — shows the capofamiglia for the selected conversation so the
   // host knows who they're talking to without decoding the booking code.
   let nameHeader = '';
-  const escHtml = (s) => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  // Round 65 Phase 1 — chat XSS fix. The previous escHtml missed `'` and
+  // backtick; combined with the unescaped `${m.message}` interpolations
+  // below, a guest-authored message like `<img src=x onerror=…>` would run
+  // in the authenticated host session. Covered by scripts/round65-chat-xss.test.mjs.
+  const chatSafe = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/`/g, '&#96;');
+  // Bot bubble supports **bold** markdown. Must escape FIRST, then apply the
+  // regex to the already-escaped text (the literal `**` survives escaping).
+  const chatSafeBot = (s) => chatSafe(s).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  const escHtml = chatSafe;
   if (selected === '_no_code') {
     nameHeader = `<div style="padding:10px 14px;margin-bottom:10px;background:var(--cream-2);border-radius:8px;border-left:3px solid var(--ink-soft);">
       <div style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-2);font-weight:600;">${h('chat_with')}</div>
@@ -13654,20 +13668,20 @@ async function loadHostChat() {
     if (m.sender === 'guest') {
       return `<div style="align-self:flex-start;max-width:85%;background:var(--cream-2);border-radius:12px 12px 12px 2px;padding:10px 14px;">
         <div style="font-size:0.72rem;color:var(--ink-soft);margin-bottom:3px;">${date} ${time}</div>
-        <div style="font-size:0.88rem;color:var(--ink);line-height:1.5;">${m.message}</div>
+        <div style="font-size:0.88rem;color:var(--ink);line-height:1.5;">${chatSafe(m.message)}</div>
       </div>`;
     } else if (m.sender === 'host') {
       return `<div style="align-self:flex-end;max-width:85%;background:var(--warm);border-radius:12px 12px 2px 12px;padding:10px 14px;">
         <div style="font-size:0.72rem;color:rgba(255,255,255,0.6);margin-bottom:3px;">${h('chat_you')} · ${time}</div>
-        <div style="font-size:0.88rem;color:#fff;line-height:1.5;">${m.message}</div>
+        <div style="font-size:0.88rem;color:#fff;line-height:1.5;">${chatSafe(m.message)}</div>
       </div>`;
     } else if (m.sender === 'bot') {
       return `<div style="align-self:flex-start;max-width:85%;background:rgba(74,144,217,0.06);border:1px solid rgba(74,144,217,0.12);border-radius:12px;padding:10px 14px;">
         <div style="font-size:0.72rem;color:var(--blue);margin-bottom:3px;">🤖 AI · ${time}</div>
-        <div style="font-size:0.85rem;color:var(--ink-2);line-height:1.5;">${m.message.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</div>
+        <div style="font-size:0.85rem;color:var(--ink-2);line-height:1.5;">${chatSafeBot(m.message)}</div>
       </div>`;
     } else if (m.sender === 'system') {
-      return `<div style="text-align:center;font-size:0.78rem;color:var(--amber);padding:8px;font-weight:500;">⚠️ ${m.message}</div>`;
+      return `<div style="text-align:center;font-size:0.78rem;color:var(--amber);padding:8px;font-weight:500;">⚠️ ${chatSafe(m.message)}</div>`;
     }
     return '';
   }).join('');

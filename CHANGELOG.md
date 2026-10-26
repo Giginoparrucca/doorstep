@@ -25,6 +25,24 @@ Claim committed before implementation. Activation remains unavailable until all 
 - Specifies per-property opt-in (default OFF), all-required-guests completion independent of Alloggiati, optional property-local arrival release time, audited booking override, correct room/code precedence, and shared enforcement across APIs, AI, chat history and automated messages. Includes unknown-roster handling, existing-content review, cache controls and secure rollback.
 - Three implementation phases with full regression and phase-specific acceptance gates. Documentation only: no runtime/schema/host changes and no runtime test pass claimed. Plan/roadmap structure and numbering checked; publication read-back required. Next step: new-round recap/confirmation before implementation; coordinate with Round 65 security changes.
 
+### Round 65 — Security hardening sprint (confirmed 2026-10-26)
+
+Daniele confirmed the recap on 2026-10-26 after the 5-domain security assessment at `docs/SECURITY_ASSESSMENT_2026-10.md` identified 2 CRITICAL (chat XSS, keybox RPC), 14 HIGH, 28 MEDIUM, 13 LOW findings. Specification: `PLAN_round65_security_hardening.md`.
+This Round runs alongside the preserved Round 63 iReservation pilot/provider gate, the shipped Round 64 admin Ops metrics, and the newly opened Round 66 check-in-gated entry release; their ownership and pending phases are unchanged.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 1 — CRIT-1: escape chat innerHTML | shipped — PR TBD — Claude Opus 4.7 | Fixed stored XSS at `host-console.html:13657-13670`. Added two helpers inside `renderHostChatPanel` — `chatSafe` (escapes `& < > " ' \``) and `chatSafeBot` (escapes first, then applies `**bold**` markdown on the already-escaped text). All 4 bubbles (guest / host / bot / system) now interpolate through the matching helper; `${m.message}` raw interpolation is gone. The old scope-local `escHtml` is aliased to `chatSafe` for backward compat with the name header. `scripts/round65-chat-xss.test.mjs` joins the suite — static regex guards no renderer regresses + sandbox-executes the helpers against 7 attack-shaped inputs (img/script/svg/attr-break/single-quote/backtick/all-dangerous) + null-safety + adversarial `**<img …>**` cannot inject HTML inside the bold wrapper. Full regression: **PASS 71 / FAIL 0 / SKIP 3**. |
+| 2 — CRIT-2: owner check on `get_reservation_keybox` RPC | pending | New migration adds explicit owner enforcement to the SECURITY DEFINER function. Behavioural RLS probe: owner-of-property call succeeds; different-owner call raises 42501; anon call raises 42501. Applied to prod via Supabase MCP; schema-drift live gate (AGENTS.md rule 8). |
+| 3 — Database HIGHs: REVOKE anon on cron RPCs + lock down `marketing_consents` | pending | One migration REVOKEing `purge_old_id_photos` / `enqueue_orphan_documents` / `list_hosts_for_admin` from PUBLIC/anon/authenticated; tightening `marketing_consents_anon_insert` to require property existence. Live behavioural probe for each. |
+| 4 — Backend HIGHs: SSRF guard + error-folding on `api/ical-sync.js` | pending | New `_isSafeFeedUrl` rejects non-https, RFC1918/127/169.254/::1/fc00::/7, caps redirects at 2, re-validates per redirect. Error strings folded to a short enum. Pure Node unit test covers the matrix. |
+| 5 — Frontend HIGHs: safe() quote escape + CSP + clickjacking + target=_blank | pending | Extend `safe()` to also escape `'` and `` ` ``. New `vercel.json` with CSP (report-only Phase 5a, enforce Phase 5b), X-Frame-Options DENY, HSTS preload, X-Content-Type-Options, Referrer-Policy, Permissions-Policy. Add `rel="noopener noreferrer"` to two `target="_blank"` sites. New live-headers smoke. |
+| 6 — Supply chain: pin + SRI Supabase JS, commit lockfile, Dependabot, pin Actions SHAs | pending | Pin exact Supabase JS version everywhere + add `integrity="sha384-…"`. Remove `package-lock.json` from `.gitignore`, commit it, switch CI `npm install` → `npm ci`. New `.github/dependabot.yml`. Pin GitHub Actions to SHAs. |
+| 7 — Secrets scoping + SECURITY.md + GitHub Environment | pending | Add `SECURITY.md` with `security@welcomebnb.it` disclosure. Move `SUPABASE_SERVICE_ROLE_KEY` into a `production` GitHub Environment with required reviewer + `main`-branch-only. Enable Private Vulnerability Reporting. **Owner-only steps** required: Daniele creates mailbox + rotates key + creates Environment + enables PVR. |
+| 8 — Regression lock + release | pending | `npm run test:all` green on main; `npm run test:live` green against prod with the environment-scoped key; CHANGELOG close with totals + PR list + prod deployment SHA + `curl -I https://app.welcomebnb.it/` showing CSP, HSTS, X-Frame-Options. |
+
+**Deferred 90-day paper trail (future round, number TBD after Round 66 lands):** ROPA, DPA template, BREACH_SOP, DSAR self-service, admin audit log, log scrubbing, Vercel Firewall rate limits, backup drill, signed commits, pentest. All documented in `docs/SECURITY_ASSESSMENT_2026-10.md` section 7.
+
 ### Round 64 — Admin Ops metrics (confirmed 2026-10-25)
 
 Daniele approved the recap and implementation. Specification: `PLAN_round64_admin_ops_metrics.md`.
@@ -236,7 +254,6 @@ This focused admin Round runs alongside the preserved Round 63 pilot/provider ga
 
 | Round | Scope | Specification | Status |
 |---|---|---|---|
-| 65 | Security hardening sprint — 30-day roadmap: 2 CRITICAL fixes (chat XSS, keybox RPC), 14 HIGH fixes (database GRANTs, iCal SSRF, CSP, SRI, lockfile, Dependabot, SECURITY.md, service-role key scoping) | `PLAN_round65_security_hardening.md` (companion: `docs/SECURITY_ASSESSMENT_2026-10.md`) | pending — awaiting Daniele |
 
 Standing rule added 2026-10-18 (AGENTS.md "Full regression"): every phase gate runs the whole suite, not only plan-listed tests.
 

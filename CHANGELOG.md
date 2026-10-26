@@ -7,6 +7,12 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Round 66 Phase 0 — Check-in-gated entry instructions plan (GPT, 2026-10-26)
+
+- Daniele approved the design and requested a round write-up. Published `PLAN_round66_checkin_access_release.md`; queued after the newly reserved Round 65 security sprint. Preserved all existing in-flight phases and ownership.
+- Specifies per-property opt-in (default OFF), all-required-guests completion independent of Alloggiati, optional property-local arrival release time, audited booking override, correct room/code precedence, and shared enforcement across APIs, AI, chat history and automated messages. Includes unknown-roster handling, existing-content review, cache controls and secure rollback.
+- Three implementation phases with full regression and phase-specific acceptance gates. Documentation only: no runtime/schema/host changes and no runtime test pass claimed. Plan/roadmap structure and numbering checked; publication read-back required. Next step: new-round recap/confirmation before implementation; coordinate with Round 65 security changes.
+
 ### Round 64 — Admin Ops metrics (confirmed 2026-10-25)
 
 Daniele approved the recap and implementation. Specification: `PLAN_round64_admin_ops_metrics.md`.
@@ -219,6 +225,7 @@ This focused admin Round runs alongside the preserved Round 63 pilot/provider ga
 | Round | Scope | Specification | Status |
 |---|---|---|---|
 | 65 | Security hardening sprint — 30-day roadmap: 2 CRITICAL fixes (chat XSS, keybox RPC), 14 HIGH fixes (database GRANTs, iCal SSRF, CSP, SRI, lockfile, Dependabot, SECURITY.md, service-role key scoping) | `PLAN_round65_security_hardening.md` (companion: `docs/SECURITY_ASSESSMENT_2026-10.md`) | pending — awaiting Daniele |
+| 66 | Entry instructions released after booking-wide completed check-in; optional arrival-time restriction, audited host override, server/API/AI/message protection | `PLAN_round66_checkin_access_release.md` | pending — specification complete; implementation not started |
 
 Standing rule added 2026-10-18 (AGENTS.md "Full regression"): every phase gate runs the whole suite, not only plan-listed tests.
 

@@ -3475,7 +3475,7 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
             <td><div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
               <button type="button" onclick="showAlloggiatiSupport('${p.id}')" style="padding:4px 8px;background:#fff;color:#005BFF;border:1px solid #005BFF;border-radius:4px;font-size:0.65rem;cursor:pointer;">Alloggiati support</button>
               <button onclick="viewAsHost('${p.id}')" style="padding:4px 8px;background:#005BFF;color:#fff;border:none;border-radius:4px;font-size:0.65rem;cursor:pointer;white-space:nowrap;">👁 Console</button>
-              <a href="${APP_CONFIG.appOrigin}/?p=${encodeURIComponent(p.id)}" target="_blank" style="padding:4px 8px;background:#6B7A90;color:#fff;border-radius:4px;font-size:0.65rem;text-decoration:none;white-space:nowrap;">👁 Guest app</a>
+              <a href="${APP_CONFIG.appOrigin}/?p=${encodeURIComponent(p.id)}" target="_blank" rel="noopener noreferrer" style="padding:4px 8px;background:#6B7A90;color:#fff;border-radius:4px;font-size:0.65rem;text-decoration:none;white-space:nowrap;">👁 Guest app</a>
               ${p._email ? `<button onclick="document.getElementById('userFilter').value='${p._email}';setActiveTab('deepdive');" style="padding:4px 8px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.65rem;cursor:pointer;color:var(--warm);font-weight:500;white-space:nowrap;">📊</button>` : ''}
               ${adminRowActions('properties', p)}
             </div></td>

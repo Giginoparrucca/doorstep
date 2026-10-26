@@ -2629,7 +2629,7 @@ async function renderDismissedList() {
     }</div>`;
     return;
   }
-  const safe = s => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const safe = s => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])).replace(/['`\/]/g, c => ({"'":'&#39;','`':'&#96;','/':'&#47;'}[c]));
   el.innerHTML = rows.map(r => {
     const when = new Date(r.dismissed_at).toLocaleDateString(it ? 'it-IT' : 'en-GB');
     return `
@@ -2638,7 +2638,7 @@ async function renderDismissedList() {
           <span style="font-family:monospace;font-size:0.78rem;color:var(--warm);">${safe(r.booking_code)}</span>
           <span style="font-size:0.7rem;color:var(--ink-soft);margin-left:8px;">${safe(when)}</span>
         </div>
-        <button class="btn btn-secondary btn-sm" onclick="restoreDismissal('${safe(r.booking_code)}')"
+        <button class="btn btn-secondary btn-sm" data-booking-code="${safe(r.booking_code)}" onclick="restoreDismissal(this.dataset.bookingCode)"
                 style="padding:4px 10px;font-size:0.7rem;">${h('btn_restore') || (it ? 'Ripristina' : 'Restore')}</button>
       </div>`;
   }).join('');
@@ -3501,7 +3501,7 @@ async function renderGaGuestBreakdown(events, summaryMap) {
     return;
   }
 
-  const safe = s => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const safe = s => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])).replace(/['`\/]/g, c => ({"'":'&#39;','`':'&#96;','/':'&#47;'}[c]));
 
   const recoLabel = (cats) => {
     if (!cats || cats.length === 0) return '';
@@ -3610,7 +3610,7 @@ function renderGaRecoActivity(events, capoMap) {
     return;
   }
 
-  const safe = s => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const safe = s => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])).replace(/['`\/]/g, c => ({"'":'&#39;','`':'&#96;','/':'&#47;'}[c]));
   const anonLabel = h('ga_breakdown_anonymous')   || 'Anonymous';
   const preLabel  = h('ga_breakdown_precheckin')  || 'Booking';
   const preSuffix = h('ga_breakdown_precheckin_suffix') || 'pre check-in';
@@ -5793,7 +5793,7 @@ async function renderDashboard() {
   });
 
   // ── Render ──────────────────────────────────────────────────────────
-  const safe = s => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const safe = s => String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])).replace(/['`\/]/g, c => ({"'":'&#39;','`':'&#96;','/':'&#47;'}[c]));
 
   const renderRow = (r, paneTone) => {
     const eng = r.eng;
@@ -5861,7 +5861,7 @@ async function renderDashboard() {
           ${statusBadge}
           ${awaitingBadge}
         </div>
-        <button onclick="dismissBooking('${safe(r.code)}', '${safe(r.summary.name)}')" title="${safe(h('dash_dismiss_tooltip') || 'Hide this booking from your dashboard')}"
+        <button data-booking-code="${safe(r.code)}" data-guest-name="${safe(r.summary.name)}" onclick="dismissBooking(this.dataset.bookingCode, this.dataset.guestName)" title="${safe(h('dash_dismiss_tooltip') || 'Hide this booking from your dashboard')}"
                 style="position:absolute;top:8px;right:8px;background:transparent;border:none;cursor:pointer;color:var(--ink-soft);font-size:0.78rem;line-height:1;padding:6px 8px;border-radius:6px;transition:all 0.15s;"
                 onmouseover="this.style.background='rgba(224,90,90,0.08)';this.style.color='#c84545'"
                 onmouseout="this.style.background='transparent';this.style.color='var(--ink-soft)'">🗑</button>
@@ -5964,7 +5964,7 @@ async function renderDashboard() {
 async function renderCoverageLostBanner() {
   if (!propertyId) return '';
   const it = hostLang === 'it';
-  const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])).replace(/['`\/]/g, c => ({"'":'&#39;','`':'&#96;','/':'&#47;'}[c]));
   let echoes = [];
   try {
     const { data, error } = await sb.from('ota_reservations')
@@ -6018,7 +6018,7 @@ async function renderCoverageLostBanner() {
       <div style="display:flex;gap:12px;align-items:flex-start;padding:12px 14px;background:rgba(232,184,75,0.12);border:1px solid rgba(232,184,75,0.4);border-radius:10px;margin-bottom:8px;">
         <span style="font-size:1.1rem;line-height:1;">⚠️</span>
         <div style="flex:1;min-width:0;font-size:0.86rem;color:#7d5e10;line-height:1.4;">${safe(line)}</div>
-        <button type="button" onclick="dismissCoverageLost('${safe(echo.id)}', this)"
+        <button type="button" data-reservation-id="${safe(echo.id)}" onclick="dismissCoverageLost(this.dataset.reservationId, this)"
           style="padding:4px 10px;background:transparent;border:1px solid rgba(154,107,0,0.35);border-radius:6px;font-size:0.72rem;cursor:pointer;color:#7d5e10;font-family:inherit;white-space:nowrap;">
           ${safe(it ? 'Ignora' : 'Dismiss')}
         </button>
@@ -6070,7 +6070,7 @@ async function renderUpcomingReservationsPanel() {
   if (!propertyId) return '';
   const todayISO = new Date().toISOString().slice(0, 10);
   const in60ISO  = new Date(Date.now() + 60 * 86400000).toISOString().slice(0, 10);
-  const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])).replace(/['`\/]/g, c => ({"'":'&#39;','`':'&#96;','/':'&#47;'}[c]));
   let rows = [];
   try {
     // Round 45 Step 4 — covered_by_reservation_id IS NULL so an OTA
@@ -6237,7 +6237,7 @@ async function renderCalendarPanel() {
 let _upcomingRowsById = {};
 
 function _renderReservationCard(r, todayISO) {
-  const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])).replace(/['`\/]/g, c => ({"'":'&#39;','`':'&#96;','/':'&#47;'}[c]));
   const isHeadType = t => t === 'single' || t === 'head' || t === 'group';
   // Round 45 Step 4 — 'direct' bookings get their own label + purple
   // palette so hosts distinguish them from OTA rows at a glance.
@@ -6355,7 +6355,7 @@ function _renderReservationCard(r, todayISO) {
     : false;
   const alreadyReopened = !!_latestReopenStamp && !_newerSubmissionExists;
   const reopenBtn = (r.booking_code && groupCheckins.length > 0 && !alreadyReopened) ? `
-    <button type="button" onclick="reopenCheckinForBooking('booking', '${safe(r.booking_code)}', '${safe(propertyId)}')"
+    <button type="button" data-booking-code="${safe(r.booking_code)}" data-property-id="${safe(propertyId)}" onclick="reopenCheckinForBooking('booking', this.dataset.bookingCode, this.dataset.propertyId)"
       title="${safe(hostLang === 'it' ? 'Permetti all\'ospite di aggiungere altri membri del gruppo' : 'Let the guest add more group members')}"
       style="padding:4px 10px;background:rgba(232,184,75,0.14);border:1px solid rgba(232,184,75,0.4);border-radius:6px;font-size:0.72rem;cursor:pointer;color:#9a6b00;font-family:inherit;font-weight:500;">🔓 ${safe(hostLang === 'it' ? 'Riapri check-in' : 'Reopen check-in')}</button>` : '';
   const reopenedNote = alreadyReopened ? `
@@ -6368,7 +6368,7 @@ function _renderReservationCard(r, todayISO) {
       <span style="font-size:0.62rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--warm);white-space:nowrap;">${safe(linkLabel)}</span>
       ${codeChip || `<span style="font-family:monospace;font-size:0.7rem;color:var(--ink-soft);">—</span>`}
       <span style="flex:1;"></span>
-      <button type="button" onclick="copyReservationLink('${safe(guestLink)}', this)" title="${safe(hostLang === 'it' ? 'Copia il link prenotazione' : 'Copy the booking link')}"
+      <button type="button" data-guest-link="${safe(guestLink)}" onclick="copyReservationLink(this.dataset.guestLink, this)" title="${safe(hostLang === 'it' ? 'Copia il link prenotazione' : 'Copy the booking link')}"
               style="padding:4px 10px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:0.72rem;cursor:pointer;color:var(--ink);font-family:inherit;">🔗 ${safe(hostLang === 'it' ? 'Copia' : 'Copy')}</button>
       <a href="${safe(guestLink)}" target="_blank" rel="noopener" title="${safe(hostLang === 'it' ? 'Apri come ospite' : 'Open as guest')}"
          style="padding:4px 10px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:0.72rem;color:var(--ink);text-decoration:none;">↗ ${safe(hostLang === 'it' ? 'Apri' : 'Open')}</a>
@@ -6404,7 +6404,7 @@ async function _showReservationDetail(reservationId) {
   const closeExisting = document.getElementById('reservationDetailModal');
   if (closeExisting) closeExisting.remove();
   const it = hostLang === 'it';
-  const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])).replace(/['`\/]/g, c => ({"'":'&#39;','`':'&#96;','/':'&#47;'}[c]));
 
   // Round 45 Step 6 — when the popup opens on a direct row, fetch the
   // full record so we can show the host-only extras (channel, guest
@@ -6499,7 +6499,7 @@ async function _showReservationDetail(reservationId) {
     const rowsHtml = coveredEchoes.map(e => `
       <div style="display:flex;gap:8px;align-items:center;padding:6px 0;font-size:0.82rem;">
         <span style="flex:1;min-width:0;color:var(--ink);">🔗 ${safe(platformLabel(e.platform))} · ${safe(e.checkin_date)} → ${safe(e.checkout_date)} <span style="color:var(--ink-soft);font-size:0.72rem;">(${safe(e.status)})</span></span>
-        <button type="button" onclick="unlinkCoverage('${safe(e.id)}', this)"
+        <button type="button" data-reservation-id="${safe(e.id)}" onclick="unlinkCoverage(this.dataset.reservationId, this)"
           style="padding:3px 8px;background:transparent;border:1px solid var(--border);border-radius:6px;font-size:0.7rem;cursor:pointer;color:var(--ink);font-family:inherit;">
           ${safe(it ? 'Scollega' : 'Unlink')}
         </button>
@@ -6517,8 +6517,8 @@ async function _showReservationDetail(reservationId) {
   if (isDirect) {
     actionsBlock = `
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding-top:12px;border-top:1px solid rgba(107,122,144,0.15);">
-        <button type="button" class="btn btn-secondary btn-sm" onclick="editDirectReservation('${safe(reservationId)}')">✏️ ${safe(it ? 'Modifica' : 'Edit')}</button>
-        <button type="button" class="btn btn-secondary btn-sm" onclick="cancelDirectReservation('${safe(reservationId)}')" style="color:var(--red);border-color:rgba(224,69,94,0.35);">${safe(it ? 'Annulla prenotazione' : 'Cancel booking')}</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-reservation-id="${safe(reservationId)}" onclick="editDirectReservation(this.dataset.reservationId)">✏️ ${safe(it ? 'Modifica' : 'Edit')}</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-reservation-id="${safe(reservationId)}" onclick="cancelDirectReservation(this.dataset.reservationId)" style="color:var(--red);border-color:rgba(224,69,94,0.35);">${safe(it ? 'Annulla prenotazione' : 'Cancel booking')}</button>
       </div>`;
   }
 
@@ -6731,7 +6731,7 @@ function openReservationForm(opts) {
   const mode = (opts && opts.mode) || 'reservation';
   const prefill = (opts && opts.prefill) || {};
   const reservationId = (opts && opts.reservationId) || null;
-  const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])).replace(/['`\/]/g, c => ({"'":'&#39;','`':'&#96;','/':'&#47;'}[c]));
 
   if (!propertyId) {
     try { toast(hostLang === 'it' ? 'Seleziona prima una proprietà.' : 'Select a property first.'); } catch(_) {}
@@ -7076,7 +7076,7 @@ async function saveDirectReservation(ev) {
 async function _renderUpcomingCalendarBody(buildHeader) {
   const it = hostLang === 'it';
   const locale = it ? 'it-IT' : 'en-GB';
-  const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])).replace(/['`\/]/g, c => ({"'":'&#39;','`':'&#96;','/':'&#47;'}[c]));
   if (_upcomingCalYear == null) {
     const now = new Date();
     _upcomingCalYear = now.getFullYear();
@@ -7294,7 +7294,7 @@ async function _renderUpcomingCalendarBody(buildHeader) {
       cells.push(`
         <button type="button" class="cal-day-cell${outside ? ' cal-outside' : ''}${isToday ? ' cal-today' : ''}${isSelected ? ' cal-selected' : ''}"
                 data-cal-day="${safe(iso)}" data-guide="cal-day"
-                onclick="_upcomingCalSelectDay('${safe(iso)}')">
+                data-date="${safe(iso)}" onclick="_upcomingCalSelectDay(this.dataset.date)">
           <span class="cal-day-num">${day.getDate()}</span>
           ${arrivalsCount > 0 ? `<span class="cal-day-badge cal-day-badge-${arrivalsToday[0].checkedIn && arrivalsToday.every(a => a.checkedIn) ? 'in' : 'wait'}">${arrivalsCount}</span>` : ''}
         </button>`);
@@ -7325,7 +7325,7 @@ async function _renderUpcomingCalendarBody(buildHeader) {
         <button type="button" class="cal-bar cal-bar-${tone}"
            data-guide="cal-bar"
            title="${title}"
-           onclick="event.stopPropagation();_showReservationDetail('${safe(b.r.id)}');"
+           data-reservation-id="${safe(b.r.id)}" onclick="event.stopPropagation();_showReservationDetail(this.dataset.reservationId);"
            style="left:${leftPct.toFixed(4)}%;width:${widthPct.toFixed(4)}%;top:${topPx}px;">${barLabel}</button>`);
       // Round 45 Step 3 — coverage-candidate pill. Painted on top of
       // the OTA row (not the direct one) at the right edge of its
@@ -7338,7 +7338,7 @@ async function _renderUpcomingCalendarBody(buildHeader) {
         bars.push(`
           <button type="button" class="cal-cover-pill"
              title="${pillTitle}"
-             onclick="event.stopPropagation();_confirmCoverage('${safe(b.r.id)}','${safe(b.coverCandidateFor)}');"
+             data-reservation-id="${safe(b.r.id)}" data-covered-id="${safe(b.coverCandidateFor)}" onclick="event.stopPropagation();_confirmCoverage(this.dataset.reservationId,this.dataset.coveredId);"
              style="left:${leftPct.toFixed(4)}%;top:${topPx - 12}px;">${pillLabel}</button>`);
       }
     }
@@ -9414,7 +9414,7 @@ async function saveArrivalReminders(btn) {
 ══════════════════════════════════════════════════════════════════════ */
 
 let _alloggiatiState = { status: 'loading', propertyId: null };
-const _alloggiatiSafe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+const _alloggiatiSafe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])).replace(/['`\/]/g, c => ({"'":'&#39;','`':'&#96;','/':'&#47;'}[c]));
 
 async function _alloggiatiApi(action, body) {
   const { data } = await sb.auth.getSession();
@@ -10788,7 +10788,7 @@ function _openAlloggiatiSendSuccessModal(out, rowMeta) {
              <div style="font-weight:700;margin-bottom:4px;">${safe(it ? 'Ricevuta pronta' : 'Receipt ready')}</div>
              <div>${safe(it ? 'La ricevuta ufficiale è stata scaricata e conservata (5 anni).' : 'The official receipt has been downloaded and stored (5-year retention).')}</div>
              <div style="margin-top:6px;">
-               <button type="button" class="btn btn-primary btn-sm" onclick="_openAlloggiatiReceipt('${safe(out.receipt_path)}')">📄 ${safe(it ? 'Apri ricevuta PDF' : 'Open receipt PDF')}</button>
+               <button type="button" class="btn btn-primary btn-sm" data-receipt-path="${safe(out.receipt_path)}" onclick="_openAlloggiatiReceipt(this.dataset.receiptPath)">📄 ${safe(it ? 'Apri ricevuta PDF' : 'Open receipt PDF')}</button>
              </div>
            </div>`
         : '');
@@ -13950,7 +13950,7 @@ function viewGuest(id) {
   const it = hostLang === 'it';
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString(it ? 'it-IT' : 'en-GB') : '—';
   const fmtDT = (d) => d ? new Date(d).toLocaleString(it ? 'it-IT' : 'en-GB') : '—';
-  const safe = s => s == null || s === '' ? '—' : String(s).replace(/[<>&"]/g, ch => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[ch]));
+  const safe = s => s == null || s === '' ? '—' : String(s).replace(/[<>&"]/g, ch => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[ch])).replace(/['`\/]/g, c => ({"'":'&#39;','`':'&#96;','/':'&#47;'}[c]));
 
   // Resolve sex display
   const sexLabel = c.sex === 'M' ? (it ? 'Maschio' : 'Male')

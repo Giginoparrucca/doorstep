@@ -81,10 +81,11 @@ In `api/ical-sync.js`:
 
 Three fixes:
 
-1. Extend every `safe()` helper in `host-console.html` to replace `'` → `&#39;` and `` ` `` → `&#96;`. Keep the behaviour change minimal (only expands the escape set).
-2. Add `vercel.json` with `headers`:
+1. Extend every `safe()` helper (including shared `_alloggiatiSafe`) in `host-console.html` to escape apostrophe/backtick/slash as well as ampersand/angle/double-quote. Move dynamic inline-JavaScript arguments to escaped data attributes: HTML entities alone are decoded before event handlers compile and cannot secure that context.
+2. Extend the existing `lib/deployment-config.mjs`/`vercel.mjs` configuration with global `lib/security-headers.mjs` headers, retaining cron/rewrites and environment separation (do not introduce a competing `vercel.json`):
    - `Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://*.supabase.co https://api.resend.com; img-src 'self' blob: data: https://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self';`
      (Reportedly needs `'unsafe-inline'` for `script-src` because the current host console uses inline event handlers extensively. First-pass CSP uses report-only in Phase 5a and switches to enforce in Phase 5b after a 7-day watch window.)
+     Implementation includes Supabase websocket connections, blob workers and Google Maps frames. HTTPS property images remain allowed because hosts supply their own image origins. A small enforced policy immediately blocks framing, base-tag changes and embedded objects; the full resource policy remains report-only. `/api/csp-report` accepts bounded reports and logs fixed enums only, discarding document/referrer/resource URLs, query strings, samples and arbitrary text. Per-instance diagnostic volume is capped; reports are advisory, not proof of complete coverage.
    - `X-Frame-Options: DENY`
    - `X-Content-Type-Options: nosniff`
    - `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`

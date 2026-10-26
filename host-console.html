@@ -8471,6 +8471,19 @@ async function regenerateRotatingCodesForLengthChange(oldLen, newLen) {
    guest counts and Airbnb doesn't even carry names. Name + count are
    filled in from the checkins table by the dashboard panel below. */
 
+function _icalSyncErrorMessage(code) {
+  const messages = {
+    blocked_private_network: ['Usa un link iCal HTTPS pubblico.', 'Use a public HTTPS iCal link.'],
+    timeout: ['Il servizio calendario non ha risposto. Riprova.', 'The calendar service did not respond. Try again.'],
+    http_error: ['Il servizio calendario non ha fornito il feed. Verifica il link.', 'The calendar service did not provide the feed. Check the link.'],
+    unreachable: ['Il servizio calendario non è raggiungibile. Riprova.', 'The calendar service cannot be reached. Try again.'],
+    parse_error: ['Il file calendario è incompleto o non valido.', 'The calendar file is incomplete or invalid.'],
+    database_error: ['Salvataggio del calendario non riuscito. Riprova.', 'The calendar could not be saved. Try again.'],
+    ambiguous_feed_ownership: ['Feed non assegnato in modo univoco: verifica le camere.', 'The feed assignment is ambiguous. Check the rooms.'],
+  };
+  return (messages[code] || ['Sincronizzazione non riuscita. Verifica il feed.', 'Sync failed. Check the feed.'])[hostLang === 'it' ? 0 : 1];
+}
+
 function _icalEscape(s) {
   return String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
 }
@@ -8892,7 +8905,7 @@ async function syncIcalNow() {
       const msg = h('ical_sync_ok')
         .replace('{n}', synced).replace('{feeds}', feeds).replace('{c}', cancelled);
       const errs = (body.errors || []).map(e =>
-        `<div style="color:#b03939;">• ${_icalEscape(e.platform || '')} ${_icalEscape(e.url || '')}: ${_icalEscape(e.error || '')}</div>`
+        `<div style="color:#b03939;">• ${_icalEscape(e.platform || '')} ${_icalEscape(e.url || '')}: ${_icalEscape(_icalSyncErrorMessage(e.error))}</div>`
       ).join('');
       resEl.innerHTML = `<div style="color:var(--green);">✓ ${_icalEscape(msg)}</div>${errs}`;
     }

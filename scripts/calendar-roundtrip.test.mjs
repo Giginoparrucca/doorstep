@@ -71,7 +71,12 @@ globalThis.Date=class extends RealDate {
   static now(){return RealDate.parse('2026-10-14T12:00:00Z');}
 };
 process.env.SUPABASE_SERVICE_ROLE_KEY='fixture-only-service';
-const {default:handler,syncOnePropertyFeeds,parseICS,vEventToRow}=await import('../api/ical-sync.js');
+const {default:handler,syncOnePropertyFeeds:syncFeeds,parseICS,vEventToRow}=await import('../api/ical-sync.js');
+// Keep the real import/cancellation pipeline; only replace its network boundary.
+const syncOnePropertyFeeds=(...args)=>syncFeeds(...args,{fetchFeed:async url=>{
+  const content=feedTexts.get(url);if(content instanceof Error)throw content;
+  assert.equal(typeof content,'string','every fixture feed must be configured');return content;
+}});
 const token='11111111-1111-4111-8111-111111111111';
 let db=[], feedTexts=new Map(), calls=[], failUpsert=false, failLookup=false;
 const response=(status,data)=>({ok:status<400,status,json:async()=>structuredClone(data),text:async()=>typeof data==='string'?data:JSON.stringify(data)});

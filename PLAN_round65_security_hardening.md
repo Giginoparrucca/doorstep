@@ -70,8 +70,8 @@ Migration: `20261026082622_round65_database_grants_consent.sql` (CLI-generated).
 
 In `api/ical-sync.js`:
 
-1. New helper `_isSafeFeedUrl(url)` — require `https:`, resolve hostname via Node DNS, refuse private/link-local/loopback (RFC1918, 127.0.0.0/8, 169.254.0.0/16, ::1, fc00::/7, 100.64.0.0/10), cap redirects at 2, re-validate hostname after each redirect.
-2. Replace raw error strings in sync response with a short enum (`timeout`, `http_error`, `parse_error`, `unreachable`, `blocked_private_network`). Log raw strings server-side only.
+1. `_safe-ical-fetch.js` requires HTTPS, validates every DNS answer against special/private ranges and pins verified addresses into the actual TLS connection (original SNI and certificate verification retained). At most two redirects, each fully revalidated; one 10-second deadline and 5 MiB compressed/decoded bounds. This replaces the proposed boolean preflight, which alone would allow DNS rebinding.
+2. Replace raw sync error strings with short enums (`timeout`, `http_error`, `parse_error`, `unreachable`, `blocked_private_network`, `database_error`, `ambiguous_feed_ownership`). Log only platform/code server-side so private feed URLs/tokens are not logged. Host-facing IT/EN text maps the enums to readable messages.
 
 **Gate:**
 - New `scripts/round65-ical-ssrf.test.mjs` — pure Node test of `_isSafeFeedUrl` across: valid https public URL, http URL (reject), javascript:/file: (reject), `localhost`/`127.0.0.1`/`169.254.169.254`/`10.0.0.1`/`192.168.1.1`/`::1` (reject), successful public URL (accept). Second test exercises the error-folding by stubbing fetch failures.

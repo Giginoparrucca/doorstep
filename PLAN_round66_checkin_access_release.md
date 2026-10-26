@@ -4,6 +4,14 @@ Requested by Daniele on 26 October 2026 after two hosts asked to withhold entry 
 
 Status: confirmed and in progress. Daniele approved concurrent development alongside Round 65 on 26 October 2026. Phase 1 is claimed by GPT on `codex/round66-checkin-access`; the first isolated policy/test foundation is tracked in PR #207. No feature activation, operational roster/override or completed phase is claimed. Preserve Round 63 ownership/provider gates and Round 65 security ownership. See CHANGELOG and `docs/entry-release/INTEGRATION.md` for precise delivery evidence and remaining integration.
 
+Phase 1 continuation: staged private roster/slot/binding/audit SQL and server-side
+current-record validation have been implemented and tested independently. The
+SQL is held under `docs/entry-release/staged-migrations`, not registered/applied
+under `supabase/migrations`. Database/HTTP exposure, coherent snapshot loading,
+guest binding/upserts, audited admin integration, shared API/UI protection and
+rollout gates remain unfinished. Keep activation unavailable; current production
+schema-drift cannot prove this staged SQL was applied.
+
 ## Outcome and host setup
 
 Add a per-property setting in the existing access/check-in settings:

@@ -3869,18 +3869,12 @@ async function saveMarketingConsent() {
     if (IS_TEST_SESSION) {
       console.log('🧪 Test mode — skipping marketing_consents insert.');
     } else {
-      const mainGuest = savedGuests[0] || {};
-      const canonicalPropId = getStoredPropertyId() || propertyId;
-      const canonicalBooking = getBookingCode() || bookingCode;
-      const { error } = await sb.from('marketing_consents').insert({
-        property_id: canonicalPropId,
-        booking_code: canonicalBooking || null,
-        guest_name: `${mainGuest.surname || ''} ${mainGuest.name || ''}`.trim() || null,
+      const result = await _guestCall('consent_save', {
         email: email || null,
         phone: phone || null,
-        consent_text_version: 'v1',
+        consent: document.getElementById('consentCheckbox').checked === true,
       });
-      if (error) throw error;
+      if (!result?.ok) throw new Error('Consent save unavailable');
     }
 
     document.getElementById('consentFields').style.display = 'none';

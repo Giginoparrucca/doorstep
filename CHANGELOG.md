@@ -17,7 +17,16 @@ Daniele explicitly confirmed concurrent development alongside Claude's Round 65.
 | 2 — Host and guest interfaces | pending — GPT | Opt-in setup, release status/override, guest cards/refresh and IT/EN desktop/mobile browser gates plus full suite. |
 | 3 — Integrated release and guides | pending — GPT | Merge Round 65 security changes first where shared; AI/history/message/cache tests, guides, full regression/CI/schema-drift/live evidence. |
 
-Claim committed before implementation. Activation remains unavailable until all exposure paths are protected. No production database mutation or runtime pass claimed at this point.
+Claim committed before implementation. Activation remains unavailable until all exposure paths are protected. No production database mutation or operational feature release is claimed.
+
+#### Phase 1a — Isolated policy foundation (GPT, 2026-10-26; partial scope)
+
+- Resumed the already approved Round in a separate `doorstep-round66` checkout on `codex/round66-checkin-access`. Incorporated Claude's Round 65 Phase 1 main merge `8288b66` (PR #206) without editing his security code. Round 63/65 ownership and all phase tables remain intact.
+- Added server-only, currently unwired `api/_entry-release-policy.js`: trusted-snapshot scope/expiry checks, explicit roster floor and stable-slot validation, revalidation revisions/photo exemptions, audited-override evidence, current arrival/timezone release calculation and a positive entry-only projection. Unknown/ambiguous/read-error data fails closed. No dependency on police filing, receipt or tax-payment status. DST folds choose the later occurrence; gaps advance to the first real minute, skipped days fail closed. Fixed/rotating switches and reservation-before-head precedence are preserved; foreign/ambiguous rooms never project door codes.
+- Added `scripts/entry-release-policy.test.mjs` to automatic full-suite discovery: **93 synthetic policy/projection scenarios PASS**. This is pure module evidence, not handler/RPC/database/concurrency/live evidence. No production import, UI activation, migration, host setting, persisted roster, override mutation or code rotation was added.
+- Added `docs/entry-release/INTEGRATION.md`: source-grounded delivery-path inventory and explicit pending transactional loader/validator/roster/audit contract. Existing check-in list/update, browser keybox RPC and AI/browser context/history paths still require integration; the feature remains unavailable. Round 65's pending keybox owner check must be reconciled before shared-route changes and serialized production migrations.
+- Test setup initially exposed missing Python alias/Chromium (58/2/14), then the alias's macOS launcher problem (68/3/3); after a proper local Python wrapper, XML validation still required isolated lxml (intermediate totals recorded after runner completion). Corrected only local tooling, not product tests or assertions. Final complete suite is running on the combined source; no green full-suite/release claim yet. All runtime setup files are untracked/outside the repository.
+- Phase 1 remains **in-progress**, Phases 2/3 pending. Next: persistence/transactional validation and handler/RPC protection after Round 65 keybox contract is available, then UI and integrated rollout gates. This checkpoint must not be described as the completed entry-release feature.
 
 ### Round 66 Phase 0 — Check-in-gated entry instructions plan (GPT, 2026-10-26)
 

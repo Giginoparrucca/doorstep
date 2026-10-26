@@ -42,17 +42,19 @@ function xmlEscape(s) {
 // Pulls the first <tag>...</tag> value out of a SOAP response body.
 // Namespace-agnostic (matches optional xmlns prefixes). Returns '' if
 // the tag isn't found — callers decide whether that's a hard failure.
+function elementRegex(tag, flags = 'i') {
+  const name = String(tag).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const prefix = '(?:[A-Za-z_][\\w.-]*:)?';
+  // Match an empty element before looking for paired content. A self-closing
+  // leaf must never consume a sibling's closing tag (and its intervening XML).
+  return new RegExp(`<${prefix}${name}(?=[\\s/>])([^>]*?)(?:\\/\\s*>|>([\\s\\S]*?)<\\/${prefix}${name}\\s*>)`, flags);
+}
+function readElement(xml, tag) {
+  const match = elementRegex(tag).exec(xml || '');
+  return match ? { content: (match[2] || '').trim() } : null;
+}
 function pickTag(xml, tag) {
-  if (!xml) return '';
-  const re = new RegExp(
-    `<(?:[a-zA-Z0-9]+:)?${tag}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/(?:[a-zA-Z0-9]+:)?${tag}>`,
-    'i',
-  );
-  const m = re.exec(xml);
-  if (!m) return '';
-  // Preserve empty tags as ''. Trim whitespace/newlines PostgREST-style
-  // callers can then treat '' as null.
-  return (m[1] || '').trim();
+  return readElement(xml, tag)?.content || '';
 }
 
 async function postSoap({ soapAction, body, timeoutMs }) {
@@ -108,23 +110,17 @@ const KNOWN_CODES = {
 };
 
 function interpretResult(xml, resultTag) {
-  // Alloggiati's response shape is inconsistent across operations:
-  //   • GenerateTokenResponse has TWO children — <GenerateTokenResult>
-  //     (TokenInfo: issued/expires/token) AND a SIBLING <result>
-  //     (EsitoOperazioneServizio: esito/ErroreCod/ErroreDes).
-  //   • Authentication_TestResponse has ONE child
-  //     <Authentication_TestResult> that IS itself the
-  //     EsitoOperazioneServizio (esito/ErroreCod/ErroreDes inline).
-  // Either way, esito/ErroreCod/ErroreDes appear exactly once in the
-  // whole document, so we scan the full XML for them. `scope` is
-  // still the resultTag body so callers can pull TokenInfo fields
-  // (token/issued/expires) out of it.
-  const result = pickTag(xml, resultTag);
-  const scope  = result || xml;
-  const esito     = pickTag(xml, 'esito').toLowerCase();
-  const erroreCod = parseInt(pickTag(xml, 'ErroreCod') || '0', 10) || 0;
-  const erroreDes = pickTag(xml, 'ErroreDes');
-  const erroreDet = pickTag(xml, 'ErroreDettaglio');
+  // GenerateToken has TokenInfo plus a sibling <result> status. Other
+  // operations put their status in <OperationResult>; batch <result>
+  // contains independent row outcomes and must not supply overall fields.
+  const result = readElement(xml, resultTag);
+  const scope = result?.content || '';
+  const status = resultTag === 'GenerateTokenResult' ? readElement(xml, 'result') : result;
+  const statusXml = status?.content || '';
+  const esito = pickTag(statusXml, 'esito').toLowerCase();
+  const erroreCod = parseInt(pickTag(statusXml, 'ErroreCod') || '0', 10) || 0;
+  const erroreDes = pickTag(statusXml, 'ErroreDes');
+  const erroreDet = pickTag(statusXml, 'ErroreDettaglio');
   const ok = esito === 'true' && erroreCod === 0;
   // If we couldn't even find <esito>, the response is not what we
   // expect (portal returned an HTML error page, WAF captcha, changed
@@ -136,7 +132,7 @@ function interpretResult(xml, resultTag) {
     ok,
     code: shapeUnknown
       ? 'unrecognized_response'
-      : (KNOWN_CODES[erroreCod] || (ok ? 'ok' : 'portal_error')),
+      : (ok ? 'ok' : (erroreCod === 0 ? 'portal_error' : KNOWN_CODES[erroreCod] || 'portal_error')),
     erroreCod,
     erroreDes,
     erroreDet,
@@ -264,7 +260,7 @@ export async function test({ utente, token, rows }, opts = {}) {
   // carries ElencoSchedineEsito with SchedineValide + Dettaglio.
   // Dettaglio is an array of <EsitoOperazioneServizio> — pull the
   // fields out of each one.
-  const perRow = extractDettaglio(xml);
+  const perRow = extractDettaglio(pickTag(pickTag(xml, 'result'), 'Dettaglio'));
   return {
     overall: {
       ok: overallResult.ok,
@@ -315,7 +311,7 @@ export async function send({ utente, token, rows }, opts = {}) {
     err.code = 'unrecognized_response';
     throw err;
   }
-  const perRow = extractDettaglio(xml);
+  const perRow = extractDettaglio(pickTag(pickTag(xml, 'result'), 'Dettaglio'));
   return {
     overall: {
       ok: overallResult.ok,
@@ -389,11 +385,11 @@ function extractDettaglio(xml) {
   const out = [];
   if (!xml) return out;
   // Grab every <EsitoOperazioneServizio>…</EsitoOperazioneServizio>
-  // block, namespace-agnostic. Non-greedy body match.
-  const re = /<(?:[a-zA-Z0-9]+:)?EsitoOperazioneServizio(?:\s[^>]*)?>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?EsitoOperazioneServizio>/gi;
+  // block, namespace-agnostic. Empty/nil entries keep their position as unknown.
+  const re = elementRegex('EsitoOperazioneServizio', 'gi');
   let m;
   while ((m = re.exec(xml)) !== null) {
-    const body = m[1] || '';
+    const body = m[2] || '';
     const esito = pickTag(body, 'esito').toLowerCase();
     const erroreCod = parseInt(pickTag(body, 'ErroreCod') || '0', 10) || 0;
     const erroreDes = pickTag(body, 'ErroreDes');
@@ -401,7 +397,7 @@ function extractDettaglio(xml) {
     const ok = esito === 'true' && erroreCod === 0;
     out.push({
       ok,
-      code: KNOWN_CODES[erroreCod] || (ok ? 'ok' : 'row_rejected'),
+      code: !esito ? 'unrecognized_response' : (ok ? 'ok' : (erroreCod === 0 ? 'row_rejected' : KNOWN_CODES[erroreCod] || 'row_rejected')),
       erroreCod,
       erroreDes,
       erroreDet,

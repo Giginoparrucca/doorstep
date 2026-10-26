@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <TestResponse xmlns="AlloggiatiService">
+      <TestResult><esito>true</esito><ErroreCod>0</ErroreCod><ErroreDes /><ErroreDettaglio /></TestResult>
+      <result>
+        <SchedineValide>0</SchedineValide>
+        <Dettaglio>
+          <EsitoOperazioneServizio><esito>false</esito><ErroreCod>12</ErroreCod><ErroreDes>SCHEDINA_CAMPO_NON_CORRETTO</ErroreDes><ErroreDettaglio>Data di Arrivo Errata</ErroreDettaglio></EsitoOperazioneServizio>
+          <EsitoOperazioneServizio><esito>false</esito><ErroreCod>12</ErroreCod><ErroreDes>SCHEDINA_CAMPO_NON_CORRETTO</ErroreDes><ErroreDettaglio>Data di Arrivo Errata</ErroreDettaglio></EsitoOperazioneServizio>
+        </Dettaglio>
+      </result>
+    </TestResponse>
+  </soap:Body>
+</soap:Envelope>

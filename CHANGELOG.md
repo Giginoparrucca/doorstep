@@ -12,6 +12,13 @@ Newest entries at the top of each section.
 Daniele approved the recap and implementation. Specification: `PLAN_round64_admin_ops_metrics.md`.
 This focused admin Round runs alongside the preserved Round 63 pilot/provider gate; its ownership and pending phases are unchanged.
 
+#### Phase 4 — SOAP empty-tag parsing and expired-arrival guidance (GPT-6, 2026-10-26)
+
+- User-provided validation screenshot exposed XML spill from self-closing overall ErroreDes/ErroreDettaglio fields into a later row. Bounded empty/paired/prefixed element extraction fixes the spill; operation-level status is scoped to its own result (GenerateToken retains its sibling result/TokenInfo split). Empty/missing status fails closed and nil row entries retain unknown positions. False/unknown row status can no longer be labelled code ok.
+- Added exact fictional SOAP response XML/expected JSON goldens reproducing the screenshot shape, real mocked Test/Send/token/auth/receipt client checks, sibling-field isolation, namespace/nil/empty/missing-result cases. Existing generated guest-line/export goldens remain unchanged. Admin dialog now labels service response separately from filing status and arrival-date rejection preserves the factual date, explains that a current expired-window error does not identify an earlier failure cause, and directs expired cases to the host’s issuing office for instructions. UI asset version bumped 64.4; mobile/desktop actual-dialog assertions/screenshots reviewed.
+- Read-only historical timeline and the official portal manual distinguish the current too-old arrival from the unrecoverable old generic error; no precise original bad field is claimed. No real guest record, arrival date, credential or filing state was changed, and no portal Test/Send was made by this work. Official references are indexed in the plan; no external message sent.
+- Final local full regression **PASS 68 / FAIL 0 / SKIP 3**, all eleven browser suites. Skips: absent demo origin, private catalog and pglast. Initial full run was 67/1/3 due to the pre-existing unsaved-credentials continuation race (fixture key became blank). Its isolated four viewport/language cases and the final whole suite passed without weakening assertions or changing the host form. Publication/green PR CI/production verification pending at this checkpoint.
+
 #### Phase 3 — Alloggiati support diagnostics (GPT-6, 2026-10-25)
 
 - Responded to the reported support gap: Ops now has an Alloggiati support action on every property and clickable nonzero failed counts. A property-scoped dialog shows connection configuration/saved verification/key-expiry availability, autofile mode, current check-in state/error/last attempt, app-window expiry and the latest immutable filing history. Bounded 200-record/50-attempt coverage is explicit. Existing audited Console/Edit remains the correction path; connection replacement remains owner-only.
@@ -51,6 +58,7 @@ This focused admin Round runs alongside the preserved Round 63 pilot/provider ga
 | 1 — Define, implement and release Ops metrics | shipped — PR #199 — GPT-6 | Synthetic aggregation/loading and browser checks, whole regression, green PR CI, deployment and read-only live smoke. |
 | 2 — Sort and filter Hosts & Properties | shipped — PR #200 — GPT-6 | User-requested follow-up; keyboard-accessible column sorting, text/city/operational filters, browser/full regression, green PR CI and production verification. |
 | 3 — Alloggiati support diagnostics | shipped — PR #201 — GPT-6 | Admin-only connection health/history, per-booking no-send validation and corrective guidance; synthetic auth/transport/browser gates, full regression, CI, deployed smoke. |
+| 4 — Correct SOAP empty-tag diagnostics | in-progress — GPT-6 | Screenshot-follow-up: bound empty/self-closing field parsing, operation result scope, arrival-date guidance and synthetic wire-response fixtures; full regression/CI/live gates. |
 
 ### Round 63 Phase 3 — pilot/cutover preparation resumed (GPT-6, 2026-10-24)
 

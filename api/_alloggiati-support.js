@@ -1,4 +1,5 @@
 // Admin support reads and explicit SOAP Test only. This module has no Send capability.
+import { parseFilingEvidence } from './_alloggiati-evidence.js';
 export function redactSupport(value, secrets = []) {
   let text = String(value ?? '').slice(0, 6000);
   for (const secret of secrets.filter(Boolean)) text = text.split(String(secret)).join('[redacted]');
@@ -53,7 +54,7 @@ export async function handleAlloggiatiSupport(req, res, deps) {
       const [credentials, records, history] = await Promise.all([
         get(`host_alloggiati_credentials?${scope}&select=verified_at,wskey_expires_at,last_error,updated_at&limit=1`),
         get(`checkins?${scope}&is_test=eq.false&deleted_at=is.null&select=${RECORD_FIELDS}&order=submitted_at.desc,id.asc&limit=201`),
-        get(`alloggiati_filing_log?${scope}&select=id,run_at,trigger,outcome,error_code,error_detail,checkin_ids&order=run_at.desc,id.asc&limit=51`),
+        get(`alloggiati_filing_log?${scope}&outcome=not.like.evidence_*&select=id,run_at,trigger,outcome,error_code,error_detail,checkin_ids&order=run_at.desc,id.asc&limit=51`),
       ]);
       const connection = credentials[0];
       return respond(200, { property: { id: property.id, name: property.name, mode: property.alloggiati_autofile_mode || 'off' }, connection: { configured: !!connection, verified_at: connection?.verified_at || null, wskey_expires_at: connection?.wskey_expires_at || null, updated_at: connection?.updated_at || null, last_error: redactSupport(connection?.last_error) }, records: records.slice(0, 200).map(row => ({ ...row, autofile_last_error: redactSupport(row.autofile_last_error), past_automatic_window: allog.autofileDueAt(row, property, new Date()) === null })), history: history.slice(0, 50).map(row => ({ ...row, error_detail: redactSupport(row.error_detail) })), records_truncated: records.length > 200, history_truncated: history.length > 50 });
@@ -71,11 +72,21 @@ export async function handleAlloggiatiSupport(req, res, deps) {
       if (action === 'support_investigate') {
         const ids = records.map(row => row.id);
         if (ids.some(value => !/^[0-9a-f-]{36}$/i.test(value))) return respond(503, { error: 'Invalid diagnostic record identifiers' });
-        const history = await get(`alloggiati_filing_log?${scope}&checkin_ids=ov.${encodeURIComponent('{'+ids.join(',')+'}')}&select=id,run_at,trigger,outcome,error_code,error_detail,checkin_ids&order=run_at.asc,id.asc&limit=51`);
+        const historyScope = `${scope}&checkin_ids=ov.${encodeURIComponent('{'+ids.join(',')+'}')}`;
+        const fields = 'id,run_at,trigger,outcome,error_code,error_detail,checkin_ids';
+        const [history, firstFailures, evidence, originalEvidence] = await Promise.all([
+          get(`alloggiati_filing_log?${historyScope}&outcome=not.like.evidence_*&select=${fields}&order=run_at.asc,id.asc&limit=51`),
+          get(`alloggiati_filing_log?${historyScope}&outcome=in.(evidence_failure,evidence_send_failure)&select=${fields}&order=run_at.asc,id.asc&limit=1`),
+          get(`alloggiati_filing_log?${historyScope}&outcome=like.evidence_*&select=${fields}&order=run_at.desc,id.asc&limit=51`),
+          get(`alloggiati_filing_log?${historyScope}&outcome=like.evidence_*&select=${fields}&order=run_at.asc,id.asc&limit=21`),
+        ]);
         const selected = new Set(ids), secrets = records.map(row => row.document_number);
         return respond(200, { filed: false, stage: 'original_attempts', checked_at: new Date().toISOString(), booking_code: target.booking_code || null,
           records: records.map(row => ({ id: row.id, submitted_at: row.submitted_at, arrival_date: row.arrival_date, guest_type: row.guest_type })),
           findings: currentBookingFindings(records), history_truncated: history.length > 50,
+          original_evidence: originalEvidence.slice(0,20).map(row=>({id:row.id,run_at:row.run_at,evidence:parseFilingEvidence(row.error_detail)})), original_evidence_truncated:originalEvidence.length>20,
+          first_durable_failure: firstFailures[0] ? {id:firstFailures[0].id,run_at:firstFailures[0].run_at,evidence:parseFilingEvidence(firstFailures[0].error_detail)} : null,
+          evidence: evidence.slice(0,50).map(row=>({id:row.id,run_at:row.run_at,evidence:parseFilingEvidence(row.error_detail)})), evidence_truncated:evidence.length>50,
           history: history.slice(0, 50).map(row => ({ ...row, error_detail: redactSupport(row.error_detail, secrets), selected_checkin_ids: (row.checkin_ids || []).filter(id => selected.has(id)), other_guest_count: (row.checkin_ids || []).filter(id => !selected.has(id)).length })),
           message: 'Historical entries describe entire batches. A rejected batch does not prove every guest was invalid. Current duplicate/group findings are leads, not proof of the original cause. Old attempts have no saved input snapshot; a new portal Test cannot reconstruct them.' });
       }

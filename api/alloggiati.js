@@ -1,4 +1,5 @@
 import { handleAlloggiatiSupport, redactSupport } from './_alloggiati-support.js';
+import { createFilingEvidence } from './_alloggiati-evidence.js';
 import { runTestCleanup } from './send-arrival-reminders.js';
 import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, rejectDemoIntegration, IS_DEMO } from './_environment.js';
 // api/alloggiati.js — Round 44 Phase 0.5
@@ -385,7 +386,10 @@ async function processPropertyAutofile(prop) {
   // state code, missing comune, etc.) — don't claim or send; stamp
   // the row and move on. The host will see autofile_last_error in
   // the console (Phase 4 UI) and know to fix the field.
-  const { lines, rowMeta, warnings } = AllogRecords.buildBatch(toFile);
+  const evidence = createFilingEvidence({persist: logFiling, propertyId: prop.id, trigger: isDry ? 'autofile_dry_run' : 'autofile', checkinIds: toFile.map(row=>row.id), secrets: toFile.flatMap(row=>[row.name,row.surname,row.document_number])});
+  const { lines, rowMeta, warnings } = await evidence.run('local_build', async()=>AllogRecords.buildBatch(toFile));
+  evidence.setRows(lines, rowMeta.map(row=>[row.checkin_id]));
+  if (warnings.length) await evidence.record('local_validation','failure',{source:'application_validation',error_code:'builder_warning',warnings});
   // Map warnings back to row ids via rowMeta's idx (1-based line index).
   const warningRowIdxs = new Set();
   for (const w of warnings) {
@@ -418,21 +422,35 @@ async function processPropertyAutofile(prop) {
   const okLines = okIndices.map(i => lines[i]);
   const okCheckinIds = okIndices.map(i => rowMeta[i].checkin_id).filter(Boolean);
 
+  evidence.setRows(okLines, okCheckinIds.map(id=>[id]));
+  // A durable Send-start marker survives a process crash or audit outage.
+  // Any subsequent automatic run must require manual review for those rows.
+  if (!isDry) {
+    const sendMarkers = await sbGet(`alloggiati_filing_log?property_id=eq.${encodeURIComponent(prop.id)}&outcome=eq.evidence_send_started&checkin_ids=ov.${encodeURIComponent('{'+okCheckinIds.join(',')+'}')}&select=checkin_ids&limit=1`);
+    if (sendMarkers.length) {
+      await pauseAutofileRows(prop.id, okCheckinIds, 'prior_send_requires_review');
+      await evidence.record('send_guard','failure',{source:'application_safety_guard',error_code:'prior_send_requires_review',message:'A previous Send started. Confirm its portal result before any repeat filing.'});
+      summary.errors += okCheckinIds.length;
+      return summary;
+    }
+  }
   // Load + decrypt credentials once per property.
   let creds;
   try {
+    creds = await evidence.run('credentials', async () => {
     const credRows = await sbGet(
       `host_alloggiati_credentials?property_id=eq.${encodeURIComponent(prop.id)}` +
       '&select=credentials_enc,credentials_nonce,enc_key_id&limit=1'
     );
     if (!Array.isArray(credRows) || !credRows[0]) throw new Error('no credentials row');
-    creds = await decryptCredentials(credRows[0]);
+    return decryptCredentials(credRows[0]);
+    });
   } catch (e) {
     console.error('[autofile_tick]', prop.id, 'cred load/decrypt failed:', e.message);
     await logFiling({
       propertyId: prop.id, trigger: isDry ? 'autofile_dry_run' : 'autofile',
       checkinIds: okCheckinIds, outcome: 'cred_error',
-      errorCode: 'cred_error', errorDetail: e.message,
+      errorCode: 'cred_error', errorDetail: evidence.redact(e.message),
     });
     summary.errors++;
     return summary;
@@ -441,14 +459,14 @@ async function processPropertyAutofile(prop) {
   // Mint token
   let token;
   try {
-    token = (await generateToken(creds)).token;
+    token = (await evidence.run('authentication', options=>generateToken(creds, options))).token;
   } catch (e) {
     const bumped = await _bumpAttempts(okCheckinIds, 'generate_token_failed', e.message);
     await maybeFireFailuresAlert(prop, bumped);
     await logFiling({
       propertyId: prop.id, trigger: isDry ? 'autofile_dry_run' : 'autofile',
       checkinIds: okCheckinIds, outcome: 'cred_error',
-      errorCode: e.code || 'generate_token_failed', errorDetail: e.message,
+      errorCode: e.code || 'generate_token_failed', errorDetail: evidence.redact(e.message),
     });
     summary.errors++;
     return summary;
@@ -459,8 +477,8 @@ async function processPropertyAutofile(prop) {
   // timestamp so a daily digest (Phase 5) can summarise outcomes.
   if (isDry) {
     try {
-      const testOutcome = await soapTest({ utente: creds.utente, token, rows: okLines });
-      const rejected = (testOutcome.perRow || []).filter(r => !r.ok).length;
+      const testOutcome = await evidence.run('test', options=>soapTest({ utente: creds.utente, token, rows: okLines }, options));
+      const rejected = !testOutcome.overall?.ok ? okLines.length : (testOutcome.perRow || []).filter(r => !r.ok).length;
       await logFiling({
         propertyId: prop.id, trigger: 'autofile_dry_run',
         checkinIds: okCheckinIds,
@@ -480,7 +498,7 @@ async function processPropertyAutofile(prop) {
       await logFiling({
         propertyId: prop.id, trigger: 'autofile_dry_run',
         checkinIds: okCheckinIds, outcome: 'test_error',
-        errorCode: e.code || 'test_error', errorDetail: e.message,
+        errorCode: e.code || 'test_error', errorDetail: evidence.redact(e.message),
       });
       summary.errors++;
       return summary;
@@ -492,6 +510,7 @@ async function processPropertyAutofile(prop) {
   // the candidate load and now), file only the ones we got.
   let claimed;
   try {
+    claimed = await evidence.run('claim', async () => {
     const claimRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/claim_autofile_rows`, {
       method: 'POST',
       headers: {
@@ -503,13 +522,14 @@ async function processPropertyAutofile(prop) {
     if (!claimRes.ok) throw new Error(`claim ${claimRes.status}: ${await claimRes.text().catch(() => '')}`);
     const claimedBody = await claimRes.json();
     // RPC returning setof uuid comes back as [{claim_autofile_rows: uuid}] OR [uuid]
-    claimed = (Array.isArray(claimedBody) ? claimedBody : []).map(x => typeof x === 'string' ? x : (x?.claim_autofile_rows || x?.id || null)).filter(Boolean);
+    return (Array.isArray(claimedBody) ? claimedBody : []).map(x => typeof x === 'string' ? x : (x?.claim_autofile_rows || x?.id || null)).filter(Boolean);
+    });
   } catch (e) {
     console.error('[autofile_tick]', prop.id, 'claim failed:', e.message);
     await logFiling({
       propertyId: prop.id, trigger: 'autofile',
       checkinIds: okCheckinIds, outcome: 'claim_failed',
-      errorCode: 'claim_failed', errorDetail: e.message,
+      errorCode: 'claim_failed', errorDetail: evidence.redact(e.message),
     });
     summary.errors++;
     return summary;
@@ -528,11 +548,13 @@ async function processPropertyAutofile(prop) {
     }
   }
 
+  evidence.setRows(batchLines, batchCheckinIds.map(id=>[id]));
+
   // SOAP Test → Send → deferred receipt. Same Round 44 safety order the host
   // manual send uses: refuse to Send if Test rejects any row.
   try {
-    const testOutcome = await soapTest({ utente: creds.utente, token, rows: batchLines });
-    const anyRejected = (testOutcome.perRow || []).some(r => !r.ok);
+    const testOutcome = await evidence.run('test', options=>soapTest({ utente: creds.utente, token, rows: batchLines }, options));
+    const anyRejected = !testOutcome.overall?.ok || (testOutcome.perRow || []).some(r => !r.ok);
     if (anyRejected) {
       await _releaseClaimAndStamp(batchCheckinIds, 'test_rejected');
       await maybeFireRejectionAlert(prop, batchCheckinIds);
@@ -552,7 +574,7 @@ async function processPropertyAutofile(prop) {
     await logFiling({
       propertyId: prop.id, trigger: 'autofile',
       checkinIds: batchCheckinIds, outcome: 'test_transport_error',
-      errorCode: e.code || 'test_error', errorDetail: e.message,
+      errorCode: e.code || 'test_error', errorDetail: evidence.redact(e.message),
     });
     summary.errors += batchCheckinIds.length;
     return summary;
@@ -560,27 +582,28 @@ async function processPropertyAutofile(prop) {
 
   let sendOutcome;
   try {
-    sendOutcome = await soapSend({ utente: creds.utente, token, rows: batchLines });
+    sendOutcome = await evidence.run('send', options=>soapSend({ utente: creds.utente, token, rows: batchLines }, options));
   } catch (e) {
-    await _releaseClaimAndStamp(batchCheckinIds, 'send_transport_error');
+    if (e.sendUncertain) await pauseAutofileRows(prop.id, batchCheckinIds, 'send_result_uncertain');
+    else await _releaseClaimAndStamp(batchCheckinIds, e.code || 'send_not_started');
     const bumped = await _bumpAttempts(batchCheckinIds, 'send_transport_error', e.message);
     await maybeFireFailuresAlert(prop, bumped);
     await logFiling({
       propertyId: prop.id, trigger: 'autofile',
       checkinIds: batchCheckinIds, outcome: 'send_transport_error',
-      errorCode: e.code || 'send_error', errorDetail: e.message,
+      errorCode: e.code || 'send_error', errorDetail: evidence.redact(e.message),
     });
     summary.errors += batchCheckinIds.length;
     return summary;
   }
   if (!sendOutcome.overall.ok || (sendOutcome.perRow || []).some(r => !r.ok)) {
-    await _releaseClaimAndStamp(batchCheckinIds, 'send_rejected');
+    await pauseAutofileRows(prop.id, batchCheckinIds, 'send_result_requires_review');
     await maybeFireRejectionAlert(prop, batchCheckinIds);
     await logFiling({
       propertyId: prop.id, trigger: 'autofile',
       checkinIds: batchCheckinIds, outcome: 'send_rejected',
       errorCode: sendOutcome.overall.code || 'portal_rejected',
-      errorDetail: sendOutcome.overall.erroreDes || 'portal rejected after test passed',
+      errorDetail: evidence.redact(sendOutcome.overall.erroreDes || 'portal rejected after test passed'),
     });
     summary.errors += batchCheckinIds.length;
     return summary;
@@ -610,10 +633,11 @@ async function processPropertyAutofile(prop) {
     );
   } catch (e) {
     console.error('[autofile_tick] stamp failed (filing done, DB desync):', e.message);
+    await evidence.failure('stamp', e, 'application_database');
     await logFiling({
       propertyId: prop.id, trigger: 'autofile',
       checkinIds: batchCheckinIds, outcome: 'stamp_desync',
-      errorCode: 'stamp_desync', errorDetail: e.message, receiptPath,
+      errorCode: 'stamp_desync', errorDetail: evidence.redact(e.message), receiptPath,
     });
     summary.errors += batchCheckinIds.length;
     return summary;
@@ -798,7 +822,7 @@ async function maybeFireDailyAlerts(prop, perTickCounts) {
       const todayStart = `${todayRome}T00:00:00Z`;
       const r = await pgrestGET(
         `alloggiati_filing_log?property_id=eq.${encodeURIComponent(prop.id)}` +
-        `&trigger=eq.autofile_dry_run&run_at=gte.${encodeURIComponent(todayStart)}` +
+        `&trigger=eq.autofile_dry_run&outcome=not.like.evidence_*&run_at=gte.${encodeURIComponent(todayStart)}` +
         '&select=outcome,checkin_ids&limit=200'
       );
       const rows = r.ok ? await r.json() : [];
@@ -893,7 +917,12 @@ async function _sendAutofileAlert(prop, kind, texts) {
   } catch (e) { console.warn('[autofile_tick] notify', kind, 'failed:', e.message); }
 }
 
-async function logFiling({ propertyId, trigger, checkinIds, outcome, errorCode = null, errorDetail = null, receiptPath = null, actor = null }) {
+async function pauseAutofileRows(propertyId, ids, reason) {
+  const list = ids.map(id=>`"${id}"`).join(',');
+  await sbPatch(`checkins?property_id=eq.${encodeURIComponent(propertyId)}&id=in.(${encodeURIComponent(list)})`, {alloggiati_status:'correction',autofile_last_error:reason,autofile_last_attempt_at:new Date().toISOString(),autofile_claimed_at:null});
+}
+
+async function logFiling({ propertyId, trigger, checkinIds, outcome, errorCode = null, errorDetail = null, receiptPath = null, actor = null, strict = false }) {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/log_alloggiati_filing`, {
       method: 'POST',
@@ -907,16 +936,19 @@ async function logFiling({ propertyId, trigger, checkinIds, outcome, errorCode =
         p_checkin_ids: checkinIds,
         p_outcome: outcome,
         p_error_code: errorCode,
-        p_error_detail: errorDetail ? String(errorDetail).slice(0, 500) : null,
+        p_error_detail: errorDetail ? String(errorDetail) : null,
         p_receipt_path: receiptPath,
         p_actor: actor,
       }),
     });
     if (!r.ok) {
       console.warn('[autofile_tick] logFiling RPC', r.status, await r.text().catch(() => ''));
+      if (strict) throw new Error('Filing evidence persistence failed');
     }
+    if (r.ok && strict) { const id = await r.json(); if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) throw new Error('Filing evidence acknowledgement missing'); return id; }
   } catch (e) {
     console.warn('[autofile_tick] logFiling exception:', e.message);
+    if (strict) throw e;
   }
 }
 
@@ -1395,40 +1427,27 @@ export default async function handler(req, res) {
     }
 
 
-    // ── Load and decrypt credentials ─────────────────────────────
-    let credRow;
-    try {
-      const rows = await sbGet(
-        `host_alloggiati_credentials?property_id=eq.${encodeURIComponent(propertyId)}` +
-        `&select=credentials_enc,credentials_nonce,enc_key_id&limit=1`
-      );
-      credRow = Array.isArray(rows) && rows[0];
-    } catch (e) {
-      console.warn('[alloggiati] send: cred lookup failed:', e.message);
-      return res.status(500).json({ error: 'Credential lookup failed' });
-    }
-    if (!credRow) return res.status(400).json({ error: 'No credentials saved for this property yet' });
-
+    // ── Load and decrypt credentials, durably recording failure ──
+    const evidence = createFilingEvidence({persist: logFiling, propertyId, trigger:'host', checkinIds:checkinIdsFlat, lines, rowIds:rowsIn.map(row=>row.checkin_ids), actor:owner.hostId});
     let creds;
     try {
-      creds = await decryptCredentials(credRow);
-    } catch (e) {
-      console.error('[alloggiati] send: decrypt failed:', e.message);
-      return res.status(200).json({
-        ok: false,
-        error: 'Stored credentials unreadable — please re-enter them.',
-        error_code: 'decrypt_failed',
+      creds = await evidence.run('credentials', async () => {
+        const saved = await sbGet(`host_alloggiati_credentials?property_id=eq.${encodeURIComponent(propertyId)}&select=credentials_enc,credentials_nonce,enc_key_id&limit=1`);
+        if (!saved[0]) throw Object.assign(new Error('No credentials saved for this property yet'),{code:'not_configured'});
+        return decryptCredentials(saved[0]);
       });
+    } catch (error) {
+      return res.status(200).json({ok:false,error:error.code==='audit_unavailable'?error.message:'Saved Alloggiati connection could not be loaded. Review Settings.',error_code:error.code || 'credential_load_failed'});
     }
 
     // ── Mint a fresh token ───────────────────────────────────────
     let token;
     const recordHostFailure = async (outcome, errorCode, detail) => logFiling({
       propertyId, trigger: 'host', checkinIds: checkinIdsFlat, outcome,
-      errorCode, errorDetail: redactSupport(detail, [creds.utente, creds.password, creds.wskey, token, ...lines.map(line => line.slice(139, 159).trim())]), actor: owner.hostId,
+      errorCode, errorDetail: redactSupport(evidence.redact(detail), [creds.utente, creds.password, creds.wskey, token, ...lines.map(line => line.slice(139, 159).trim())]), actor: owner.hostId,
     });
     try {
-      const t = await generateToken(creds);
+      const t = await evidence.run('authentication', options=>generateToken(creds, options));
       token = t.token;
     } catch (e) {
       const portalMsg = e.message || 'Alloggiati portal rejected the credentials';
@@ -1440,7 +1459,7 @@ export default async function handler(req, res) {
     // ── Test first — abort if any row would be rejected ──────────
     let testOutcome;
     try {
-      testOutcome = await soapTest({ utente: creds.utente, token, rows: lines });
+      testOutcome = await evidence.run('test', options=>soapTest({ utente: creds.utente, token, rows: lines }, options));
     } catch (e) {
       const portalMsg = e.message || 'Alloggiati Test failed';
       console.warn('[alloggiati] send: Test failed:', e.code, portalMsg);
@@ -1450,7 +1469,7 @@ export default async function handler(req, res) {
     const failedInTest = (testOutcome.perRow || [])
       .map((r, i) => ({ idx: i + 1, r }))
       .filter(x => !x.r.ok);
-    if (failedInTest.length > 0) {
+    if (!testOutcome.overall?.ok || failedInTest.length > 0) {
       await recordHostFailure('test_rejected', 'validation_failed', failedInTest.slice(0, 5).map(({idx,r}) => [rowsIn[idx - 1].checkin_ids.join(','), r.erroreDes || r.code, r.erroreDet].filter(Boolean).join(': ')).join(' | '));
       return res.status(200).json({
         ok: false,
@@ -1465,12 +1484,12 @@ export default async function handler(req, res) {
     // ── Send the batch (this is the legally-consequential call) ──
     let sendOutcome;
     try {
-      sendOutcome = await soapSend({ utente: creds.utente, token, rows: lines });
+      sendOutcome = await evidence.run('send', options=>soapSend({ utente: creds.utente, token, rows: lines }, options));
     } catch (e) {
       const portalMsg = e.message || 'Alloggiati Send failed';
       console.warn('[alloggiati] send: Send failed:', e.code, portalMsg);
       await recordHostFailure('send_transport_error', e.code || 'portal_error', portalMsg);
-      return res.status(200).json({ ok: false, error: portalMsg, error_code: e.code || 'portal_error' });
+      return res.status(200).json({ ok: false, error: portalMsg, error_code: e.code || 'portal_error', send_result_uncertain: !!e.sendUncertain, review_required: !!e.sendUncertain });
     }
     // If overall Send failed OR any row was rejected (shouldn't
     // happen after Test passed, but portal state can change between
@@ -1530,6 +1549,7 @@ export default async function handler(req, res) {
       // database didn't update" banner.
       console.error('[alloggiati] send: stamp failed:', e.message);
       stampError = e.message;
+      try { await evidence.failure('stamp', e, 'application_database'); } catch { stampError += ' (evidence store unavailable)'; }
     }
 
     // Round 49 Phase 3 — mirror the manual Send into alloggiati_filing_log.

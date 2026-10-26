@@ -1,4 +1,4 @@
-# Inactive until the owner provisions and verifies the protected environment.
+# Owner-provisioned and verified 2026-10-26; every run requires owner review.
 name: production security smoke
 on:
   workflow_dispatch:

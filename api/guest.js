@@ -152,6 +152,7 @@ export default async function handler(req, res) {
     if (action === 'checkin_update')   return await doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, isTest);
     if (action === 'checkin_lookup')   return await doCheckinLookup(res, propertyId, sessionId, body, isTest);
     if (action === 'consent_withdraw') return await doConsentWithdraw(res, propertyId, body);
+    if (action === 'consent_save')     return await doConsentSave(res, propertyId, bookingCode, body, isTest);
     if (action === 'track_event')      return await doTrackEvent(res, propertyId, bookingCode, sessionId, body, isTest);
     return res.status(400).json({ error: 'Unknown action' });
   } catch (e) {
@@ -962,6 +963,37 @@ async function doTrackEvent(res, propertyId, bookingCode, sessionId, body, isTes
     return res.status(500).json({ error: 'track_event failed' });
   }
   return res.status(204).end();
+}
+
+async function doConsentSave(res, propertyId, bookingCode, body, isTest) {
+  res.setHeader('Cache-Control', 'private, no-store');
+  if (isTest) return res.status(200).json({ ok: true, skipped: true });
+  const email = typeof body.email === 'string' ? body.email.trim() : '';
+  const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
+  if (!bookingCode || body.consent !== true || (!email && !phone)
+      || email.length > 254 || phone.length > 40
+      || (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+      || (phone && !/^\+?[0-9() .-]{6,40}$/.test(phone))) {
+    return res.status(400).json({ error: 'Invalid consent request' });
+  }
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/save_guest_marketing_consent`, {
+    method: 'POST', headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_property_id: propertyId, p_booking_code: bookingCode,
+      p_email: email || null, p_phone: phone || null, p_consent: true }),
+  });
+  if (!r.ok) {
+    const error = await r.json().catch(() => ({}));
+    if (error.code === 'P0001') {
+      res.setHeader('Retry-After', '3600');
+      return res.status(429).json({ error: 'Too many consent changes' });
+    }
+    if (error.code === '42501') return res.status(403).json({ error: 'Consent booking unavailable' });
+    if (error.code === '22023') return res.status(400).json({ error: 'Invalid consent request' });
+    return res.status(503).json({ error: 'Consent save unavailable' });
+  }
+  const saved = await r.json();
+  if (saved?.ok !== true) return res.status(503).json({ error: 'Consent save unavailable' });
+  return res.status(200).json({ ok: true });
 }
 
 async function doConsentWithdraw(res, propertyId, body) {

@@ -14,7 +14,7 @@ Non-security-sensitive behaviour must not regress. Every phase's gate includes t
 
 ## Out of scope
 
-- 90-day program items (ROPA, DPA templates, DSAR self-service, BREACH SOP, admin audit log, log scrubbing, Vercel Firewall rate limits, backup drill, signed commits, pentest). These go to Round 66 "Security compliance paper trail" once Round 65 lands.
+- 90-day program items (ROPA, DPA templates, DSAR self-service, BREACH SOP, admin audit log, log scrubbing, Vercel Firewall rate limits, backup drill, signed commits, pentest). These go to a future round after the already allocated Round 66 entry-release feature.
 - Any API surface change beyond the two CRITICAL fixes and the SSRF/error-folding fixes in `ical-sync.js`.
 - Service-role or anon-JWT rotation (coordinate with Daniele separately before touching).
 
@@ -51,22 +51,20 @@ Migration: `supabase/migrations/20261026081549_round65_keybox_gateway_enforcemen
 
 ### Phase 3 — Database HIGHs: REVOKE anon on cron RPCs + lock down marketing_consents
 
-Three fixes in one migration:
+Revoke PUBLIC/anon/authenticated execution on the existing photo-purge/orphan-enqueue RPCs and keep service_role. Revoke PUBLIC/anon on list_hosts_for_admin while retaining authenticated/admin checks and service execution. Retention function bodies remain byte-for-byte unchanged.
 
-1. `REVOKE EXECUTE ON FUNCTION public.purge_old_id_photos(boolean,int,int,int), public.enqueue_orphan_documents(boolean,int) FROM PUBLIC, anon, authenticated; GRANT EXECUTE … TO service_role;`
-2. `REVOKE EXECUTE ON FUNCTION public.list_hosts_for_admin(…) FROM PUBLIC;` (keep GRANT to `authenticated` — admin UI calls as signed-in user).
-3. Replace `marketing_consents_anon_insert` policy's `with_check` from `(property_id IS NOT NULL)` to require an existence check:
-   ```sql
-   with_check: (property_id IS NOT NULL AND
-                EXISTS (SELECT 1 FROM properties p
-                        WHERE p.id = property_id AND p.deleted_at IS NULL))
-   ```
-   Rate-limit at the API layer in a Phase 4 companion change.
+The original EXISTS(properties) anon-consent policy would fail under current property RLS; `migration_round48c_anon_revoke.sql` already documents that failure mode. Replace direct anon INSERT with signed-gateway consent_save and service-only SECURITY INVOKER save_guest_marketing_consent. Revoke anon INSERT and remove the obsolete policy without widening property RLS.
+
+Require explicit boolean consent and valid bounded contacts, derive property/booking from the signed token and name/text version from authoritative server data, suppress test writes, reject missing/deleted/cancelled/ambiguous booking/property scope. A transaction-level booking advisory lock serializes exact active-contact retry deduplication and at most five new consent events per booking/hour across sessions. This is not email ownership verification or double opt-in, and does not send email/SMS.
+
+Migration: `20261026082622_round65_database_grants_consent.sql` (CLI-generated). Gateway/browser code and migration ship together. Existing old pages may need refresh once direct anonymous writes are closed; no check-in or required guest workflow depends on marketing consent.
 
 **Gate:**
-- Behavioural probe (new `scripts/round65-grant-probes.test.live.mjs`, or extend an existing live test): anon call to `purge_old_id_photos`, `enqueue_orphan_documents`, `list_hosts_for_admin` all return `42501`. Service-role call to each succeeds. `marketing_consents` INSERT with a nonexistent `property_id` fails with policy violation.
-- Migration applied to prod; schema-drift live gate green.
-- Full regression.
+- Actual disposable SQL: grants, anonymous INSERT/RPC denial, service saves, standalone/registered scope, duplicate retries, five-event booking cap and invalid/test/cancelled/deleted inputs.
+- Real gateway: token-derived identity, explicit consent, safe field whitelist, bounds, test suppression and folded 400/403/429/503 errors.
+- Actual consent-card markup/translations/save flow in Chromium IT/EN at mobile/desktop: optional opt-in, empty contact, same-origin signed request, rate-error retry and successful UI. No real guest data or communications.
+- Read-only production role probes: anon/host denied on cron RPCs; anon denied on admin/consent RPC; trusted service dry/read-only calls and authenticated admin execute preserved. Effective anon INSERT grant absent. Invalid consent fails before writes.
+- Discoverable live grant-probe file uses dry-run=true or invalid consent only; no photo queuing/deletion or consent insertion. Production migration RPC name, advisors and full regression/CI/schema-drift/deployment gates required.
 
 ### Phase 4 — Backend HIGHs: SSRF guard + error-folding on ical-sync
 
@@ -151,4 +149,4 @@ Non-blocking; agent proceeds, flags these to Daniele:
 
 ## Acceptance
 
-Round 65 is "shipped" when every phase above closes shipped-PR-N, the full regression stays green, and the Phase 8 live-headers smoke confirms CSP + HSTS + X-Frame-Options on the production deployment. Items 13–28 of the 30-day roadmap are explicitly deferred to Round 66.
+Round 65 is "shipped" when every phase above closes shipped-PR-N, the full regression stays green, and the Phase 8 live-headers smoke confirms CSP + HSTS + X-Frame-Options on the production deployment. Items 13–28 of the 30-day roadmap are deferred to a future numbered round; Round 66 is already allocated to entry release.

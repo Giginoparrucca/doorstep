@@ -7,6 +7,18 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Round 66 — Check-in-gated entry release (confirmed 2026-10-26)
+
+Daniele explicitly confirmed concurrent development alongside Claude's Round 65. GPT owns Round 66 on `codex/round66-checkin-access` in a separate checkout. Specification: `PLAN_round66_checkin_access_release.md`. Preserve Round 63 and Round 65 ownership. Round 65 retains keybox RPC/security configuration/dependency changes; Round 66 adds policy modules, uniquely named migration/tests, then integrates shared guest/host pages after inspecting the security changes. Do not overwrite one branch with another. Serialize production migrations and merges; rerun full regression on the combined source before release. Round 66 is the entry-release feature; Round 65's prose reference to a future security-paperwork “Round 66” is not an allocated security implementation round.
+
+| Phase | Status | Gate |
+|---|---|---|
+| 1 — Authoritative policy and protected delivery | in-progress — GPT | New server policy, trusted roster, time rules, audited override and protected projections; API/RPC, tenant, concurrency/error tests plus full suite. |
+| 2 — Host and guest interfaces | pending — GPT | Opt-in setup, release status/override, guest cards/refresh and IT/EN desktop/mobile browser gates plus full suite. |
+| 3 — Integrated release and guides | pending — GPT | Merge Round 65 security changes first where shared; AI/history/message/cache tests, guides, full regression/CI/schema-drift/live evidence. |
+
+Claim committed before implementation. Activation remains unavailable until all exposure paths are protected. No production database mutation or runtime pass claimed at this point.
+
 ### Round 66 Phase 0 — Check-in-gated entry instructions plan (GPT, 2026-10-26)
 
 - Daniele approved the design and requested a round write-up. Published `PLAN_round66_checkin_access_release.md`; queued after the newly reserved Round 65 security sprint. Preserved all existing in-flight phases and ownership.
@@ -225,7 +237,6 @@ This focused admin Round runs alongside the preserved Round 63 pilot/provider ga
 | Round | Scope | Specification | Status |
 |---|---|---|---|
 | 65 | Security hardening sprint — 30-day roadmap: 2 CRITICAL fixes (chat XSS, keybox RPC), 14 HIGH fixes (database GRANTs, iCal SSRF, CSP, SRI, lockfile, Dependabot, SECURITY.md, service-role key scoping) | `PLAN_round65_security_hardening.md` (companion: `docs/SECURITY_ASSESSMENT_2026-10.md`) | pending — awaiting Daniele |
-| 66 | Entry instructions released after booking-wide completed check-in; optional arrival-time restriction, audited host override, server/API/AI/message protection | `PLAN_round66_checkin_access_release.md` | pending — specification complete; implementation not started |
 
 Standing rule added 2026-10-18 (AGENTS.md "Full regression"): every phase gate runs the whole suite, not only plan-listed tests.
 

@@ -37,7 +37,7 @@ assert.match(launch, /cfg\.appOrigin/, 'launch: link origin derives from appOrig
 assert.match(launch, /cfg\.mode !== 'demo'/, 'launch: refuses to render in non-demo mode');
 assert.match(launch, /sb\.rpc\('demo_reset_v1'/, 'launch: calls demo_reset_v1 RPC');
 assert.match(launch, /qrcode-generator@1\.4\.4/, 'launch: pinned QR library version');
-assert.match(launch, /@supabase\/supabase-js@2\.47\.10/, 'launch: pinned Supabase client version');
+assert.match(launch, /\/vendor\/supabase-2\.118\.0\.js/, 'launch: pinned Supabase client version');
 assert.ok(!/\.jpg|\.png|real-receipt/i.test(launch), 'launch: no production imagery');
 // Scenario list is rendered dynamically; verify the HTML carries the
 // container row and the Italian "Scenari" heading.

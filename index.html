@@ -3697,6 +3697,7 @@ async function saveCurrentGuest() {
       document.getElementById('checkinBadge').style.display = 'none';
       renderReviewCards();
       showConsentCard();
+      await fetchReservationKeybox();
       console.log(`✅ All ${savedGuests.length} guests checked in!`);
 
       // Analytics: funnel completion
@@ -5386,21 +5387,21 @@ function showResetToast(msg) {
 // backs this guest's booking. Populated by fetchReservationKeybox() at
 // load time (best-effort, silent on failure). Used as the primary
 // rotating source in _resolveLockboxCodes so the code the host sees on
-// their dashboard is the same one the guest sees, and it appears even
-// before the guest has completed check-in.
+// their dashboard is the same one the guest sees. Round 65 routes this through
+// the signed guest gateway and the existing one-submission access boundary.
 let reservationKeyboxCode = '';
 
 async function fetchReservationKeybox() {
   const pid  = getStoredPropertyId() || propertyId;
   const bc   = getBookingCode() || bookingCode;
+  reservationKeyboxCode = '';
+  refreshLockboxDisplay();
   if (!pid || !bc) return;
   try {
-    const { data, error } = await sb.rpc('get_reservation_keybox', {
-      p_property_id: pid, p_booking_code: bc,
-    });
-    if (error) { console.warn('[keybox] rpc failed:', error.message); return; }
-    if (data && typeof data === 'string') {
-      reservationKeyboxCode = data.trim();
+    const r = await _guestCall('keybox', {});
+    if (pid !== (getStoredPropertyId() || propertyId) || bc !== (getBookingCode() || bookingCode)) return;
+    if (r?.ok && typeof r.data?.code === 'string') {
+      reservationKeyboxCode = r.data.code.trim();
       refreshLockboxDisplay();
     }
   } catch (e) { /* non-fatal */ }

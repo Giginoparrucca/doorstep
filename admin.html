@@ -3112,7 +3112,7 @@ function renderInvitesPanel() {
           <td style="text-align:center;font-size:0.82rem;font-family:monospace;">${escapeHtml(String(propCount ?? '—'))}</td>
           <td style="white-space:nowrap;">
             ${inv.status !== 'accepted' ? `<button onclick="opsInviteAction('resend','${escapeHtml(email)}')" style="padding:4px 10px;background:var(--warm);color:#fff;border:none;border-radius:4px;font-size:0.7rem;cursor:pointer;font-family:inherit;">Resend</button>` : ''}
-            ${inv.status !== 'accepted' ? `<button onclick="opsCopyInviteLink('${escapeHtml(email)}', this)" title="Copia il link e inviaglielo dalla tua email personale" style="padding:4px 10px;background:#111827;color:#fff;border:none;border-radius:4px;font-size:0.7rem;cursor:pointer;font-family:inherit;margin-left:4px;">Copy link</button>` : ''}
+            ${inv.status !== 'revoked' ? `<button onclick="opsCopyInviteLink('${escapeHtml(email)}', this)" title="${inv.status === 'accepted' ? 'Genera un link di accesso diretto (bypass email): utile se il reset password non arriva' : 'Copia il link e inviaglielo dalla tua email personale'}" style="padding:4px 10px;background:#111827;color:#fff;border:none;border-radius:4px;font-size:0.7rem;cursor:pointer;font-family:inherit;margin-left:4px;">${inv.status === 'accepted' ? 'Link accesso' : 'Copy link'}</button>` : ''}
             ${inv.status !== 'revoked' ? `<button onclick="opsInviteAction('revoke','${escapeHtml(email)}')" style="padding:4px 10px;background:transparent;color:#b03a3a;border:1px solid #b03a3a;border-radius:4px;font-size:0.7rem;cursor:pointer;font-family:inherit;margin-left:4px;">Revoke</button>` : ''}
           </td>
         </tr>`;

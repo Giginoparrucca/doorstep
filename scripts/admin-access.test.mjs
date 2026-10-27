@@ -30,7 +30,7 @@ const absent=destination({authed:false});await absent.ctx.init();assert.equal(ab
 console.log('PASS actual destination init: persisted session, selected foreign property, server admin check before read, read-only including late DOM, non-admin/no-session denial');
 // Execute the real callback with an exclusive-auth-lock fixture.
 const tasks=[],rpc=[],updates=[],alerts=[];let locked=true;const location={origin:'https://app.welcomebnb.it',search:'?p=p-target&admin=1',pathname:'/host-console.html',hash:''};const storage=new Map();let handler;
-const ctx=vm.createContext({console,location,window:{location},document:{title:'Fixture'},hostLang:'en',sessionStorage:{getItem:k=>storage.get(k)||null,removeItem:k=>storage.delete(k)},history:{replaceState:()=>{}},prompt:()=> 'fixture-password',alert:m=>alerts.push(m),setTimeout:f=>{tasks.push(f);},
+const ctx=vm.createContext({console,location,window:{location,promptForNewPassword:async()=>'fixture-password'},document:{title:'Fixture'},hostLang:'en',sessionStorage:{getItem:k=>storage.get(k)||null,removeItem:k=>storage.delete(k)},history:{replaceState:()=>{}},alert:m=>alerts.push(m),setTimeout:f=>{tasks.push(f);},
  sb:{auth:{onAuthStateChange:f=>handler=f,updateUser:async value=>{assert.equal(locked,false);updates.push(value);return {}; }},rpc:async name=>{assert.equal(locked,false,'no nested auth inside locked callback');rpc.push(name);return {};}}});
 vm.runInContext(fn(host,'handleHostAuthEvent'),ctx);const a=host.indexOf('sb.auth.onAuthStateChange(');vm.runInContext(host.slice(a,host.indexOf('\n});',a)+4),ctx);
 assert.equal(handler('SIGNED_IN',{user:{user_metadata:{}}}),undefined);assert.equal(rpc.length,0);locked=false;tasks.shift()();await new Promise(r=>setTimeout(r,0));assert.equal(rpc.length,1);

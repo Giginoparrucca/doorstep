@@ -45,6 +45,20 @@ assert.ok(
   'releaseEntryManually function must be defined',
 );
 assert.ok(
+  /async\s+function\s+restoreAutomaticRelease\s*\(/.test(src),
+  'restoreAutomaticRelease function must be defined (Phase 2d "Restore automatic" button)',
+);
+assert.ok(
+  /p_release:\s*false/.test(src),
+  'restoreAutomaticRelease must call set_release with p_release=false',
+);
+assert.ok(
+  /onclick="restoreAutomaticRelease\(/.test(src),
+  'Restore button must dispatch to restoreAutomaticRelease',
+);
+assert.ok(/Ripristina automatico/.test(src), 'IT restore button label present');
+assert.ok(/Restore automatic/.test(src), 'EN restore button label present');
+assert.ok(
   /sb\.rpc\('entry_access_confirm_roster'/.test(src),
   'handler must call entry_access_confirm_roster to ensure booking row exists',
 );

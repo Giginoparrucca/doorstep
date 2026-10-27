@@ -6581,7 +6581,17 @@ function _renderReservationCard(r, todayISO) {
         data-expected-count="${safe(String(r.guest_count || 1))}"
         onclick="releaseEntryManually(this.dataset.bookingCode, this.dataset.arrival, this.dataset.departure, this.dataset.isTest === 'true', this.dataset.reservationId, Number(this.dataset.expectedCount))"
         title="${safe(hostLang === 'it' ? 'Rilascia manualmente il codice del lockbox per questa prenotazione — scavalca il check-in richiesto; l\'azione sarà registrata nell\'audit' : 'Manually release the lockbox code for this booking — bypasses the check-in requirement; the action is recorded in the audit log')}"
-        style="padding:4px 10px;background:rgba(27,94,32,0.14);border:1px solid rgba(27,94,32,0.4);border-radius:6px;font-size:0.72rem;cursor:pointer;color:#1b5e20;font-family:inherit;font-weight:500;">🔓 ${safe(hostLang === 'it' ? 'Rilascia accesso' : 'Release access')}</button>` : ''}
+        style="padding:4px 10px;background:rgba(27,94,32,0.14);border:1px solid rgba(27,94,32,0.4);border-radius:6px;font-size:0.72rem;cursor:pointer;color:#1b5e20;font-family:inherit;font-weight:500;">🔓 ${safe(hostLang === 'it' ? 'Rilascia accesso' : 'Release access')}</button>
+      <button type="button"
+        data-booking-code="${safe(r.booking_code)}"
+        data-arrival="${safe(r.checkin_date)}"
+        data-departure="${safe(r.checkout_date)}"
+        data-is-test="${r.is_test === true ? 'true' : 'false'}"
+        data-reservation-id="${safe(r.id || '')}"
+        data-expected-count="${safe(String(r.guest_count || 1))}"
+        onclick="restoreAutomaticRelease(this.dataset.bookingCode, this.dataset.arrival, this.dataset.departure, this.dataset.isTest === 'true', this.dataset.reservationId, Number(this.dataset.expectedCount))"
+        title="${safe(hostLang === 'it' ? 'Ripristina il rilascio automatico — il codice tornerà nascosto finché il check-in non è completato' : 'Restore automatic release — the code goes back to hidden until check-in is complete')}"
+        style="padding:4px 10px;background:transparent;border:1px solid var(--border);border-radius:6px;font-size:0.72rem;cursor:pointer;color:var(--ink-soft);font-family:inherit;font-weight:500;">↩ ${safe(hostLang === 'it' ? 'Ripristina automatico' : 'Restore automatic')}</button>` : ''}
     </div>` : '';
   const html = `
     <div style="background:var(--white);border:1px solid rgba(107,122,144,0.10);border-left:3px solid ${style.color};border-radius:8px;padding:10px 14px;margin-bottom:8px;">
@@ -15008,6 +15018,74 @@ async function releaseEntryManually(bookingCode, arrival, departure, isTest, res
       : '✅ Released manually. The guest will see the entry instructions on next page load.');
   } catch (e) {
     console.error('[round66 release] unexpected error:', e);
+    alert((isIt ? 'Errore imprevisto: ' : 'Unexpected error: ') + (e && e.message || e));
+  }
+}
+
+// Round 66 Phase 2d — restore automatic release.
+// Mirror of releaseEntryManually with p_release=false. Keeps the
+// confirm_roster + set_release two-step so a host who clicks Restore
+// before ever Releasing still ends up in the "automatic / check-in
+// gates entry" baseline instead of an authorization error. The
+// confirmed_automatic state means the policy returns legacy_available
+// / locked / scheduled based on roster + time, not the host's audit.
+async function restoreAutomaticRelease(bookingCode, arrival, departure, isTest, reservationId, expectedCount) {
+  if (!bookingCode || !arrival || !departure) {
+    alert(hostLang === 'it' ? 'Dati prenotazione incompleti.' : 'Incomplete booking data.');
+    return;
+  }
+  const isIt = hostLang === 'it';
+  if (!confirm(isIt
+    ? 'Vuoi ripristinare il rilascio automatico per questa prenotazione?\n\nIl codice tornerà nascosto finché il check-in richiesto non è completato (e, se impostato, finché non arriva l\'orario di rilascio). I codici già visti dall\'ospite non possono essere richiamati.'
+    : 'Restore automatic release for this booking?\n\nThe code will go back to hidden until the required check-in is complete (and, if configured, until the release time is reached). Any codes the guest has already seen cannot be recalled.')) {
+    return;
+  }
+  const requestIdConfirm = (window.crypto && typeof window.crypto.randomUUID === 'function')
+    ? window.crypto.randomUUID()
+    : ('r66-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+  const requestIdRelease = (window.crypto && typeof window.crypto.randomUUID === 'function')
+    ? window.crypto.randomUUID()
+    : ('r66-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+  try {
+    const roster = await sb.rpc('entry_access_confirm_roster', {
+      p_property_id: propertyId,
+      p_booking_code: bookingCode,
+      p_count: Number.isFinite(expectedCount) && expectedCount >= 1 && expectedCount <= 50 ? Math.floor(expectedCount) : 1,
+      p_arrival: arrival,
+      p_departure: departure,
+      p_request_id: requestIdConfirm,
+      p_reservation_id: reservationId || null,
+      p_expected_version: null,
+      p_is_test: isTest === true,
+    });
+    if (roster.error) {
+      console.error('[round66 restore] confirm_roster failed:', roster.error);
+      alert((isIt ? 'Errore nel passo roster: ' : 'Roster step failed: ') + roster.error.message);
+      return;
+    }
+    const summary = roster.data || {};
+    const bookingId = summary.booking_id;
+    const stateVersion = summary.state_version;
+    if (!bookingId || !stateVersion) {
+      alert(isIt ? 'Risposta roster non valida.' : 'Invalid roster response.');
+      return;
+    }
+    const release = await sb.rpc('entry_access_set_release', {
+      p_booking_id: bookingId,
+      p_release: false,
+      p_expected_version: stateVersion,
+      p_request_id: requestIdRelease,
+    });
+    if (release.error) {
+      console.error('[round66 restore] set_release failed:', release.error);
+      alert((isIt ? 'Errore nel ripristino: ' : 'Restore step failed: ') + release.error.message);
+      return;
+    }
+    alert(isIt
+      ? '✅ Rilascio automatico ripristinato. Il codice torna visibile solo a check-in completato.'
+      : '✅ Automatic release restored. The code will reappear only after check-in completes.');
+  } catch (e) {
+    console.error('[round66 restore] unexpected error:', e);
     alert((isIt ? 'Errore imprevisto: ' : 'Unexpected error: ') + (e && e.message || e));
   }
 }

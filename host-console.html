@@ -1608,6 +1608,43 @@ tr:hover td { background: rgba(250,246,240,0.6); }
               <span data-h="prop_show_rotating_lockbox">Show rotating code in the guest app</span>
             </label>
           </div>
+          <!-- Round 66 Phase 2b — opt-in gate: show entry codes only
+               after online check-in is complete (optionally plus an
+               arrival-day release time). Default OFF preserves today's
+               behaviour; flipping it on makes the policy module's
+               roster/time path fire for this property. -->
+          <div class="form-group full" style="padding-top:14px;border-top:1px dashed var(--border);">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;font-size:0.86rem;font-weight:600;">
+              <input type="checkbox" id="propEntryCheckinRequired" onchange="onToggleEntryCheckinRequired()" style="width:18px;height:18px;cursor:pointer;">
+              <span data-h="prop_entry_checkin_required">Show entry instructions only after check-in is complete</span>
+            </label>
+            <div class="form-hint" data-h="prop_entry_checkin_required_hint" style="margin-left:28px;">When on, keybox code, door code and the "how to get in" text stay hidden in the guest app until every required guest has finished their online check-in. Wi-Fi and other info stay visible. Default is off.</div>
+            <div id="propEntryReleaseWrap" style="display:none;margin-top:10px;margin-left:28px;">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;font-size:0.82rem;">
+                <input type="checkbox" id="propEntryReleaseTimeEnabled" onchange="onToggleEntryReleaseTime()" style="width:18px;height:18px;cursor:pointer;">
+                <span data-h="prop_entry_release_time_label">Also require arrival-day release time</span>
+              </label>
+              <div id="propEntryReleaseFields" style="display:none;margin-top:8px;gap:12px;align-items:end;flex-wrap:wrap;">
+                <div>
+                  <label for="propEntryReleaseTime" style="font-size:0.78rem;color:var(--ink-soft);display:block;" data-h="prop_entry_release_time">Release from</label>
+                  <input type="time" id="propEntryReleaseTime" class="form-input" style="width:120px;padding:4px 8px;" value="14:00">
+                </div>
+                <div>
+                  <label for="propEntryReleaseTimezone" style="font-size:0.78rem;color:var(--ink-soft);display:block;" data-h="prop_entry_release_tz">Timezone</label>
+                  <select id="propEntryReleaseTimezone" class="form-input" style="width:auto;padding:4px 8px;">
+                    <option value="Europe/Rome">Europe/Rome (Italia)</option>
+                    <option value="Europe/London">Europe/London</option>
+                    <option value="Europe/Berlin">Europe/Berlin</option>
+                    <option value="Europe/Madrid">Europe/Madrid</option>
+                    <option value="Europe/Paris">Europe/Paris</option>
+                    <option value="Europe/Vienna">Europe/Vienna</option>
+                    <option value="Europe/Zurich">Europe/Zurich</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-hint" style="margin-top:8px;" data-h="prop_entry_release_time_hint">Even after check-in is complete, codes stay hidden until this wall-clock time on the arrival day.</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -4436,6 +4473,13 @@ const HT = {
     prop_rotating_lockbox_length: 'Code length',
     prop_rotating_lockbox_length_hint: 'digits',
     prop_show_rotating_lockbox: 'Show rotating code in the guest app',
+    // Round 66 Phase 2b — opt-in: show entry instructions only after check-in
+    prop_entry_checkin_required: 'Show entry instructions only after check-in is complete',
+    prop_entry_checkin_required_hint: 'When on, keybox code, door code and the "how to get in" text stay hidden in the guest app until every required guest has finished their online check-in. Wi-Fi and other info stay visible. Default is off.',
+    prop_entry_release_time_label: 'Also require arrival-day release time',
+    prop_entry_release_time: 'Release from',
+    prop_entry_release_tz: 'Timezone',
+    prop_entry_release_time_hint: 'Even after check-in is complete, codes stay hidden until this wall-clock time on the arrival day.',
     // Legacy keys kept so an older DOM (pre-hard-refresh) still resolves.
     prop_per_guest_lockbox: 'Use a rotating code that changes per guest',
     prop_per_guest_lockbox_hint: 'When on, every new check-in gets a fresh code automatically. You choose the code length (4–8 digits) to match your lockbox. You can overwrite it per booking in the Check-in Data tab.',
@@ -5017,6 +5061,13 @@ const HT = {
     prop_rotating_lockbox_length: 'Lunghezza codice',
     prop_rotating_lockbox_length_hint: 'cifre',
     prop_show_rotating_lockbox: "Mostra il codice rotante nell'app ospite",
+    // Round 66 Phase 2b — opt-in: mostra istruzioni di accesso solo dopo check-in
+    prop_entry_checkin_required: 'Mostra le istruzioni di accesso solo dopo il completamento del check-in',
+    prop_entry_checkin_required_hint: "Quando attivo, il codice del lockbox, il codice della porta e il testo \"come entrare\" restano nascosti nell'app ospite finché tutti i check-in richiesti non sono completati. Il Wi-Fi e le altre informazioni restano visibili. Predefinito: disattivo.",
+    prop_entry_release_time_label: 'Richiedi anche un orario di rilascio nel giorno di arrivo',
+    prop_entry_release_time: 'Rilascia dalle',
+    prop_entry_release_tz: 'Fuso orario',
+    prop_entry_release_time_hint: 'Anche a check-in completato, i codici restano nascosti fino a questo orario del giorno di arrivo.',
     prop_per_guest_lockbox: 'Usa un codice rotante che cambia per ogni ospite',
     prop_per_guest_lockbox_hint: 'Quando attivo, ogni nuovo check-in riceve automaticamente un codice. Scegli la lunghezza del codice (4–8 cifre) in base al tuo lockbox. Puoi sovrascriverlo per prenotazione nella scheda Dati Check-in.',
     prop_instructions: 'Istruzioni di Arrivo e Partenza',
@@ -8392,6 +8443,23 @@ async function saveProperty(scope = 'property') {
     show_fixed_lockbox_to_guest:    !!document.getElementById('propShowFixedLockboxToGuest')?.checked,
     rotating_lockbox_enabled:       !!document.getElementById('propRotatingLockboxEnabled')?.checked,
     show_rotating_lockbox_to_guest: !!document.getElementById('propShowRotatingLockboxToGuest')?.checked,
+    // Round 66 Phase 2b — opt-in gate + optional arrival-day release time.
+    // The CHECK constraint on properties enforces that entry_release_time
+    // and entry_release_timezone are both set or both null, so when the
+    // time toggle is off we send null for both. HH:MM is enforced client-
+    // side by the <input type="time"> and server-side by a regex CHECK.
+    entry_checkin_required: !!document.getElementById('propEntryCheckinRequired')?.checked,
+    entry_release_time: (() => {
+      if (!document.getElementById('propEntryCheckinRequired')?.checked) return null;
+      if (!document.getElementById('propEntryReleaseTimeEnabled')?.checked) return null;
+      const v = document.getElementById('propEntryReleaseTime')?.value || '';
+      return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : null;
+    })(),
+    entry_release_timezone: (() => {
+      if (!document.getElementById('propEntryCheckinRequired')?.checked) return null;
+      if (!document.getElementById('propEntryReleaseTimeEnabled')?.checked) return null;
+      return document.getElementById('propEntryReleaseTimezone')?.value || null;
+    })(),
     // Round 36.2.5 — persist the host's chosen code length (4..8). The
     // DB CHECK will reject anything outside that range, so clamp on read.
     rotating_lockbox_length:        (() => {
@@ -14853,6 +14921,27 @@ function onToggleRotatingLockbox() {
 // Preserve the old name for anything (auto-save, tests) that still calls it.
 const onTogglePerGuestLockbox = onToggleRotatingLockbox;
 
+// Round 66 Phase 2b — opt-in gate visibility.
+// When the host toggles "Show entry instructions only after check-in,"
+// reveal the optional "release time" controls; otherwise hide them AND
+// the release-time toggle itself so the saved payload cleanly carries
+// null for both time and timezone (the DB CHECK requires them paired).
+function onToggleEntryCheckinRequired() {
+  const enabled = !!document.getElementById('propEntryCheckinRequired')?.checked;
+  const wrap = document.getElementById('propEntryReleaseWrap');
+  if (wrap) wrap.style.display = enabled ? 'block' : 'none';
+  if (!enabled) {
+    const timeToggle = document.getElementById('propEntryReleaseTimeEnabled');
+    if (timeToggle) timeToggle.checked = false;
+    onToggleEntryReleaseTime();
+  }
+}
+function onToggleEntryReleaseTime() {
+  const enabled = !!document.getElementById('propEntryReleaseTimeEnabled')?.checked;
+  const fields = document.getElementById('propEntryReleaseFields');
+  if (fields) fields.style.display = enabled ? 'flex' : 'none';
+}
+
 // Round 36.2.5 — generate a random N-digit code where N is the property's
 // configured rotating_lockbox_length (default 4, capped 4..8). The host
 // still has to physically program the lockbox; this just saves them
@@ -15601,6 +15690,30 @@ function fillPropertyForm(data) {
   if (el('propShowFixedLockboxToGuest'))    el('propShowFixedLockboxToGuest').checked    = data.show_fixed_lockbox_to_guest    !== false;
   if (el('propRotatingLockboxEnabled'))     el('propRotatingLockboxEnabled').checked     = !!data.rotating_lockbox_enabled;
   if (el('propShowRotatingLockboxToGuest')) el('propShowRotatingLockboxToGuest').checked = data.show_rotating_lockbox_to_guest !== false;
+  // Round 66 Phase 2b — opt-in gate.
+  if (el('propEntryCheckinRequired')) {
+    el('propEntryCheckinRequired').checked = data.entry_checkin_required === true;
+  }
+  if (el('propEntryReleaseTimeEnabled')) {
+    el('propEntryReleaseTimeEnabled').checked = !!(data.entry_release_time && data.entry_release_timezone);
+  }
+  if (el('propEntryReleaseTime') && data.entry_release_time) {
+    el('propEntryReleaseTime').value = data.entry_release_time;
+  }
+  if (el('propEntryReleaseTimezone') && data.entry_release_timezone) {
+    const sel = el('propEntryReleaseTimezone');
+    // Add the saved value as an option if it's not in the hardcoded list,
+    // so a host who typed a less-common IANA zone keeps seeing it.
+    if (![...sel.options].some(o => o.value === data.entry_release_timezone)) {
+      const opt = document.createElement('option');
+      opt.value = data.entry_release_timezone;
+      opt.textContent = data.entry_release_timezone;
+      sel.appendChild(opt);
+    }
+    sel.value = data.entry_release_timezone;
+  }
+  if (typeof onToggleEntryCheckinRequired === 'function') onToggleEntryCheckinRequired();
+  if (typeof onToggleEntryReleaseTime === 'function') onToggleEntryReleaseTime();
   // Round 36.2.5 — restore the rotating-code length picker; the DB
   // CHECK guarantees 4..8, but clamp anyway to survive old rows.
   if (el('propRotatingLockboxLength')) {

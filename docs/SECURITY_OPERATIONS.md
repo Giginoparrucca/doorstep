@@ -1,5 +1,12 @@
 # Round 65 security operations handoff
 
+## 27 October application cutover and public-key continuation
+
+The owner updated the Vercel server variable; metadata updatedAt is 1793075954121, still sensitive/production-only. Redeployment dpl_J9iLBTBVFRJH1F2GTZSKkd2RwRQ2 at e5821ca is READY and canonical. Hosted synthetic nonexistent-property lookup returns 404 after service REST access, while guest/host unauthenticated actions return 401; no token/usage/booking/message write. Public live 3/0/5; protected CI 40450034237 remains 6/0/2. This verifies the deployed service REST path and unauthorized boundaries, not a signed-in real-user flow or the exact hidden key format.
+
+This branch migrates the built-in production public key and generated browser config to the provider-verified active modern publishable key, preserving the project and user-session storage/JWT contract. Vercel has no SUPABASE_ANON_KEY override in the inspected metadata. Pinned-SDK hosted privileged RPC denial passed with the modern key; full combined release gates remain pending. Existing app-config.js no-store headers reduce stale config on reload; already open tabs, cached clients and external operator scripts still require review. Keep legacy API keys active. No JWT signing-key reset or key revocation.
+
+
 **Protected replacement-key verification — 27 October 2026:** owner-approved main run [40450034237](https://github.com/Giginoparrucca/doorstep/actions/runs/40450034237), job `122010353999`, SHA `6f178130086b22877a9553dec33e149f39aa8dcf`: **PASS 6 / FAIL 0 / SKIP 2**. Actual production grants/dry-run calls, Auth-admin/Storage GET authorization, schema drift, security headers, SPOT and tax pass. Only demo origin/provider opt-in skip. The owner reports entering the modern `default` secret; successful authorization is independently verified, while key format remains owner-reported because the runner suppresses passing test stdout and no credential value was retrieved. Prior run 40431137141 was cancelled. Vercel metadata is still unchanged (sensitive, production-only; updatedAt 1787729237074), so application-key cutover is not complete.
 
 ## Verified on 26 October 2026

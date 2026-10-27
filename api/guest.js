@@ -7,7 +7,7 @@ import handleCspReport from './_csp-report.js';
 // result is identical to the prior inlined bookingHasCheckin + ota
 // keybox_code read. Phase 2 adds the opt-in UI and the roster/time
 // enforcement for properties that opt in.
-import { projectGuestEntry } from './_entry-release-loader.js';
+import { entryReleaseAllows, projectGuestEntry } from './_entry-release-loader.js';
 // api/guest.js — Round 34 chat gateway + Round 48 guest gateway.
 //
 // Round 48 Phase 2 renamed api/guest-chat.js → api/guest.js and
@@ -157,7 +157,7 @@ export default async function handler(req, res) {
     if (action === 'send')             return await doSend(res, propertyId, bookingCode, sessionId, body, isTest);
     if (action === 'poll')             return await doPoll(res, propertyId, bookingCode, body);
     // Round 48 Phase 2 — guest-visible resources
-    if (action === 'property')         return await doProperty(res, propertyId, bookingCode, isTest);
+    if (action === 'property')         return await doProperty(res, propertyId, bookingCode, isTest, v.payload.exp);
     if (action === 'keybox')           return await doGuestKeybox(res, propertyId, bookingCode, isTest, v.payload.exp);
     if (action === 'checkin_list')     return await doCheckinList(res, propertyId, bookingCode, isTest);
     if (action === 'checkin_insert')   return await doCheckinInsert(res, propertyId, bookingCode, sessionId, body, isTest);
@@ -453,7 +453,7 @@ async function doGuestKeybox(res, propertyId, bookingCode, isTest, sessionExpUni
   return res.status(200).json({ code: code || null });
 }
 
-async function doProperty(res, propertyId, bookingCode, isTest) {
+async function doProperty(res, propertyId, bookingCode, isTest, sessionExpUnixSec) {
   const r = await pgrestGET(
     `properties?id=eq.${encodeURIComponent(propertyId)}` +
     `&deleted_at=is.null&select=*&limit=1`
@@ -462,9 +462,18 @@ async function doProperty(res, propertyId, bookingCode, isTest) {
   const [row] = await r.json();
   if (!row) return res.status(404).json({ error: 'property not found' });
 
-  // Does this booking have any guests yet? Keybox + wifi are gated
-  // behind "check-in complete" per today's UI behaviour.
-  const hasCheckin = await bookingHasCheckin(propertyId, bookingCode, isTest);
+  // Does this booking qualify for the post-check-in field set? Keybox,
+  // wifi and access_method are gated behind "entry eligible per policy."
+  // Round 66 Phase 1b — delegate to the shared policy module. For every
+  // property today (opt-in column absent → entry_checkin_required=null)
+  // the loader+policy returns legacy_available iff a check-in row exists,
+  // which is byte-equivalent to the prior bookingHasCheckin() call.
+  const sessionValidUntil = Number.isFinite(sessionExpUnixSec)
+    ? new Date(sessionExpUnixSec * 1000).toISOString()
+    : null;
+  const hasCheckin = bookingCode ? await entryReleaseAllows({
+    pgrestGET, propertyId, bookingCode, isTest, sessionValidUntil,
+  }) : false;
 
   const out = {};
   for (const k of PROPERTY_PUBLIC_FIELDS) {

@@ -6571,6 +6571,17 @@ function _renderReservationCard(r, todayISO) {
          style="padding:4px 10px;background:var(--white);border:1px solid var(--border);border-radius:6px;font-size:0.72rem;color:var(--ink);text-decoration:none;">↗ ${safe(hostLang === 'it' ? 'Apri' : 'Open')}</a>
       <button type="button" class="btn btn-secondary btn-sm" data-share-code="${encodeURIComponent(r.booking_code)}" onclick="openBookingShare(decodeURIComponent(this.dataset.shareCode))">${safe(hostLang === 'it' ? 'Condividi' : 'Share')}</button>
       ${reopenBtn}${reopenedNote}
+      ${propertyData?.entry_checkin_required === true && r.booking_code && r.checkin_date && r.checkout_date ? `
+      <button type="button"
+        data-booking-code="${safe(r.booking_code)}"
+        data-arrival="${safe(r.checkin_date)}"
+        data-departure="${safe(r.checkout_date)}"
+        data-is-test="${r.is_test === true ? 'true' : 'false'}"
+        data-reservation-id="${safe(r.id || '')}"
+        data-expected-count="${safe(String(r.guest_count || 1))}"
+        onclick="releaseEntryManually(this.dataset.bookingCode, this.dataset.arrival, this.dataset.departure, this.dataset.isTest === 'true', this.dataset.reservationId, Number(this.dataset.expectedCount))"
+        title="${safe(hostLang === 'it' ? 'Rilascia manualmente il codice del lockbox per questa prenotazione — scavalca il check-in richiesto; l\'azione sarà registrata nell\'audit' : 'Manually release the lockbox code for this booking — bypasses the check-in requirement; the action is recorded in the audit log')}"
+        style="padding:4px 10px;background:rgba(27,94,32,0.14);border:1px solid rgba(27,94,32,0.4);border-radius:6px;font-size:0.72rem;cursor:pointer;color:#1b5e20;font-family:inherit;font-weight:500;">🔓 ${safe(hostLang === 'it' ? 'Rilascia accesso' : 'Release access')}</button>` : ''}
     </div>` : '';
   const html = `
     <div style="background:var(--white);border:1px solid rgba(107,122,144,0.10);border-left:3px solid ${style.color};border-radius:8px;padding:10px 14px;margin-bottom:8px;">
@@ -14920,6 +14931,86 @@ function onToggleRotatingLockbox() {
 }
 // Preserve the old name for anything (auto-save, tests) that still calls it.
 const onTogglePerGuestLockbox = onToggleRotatingLockbox;
+
+// Round 66 Phase 2d — manual override for the entry-release gate.
+// Calls the authenticated-only RPC pair exposed by the Phase 1a
+// migration:
+//   public.entry_access_confirm_roster(...) ensures the
+//     entry_access.bookings row exists for this (property, booking,
+//     is_test) with the current roster count/dates/reservation link.
+//     Idempotent on p_request_id — a second call with the same
+//     request_id returns the first result without a new write.
+//   public.entry_access_set_release(booking_id, true, state_version,
+//     request_id) flips released_manually=true, recording the actor,
+//     request fingerprint and immutable audit event in the same
+//     transaction.
+//
+// For the FIRST manual release on a booking confirm_roster has to run
+// so the booking row exists; for subsequent toggles we could skip it,
+// but running it is still safe (idempotent) and keeps the roster in
+// sync with any arrival/departure changes since.
+async function releaseEntryManually(bookingCode, arrival, departure, isTest, reservationId, expectedCount) {
+  if (!bookingCode || !arrival || !departure) {
+    alert(hostLang === 'it' ? 'Dati prenotazione incompleti.' : 'Incomplete booking data.');
+    return;
+  }
+  const isIt = hostLang === 'it';
+  if (!confirm(isIt
+    ? 'Vuoi rilasciare manualmente le istruzioni di accesso per questa prenotazione?\n\nL\'azione scavalca il requisito di check-in e sarà registrata in modo immutabile nell\'audit (actor, timestamp, request fingerprint). Puoi ripristinare il rilascio automatico in qualsiasi momento.'
+    : 'Manually release entry instructions for this booking?\n\nThis bypasses the check-in requirement and is recorded immutably in the audit log (actor, timestamp, request fingerprint). You can restore automatic release at any time.')) {
+    return;
+  }
+  const requestIdConfirm = (window.crypto && typeof window.crypto.randomUUID === 'function')
+    ? window.crypto.randomUUID()
+    : ('r66-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+  const requestIdRelease = (window.crypto && typeof window.crypto.randomUUID === 'function')
+    ? window.crypto.randomUUID()
+    : ('r66-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+  try {
+    // 1. Ensure (or refresh) the entry_access.bookings row.
+    const roster = await sb.rpc('entry_access_confirm_roster', {
+      p_property_id: propertyId,
+      p_booking_code: bookingCode,
+      p_count: Number.isFinite(expectedCount) && expectedCount >= 1 && expectedCount <= 50 ? Math.floor(expectedCount) : 1,
+      p_arrival: arrival,
+      p_departure: departure,
+      p_request_id: requestIdConfirm,
+      p_reservation_id: reservationId || null,
+      p_expected_version: null,
+      p_is_test: isTest === true,
+    });
+    if (roster.error) {
+      console.error('[round66 release] confirm_roster failed:', roster.error);
+      alert((isIt ? 'Errore nel passo roster: ' : 'Roster step failed: ') + roster.error.message);
+      return;
+    }
+    const summary = roster.data || {};
+    const bookingId = summary.booking_id;
+    const stateVersion = summary.state_version;
+    if (!bookingId || !stateVersion) {
+      alert(isIt ? 'Risposta roster non valida.' : 'Invalid roster response.');
+      return;
+    }
+    // 2. Flip released_manually=true against the version we just read.
+    const release = await sb.rpc('entry_access_set_release', {
+      p_booking_id: bookingId,
+      p_release: true,
+      p_expected_version: stateVersion,
+      p_request_id: requestIdRelease,
+    });
+    if (release.error) {
+      console.error('[round66 release] set_release failed:', release.error);
+      alert((isIt ? 'Errore nel rilascio: ' : 'Release step failed: ') + release.error.message);
+      return;
+    }
+    alert(isIt
+      ? '✅ Rilasciato manualmente. L\'ospite vedrà le istruzioni di accesso al prossimo caricamento della pagina.'
+      : '✅ Released manually. The guest will see the entry instructions on next page load.');
+  } catch (e) {
+    console.error('[round66 release] unexpected error:', e);
+    alert((isIt ? 'Errore imprevisto: ' : 'Unexpected error: ') + (e && e.message || e));
+  }
+}
 
 // Round 66 Phase 2b — opt-in gate visibility.
 // When the host toggles "Show entry instructions only after check-in,"

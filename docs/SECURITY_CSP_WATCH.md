@@ -35,3 +35,8 @@ policy to the enforced header, rerun the whole suite, CI and production header/
 flow checks. Keep reporting enabled. If it breaks a legitimate flow, restore the
 previous report-only resource policy and verify the rollback; retain the small
 enforced framing/base/object policy and the other security headers.
+
+
+## 27 October observation note
+
+A production `[csp-report]` count query over the recent 30 minutes returned no groups. The 1-hour boundary was rejected by the provider because it exceeded the Hobby runtime-log retention window; the narrower query succeeded. This exposes a retention/coverage gap, not seven days of clean traffic. Preserve browser flow evidence and sanitized counts during actual active reviews. Empty recent counts do not advance Phase 5b or substitute for the signed-in flow review. No log drain, paid observability plan or unattended monitor was configured.

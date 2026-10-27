@@ -1,5 +1,12 @@
 # Production API-key replacement — Round 65
 
+## Current verified release — 27 October
+
+**Verified 27 October 2026:** CI and Vercel server-key replacement are operationally verified (owner-approved run 40450034237: 6/0/2; Vercel sensitive/production-only variable updatedAt 1793075954121; hosted synthetic service REST lookup returns 404 and unauthenticated guest/host actions 401). PR #224 migrated the built-in browser/public defaults to the provider-verified active modern publishable key. Main `09ec3c85ae5edae6934904cad8ed5b33a0afb610`, tested/merged tree `ddb6823ec9a16963fbc0fafbbb7f08b8382a50df`, production `dpl_4M4LhHWG6oRt4sy4kmjRiYRHqTnr` READY and canonical. Local full regression and final CI 40451785788/job 122015960275: **88/0/3**, all fourteen browser suites. Public hosted smoke **3/0/5**, including four anonymous RPC denials with the new public key before the service skip. Generated production public config matches exact expected bytes using the verified deployment origins and has no-store; the project and user-session storage name/JWT contract stay unchanged. No real guest/provider/booking writes or signing-key reset. Authenticated real-user journeys were not exercised.
+
+Legacy API keys remain enabled for already-open/cached clients and external tools. The remaining acceptance items are legacy-consumer retirement, verified security mailbox, CSP flow/log review and final protected release evidence. Historical preparation notes below describe earlier states.
+
+
 ## 27 October application cutover and public-key continuation
 
 The owner updated the Vercel server variable; metadata updatedAt is 1793075954121, still sensitive/production-only. Redeployment dpl_J9iLBTBVFRJH1F2GTZSKkd2RwRQ2 at e5821ca is READY and canonical. Hosted synthetic nonexistent-property lookup returns 404 after service REST access, while guest/host unauthenticated actions return 401; no token/usage/booking/message write. Public live 3/0/5; protected CI 40450034237 remains 6/0/2. This verifies the deployed service REST path and unauthorized boundaries, not a signed-in real-user flow or the exact hidden key format.
@@ -24,7 +31,7 @@ This branch migrates the built-in production public key and generated browser co
 | api/telegram-link.js, api/telegram-webhook.js, api/_notify-host.js, api/send-arrival-reminders.js | Privileged REST/storage; Telegram, mail, push and cron credentials separate | Existing synthetic notification/reminder suites; no messages sent by tests |
 | api/_ireservation-store.js via _ireservation.js / comparison actions | Private-schema RPC gateway | Synthetic transport key-header test; preserve provider activation gate |
 | scripts/round65-grant-probes.test.live.mjs and scripts/schema-drift.test.live.mjs | Reviewed CI read-only/dry-run production REST probes | Support new API-key header, no bearer when key is opaque; run with owner-provisioned CI key |
-| Browser clients and lib/environment.mjs | Still use legacy production public anon key; host/user JWTs remain independent | Public-key migration and cached-client inventory before legacy API keys may be disabled |
+| Browser clients and lib/environment.mjs | Modern production publishable default deployed in PR #224; host/user JWTs remain independent | Public-key migration and cached-client inventory before legacy API keys may be disabled |
 | Local/demo/operator scripts | Some still send legacy key as bearer or use their own SDK/config | Audit the exact tool before use with a new key; never point demo tools at production |
 
 ## Actual database metadata inspection

@@ -57,7 +57,7 @@ Daniele explicitly confirmed concurrent development alongside Claude's Round 65.
 
 | Phase | Status | Gate |
 |---|---|---|
-| 1 — Authoritative policy and protected delivery | in-progress — GPT | New server policy, trusted roster, time rules, audited override and protected projections; API/RPC, tenant, concurrency/error tests plus full suite. |
+| 1 — Authoritative policy and protected delivery | in-progress — Claude Opus 4.7 (handoff from GPT, 2026-10-27) | New server policy, trusted roster, time rules, audited override and protected projections; API/RPC, tenant, concurrency/error tests plus full suite. GPT's draft PR #207 (3 commits: policy foundation `c94e4be`, fixture focus `97104c1`, staged roster audit storage `4056e32`) rebased onto main `b51fb4c`; staged SQL at `docs/entry-release/staged-migrations/20261026072310_round66_entry_roster_audit.sql` to be promoted into `supabase/migrations/`, applied via Supabase MCP, verified via `scripts/schema-drift.test.live.mjs` per AGENTS.md rule 8. Then wire policy/loader into `api/guest.js` entry projections (`doProperty`, `checkin_list/insert/update`, `resolveGuestRoom`, `doGuestKeybox`) and `api/chat.js` history filter. Opt-in UI remains disabled; the per-property `entry_checkin_required` setting exists at the data layer but no host-console toggle exposes it until Phase 2 ships. |
 | 2 — Host and guest interfaces | pending — GPT | Opt-in setup, release status/override, guest cards/refresh and IT/EN desktop/mobile browser gates plus full suite. |
 | 3 — Integrated release and guides | pending — GPT | Merge Round 65 security changes first where shared; AI/history/message/cache tests, guides, full regression/CI/schema-drift/live evidence. |
 

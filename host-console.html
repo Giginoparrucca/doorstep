@@ -3675,6 +3675,131 @@ async function checkAuth() {
   return false;
 }
 
+// Hotfix 2026-10-27 — modal password-set dialog, replaces native prompt()
+// in the invite/recovery flow. See handleHostAuthEvent below for context.
+//
+// Returns a Promise<string|null>: the chosen password, or null on cancel.
+// Validates length >= 6 and that the two fields match before resolving.
+// Uses type="password" autocomplete="new-password" so password managers
+// still work (the user sees their autofill in both fields) and so iOS
+// cannot silently fill a Keychain-generated password without the user
+// confirming visibly.
+window.promptForNewPassword = function (opts) {
+  var title = opts.title;
+  var message = opts.message;
+  var isIt = !!opts.isIt;
+  var allowSkip = !!opts.allowSkip;
+  return new Promise(function (resolve) {
+    var backdrop = document.createElement('div');
+    backdrop.setAttribute('role', 'dialog');
+    backdrop.setAttribute('aria-modal', 'true');
+    backdrop.style.cssText =
+      'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);' +
+      'z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;';
+
+    var card = document.createElement('div');
+    card.style.cssText =
+      'background:white;max-width:420px;width:100%;border-radius:12px;padding:24px;' +
+      'box-shadow:0 8px 32px rgba(0,0,0,0.25);';
+
+    var h = document.createElement('h3');
+    h.textContent = title;
+    h.style.cssText = 'margin:0 0 10px 0;font-size:1.1rem;color:#1b5e20;font-weight:700;';
+    card.appendChild(h);
+
+    var msg = document.createElement('p');
+    msg.textContent = message;
+    msg.style.cssText = 'margin:0 0 16px 0;color:#444;font-size:0.88rem;line-height:1.45;';
+    card.appendChild(msg);
+
+    function mkField(labelText) {
+      var lbl = document.createElement('label');
+      lbl.textContent = labelText;
+      lbl.style.cssText = 'display:block;font-size:0.78rem;margin:0 0 4px 0;color:#333;font-weight:600;';
+      card.appendChild(lbl);
+      var inp = document.createElement('input');
+      inp.type = 'password';
+      inp.setAttribute('autocomplete', 'new-password');
+      inp.setAttribute('minlength', '6');
+      inp.style.cssText =
+        'width:100%;padding:10px;border:1px solid #ccc;border-radius:6px;margin-bottom:12px;' +
+        'font-size:1rem;box-sizing:border-box;-webkit-appearance:none;';
+      card.appendChild(inp);
+      return inp;
+    }
+
+    var input1 = mkField(isIt ? 'Nuova password (min. 6 caratteri)' : 'New password (min. 6 characters)');
+    var input2 = mkField(isIt ? 'Conferma password' : 'Confirm password');
+
+    var err = document.createElement('div');
+    err.style.cssText = 'color:#c62828;font-size:0.78rem;margin-bottom:12px;min-height:1em;';
+    card.appendChild(err);
+
+    var btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:8px;';
+
+    var cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.textContent = isIt
+      ? (allowSkip ? 'Salta' : 'Annulla')
+      : (allowSkip ? 'Skip' : 'Cancel');
+    cancelBtn.style.cssText =
+      'flex:1;padding:12px;border:1px solid #ccc;background:#f7f7f7;border-radius:6px;' +
+      'cursor:pointer;font-size:0.95rem;font-family:inherit;';
+
+    var confirmBtn = document.createElement('button');
+    confirmBtn.type = 'button';
+    confirmBtn.textContent = isIt ? 'Imposta password' : 'Set password';
+    confirmBtn.style.cssText =
+      'flex:1;padding:12px;border:none;background:#1b5e20;color:white;border-radius:6px;' +
+      'cursor:pointer;font-weight:600;font-size:0.95rem;font-family:inherit;';
+
+    btnRow.appendChild(cancelBtn);
+    btnRow.appendChild(confirmBtn);
+    card.appendChild(btnRow);
+
+    var hint = document.createElement('p');
+    hint.textContent = isIt
+      ? 'Scegli una password che ricorderai. Se il browser propone una password automatica, assicurati di salvarla nel tuo gestore password — altrimenti non potrai più accedere.'
+      : 'Choose a password you will remember. If your browser suggests an automatic password, make sure you save it to your password manager — otherwise you will not be able to sign in again.';
+    hint.style.cssText = 'font-size:0.72rem;color:#777;margin:12px 0 0 0;line-height:1.4;';
+    card.appendChild(hint);
+
+    backdrop.appendChild(card);
+    document.body.appendChild(backdrop);
+
+    function close(value) {
+      try { backdrop.remove(); } catch (_) {}
+      resolve(value);
+    }
+
+    cancelBtn.addEventListener('click', function () { close(null); });
+    confirmBtn.addEventListener('click', function () {
+      var p1 = input1.value;
+      var p2 = input2.value;
+      if (!p1 || p1.length < 6) {
+        err.textContent = isIt ? 'Minimo 6 caratteri.' : 'Minimum 6 characters.';
+        try { input1.focus(); } catch (_) {}
+        return;
+      }
+      if (p1 !== p2) {
+        err.textContent = isIt ? 'Le due password non coincidono.' : 'The two passwords do not match.';
+        try { input2.focus(); } catch (_) {}
+        return;
+      }
+      close(p1);
+    });
+
+    backdrop.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape') close(null);
+      if (ev.key === 'Enter' && document.activeElement === input2) confirmBtn.click();
+    });
+
+    // iOS needs a short delay before focus works on dynamically-inserted inputs.
+    setTimeout(function () { try { input1.focus(); } catch (_) {} }, 50);
+  });
+};
+
 // Handle password recovery and invite from email links.
 async function handleHostAuthEvent(event, session) {
   // Round 51 hotfix — an invite / magic-link / recovery lands here
@@ -3713,7 +3838,22 @@ async function handleHostAuthEvent(event, session) {
         ? 'Benvenuto! Imposta la tua password (minimo 6 caratteri). Lascia vuoto o Annulla per mantenere quella esistente.'
         : 'Welcome! Set your password (minimum 6 characters). Leave empty or Cancel to keep your existing one.';
     }
-    var newPass = prompt(promptMsg);
+    // Hotfix 2026-10-27 — replace the native browser-dialog password
+    // collector with a visible modal. iOS Safari and Chrome mobile treat
+    // the native dialog as a password input and silently auto-fill a
+    // Keychain-generated strong password, then our code accepts it and
+    // signs the user in without them knowing a password was set. The
+    // modal uses two explicit <input type="password"
+    // autocomplete="new-password"> fields so any autofill is visible and
+    // the user has to confirm it.
+    var newPass = await window.promptForNewPassword({
+      title: isIt
+        ? (event === 'PASSWORD_RECOVERY' ? 'Imposta la tua nuova password' : 'Benvenuto! Imposta la password')
+        : (event === 'PASSWORD_RECOVERY' ? 'Set your new password' : 'Welcome! Set your password'),
+      message: promptMsg,
+      isIt: isIt,
+      allowSkip: event !== 'PASSWORD_RECOVERY',
+    });
     var passwordSet = false;
     if (newPass && newPass.length >= 6) {
       var upd = await sb.auth.updateUser({ password: newPass });
@@ -3934,9 +4074,14 @@ async function forgotPassword() {
     errEl.classList.add('show');
   } else {
     errEl.style.color = 'var(--green)';
-    errEl.textContent = hostLang === 'it' ? '📧 Email inviata! Controlla la tua casella per il link di reset.' : '📧 Email sent! Check your inbox for the reset link.';
+    // Hotfix 2026-10-27 — Supabase's default SMTP has a 2-emails/hour/recipient
+    // rate limit and the sender lands in Gmail spam for many recipients.
+    // Point stuck users to the human fallback so they don't abandon.
+    errEl.innerHTML = hostLang === 'it'
+      ? '📧 Email inviata! Controlla la tua casella per il link di reset.<br><span style="font-size:0.66rem;color:var(--ink-soft);">Non la ricevi entro 5 minuti? Controlla lo spam o scrivi a <a href="mailto:info@welcomebnb.it" style="color:var(--warm);">info@welcomebnb.it</a> per un link diretto.</span>'
+      : '📧 Email sent! Check your inbox for the reset link.<br><span style="font-size:0.66rem;color:var(--ink-soft);">Not arrived within 5 minutes? Check spam or email <a href="mailto:info@welcomebnb.it" style="color:var(--warm);">info@welcomebnb.it</a> for a direct link.</span>';
     errEl.classList.add('show');
-    setTimeout(() => { errEl.style.color = ''; }, 5000);
+    setTimeout(() => { errEl.style.color = ''; }, 10000);
   }
 }
 
@@ -3969,11 +4114,12 @@ async function firstTimeSetup() {
     return;
   }
   errEl.style.color = 'var(--green)';
-  errEl.textContent = isIt
-    ? '📧 Email inviata! Controlla la tua casella: il link ti porta qui a impostare la password.'
-    : '📧 Email sent! Check your inbox: the link brings you back here to set your password.';
+  // Hotfix 2026-10-27 — see forgotPassword above for context.
+  errEl.innerHTML = isIt
+    ? '📧 Email inviata! Controlla la tua casella: il link ti porta qui a impostare la password.<br><span style="font-size:0.66rem;color:var(--ink-soft);">Non la ricevi entro 5 minuti? Controlla lo spam o scrivi a <a href="mailto:info@welcomebnb.it" style="color:var(--warm);">info@welcomebnb.it</a> per un link diretto.</span>'
+    : '📧 Email sent! Check your inbox: the link brings you back here to set your password.<br><span style="font-size:0.66rem;color:var(--ink-soft);">Not arrived within 5 minutes? Check spam or email <a href="mailto:info@welcomebnb.it" style="color:var(--warm);">info@welcomebnb.it</a> for a direct link.</span>';
   errEl.classList.add('show');
-  setTimeout(() => { errEl.style.color = ''; }, 7000);
+  setTimeout(() => { errEl.style.color = ''; }, 12000);
 }
 
 /* ══════════════════════════════════════

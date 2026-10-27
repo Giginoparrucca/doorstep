@@ -2,7 +2,15 @@
 
 Requested by Daniele on 26 October 2026 after two hosts asked to withhold entry codes until online check-in is complete.
 
-Status: specification only; implementation not started. Daniele approved the design and requested this write-up. This document does not open or claim an implementation phase. Preserve Round 63 ownership/provider gates and the preceding Round 65 security work.
+Status: confirmed and in progress. Daniele approved concurrent development alongside Round 65 on 26 October 2026. Phase 1 is claimed by GPT on `codex/round66-checkin-access`; the first isolated policy/test foundation is tracked in PR #207. No feature activation, operational roster/override or completed phase is claimed. Preserve Round 63 ownership/provider gates and Round 65 security ownership. See CHANGELOG and `docs/entry-release/INTEGRATION.md` for precise delivery evidence and remaining integration.
+
+Phase 1 continuation: staged private roster/slot/binding/audit SQL and server-side
+current-record validation have been implemented and tested independently. The
+SQL is held under `docs/entry-release/staged-migrations`, not registered/applied
+under `supabase/migrations`. Database/HTTP exposure, coherent snapshot loading,
+guest binding/upserts, audited admin integration, shared API/UI protection and
+rollout gates remain unfinished. Keep activation unavailable; current production
+schema-drift cannot prove this staged SQL was applied.
 
 ## Outcome and host setup
 
@@ -93,7 +101,7 @@ Preserve existing fixed/rotating visibility switches and code precedence: releas
 
 Every implementation phase runs npm run test:all plus its specific checks; new tests join the full suite. Record pass/fail/skip totals and reasons in CHANGELOG. Red suites block merge. New migrations require production schema-drift RPC evidence before shipped status. After deployment run npm run test:live and distinguish synthetic, authenticated hosted and read-only smoke evidence; no simulated result is a live pass.
 
-Phase 1 backend delivery must stay compatible with existing clients and keep activation unavailable until the complete gate and UI ship. Claim each phase in CHANGELOG before implementation; preserve other round ownership. Implementation still needs the repository's new-round recap/confirmation gate. No owner action, new provider account or additional service cost is expected beyond hosts choosing to enable the setting.
+Phase 1 backend delivery must stay compatible with existing clients and keep activation unavailable until the complete gate and UI ship. Claim each phase in CHANGELOG before implementation; preserve other round ownership. The new-round recap/confirmation gate was satisfied on 26 October 2026; do not request confirmation again to resume this Round. No owner action, new provider account or additional service cost is expected beyond hosts choosing to enable the setting.
 
 ## Rollout, rollback and acceptance
 

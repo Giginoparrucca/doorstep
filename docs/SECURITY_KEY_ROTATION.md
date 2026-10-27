@@ -1,6 +1,6 @@
 # Production API-key replacement — Round 65
 
-Status on 26 October 2026: preparation only. No key created, entered, replaced, revoked or signing secret reset. Production project: `jcjwaqqabgwqhhzhfbts`. Demo `wmegnnlmcrabndyzywmj` remains separate.
+Status on 27 October 2026: compatibility code is merged and deployed via PR #220; credential replacement is still pending. No key created, entered, replaced, revoked or signing secret reset. Production project: `jcjwaqqabgwqhhzhfbts`. Demo `wmegnnlmcrabndyzywmj` remains separate.
 
 ## Verified consumer inventory
 
@@ -39,7 +39,7 @@ Current Supabase migration guidance sends opaque keys on apikey, not as bearer J
 ## Staged owner handoff and acceptance
 
 1. After code/CI/deployment gates pass, the owner opens production Settings > API Keys and creates named secret keys for Vercel production and trusted CI. Keep existing keys active. Credential creation/entry stays in owner interfaces; never paste values in chat/source, screenshots or command arguments.
-2. Owner replaces only the Vercel production sensitive environment value and the GitHub Production Environment secret value. Preserve names, production scope and owner-review rules. Separate secrets let either backend be rotated independently. Record only names/metadata.
+2. First replace only GitHub Production Environment secret SUPABASE_PRODUCTION_SERVICE_ROLE_KEY with the named CI key. Invoke production security smoke from main and approve its Environment review. Require grants/schema/header/SPOT/tax passes before touching the application credential. Preserve the Environment protections and record only names/metadata. Then the owner can enter a separate named key into Vercel production SUPABASE_SERVICE_ROLE_KEY, preserving sensitive/production-only scope.
 3. Deploy main, approve the protected main workflow and require all five read-only production checks to pass. Verify new-key authorization on read-only Auth admin and storage-list probes without logging response bodies, plus guest/host behavior; the ordinary five checks alone do not cover every service. No real Alloggiati send/calendar sync/notifications are validation probes.
 4. If a new key fails, restore the existing compatible key through owner secret interfaces and redeploy, while legacy keys still work. Do not log old/new values. Leave the failed new key unused and review its later removal with owner confirmation.
 5. A separate public publishable-key migration must replace every built-in fallback/browser entrypoint and inventory cached clients/local operators before disabling legacy API keys. **The current browser still needs legacy anon. Do not disable the legacy API-key switch or reset the JWT signing secret in this server-only stage.** Server cutover alone does not revoke the old service-role credential.

@@ -159,9 +159,9 @@ export default async function handler(req, res) {
     // Round 48 Phase 2 — guest-visible resources
     if (action === 'property')         return await doProperty(res, propertyId, bookingCode, isTest, v.payload.exp);
     if (action === 'keybox')           return await doGuestKeybox(res, propertyId, bookingCode, isTest, v.payload.exp);
-    if (action === 'checkin_list')     return await doCheckinList(res, propertyId, bookingCode, isTest);
+    if (action === 'checkin_list')     return await doCheckinList(res, propertyId, bookingCode, isTest, v.payload.exp);
     if (action === 'checkin_insert')   return await doCheckinInsert(res, propertyId, bookingCode, sessionId, body, isTest);
-    if (action === 'checkin_update')   return await doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, isTest);
+    if (action === 'checkin_update')   return await doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, isTest, v.payload.exp);
     if (action === 'checkin_lookup')   return await doCheckinLookup(res, propertyId, sessionId, body, isTest);
     if (action === 'consent_withdraw') return await doConsentWithdraw(res, propertyId, body);
     if (action === 'consent_save')     return await doConsentSave(res, propertyId, bookingCode, body, isTest);
@@ -582,7 +582,7 @@ async function bookingHasCheckin(propertyId, bookingCode, isTest) {
 }
 
 // ── action: checkin_list ──────────────────────────────────────────────
-async function doCheckinList(res, propertyId, bookingCode, isTest) {
+async function doCheckinList(res, propertyId, bookingCode, isTest, sessionExpUnixSec) {
   const scope = bookingCode
     ? `booking_code=eq.${encodeURIComponent(bookingCode)}`
     : `or=(booking_code.is.null,booking_code.eq.)`;
@@ -596,6 +596,20 @@ async function doCheckinList(res, propertyId, bookingCode, isTest) {
   const r = await pgrestGET(path);
   if (!r.ok) return res.status(500).json({ error: 'checkin_list query failed' });
   const rows = await r.json();
+
+  // Round 66 Phase 1b — decide whether to project each row's per-guest
+  // keybox_code or strip it. For every property today (opt-in column
+  // absent) the policy returns allow_entry iff a check-in row exists
+  // for the booking, which is the same signal "checkins returned rows"
+  // already carries. Still routing through the policy so Phase 2's
+  // opt-in flows automatically pick up the roster/time gates without
+  // another handler change.
+  const sessionValidUntil = Number.isFinite(sessionExpUnixSec)
+    ? new Date(sessionExpUnixSec * 1000).toISOString()
+    : null;
+  const allowKeyboxProjection = bookingCode ? await entryReleaseAllows({
+    pgrestGET, propertyId, bookingCode, isTest, sessionValidUntil,
+  }) : false;
 
   // Round 49 Phase 4 — when the property is in autofile 'live' mode,
   // compute editable_until per row so the guest app can show
@@ -627,7 +641,7 @@ async function doCheckinList(res, propertyId, bookingCode, isTest) {
         editable_until = d ? d.toISOString() : null;
       } catch (_e) { editable_until = null; }
     }
-    return {
+    const out = {
       ...row,
       // Round 49 Phase 2 — 'filing' = the autofile tick has claimed the
       // row for an in-flight SOAP Send. The DB trigger raises on edits
@@ -636,6 +650,12 @@ async function doCheckinList(res, propertyId, bookingCode, isTest) {
       editable: !['filed', 'filing', 'correction'].includes(row.alloggiati_status),
       editable_until,
     };
+    // Round 66 Phase 1b — strip per-guest keybox_code when the policy
+    // denies entry. For every property today this fires only when
+    // bookingCode is null (standalone pre-check-in rows, which already
+    // don't carry a keybox_code in practice).
+    if (!allowKeyboxProjection) delete out.keybox_code;
+    return out;
   });
   // Also expose the reopen flag from ota_reservations if the booking has one.
   let reopened_at = null;
@@ -766,7 +786,7 @@ async function doCheckinInsert(res, propertyId, incomingBookingCode, sessionId, 
 }
 
 // ── action: checkin_update ────────────────────────────────────────────
-async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, isTest) {
+async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, isTest, sessionExpUnixSec) {
   const id = String(body.id || '').trim();
   const fields = body.fields || {};
   if (!id) return res.status(400).json({ error: 'id required' });
@@ -852,6 +872,21 @@ async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, is
   const out = {};
   for (const k of CHECKIN_READ_FIELDS) if (updated[k] !== undefined) out[k] = updated[k];
   out.editable = !['filed', 'filing', 'correction'].includes(updated.alloggiati_status);
+
+  // Round 66 Phase 1b — strip per-guest keybox_code from the update
+  // response when the policy denies entry. For every property today
+  // the policy returns allow_entry iff a check-in exists for the
+  // booking; since this handler just updated such a row, the policy
+  // normally allows and the keybox_code stays. Phase 2's roster/time
+  // gates will fire here without another handler change.
+  const sessionValidUntil = Number.isFinite(sessionExpUnixSec)
+    ? new Date(sessionExpUnixSec * 1000).toISOString()
+    : null;
+  const allowKeyboxProjection = bookingCode ? await entryReleaseAllows({
+    pgrestGET, propertyId, bookingCode, isTest, sessionValidUntil,
+  }) : false;
+  if (!allowKeyboxProjection) delete out.keybox_code;
+
   return res.status(200).json({ updated: out });
 }
 

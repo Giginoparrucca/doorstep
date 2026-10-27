@@ -329,7 +329,44 @@ const checkinRow = (over = {}) => ({
   assert.equal(snap.scope.is_test, false);
   assert.equal(snap.booking.identity_version, snap.scope.booking_id);
   assert.equal(snap.booking.valid_until, snap.scope.session_valid_until);
-  assert.equal(snap.property.entry_checkin_required, null, 'Phase 2 column defaulted null in Phase 1b');
+  // Round 66 Phase 2 — the opt-in column is now real on public.properties
+  // with default=false. The loader passes the row value through verbatim.
+  // This mock row does not set entry_checkin_required, so it is undefined
+  // on the spread; the policy's "entry_checkin_required == null || false"
+  // branch handles both undefined and null the same way as it handles
+  // false, so OFF-path semantics are preserved.
+  assert.ok(
+    snap.property.entry_checkin_required === undefined
+    || snap.property.entry_checkin_required === null
+    || snap.property.entry_checkin_required === false,
+    'Phase 2 column: null/false/undefined all trigger the policy OFF branch',
+  );
 }
 
-console.log('PASS entry-release-loader: 17 scenarios across guards, OFF-path legacy equivalence (bookingHasCheckin), rotating-code projection parity with api/guest.js (reservation wins + single-head fallback + show-flag gates + ambiguous-heads safety), room resolution with cross-property isolation, stableBookingId determinism, and scope/booking/reads_complete shape.');
+// ── 18. Phase 2 ON path — host opts in but roster not persisted ────────
+// Verifies the policy stops returning legacy_available once a host sets
+// entry_checkin_required=true: without a persisted roster (loader does
+// not yet read entry_access.bookings — Phase 2 scope), the policy must
+// fail closed to unavailable, denying code projection.
+{
+  const pg = mockPgrest([
+    ['properties?', [propertyRow({ entry_checkin_required: true })]],
+    ['ota_reservations?', [reservationRow()]],
+    ['checkins?', [checkinRow()]],
+  ]);
+  const snap = await loadEntryReleaseSnapshot({
+    pgrestGET: pg, propertyId: PROPERTY_ID, bookingCode: BOOKING_CODE, isTest: false, sessionValidUntil: SESSION_VALID_UNTIL,
+  });
+  assert.ok(snap);
+  assert.equal(snap.property.entry_checkin_required, true, 'ON-path mock row forwarded');
+  const r = evaluateEntryRelease(snap);
+  // The policy's ON branch requires roster/room/submissions all to be
+  // consistent. With roster=null (Phase 2b will supply it) the policy
+  // short-circuits to unavailable — exactly the fail-closed behaviour
+  // we want for a host who has opted in but not yet shipped Phase 2's
+  // roster integration.
+  assert.notEqual(r.state, 'legacy_available', 'ON-path must leave the legacy branch');
+  assert.equal(r.allow_entry, false, 'ON-path with unpersisted roster denies entry');
+}
+
+console.log('PASS entry-release-loader: 18 scenarios across guards, OFF-path legacy equivalence (bookingHasCheckin), rotating-code projection parity with api/guest.js, room resolution with cross-property isolation, stableBookingId determinism, scope/booking/reads_complete shape, and the Phase 2 ON-path fail-closed check.');

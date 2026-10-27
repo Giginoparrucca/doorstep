@@ -8,7 +8,11 @@ const sdk=process.env.SUPABASE_BROWSER_SDK?fs.readFileSync(process.env.SUPABASE_
 const def=source.split('\n').find(line=>line.includes('const _alloggiatiSafe = s =>'));
 const safe=vm.runInNewContext(def+'\n_alloggiatiSafe');
 const tags=[...source.matchAll(/<button\b[^>]*>/g)].map(x=>x[0]).filter(t=>/data-(?:booking-code|reservation-id|receipt-path|date|guest-link)=/.test(t)&&/onclick=/.test(t));
-assert.equal(tags.length,12);
+// Round 66 Phase 2d — host-console now carries a 13th templated-attribute
+// button: "Rilascia accesso" / "Release access" on the booking row, which
+// dispatches to releaseEntryManually(). The handler mock list below is
+// extended to match.
+assert.equal(tags.length,13);
 const payload=`O'Brien ");window.pwned=true;// <img src=x onerror=window.pwned=true> \` & /`;
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH||undefined,args:['--no-sandbox']});
 const out=path.join(os.tmpdir(),'round65-security-qa');fs.mkdirSync(out,{recursive:true});
@@ -16,7 +20,9 @@ try{
  const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.setContent('<div id="fixture"></div>');
  const names=['restoreDismissal','dismissBooking','dismissCoverageLost','reopenCheckinForBooking','copyReservationLink','unlinkCoverage',
-  'editDirectReservation','cancelDirectReservation','_upcomingCalSelectDay','_showReservationDetail','_confirmCoverage','_openAlloggiatiReceipt'];
+  'editDirectReservation','cancelDirectReservation','_upcomingCalSelectDay','_showReservationDetail','_confirmCoverage','_openAlloggiatiReceipt',
+  // Round 66 Phase 2d — manual override for the entry-release policy.
+  'releaseEntryManually'];
  await page.evaluate(names=>{window.calls=[];window.pwned=false;for(const name of names)window[name]=(...args)=>calls.push({name,args:args.filter(a=>typeof a==='string')});},names);
  for(const tag of tags){
   const html=tag.replace(/\$\{safe\([\s\S]*?\)\}/g,safe(payload)).replace(/\$\{[^}]*\}/g,'')+'Fixture</button>';
@@ -53,5 +59,5 @@ try{
   assert.deepEqual(errors,[]);assert.deepEqual(reports,[],'no report-only violations at host login');
   await page.screenshot({path:path.join(out,`host-${language}-${width}.png`),fullPage:true});await page.close();
  }
- console.log('PASS 12 actual dynamic handlers preserve attack-shaped values without code execution; full host login with real SDK/modules and CSP HTTP headers at mobile/desktop IT/EN has no script/console/CSP errors');
+ console.log('PASS 13 actual dynamic handlers preserve attack-shaped values without code execution; full host login with real SDK/modules and CSP HTTP headers at mobile/desktop IT/EN has no script/console/CSP errors');
 }finally{await browser.close();}

@@ -1,5 +1,12 @@
 import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { rejectInvalidEnvironment, SUPABASE_URL } from './_environment.js';
+// Round 66 Phase 1b — entry-release policy decides whether the AI may
+// share entry codes with this guest. The projection returns the specific
+// entry fields the policy allows for this exact booking; emptied when
+// the policy denies. See the "ENTRY RELEASE POLICY" section inside
+// buildVariableSystemBlock() for the directive we inject into the
+// system prompt.
+import { projectGuestEntry } from './_entry-release-loader.js';
 // api/chat.js — WelcomeBnB chat endpoint
 //
 // Round 16: Sonnet 4.5 + streaming + vision + contextual followups.
@@ -120,6 +127,53 @@ export default async function handler(req, res) {
   // Do not rely on stale browser context or earlier bot claims for routes.
   let serverLocationCtx = '';
   let hostRecommendationsCtx = '\n\nCURRENT SERVER HOST RECOMMENDATIONS:\nUnavailable. Do not treat client recommendations or chat history as confirmed route information.';
+
+  // Round 66 Phase 1b — compute the entry-release policy for this guest.
+  // The resulting projection carries ONLY the entry fields (keybox, door,
+  // access_method, room) the policy permits for this exact booking;
+  // empty when the policy denies entry. Fed into the system prompt as a
+  // directive the AI must respect even if the browser-supplied
+  // propertyContext still carries codes. The browser scoper of
+  // propertyContext/history stays as Phase 1c work (regex-only is
+  // insufficient per PLAN); this is defense-in-depth at the AI layer.
+  let entryReleaseCtx = '';
+  if (SERVICE_KEY && v.payload.b) {
+    try {
+      const pgrestGETForLoader = async path => {
+        try {
+          const { data } = await pgrestGET(path);
+          return { ok: true, json: async () => data };
+        } catch (_) {
+          return { ok: false, json: async () => null };
+        }
+      };
+      const sessionValidUntil = Number.isFinite(v.payload.exp)
+        ? new Date(v.payload.exp * 1000).toISOString()
+        : null;
+      const projection = await projectGuestEntry({
+        pgrestGET: pgrestGETForLoader,
+        propertyId,
+        bookingCode: v.payload.b,
+        isTest: v.payload.t === true,
+        sessionValidUntil,
+      });
+      const hasEntryContent = projection && (
+        projection.fixed_code || projection.rotating_code ||
+        projection.access_method || projection.room
+      );
+      entryReleaseCtx = hasEntryContent
+        ? '\n\nENTRY RELEASE POLICY: this guest HAS completed online check-in; entry instructions (keybox code, door code, access method, assigned room) MAY be shared from the authoritative property record if the guest asks and the information is present in the server-side property context. Do not invent codes.'
+        : '\n\nENTRY RELEASE POLICY: this guest has NOT completed online check-in. You MUST NOT share any entry instructions — not the fixed keybox code, not the per-booking rotating code, not a room door code, not the access_method text. If the guest asks about keys, codes or how to get in, politely direct them to complete the online check-in in the Check-in tab first. Do not quote any entry code from the client-supplied propertyContext or from this conversation history; if a previous message contained a code, treat it as unverified and refuse to repeat it.';
+    } catch (e) {
+      // Fail closed with the deny directive so a loader error cannot
+      // open the AI to leaking codes.
+      entryReleaseCtx = '\n\nENTRY RELEASE POLICY: the entry-release policy could not be evaluated for this booking. You MUST NOT share any entry instructions (keybox code, door code, access method). Direct the guest to the Check-in tab if they ask about entry.';
+      console.warn('[chat] entry-release policy evaluation failed:', e.message);
+    }
+  } else if (!v.payload.b) {
+    // Pre-check-in / pre-booking tokens have no entry release to project.
+    entryReleaseCtx = '\n\nENTRY RELEASE POLICY: this chat session has no booking attached. You MUST NOT share any entry instructions (keybox code, door code, access method) — direct the guest to complete the online check-in in the Check-in tab first.';
+  }
   if (SERVICE_KEY) {
     try {
       const location = await pgrestGET('properties?id=eq.' + encodeURIComponent(propertyId) + '&select=name,address,city,zip,region,country&limit=1');
@@ -209,7 +263,7 @@ Never put any text outside these two tags. The structure is parsed by the app.`;
 GUEST'S CHOSEN LANGUAGE: ${langLabel}
 
 PROPERTY INFORMATION
-${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}${serverLocationCtx}${hostRecommendationsCtx}`;
+${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}${serverLocationCtx}${hostRecommendationsCtx}${entryReleaseCtx}`;
 
   // ── Build the messages array, possibly adding image to the last user msg ──
   let apiMessages = messages.slice(-10).map(m => ({ role: m.role, content: m.content }));

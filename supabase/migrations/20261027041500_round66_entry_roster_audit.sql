@@ -1,6 +1,18 @@
--- Round 66 Phase 1b: STAGED ONLY, not applied or registered as a migration.
--- CLI-created migration held outside supabase/migrations until Round 65's
--- keybox contract/serialized application gate. No activation/property changes.
+-- Round 66 Phase 1 — entry-release roster/audit storage.
+--
+-- Promoted from docs/entry-release/staged-migrations/ into the migration
+-- runner on 2026-10-27 after Round 65 keybox/consent migrations landed
+-- (20261026081549 + 20261026082622). This migration creates the private
+-- entry_access schema (bookings/slots/submissions/audit) plus two public
+-- RPCs for owner-only roster confirmation and release/restore. No
+-- behaviour change for existing properties: callers are not yet wired
+-- into api/guest.js or api/chat.js; the per-property `entry_checkin_required`
+-- setting is not surfaced to hosts until Phase 2 ships. The schema is
+-- strict-fail-closed by default — an opted-out property's entry delivery
+-- path continues to use the legacy bookingHasCheckin() semantics.
+--
+-- Rollback: DROP SCHEMA entry_access CASCADE + DROP FUNCTION public.entry_access_*;
+-- then DELETE FROM supabase_migrations.schema_migrations WHERE name='round66_entry_roster_audit'.
 BEGIN;
 
 CREATE SCHEMA IF NOT EXISTS entry_access;

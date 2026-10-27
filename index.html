@@ -5045,6 +5045,56 @@ async function init() {
         el('checkoutTime').textContent = coParts.length === 2 ? `${coParts[0].slice(0,5)} — ${coParts[1].slice(0,5)}` : co.slice(0,5);
       }
       if (el('accessMethod')) el('accessMethod').textContent = d.access_method || 'Self check-in';
+      // Round 66 Phase 2c — guest-side locked / scheduled card. When the
+      // policy denies entry (state=locked or scheduled or unavailable),
+      // overwrite the access_method text with the guest-facing message
+      // and force the lockbox-codes block hidden. For every property
+      // today the state is `legacy_available` when a check-in exists
+      // (nothing to override) and `locked` when no check-in exists
+      // yet (same as the current "no code shown" behaviour, but now
+      // explicit text explains why). Phase 2 opt-in ON path adds the
+      // scheduled / manual states; this branch handles them when they
+      // start to arrive.
+      try {
+        const er = r?.data?.entry_release || null;
+        if (er && !er.allow_entry) {
+          const isIt = lang === 'it';
+          let msg;
+          if (er.state === 'scheduled' && er.release_at) {
+            const dt = new Date(er.release_at);
+            if (Number.isFinite(dt.getTime())) {
+              // Property-timezone-aware wall-clock rendering is a
+              // Phase 2c-polish task; for the first cut we lean on the
+              // guest's browser locale, with the raw ISO fallback kept
+              // as a defensive string so nothing says "undefined."
+              const timeStr = dt.toLocaleString(isIt ? 'it-IT' : 'en-GB', {
+                day: '2-digit', month: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit',
+              });
+              msg = isIt
+                ? `Le istruzioni di accesso saranno disponibili dalle ${timeStr}.`
+                : `Your entry instructions will be available from ${timeStr}.`;
+            }
+          }
+          if (!msg) {
+            if (er.state === 'locked') {
+              msg = isIt
+                ? 'Completa il check-in online per visualizzare le istruzioni di accesso.'
+                : 'Complete online check-in to view your entry instructions.';
+            } else {
+              // unavailable / invalid / anything else → generic deny.
+              msg = isIt
+                ? 'Istruzioni di accesso non disponibili. Contatta il tuo host.'
+                : 'Entry instructions unavailable. Please contact your host.';
+            }
+          }
+          if (el('accessMethod')) el('accessMethod').textContent = msg;
+          const lcw = el('lockboxCodesWrap');
+          if (lcw) lcw.style.display = 'none';
+          const cit = el('checkinInstructionsText');
+          if (cit) cit.style.display = 'none';
+        }
+      } catch (_) { /* defensive — never block welcome rendering on policy */ }
       // Round 60 Phase 4 — show the Your-room card when the gateway
       // resolved a room for this booking. Name is always safe to show
       // (it's just the host's label like "Camera Blu"); door_code only

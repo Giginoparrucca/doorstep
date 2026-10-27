@@ -250,3 +250,28 @@ export async function projectGuestEntry(opts) {
   if (!snapshot) return {};
   return projectEntryInstructions(snapshot);
 }
+
+/**
+ * Return the full policy result ({ state, reason, allow_entry, submitted,
+ * expected, release_at }) for the current snapshot. The guest app uses
+ * this to render locked / scheduled / released cards without needing to
+ * duplicate the policy's logic client-side.
+ *
+ * Returns a minimal unavailable result when the loader cannot assemble a
+ * snapshot (missing booking, failed read, etc.) so the caller can key off
+ * `state` without null-checking.
+ */
+export async function evaluateGuestEntryRelease(opts) {
+  const snapshot = await loadEntryReleaseSnapshot(opts);
+  if (!snapshot) {
+    return Object.freeze({
+      state: 'unavailable',
+      reason: 'no_snapshot',
+      allow_entry: false,
+      submitted: null,
+      expected: null,
+      release_at: null,
+    });
+  }
+  return evaluateEntryRelease(snapshot);
+}

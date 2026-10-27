@@ -13,7 +13,7 @@
 //
 // Mocks pgrestGET to return canned rows for each table. No real DB.
 import assert from 'node:assert/strict';
-import { loadEntryReleaseSnapshot, entryReleaseAllows, projectGuestEntry, stableBookingId } from '../api/_entry-release-loader.js';
+import { loadEntryReleaseSnapshot, entryReleaseAllows, evaluateGuestEntryRelease, projectGuestEntry, stableBookingId } from '../api/_entry-release-loader.js';
 import { evaluateEntryRelease, projectEntryInstructions } from '../api/_entry-release-policy.js';
 
 const PROPERTY_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
@@ -369,4 +369,48 @@ const checkinRow = (over = {}) => ({
   assert.equal(r.allow_entry, false, 'ON-path with unpersisted roster denies entry');
 }
 
-console.log('PASS entry-release-loader: 18 scenarios across guards, OFF-path legacy equivalence (bookingHasCheckin), rotating-code projection parity with api/guest.js, room resolution with cross-property isolation, stableBookingId determinism, scope/booking/reads_complete shape, and the Phase 2 ON-path fail-closed check.');
+// ── 19. evaluateGuestEntryRelease returns the full policy result ────────
+// Used by doProperty to populate `entry_release` on the response so the
+// guest UI can render locked / scheduled / released cards. Returns a
+// bounded `unavailable` fallback when no snapshot can be loaded, so the
+// caller never has to null-check.
+{
+  // No snapshot — fallback shape
+  const noPg = async () => ({ ok: false, json: async () => [] });
+  const fallback = await evaluateGuestEntryRelease({
+    pgrestGET: noPg, propertyId: PROPERTY_ID, bookingCode: BOOKING_CODE, isTest: false, sessionValidUntil: SESSION_VALID_UNTIL,
+  });
+  assert.equal(fallback.state, 'unavailable');
+  assert.equal(fallback.allow_entry, false);
+  assert.equal(fallback.release_at, null);
+  assert.equal(fallback.submitted, null);
+  assert.equal(fallback.expected, null);
+}
+{
+  // OFF path, no check-in → locked
+  const pg = mockPgrest([
+    ['properties?', [propertyRow()]],
+    ['ota_reservations?', []],
+    ['checkins?', []],
+  ]);
+  const result = await evaluateGuestEntryRelease({
+    pgrestGET: pg, propertyId: PROPERTY_ID, bookingCode: BOOKING_CODE, isTest: false, sessionValidUntil: SESSION_VALID_UNTIL,
+  });
+  assert.equal(result.state, 'locked');
+  assert.equal(result.allow_entry, false);
+}
+{
+  // OFF path, with check-in → legacy_available
+  const pg = mockPgrest([
+    ['properties?', [propertyRow()]],
+    ['ota_reservations?', [reservationRow()]],
+    ['checkins?', [checkinRow()]],
+  ]);
+  const result = await evaluateGuestEntryRelease({
+    pgrestGET: pg, propertyId: PROPERTY_ID, bookingCode: BOOKING_CODE, isTest: false, sessionValidUntil: SESSION_VALID_UNTIL,
+  });
+  assert.equal(result.state, 'legacy_available');
+  assert.equal(result.allow_entry, true);
+}
+
+console.log('PASS entry-release-loader: 19 scenarios across guards, OFF-path legacy equivalence (bookingHasCheckin), rotating-code projection parity with api/guest.js, room resolution with cross-property isolation, stableBookingId determinism, scope/booking/reads_complete shape, Phase 2 ON-path fail-closed check, and evaluateGuestEntryRelease shape for guest UI consumption.');

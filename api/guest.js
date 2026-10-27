@@ -7,7 +7,7 @@ import handleCspReport from './_csp-report.js';
 // result is identical to the prior inlined bookingHasCheckin + ota
 // keybox_code read. Phase 2 adds the opt-in UI and the roster/time
 // enforcement for properties that opt in.
-import { entryReleaseAllows, projectGuestEntry } from './_entry-release-loader.js';
+import { entryReleaseAllows, evaluateGuestEntryRelease, projectGuestEntry } from './_entry-release-loader.js';
 // api/guest.js — Round 34 chat gateway + Round 48 guest gateway.
 //
 // Round 48 Phase 2 renamed api/guest-chat.js → api/guest.js and
@@ -503,6 +503,37 @@ async function doProperty(res, propertyId, bookingCode, isTest, sessionExpUnixSe
   const room = await resolveGuestRoom(propertyId, bookingCode, isTest, hasCheckin);
   const resp = { property: out, checked_in: hasCheckin };
   if (room) resp.room = room;
+  // Round 66 Phase 2c — expose the policy's state/reason/counts/release_at
+  // to the guest UI so it can render locked / scheduled / released cards
+  // without duplicating the policy's logic client-side. For every property
+  // today (opt-in column default false) the state is `legacy_available`
+  // when a check-in exists and `locked` when none exists — the guest UI
+  // can treat the former as "proceed as today" and the latter as "show
+  // the locked card." Shipped as a non-breaking addition; existing
+  // clients that read only `checked_in` continue to work.
+  if (bookingCode) {
+    try {
+      const sessionValidUntil = Number.isFinite(sessionExpUnixSec)
+        ? new Date(sessionExpUnixSec * 1000).toISOString()
+        : null;
+      const policy = await evaluateGuestEntryRelease({
+        pgrestGET, propertyId, bookingCode, isTest, sessionValidUntil,
+      });
+      resp.entry_release = {
+        state: policy.state,
+        reason: policy.reason,
+        allow_entry: policy.allow_entry === true,
+        submitted: policy.submitted ?? null,
+        expected: policy.expected ?? null,
+        release_at: policy.release_at ?? null,
+      };
+    } catch (_) {
+      resp.entry_release = {
+        state: 'unavailable', reason: 'policy_error',
+        allow_entry: false, submitted: null, expected: null, release_at: null,
+      };
+    }
+  }
   return res.status(200).json(resp);
 }
 

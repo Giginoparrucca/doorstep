@@ -1,3 +1,4 @@
+import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY } from './_environment.js';
 // api/parse-tax-delibera.js — Round 37 (redux)
 //
@@ -303,8 +304,7 @@ async function checkHourlyLimit(userId) {
       + `&select=id`;
     const r = await fetch(url, {
       headers: {
-        apikey: SERVICE_KEY,
-        Authorization: `Bearer ${SERVICE_KEY}`,
+        ...supabaseAuthHeaders(SERVICE_KEY),
         Prefer: 'count=exact',
       },
     });
@@ -328,8 +328,7 @@ async function recordUsage(row) {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/api_usage`, {
       method: 'POST',
       headers: {
-        apikey: SERVICE_KEY,
-        Authorization: `Bearer ${SERVICE_KEY}`,
+        ...supabaseAuthHeaders(SERVICE_KEY),
         'Content-Type': 'application/json',
         Prefer: 'return=minimal',
       },

@@ -1,3 +1,4 @@
+import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { rejectInvalidEnvironment, SUPABASE_URL, APP_BASE_URL, HOST_CONSOLE_URL, rejectDemoIntegration } from './_environment.js';
 // api/send-arrival-reminders.js — Round 32 arrival reminder, Round 36
 // filing reminder, Round 46 storage purge.
@@ -343,8 +344,7 @@ function escForIn(s) {
 function pgrestGET(path) {
   return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       Accept: 'application/json',
     },
   }).then(async r => {
@@ -356,8 +356,7 @@ function pgrestPATCH(path, body) {
   return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     method: 'PATCH',
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       'Content-Type': 'application/json',
       Prefer: 'return=minimal',
     },
@@ -371,8 +370,7 @@ function pgrestDELETE(path) {
   return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     method: 'DELETE',
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       Prefer: 'return=minimal',
     },
   }).then(async r => {
@@ -435,8 +433,7 @@ export async function runStoragePurgePass(dry, onlyPaths = null) {
     httpRes = await fetch(`${SUPABASE_URL}/storage/v1/object/documents`, {
       method: 'DELETE',
       headers: {
-        apikey: SERVICE_KEY,
-        Authorization: `Bearer ${SERVICE_KEY}`,
+        ...supabaseAuthHeaders(SERVICE_KEY),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ prefixes: paths }),
@@ -622,7 +619,7 @@ function renderFilingHTML(property, yesterday, count, lang) {
 export async function runTestCleanup(dry) {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/purge_onboarding_tests`, {
-      method: 'POST', headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
+      method: 'POST', headers: { ...supabaseAuthHeaders(SERVICE_KEY), 'Content-Type': 'application/json' },
       body: JSON.stringify({ p_dry_run: !!dry }), signal: AbortSignal.timeout(8000),
     });
     if (!r.ok) throw new Error(`test purge ${r.status}`);

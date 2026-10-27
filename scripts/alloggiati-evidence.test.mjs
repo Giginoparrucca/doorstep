@@ -1,3 +1,4 @@
+import {supabaseAuthHeaders} from '../api/_supabase-auth.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -40,7 +41,7 @@ async function runtime(mode,{ledger=[],failureAt=null}={}) {
  const rows=ids.map((id,i)=>({id,property_id:property,booking_code:'FICTIONAL',guest_type:i?'member':'head',arrival_date:'2026-10-26',submitted_at:'2026-10-26T00:00:00Z'}));
  const persist=async entry=>{if(entry.outcome.startsWith('evidence_')){const data=parseFilingEvidence(entry.errorDetail);if(failureAt?.(data))throw Error('store offline');ledger.push(entry);}else legacy.push(entry);};
  const RealDate=Date;class Clock extends RealDate{constructor(...args){super(...(args.length?args:['2026-10-26T03:00:00Z']));}static now(){return new Clock().getTime();}}
- const context=vm.createContext({console:{warn(){},error(){}},Date:Clock,Set,Map,encodeURIComponent,createFilingEvidence,logFiling:persist,redactSupport:value=>value,
+ const context=vm.createContext({supabaseAuthHeaders,console:{warn(){},error(){}},Date:Clock,Set,Map,encodeURIComponent,createFilingEvidence,logFiling:persist,redactSupport:value=>value,
  AllogRecords:{autofileDueAt:()=>new Date('2026-10-26T02:00:00Z'),buildBatch:()=>({lines,rowMeta:rows.map(row=>({checkin_id:row.id})),warnings:[]})},
  _romeDateYmd:()=> '2026-10-26',sbGet:async query=>{
  if(query.startsWith('checkins?'))return query.includes('select=booking_code')?[]:rows;
@@ -66,7 +67,7 @@ r=await runtime('stamp');assert.ok(r.ledger.some(entry=>parseFilingEvidence(entr
 r=await runtime('success');assert.equal(r.sendCalls,1);assert.ok(r.patches.some(patch=>patch.alloggiati_status==='filed'));
 // The actual persistence helper requires a successful UUID acknowledgement and keeps >500 chars.
 const logs=[];globalThis.fetch=async(_url,opts)=>{logs.push(JSON.parse(opts.body));return {ok:true,json:async()=>ids[0]};};
-try{const context=vm.createContext({fetch:globalThis.fetch,console,SUPABASE_URL:'https://fictional.invalid',SERVICE_KEY:'FICTIONAL'});vm.runInContext(extract('logFiling'),context);await context.logFiling({propertyId:property,trigger:'autofile',checkinIds:ids,outcome:'evidence_failure',errorDetail:long,strict:true});assert.equal(logs[0].p_error_detail,long);
+try{const context=vm.createContext({supabaseAuthHeaders,fetch:globalThis.fetch,console,SUPABASE_URL:'https://fictional.invalid',SERVICE_KEY:'FICTIONAL'});vm.runInContext(extract('logFiling'),context);await context.logFiling({propertyId:property,trigger:'autofile',checkinIds:ids,outcome:'evidence_failure',errorDetail:long,strict:true});assert.equal(logs[0].p_error_detail,long);
  globalThis.fetch=async()=>({ok:true,json:async()=>null});context.fetch=globalThis.fetch;await assert.rejects(()=>context.logFiling({propertyId:property,trigger:'autofile',checkinIds:ids,outcome:'evidence_started',strict:true}),/acknowledgement/);
 }finally{globalThis.fetch=originalFetch;}
 console.log('PASS full wire/evidence golden; all-row/long-field retention; secret-free fingerprints; original survives retries/date changes; real auto path rejects mismatch/overall failure; strict pre-Send audit; post-Send uncertainty/manual-review guard; stamp responsibility and persistence acknowledgement');
@@ -75,7 +76,7 @@ const begin=api.indexOf('    // ── Mint a fresh token',api.indexOf("  if (ac
 for(const mode of ['rejected','overall_rejected','mismatch','audit_before_send','audit_after_send','timeout','success']){
  let sent=0;const ledger=[];
  const journal=create({persist:async entry=>{const e=parseFilingEvidence(entry.errorDetail);if((mode==='audit_before_send'&&e.stage==='send'&&e.event==='started')||(mode==='audit_after_send'&&e.stage==='send'&&e.event==='completed'))throw Error('store offline');ledger.push(entry);}});
- const context=vm.createContext({console:{warn(){},error(){}},evidence:journal,propertyId:property,checkinIdsFlat:ids,rowsIn:ids.map(id=>({checkin_ids:[id]})),lines,owner:{hostId:'fixture'},creds:{utente:'USER',password:'PASS',wskey:'KEY'},redactSupport:value=>value,logFiling:async()=>{},
+ const context=vm.createContext({supabaseAuthHeaders,console:{warn(){},error(){}},evidence:journal,propertyId:property,checkinIdsFlat:ids,rowsIn:ids.map(id=>({checkin_ids:[id]})),lines,owner:{hostId:'fixture'},creds:{utente:'USER',password:'PASS',wskey:'KEY'},redactSupport:value=>value,logFiling:async()=>{},
  generateToken:async()=>({token:'TOKEN'}),soapTest:async()=>({overall:{ok:mode!=='overall_rejected'},perRow:mode==='mismatch'?[]:ids.map(()=>({ok:mode!=='rejected',erroreDet:'Original detail'}))}),
  soapSend:async()=>{sent++;if(mode==='timeout')throw Object.assign(Error('timeout'),{code:'timeout'});return {overall:{ok:true},perRow:ids.map(()=>({ok:true}))};},res:{status(){return this;},json(value){return value;}}});
  vm.runInContext('async function probe(){'+api.slice(begin,end)+'}',context);const result=await context.probe();assert.equal(sent,['audit_after_send','timeout','success'].includes(mode)?1:0,mode);if(mode==='timeout'||mode==='audit_after_send')assert.equal(result.send_result_uncertain,true);if(mode==='audit_before_send')assert.equal(result.error_code,'audit_unavailable');

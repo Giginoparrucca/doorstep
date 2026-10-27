@@ -1,3 +1,4 @@
+import { supabaseAuthHeaders } from '../api/_supabase-auth.js';
 // Round 60b Phase 1 — live schema-drift gate.
 //
 // Reads supabase_migrations.schema_migrations on the production project
@@ -52,8 +53,7 @@ async function readSchemaMigrations() {
   const res = await fetch(url, {
     method: 'POST',
     headers: {
-      apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`,
+      ...supabaseAuthHeaders(serviceKey),
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },

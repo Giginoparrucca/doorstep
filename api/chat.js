@@ -1,3 +1,4 @@
+import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { rejectInvalidEnvironment, SUPABASE_URL } from './_environment.js';
 // api/chat.js — WelcomeBnB chat endpoint
 //
@@ -547,8 +548,7 @@ function readCount(rangeHeader, dataFallback) {
 async function pgrestGET(path, opts = {}) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       Accept: 'application/json',
       ...(opts.headers || {}),
     },
@@ -570,8 +570,7 @@ async function recordUsage(row) {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/api_usage`, {
       method: 'POST',
       headers: {
-        apikey: SERVICE_KEY,
-        Authorization: `Bearer ${SERVICE_KEY}`,
+        ...supabaseAuthHeaders(SERVICE_KEY),
         'Content-Type': 'application/json',
         Prefer: 'return=minimal',
       },

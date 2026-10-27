@@ -1,3 +1,4 @@
+import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { SUPABASE_URL, APP_BASE_URL, environmentReady, IS_DEMO } from './_environment.js';
 // api/_notify-host.js — Round 42 shared host-notification pipeline.
 //
@@ -478,7 +479,7 @@ async function _resolveHostEmail(hostId, settings, propertyReminderEmail) {
   // Fall back to the auth user's email — service_role can read /auth/v1/admin/users.
   try {
     const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(hostId)}`, {
-      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+      headers: { ...supabaseAuthHeaders(SERVICE_KEY) },
     });
     if (!r.ok) return '';
     const u = await r.json();
@@ -491,8 +492,7 @@ async function _logRow({ hostId, propertyId, convKey, trigger, channel, status, 
     await fetch(`${SUPABASE_URL}/rest/v1/notification_log`, {
       method: 'POST',
       headers: {
-        apikey: SERVICE_KEY,
-        Authorization: `Bearer ${SERVICE_KEY}`,
+        ...supabaseAuthHeaders(SERVICE_KEY),
         'Content-Type': 'application/json',
         Prefer: 'return=minimal',
       },
@@ -568,8 +568,7 @@ function _escAttr(s) { return _esc(s).replace(/`/g, '&#96;'); }
 async function pgrestGET(path) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       Accept: 'application/json',
     },
   });
@@ -580,8 +579,7 @@ async function pgrestPATCH(path, body) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     method: 'PATCH',
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       'Content-Type': 'application/json',
       Prefer: 'return=minimal',
     },
@@ -593,8 +591,7 @@ async function pgrestDELETE(path) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     method: 'DELETE',
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       Prefer: 'return=minimal',
     },
   });

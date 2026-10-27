@@ -1,3 +1,4 @@
+import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { rejectInvalidEnvironment, SUPABASE_URL } from './_environment.js';
 import handleCspReport from './_csp-report.js';
 // api/guest.js — Round 34 chat gateway + Round 48 guest gateway.
@@ -217,8 +218,7 @@ async function doSend(res, propertyId, bookingCode, sessionId, body, isTest) {
   const insRes = await fetch(`${SUPABASE_URL}/rest/v1/chat_messages`, {
     method: 'POST',
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       'Content-Type': 'application/json',
       Prefer: 'return=representation',
     },
@@ -336,8 +336,7 @@ function readCount(rangeHeader, dataFallback) {
 async function pgrestGET(path, opts = {}) {
   return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       Accept: 'application/json',
       ...(opts.headers || {}),
     },
@@ -349,8 +348,7 @@ async function recordUsage(row) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/api_usage`, {
     method: 'POST',
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       'Content-Type': 'application/json',
       Prefer: 'return=minimal',
     },
@@ -650,8 +648,7 @@ async function doCheckinInsert(res, propertyId, incomingBookingCode, sessionId, 
   const insRes = await fetch(`${SUPABASE_URL}/rest/v1/checkins`, {
     method: 'POST',
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       'Content-Type': 'application/json',
       Prefer: 'return=representation',
     },
@@ -682,7 +679,7 @@ async function doCheckinInsert(res, propertyId, incomingBookingCode, sessionId, 
       fetch(`${SUPABASE_URL}/rest/v1/ota_reservations?property_id=eq.${encodeURIComponent(propertyId)}&booking_code=eq.${encodeURIComponent(bookingCode)}`, {
         method: 'PATCH',
         headers: {
-          apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+          ...supabaseAuthHeaders(SERVICE_KEY),
           'Content-Type': 'application/json', Prefer: 'return=minimal',
         },
         body: JSON.stringify({ checkin_reopened_at: null }),
@@ -690,7 +687,7 @@ async function doCheckinInsert(res, propertyId, incomingBookingCode, sessionId, 
       fetch(`${SUPABASE_URL}/rest/v1/checkins?property_id=eq.${encodeURIComponent(propertyId)}&booking_code=eq.${encodeURIComponent(bookingCode)}`, {
         method: 'PATCH',
         headers: {
-          apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+          ...supabaseAuthHeaders(SERVICE_KEY),
           'Content-Type': 'application/json', Prefer: 'return=minimal',
         },
         body: JSON.stringify({ checkin_reopened_at: null }),
@@ -708,7 +705,7 @@ async function doCheckinInsert(res, propertyId, incomingBookingCode, sessionId, 
       const kbRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_reservation_keybox`, {
         method: 'POST',
         headers: {
-          apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+          ...supabaseAuthHeaders(SERVICE_KEY),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ p_property_id: propertyId, p_booking_code: bookingCode }),
@@ -719,7 +716,7 @@ async function doCheckinInsert(res, propertyId, incomingBookingCode, sessionId, 
           await fetch(`${SUPABASE_URL}/rest/v1/checkins?id=eq.${encodeURIComponent(inserted.id)}`, {
             method: 'PATCH',
             headers: {
-              apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+              ...supabaseAuthHeaders(SERVICE_KEY),
               'Content-Type': 'application/json', Prefer: 'return=minimal',
             },
             body: JSON.stringify({ keybox_code: code }),
@@ -767,7 +764,7 @@ async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, is
     {
       method: 'PATCH',
       headers: {
-        apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+        ...supabaseAuthHeaders(SERVICE_KEY),
         'Content-Type': 'application/json',
         Prefer: 'return=representation',
       },
@@ -805,7 +802,7 @@ async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, is
         {
           method: 'PATCH',
           headers: {
-            apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+            ...supabaseAuthHeaders(SERVICE_KEY),
             'Content-Type': 'application/json', Prefer: 'return=minimal',
           },
           body: JSON.stringify(fanPatch),
@@ -954,8 +951,7 @@ async function doTrackEvent(res, propertyId, bookingCode, sessionId, body, isTes
   const r = await fetch(`${SUPABASE_URL}/rest/v1/analytics_events`, {
     method: 'POST',
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       'Content-Type': 'application/json',
       Prefer: 'return=minimal',
     },
@@ -981,7 +977,7 @@ async function doConsentSave(res, propertyId, bookingCode, body, isTest) {
     return res.status(400).json({ error: 'Invalid consent request' });
   }
   const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/save_guest_marketing_consent`, {
-    method: 'POST', headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
+    method: 'POST', headers: { ...supabaseAuthHeaders(SERVICE_KEY), 'Content-Type': 'application/json' },
     body: JSON.stringify({ p_property_id: propertyId, p_booking_code: bookingCode,
       p_email: email || null, p_phone: phone || null, p_consent: true }),
   });
@@ -1013,7 +1009,7 @@ async function doConsentWithdraw(res, propertyId, body) {
     {
       method: 'PATCH',
       headers: {
-        apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+        ...supabaseAuthHeaders(SERVICE_KEY),
         'Content-Type': 'application/json', Prefer: 'return=representation',
       },
       body: JSON.stringify({ withdrawn_at: new Date().toISOString() }),

@@ -1,3 +1,4 @@
+import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { handleConnection } from './_ireservation.js';
 import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, rejectDemoIntegration } from './_environment.js';
 import { createRequire } from 'node:module';
@@ -730,8 +731,7 @@ async function mergeBookingRollingUIDs(propertyId, incoming, apikey, bearer, see
 function pgrestGET(path, apikey, bearer = apikey) {
   return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     headers: {
-      apikey,
-      Authorization: `Bearer ${bearer}`,
+      ...supabaseAuthHeaders(apikey, bearer),
       Accept: 'application/json',
     },
   });
@@ -740,8 +740,7 @@ function pgrestPATCH(path, body, apikey, bearer = apikey) {
   return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     method: 'PATCH',
     headers: {
-      apikey,
-      Authorization: `Bearer ${bearer}`,
+      ...supabaseAuthHeaders(apikey, bearer),
       'Content-Type': 'application/json',
       Prefer: 'return=representation',
     },
@@ -752,8 +751,7 @@ function pgrestUPSERT(table, rows, apikey, bearer = apikey) {
   return fetch(`${SUPABASE_URL}/rest/v1/${table}?on_conflict=property_id,platform,uid`, {
     method: 'POST',
     headers: {
-      apikey,
-      Authorization: `Bearer ${bearer}`,
+      ...supabaseAuthHeaders(apikey, bearer),
       'Content-Type': 'application/json',
       Prefer: 'resolution=merge-duplicates,return=minimal',
     },
@@ -926,8 +924,7 @@ async function _outboundSbGetJSON(pathAndQuery) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${pathAndQuery}`, {
     method: 'GET',
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       Accept: 'application/json',
     },
   });

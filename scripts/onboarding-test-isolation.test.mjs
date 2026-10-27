@@ -1,3 +1,4 @@
+import {supabaseAuthHeaders} from '../api/_supabase-auth.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -15,7 +16,7 @@ const next=new Date(Date.now()+86400000).toISOString().slice(0,10);
 const base={ name:'NORMAL',surname:'SURVIVES',id:'51111111-1111-4111-8111-111111111111',is_test:false,guest_type:'single',booking_code:'NORMAL',arrival_date:day,departure_date:next,nights:1,date_of_birth:'1980-01-01',birth_country:'France',citizenship:'France',birth_province:'EE',document_type:'passport',document_number:'FACSIMILE123',submitted_at:new Date().toISOString() };
 const test={...base,is_test:true,name:'TESTMUSTNOTLEAK',id:'52222222-2222-4222-8222-222222222222',booking_code:'TESTMUSTNOTLEAK'};
 let downloads=[];
-const context=vm.createContext({console,Date,Map,Set,allCheckins:[base,test],hostLang:'it',propertyData:{name:'Fixture',city:'Ostuni',cir_code:'FACSIMILE',ross1000_codice:'FACSIMILE',tax_rate_eur:1.5},
+const context=vm.createContext({supabaseAuthHeaders,console,Date,Map,Set,allCheckins:[base,test],hostLang:'it',propertyData:{name:'Fixture',city:'Ostuni',cir_code:'FACSIMILE',ross1000_codice:'FACSIMILE',tax_rate_eur:1.5},
   downloadFile:(name,text)=>downloads.push({name,text}),track:()=>{},toast:()=>{},alert:()=>{},confirm:()=>true,
   prompt:(label)=>label.includes('Mese')?day.slice(0,7):day.slice(0,4)+'-'+(Math.floor((new Date().getMonth())/3)+1),
   document:{getElementById:()=>({value:''}),body:{appendChild:()=>{}}},
@@ -43,7 +44,7 @@ for(const name of ['exportAlloggiati','exportCSV','exportISTAT','exportCityTax',
 const api=read('api/alloggiati.js');
 const send=api.slice(api.indexOf("  if (action === 'send')"),api.indexOf('    // ── Load and decrypt credentials',api.indexOf("  if (action === 'send')")));
 let credentialOrSoapCalls=0;
-const guard=vm.createContext({action:'send',body:{rows:[{line:'x',checkin_ids:[test.id]}]},propertyId:'property',SERVICE_KEY:'stub',SUPABASE_URL:'https://stub.invalid',console,
+const guard=vm.createContext({supabaseAuthHeaders,action:'send',body:{rows:[{line:'x',checkin_ids:[test.id]}]},propertyId:'property',SERVICE_KEY:'stub',SUPABASE_URL:'https://stub.invalid',console,
   fetch:async url=> {assert.match(url,/select=id,property_id,is_test,deleted_at/);return {ok:true,json:async()=>[{id:test.id,property_id:'property',is_test:true}]};},
   res:{status(n){this.code=n;return this;},json(b){this.body=b;return b;}},
 });

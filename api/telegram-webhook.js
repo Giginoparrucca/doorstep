@@ -1,3 +1,4 @@
+import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { rejectInvalidEnvironment, SUPABASE_URL, APP_BASE_URL, rejectDemoIntegration } from './_environment.js';
 // api/telegram-webhook.js — Round 42.
 //
@@ -124,7 +125,7 @@ async function _reply(chatId, text) {
 
 async function _get(path) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, Accept: 'application/json' },
+    headers: { ...supabaseAuthHeaders(SERVICE_KEY), Accept: 'application/json' },
   });
   if (!r.ok) return null;
   return r.json();
@@ -133,7 +134,7 @@ async function _post(path, body) {
   await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     method: 'POST',
     headers: {
-      apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       'Content-Type': 'application/json', Prefer: 'return=minimal',
     },
     body: JSON.stringify(body),
@@ -143,7 +144,7 @@ async function _patch(path, body) {
   await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     method: 'PATCH',
     headers: {
-      apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       'Content-Type': 'application/json', Prefer: 'return=minimal',
     },
     body: JSON.stringify(body),

@@ -1,3 +1,4 @@
+import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, rejectDemoIntegration } from './_environment.js';
 // api/push-config.js — Round 42, extended in Round 44 Phase 0.5.
 //
@@ -65,7 +66,7 @@ export default async function handler(req, res) {
     const since = new Date(Date.now() - TEST_RATE_WINDOW_MS).toISOString();
     const r = await fetch(
       `${SUPABASE_URL}/rest/v1/notification_log?host_id=eq.${encodeURIComponent(hostId)}&trigger=eq.test&created_at=gte.${encodeURIComponent(since)}&select=id&limit=${TEST_RATE_MAX + 1}`,
-      { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } },
+      { headers: { ...supabaseAuthHeaders(SERVICE_KEY) } },
     );
     if (r.ok) {
       const rows = await r.json().catch(() => []);

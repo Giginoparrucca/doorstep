@@ -1,3 +1,4 @@
+import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { rejectInvalidEnvironment, SUPABASE_URL } from './_environment.js';
 // api/guest-token.js — guest session token mint endpoint.
 //
@@ -118,8 +119,7 @@ export default async function handler(req, res) {
       `&deleted_at=is.null&select=id`,
       {
         headers: {
-          apikey: SERVICE_KEY,
-          Authorization: `Bearer ${SERVICE_KEY}`,
+          ...supabaseAuthHeaders(SERVICE_KEY),
           Accept: 'application/json',
         },
       },
@@ -143,7 +143,7 @@ export default async function handler(req, res) {
   if (bc) {
     try {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/ota_reservations?property_id=eq.${encodeURIComponent(property_id)}&booking_code=eq.${encodeURIComponent(bc)}&deleted_at=is.null&select=is_test&limit=1`, {
-        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+        headers: { ...supabaseAuthHeaders(SERVICE_KEY) },
       });
       if (!r.ok) throw new Error('booking lookup failed');
       const rows = await r.json();
@@ -189,8 +189,7 @@ async function checkMintRateLimit(sessionId) {
       `&select=id`,
       {
         headers: {
-          apikey: SERVICE_KEY,
-          Authorization: `Bearer ${SERVICE_KEY}`,
+          ...supabaseAuthHeaders(SERVICE_KEY),
           Accept: 'application/json',
           Prefer: 'count=exact',
         },
@@ -217,8 +216,7 @@ async function recordUsage(row) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/api_usage`, {
     method: 'POST',
     headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      ...supabaseAuthHeaders(SERVICE_KEY),
       'Content-Type': 'application/json',
       Prefer: 'return=minimal',
     },

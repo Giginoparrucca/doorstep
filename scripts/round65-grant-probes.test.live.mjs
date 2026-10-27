@@ -1,3 +1,4 @@
+import { supabaseAuthHeaders } from '../api/_supabase-auth.js';
 // Read-only RPC probes. Purge/enqueue ALWAYS use p_dry_run:true; consent ALWAYS
 // uses p_consent:false. Never insert consents or queue/delete real documents.
 import assert from 'node:assert/strict';
@@ -10,7 +11,7 @@ const probes=[
  ['save_guest_marketing_consent',{p_property_id:'00000000-0000-4000-8000-000000000000',p_booking_code:'SYNTHETIC-NOT-A-BOOKING',p_email:null,p_phone:null,p_consent:false}],
 ];
 async function call(name,body,key){
- return fetch(base+name,{method:'POST',headers:{apikey:key,Authorization:'Bearer '+key,'Content-Type':'application/json'},
+ return fetch(base+name,{method:'POST',headers:{...supabaseAuthHeaders(key),'Content-Type':'application/json'},
   body:JSON.stringify(body),signal:AbortSignal.timeout(20000)});
 }
 for(const [name,body]of probes){

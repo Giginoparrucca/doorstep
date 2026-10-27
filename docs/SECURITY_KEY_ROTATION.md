@@ -1,6 +1,6 @@
 # Production API-key replacement — Round 65
 
-Status on 27 October 2026: compatibility code is merged and deployed via PR #220; the owner reports the GitHub CI secret updated to the existing modern `default` secret key. This is not independently verified: run 40431137141 is waiting for owner review. Vercel remains unchanged; no legacy key deactivation or signing-secret reset. Production project: `jcjwaqqabgwqhhzhfbts`. Demo `wmegnnlmcrabndyzywmj` remains separate.
+**Protected replacement-key verification — 27 October 2026:** owner-approved main run [40450034237](https://github.com/Giginoparrucca/doorstep/actions/runs/40450034237), job `122010353999`, SHA `6f178130086b22877a9553dec33e149f39aa8dcf`: **PASS 6 / FAIL 0 / SKIP 2**. Actual production grants/dry-run calls, Auth-admin/Storage GET authorization, schema drift, security headers, SPOT and tax pass. Only demo origin/provider opt-in skip. The owner reports entering the modern `default` secret; successful authorization is independently verified, while key format remains owner-reported because the runner suppresses passing test stdout and no credential value was retrieved. Prior run 40431137141 was cancelled. Vercel metadata is still unchanged (sensitive, production-only; updatedAt 1787729237074), so application-key cutover is not complete. Production project: `jcjwaqqabgwqhhzhfbts`; demo remains separate.
 
 ## Verified consumer inventory
 

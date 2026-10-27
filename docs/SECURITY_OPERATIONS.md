@@ -1,5 +1,7 @@
 # Round 65 security operations handoff
 
+**Protected replacement-key verification — 27 October 2026:** owner-approved main run [40450034237](https://github.com/Giginoparrucca/doorstep/actions/runs/40450034237), job `122010353999`, SHA `6f178130086b22877a9553dec33e149f39aa8dcf`: **PASS 6 / FAIL 0 / SKIP 2**. Actual production grants/dry-run calls, Auth-admin/Storage GET authorization, schema drift, security headers, SPOT and tax pass. Only demo origin/provider opt-in skip. The owner reports entering the modern `default` secret; successful authorization is independently verified, while key format remains owner-reported because the runner suppresses passing test stdout and no credential value was retrieved. Prior run 40431137141 was cancelled. Vercel metadata is still unchanged (sensitive, production-only; updatedAt 1787729237074), so application-key cutover is not complete.
+
 ## Verified on 26 October 2026
 
 - Phases 1–4 and 5a/6 are deployed. See CHANGELOG for the tested trees, PRs and production deployment evidence.

@@ -14,7 +14,11 @@ try {
   console.error('SKIP entry storage needs pinned @electric-sql/pglite@0.3.14 (ENTRY_PGLITE_MODULE); no hosted DB substitute');
   process.exit(77);
 }
-const sql = fs.readFileSync(new URL('../docs/entry-release/staged-migrations/20261026072310_round66_entry_roster_audit.sql', import.meta.url), 'utf8');
+// Round 66 Phase 1a (2026-10-27) — SQL file was promoted from
+// docs/entry-release/staged-migrations/ into supabase/migrations/
+// at a fresh timestamp (20261027041500) so it sorts after the
+// shipped Round 65 keybox/consent migrations.
+const sql = fs.readFileSync(new URL('../supabase/migrations/20261027041500_round66_entry_roster_audit.sql', import.meta.url), 'utf8');
 const db = new PGlite();
 let checks = 0;
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;

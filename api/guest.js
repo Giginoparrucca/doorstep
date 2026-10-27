@@ -420,23 +420,27 @@ async function doGuestKeybox(res, propertyId, bookingCode, isTest, sessionExpUni
   res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader('Vary', 'Authorization, Origin');
   if (!bookingCode) return res.status(200).json({ code: null });
-  // Preserve the 404/503 contract from Round 36 by pre-checking property
-  // existence/readability before delegating to the policy. The policy
-  // module itself handles the rotating-code projection (visibility
-  // flags, enabled toggles, single-head fallback) and fails closed
-  // on any later read error, which this handler maps to a 200+null
-  // (deliberately safer than the prior 503: the guest keeps retrying
-  // without the client treating it as an outage).
+  // Preserve the Round 36 404/503 contract so any monitoring that treats
+  // a 503 as "retry later" keeps working. The reservation ambiguity check
+  // is intentionally duplicated with the loader's internal read because
+  // the loader fails closed to 200+null — the pre-check tightens that
+  // to 503 for the same ops signal the previous implementation exposed.
   const prop = await pgrestGET(`properties?id=eq.${encodeURIComponent(propertyId)}`
     + '&deleted_at=is.null&select=id&limit=1');
   if (!prop.ok) return res.status(503).json({ error: 'Access information unavailable' });
   const properties = await prop.json();
   if (!Array.isArray(properties) || properties.length !== 1) return res.status(404).json({ error: 'Property not found' });
+  const r = await pgrestGET(`ota_reservations?property_id=eq.${encodeURIComponent(propertyId)}`
+    + `&booking_code=eq.${encodeURIComponent(bookingCode)}&is_test=eq.${isTest === true ? 'true' : 'false'}`
+    + '&deleted_at=is.null&status=eq.active&entry_type=eq.reservation&select=id&limit=2');
+  if (!r.ok) return res.status(503).json({ error: 'Access information unavailable' });
+  const rows = await r.json();
+  if (!Array.isArray(rows) || rows.length > 1) return res.status(503).json({ error: 'Access information unavailable' });
   // Round 66 Phase 1b — delegate the rotating-code decision to the shared
   // policy module. For every property today the opt-in column is absent,
   // so the loader sets property.entry_checkin_required=null and the
   // policy enters its legacy branch: allow_entry iff legacy_has_checkin
-  // (i.e. identical to the prior inline bookingHasCheckin() + ota
+  // (identical to the prior inline bookingHasCheckin() + ota_reservations
   // keybox_code read). See scripts/entry-release-loader.test.mjs for
   // scenario parity with the Round 36 behaviour.
   const sessionValidUntil = Number.isFinite(sessionExpUnixSec)

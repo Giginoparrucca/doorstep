@@ -116,4 +116,15 @@ assert.ok(
   'firstTimeSetup() must mention checking the spam folder',
 );
 
-console.log('PASS round67-password-modal: no prompt() in auth handler; promptForNewPassword modal exists with two autocomplete="new-password" fields + confirm-match; forgotPassword and firstTimeSetup success messages name info@welcomebnb.it + spam-folder fallback.');
+// ── 5. Admin UI exposes "Link accesso" (Copy link) for accepted users ──
+// A user who already accepted the invite and now cannot sign in needs a
+// direct magic-link; the backend's generate_link action falls back to
+// type=magiclink on email_exists at api/admin-invite-host.js:198. Without
+// a UI button exposing it, the admin has no way to produce one.
+const adminSrc = fs.readFileSync(path.resolve(here, '..', 'admin.html'), 'utf8');
+assert.ok(
+  /inv\.status\s*!==\s*['"]revoked['"][^]*?opsCopyInviteLink/.test(adminSrc),
+  'admin.html must expose the Copy link / Link accesso button for every non-revoked invite status (invited AND accepted), so an accepted-but-stuck host can get a direct magic-link bypass of the stuck Supabase email',
+);
+
+console.log('PASS round67-password-modal: no prompt() in auth handler; promptForNewPassword modal exists with two autocomplete="new-password" fields + confirm-match; forgotPassword and firstTimeSetup success messages name info@welcomebnb.it + spam-folder fallback; admin UI exposes direct-link button for accepted users.');

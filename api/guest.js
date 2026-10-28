@@ -399,11 +399,22 @@ const PROPERTY_PUBLIC_FIELDS = [
   'show_fixed_lockbox_to_guest', 'show_rotating_lockbox_to_guest',
   'use_per_guest_lockbox',
   'rotating_lockbox_enabled', 'rotating_lockbox_length',
+  // Round 66 Phase 2f — the FIXED keybox code was never surfaced to the
+  // guest UI through doProperty (index.html's _resolveLockboxCodes reads
+  // propData.keybox_code but the field was absent from the response), so
+  // fixed-code properties quietly rendered an empty lockbox tile. Add it
+  // now, gated behind the entry-release policy via POST_CHECKIN_FIELDS.
+  'keybox_code',
 ];
-// Fields revealed only AFTER the booking has at least one check-in row.
-// Everything else above is visible from the booking link onwards.
+// Fields revealed only AFTER the entry-release policy allows entry. For
+// every OFF-path property that resolves to legacy_available|locked, this
+// is "a check-in row exists for the booking" (byte-equivalent to the
+// pre-Round-66 behaviour). For an opt-in property, "manual" (host
+// release) and "available" (roster complete) also qualify; "scheduled"
+// does NOT — the arrival_time window still gates these fields.
 const PROPERTY_POST_CHECKIN_FIELDS = new Set([
   'wifi_name', 'wifi_password', 'access_method',
+  'keybox_code',
 ]);
 // Columns the guest form writes. Narrows what checkin_insert and
 // checkin_update accept so no caller can set alloggiati_status,

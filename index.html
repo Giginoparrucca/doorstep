@@ -5094,6 +5094,29 @@ async function init() {
           const cit = el('checkinInstructionsText');
           if (cit) cit.style.display = 'none';
         }
+        // Round 66 Phase 2f — "manual" release path. The host pressed
+        // "Rilascia accesso" on the console, so entry_access.bookings
+        // carries released_manually=true + an audit row and the policy
+        // returned state=manual with allow_entry=true. Add a small
+        // bilingual chip above the keybox code so the guest understands
+        // where the released code came from (host override, not the
+        // check-in form) and the host sees visible confirmation during
+        // pilot testing. Rendered under the access-method line so the
+        // existing lockbox tile continues to show the code itself.
+        if (er && er.state === 'manual' && er.allow_entry) {
+          const isIt = lang === 'it';
+          const chip = isIt
+            ? '✓ Il tuo host ha rilasciato il codice di accesso.'
+            : '✓ Your host has released the access code.';
+          const am = el('accessMethod');
+          if (am && !am.querySelector('.entry-released-note')) {
+            const note = document.createElement('div');
+            note.className = 'entry-released-note';
+            note.style.cssText = 'margin-top:6px;font-size:0.9em;color:var(--ok,#1a7f3c);';
+            note.textContent = chip;
+            am.appendChild(note);
+          }
+        }
       } catch (_) { /* defensive — never block welcome rendering on policy */ }
       // Round 60 Phase 4 — show the Your-room card when the gateway
       // resolved a room for this booking. Name is always safe to show

@@ -206,6 +206,18 @@ export async function loadEntryReleaseSnapshot(opts) {
     }
   }
 
+  // A saved release must still refer to the current active reservation.
+  // The active-only query returns no row after cancellation/deletion; do
+  // not reinterpret its persisted override as a standalone booking. Date
+  // edits and replacement reservations likewise require a fresh contract.
+  if (eaState) {
+    if (eaState.property_id !== propertyId || eaState.booking_code !== bookingCode
+      || eaState.is_test !== (isTest === true)) return null;
+    if ((eaState.reservation_id ?? null) !== (reservation?.id ?? null)) return null;
+    if (reservation && (eaState.arrival_date !== reservation.checkin_date
+      || eaState.departure_date !== reservation.checkout_date)) return null;
+  }
+
   const bookingId = eaState?.booking_id
     || reservation?.id
     || stableBookingId(propertyId, bookingCode, isTest);

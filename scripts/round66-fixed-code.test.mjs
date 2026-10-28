@@ -39,7 +39,7 @@ async function request(options = {}) {
     assert.ok(path.includes(`booking_code=eq.${code}`));
     assert.ok(path.includes('is_test=eq.false'));
     if (options.readFailure) return { ok: false };
-    return { ok: true, json: async () => path.startsWith('checkins?') ? checkins : [] };
+    return { ok: true, json: async () => path.startsWith('checkins?') ? checkins : options.reservations || [] };
   };
   const gateway = vm.createContext({ Date, Number, encodeURIComponent,
     PROPERTY_PUBLIC_FIELDS: fields, PROPERTY_POST_CHECKIN_FIELDS: new Set(gated),
@@ -89,6 +89,18 @@ denied(await request({ noRoster: true }), 'unavailable');
 denied(await request({ expired: true }), 'invalid');
 denied(await request({ noBooking: true }));
 denied(await request({ readFailure: true }), 'unavailable');
+// An active-only reservation query returns [] for cancellation/deletion.
+// A saved override tied to that reservation must never become standalone.
+denied(await request({ state: { reservation_id: 'old-reservation' } }), 'unavailable');
+const reservation = { id: 'reservation-fictional', property_id: pid, booking_code: code,
+  is_test: false, status: 'active', entry_type: 'reservation', deleted_at: null,
+  checkin_date: '2099-01-01', checkout_date: '2099-01-02' };
+assert.equal((await request({ reservations: [reservation],
+  state: { reservation_id: reservation.id } })).entry_release.state, 'manual');
+denied(await request({ reservations: [reservation], state: { reservation_id: 'replaced-reservation' } }), 'unavailable');
+denied(await request({ reservations: [{ ...reservation, checkin_date: '2099-01-02' }],
+  state: { reservation_id: reservation.id } }), 'unavailable');
+denied(await request({ state: { property_id: 'foreign-property' } }), 'unavailable');
 const failure = await request({ policyError: true });
 denied(failure, 'unavailable');
 assert.equal(failure.entry_release.reason, 'policy_error');

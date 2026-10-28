@@ -103,4 +103,40 @@ assert.ok(
   'scheduled branch must build the wall-clock from the server-returned er.release_at',
 );
 
+// ── 7. Phase 2f — "manual" release path. When the host has clicked
+// "Rilascia accesso" the policy returns state=manual with allow_entry=true.
+// The guest UI must render a visible chip under the access-method line so
+// the guest sees the released confirmation, and the lockbox tile must
+// keep rendering (not hidden) because the code IS available.
+assert.ok(
+  /er\.state === 'manual'.*er\.allow_entry/s.test(index),
+  'guest UI must branch on state=manual + allow_entry',
+);
+assert.ok(
+  /Il tuo host ha rilasciato il codice di accesso/.test(index),
+  'IT manual-release chip must be present verbatim',
+);
+assert.ok(
+  /Your host has released the access code/.test(index),
+  'EN manual-release chip must be present verbatim',
+);
+assert.ok(
+  /entry-released-note/.test(index),
+  'manual-release chip must carry its own CSS class so a repeat render does not stack',
+);
+
+// ── 8. Phase 2f — fixed keybox_code must flow through doProperty so the
+// guest's _resolveLockboxCodes can read propData.keybox_code. For every
+// property today the code was absent from the server response (never in
+// PROPERTY_PUBLIC_FIELDS), so fixed-code properties quietly rendered
+// an empty lockbox tile. Lock that in now:
+assert.ok(
+  /const PROPERTY_PUBLIC_FIELDS = \[[\s\S]*?'keybox_code'[\s\S]*?\];/.test(guestApi),
+  'PROPERTY_PUBLIC_FIELDS must include keybox_code',
+);
+assert.ok(
+  /const PROPERTY_POST_CHECKIN_FIELDS = new Set\(\[[\s\S]*?'keybox_code'[\s\S]*?\]\)/.test(guestApi),
+  'PROPERTY_POST_CHECKIN_FIELDS must gate keybox_code behind the entry-release policy',
+);
+
 console.log('PASS round66-guest-entry-release: loader exports evaluateGuestEntryRelease with no_snapshot fallback; doProperty attaches entry_release with fail-closed policy_error; guest UI reads r.data.entry_release and branches on state (locked/scheduled/unavailable); IT + EN strings present for all three deny states; lockboxCodesWrap hidden on deny; scheduled uses server-authoritative release_at.');

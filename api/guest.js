@@ -399,11 +399,22 @@ const PROPERTY_PUBLIC_FIELDS = [
   'show_fixed_lockbox_to_guest', 'show_rotating_lockbox_to_guest',
   'use_per_guest_lockbox',
   'rotating_lockbox_enabled', 'rotating_lockbox_length',
+  // Round 66 Phase 2f — the FIXED keybox code was never surfaced to the
+  // guest UI through doProperty (index.html's _resolveLockboxCodes reads
+  // propData.keybox_code but the field was absent from the response), so
+  // fixed-code properties quietly rendered an empty lockbox tile. Add it
+  // now, gated behind the entry-release policy via POST_CHECKIN_FIELDS.
+  'keybox_code',
 ];
-// Fields revealed only AFTER the booking has at least one check-in row.
-// Everything else above is visible from the booking link onwards.
+// Fields revealed only AFTER the entry-release policy allows entry. For
+// every OFF-path property that resolves to legacy_available|locked, this
+// is "a check-in row exists for the booking" (byte-equivalent to the
+// pre-Round-66 behaviour). For an opt-in property, "manual" (host
+// release) and "available" (roster complete) also qualify; "scheduled"
+// does NOT — the arrival_time window still gates these fields.
 const PROPERTY_POST_CHECKIN_FIELDS = new Set([
   'wifi_name', 'wifi_password', 'access_method',
+  'keybox_code',
 ]);
 // Columns the guest form writes. Narrows what checkin_insert and
 // checkin_update accept so no caller can set alloggiati_status,
@@ -487,13 +498,28 @@ async function doProperty(res, propertyId, bookingCode, isTest, sessionExpUnixSe
   const sessionValidUntil = Number.isFinite(sessionExpUnixSec)
     ? new Date(sessionExpUnixSec * 1000).toISOString()
     : null;
-  const hasCheckin = bookingCode ? await entryReleaseAllows({
-    pgrestGET, callRPC, propertyId, bookingCode, isTest, sessionValidUntil,
-  }) : false;
+  // Use one decision for both secrets and the displayed release state.
+  // Separate reads could otherwise return a code alongside a later denial.
+  let policy = null;
+  if (bookingCode) {
+    try {
+      policy = await evaluateGuestEntryRelease({
+        pgrestGET, callRPC, propertyId, bookingCode, isTest, sessionValidUntil,
+      });
+    } catch (_) {
+      policy = {
+        state: 'unavailable', reason: 'policy_error',
+        allow_entry: false, submitted: null, expected: null, release_at: null,
+      };
+    }
+  }
+  const hasCheckin = policy?.allow_entry === true;
 
   const out = {};
   for (const k of PROPERTY_PUBLIC_FIELDS) {
     if (PROPERTY_POST_CHECKIN_FIELDS.has(k) && !hasCheckin) continue;
+    // Host visibility is a server boundary, including after manual release.
+    if (k === 'keybox_code' && row.show_fixed_lockbox_to_guest === false) continue;
     if (row[k] !== undefined) out[k] = row[k];
   }
 
@@ -527,28 +553,15 @@ async function doProperty(res, propertyId, bookingCode, isTest, sessionExpUnixSe
   // can treat the former as "proceed as today" and the latter as "show
   // the locked card." Shipped as a non-breaking addition; existing
   // clients that read only `checked_in` continue to work.
-  if (bookingCode) {
-    try {
-      const sessionValidUntil = Number.isFinite(sessionExpUnixSec)
-        ? new Date(sessionExpUnixSec * 1000).toISOString()
-        : null;
-      const policy = await evaluateGuestEntryRelease({
-        pgrestGET, callRPC, propertyId, bookingCode, isTest, sessionValidUntil,
-      });
-      resp.entry_release = {
-        state: policy.state,
-        reason: policy.reason,
-        allow_entry: policy.allow_entry === true,
-        submitted: policy.submitted ?? null,
-        expected: policy.expected ?? null,
-        release_at: policy.release_at ?? null,
-      };
-    } catch (_) {
-      resp.entry_release = {
-        state: 'unavailable', reason: 'policy_error',
-        allow_entry: false, submitted: null, expected: null, release_at: null,
-      };
-    }
+  if (policy) {
+    resp.entry_release = {
+      state: policy.state,
+      reason: policy.reason,
+      allow_entry: policy.allow_entry === true,
+      submitted: policy.submitted ?? null,
+      expected: policy.expected ?? null,
+      release_at: policy.release_at ?? null,
+    };
   }
   return res.status(200).json(resp);
 }

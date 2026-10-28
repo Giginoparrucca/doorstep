@@ -431,7 +431,7 @@ const checkinRow = (over = {}) => ({
   const EA_IDENT = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb6';
   const pg = mockPgrest([
     ['properties?', [propertyRow({ entry_checkin_required: true, use_per_guest_lockbox: true, rotating_lockbox_enabled: false })]],
-    ['ota_reservations?', [reservationRow({ keybox_code: null, room_id: null })]],
+    ['ota_reservations?', [reservationRow({ keybox_code: null, room_id: null, checkout_date: '2026-11-02' })]],
     ['checkins?', [checkinRow({ keybox_code: '7777', guest_type: 'single' })]],
   ]);
   const callRPC = async () => ({ ok: true, json: async () => ({

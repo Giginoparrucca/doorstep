@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { parseFilename, diff, formatFailure } = require('../lib/schema-drift.js');
+const { parseFilename, parseRequiredNames, diff, formatFailure } = require('../lib/schema-drift.js');
 
 // parseFilename
 assert.deepEqual(
@@ -111,3 +111,14 @@ assert.equal(parseFilename('20261014145714_name_without_sql'), null, 'needs .sql
 }
 
 console.log('PASS schema-drift diff: parse/filename, name-match wins over timestamp drift, extra applied allowed, missing enumerated, failure message carries project + filename + apply hint');
+
+// Additional pre-merge requirements may only strengthen the committed-file gate.
+assert.deepEqual(parseRequiredNames(undefined),[]);
+assert.deepEqual(parseRequiredNames('["round66_atomic_submissions","round66_atomic_submissions"]'),['round66_atomic_submissions']);
+for(const invalid of ['oops','{}','[null]','["../other"]','["x; command"]',JSON.stringify(Array(33).fill('valid'))]) {
+  assert.throws(()=>parseRequiredNames(invalid));
+}
+assert.equal(diff({files:[],applied:[],required:['round66_atomic_submissions']}).ok,false);
+assert.equal(diff({files:[],applied:[{name:'round66_atomic_submissions'}],required:['round66_atomic_submissions']}).ok,true);
+assert.equal(diff({files:['20261014145714_round57_cover_layout.sql'],applied:[{name:'round66_atomic_submissions'}],required:['round66_atomic_submissions']}).missing[0].name,'round57_cover_layout');
+console.log('PASS required-name preflight: strict metadata parsing, missing required name fails, applied name passes, committed files remain mandatory.');

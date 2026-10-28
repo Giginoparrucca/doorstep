@@ -29,6 +29,9 @@ async function request(options = {}) {
     released_manually: true, manual_audit_id: 'audit-fictional',
     override_audit: { id: 'audit-fictional', actor_id: 'host-fictional', created_at: past },
     ...options.state };
+  Object.assign(state, { snapshot_version: 2, property_snapshot: property,
+    current_rows: checkins, reservation_snapshot: options.reservations?.[0] || null,
+    room_snapshot: null, room_resolution: 'none', resolved_room_id: null });
   let policyCalls = 0, status, body;
   const pgrestGET = async path => {
     if (path.startsWith('properties?')) {
@@ -44,7 +47,7 @@ async function request(options = {}) {
   const gateway = vm.createContext({ Date, Number, encodeURIComponent,
     PROPERTY_PUBLIC_FIELDS: fields, PROPERTY_POST_CHECKIN_FIELDS: new Set(gated),
     pgrestGET, callRPC: async (name, args) => {
-      assert.equal(name, 'get_entry_access_booking_state');
+      assert.equal(name, 'get_entry_access_booking_snapshot');
       assert.deepEqual(args, { p_property_id: pid, p_booking_code: code, p_is_test: false });
       return { ok: true, json: async () => options.noRoster ? null : state };
     },
@@ -105,7 +108,10 @@ const failure = await request({ policyError: true });
 denied(failure, 'unavailable');
 assert.equal(failure.entry_release.reason, 'policy_error');
 const completed = { checkins: [{ id: 'guest-1', property_id: pid, booking_code: code,
-  is_test: false, guest_type: 'single', submitted_at: past }],
+  is_test: false, guest_type: 'single', submitted_at: past,
+  surname:'Synthetic',name:'Person',sex:'F',date_of_birth:'2000-01-01',place_of_birth:'London',
+  birth_country:'United Kingdom',citizenship:'United Kingdom',document_type:'passport',
+  document_number:'FICTIONAL123',doc_issue_place:'London',arrival_date:'2099-01-01',departure_date:'2099-01-02',nights:1 }],
   state: { released_manually: false, submissions: [{ slot_id: 'slot-1', checkin_id: 'guest-1' }] } };
 assert.equal((await request(completed)).entry_release.state, 'available');
 denied(await request({ ...completed, property: { entry_release_time: '15:00', entry_release_timezone: 'Europe/Rome' } }), 'scheduled');

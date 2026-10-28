@@ -152,6 +152,7 @@ export default async function handler(req, res) {
         : null;
       const projection = await projectGuestEntry({
         pgrestGET: pgrestGETForLoader,
+        callRPC,
         propertyId,
         bookingCode: v.payload.b,
         isTest: v.payload.t === true,
@@ -613,6 +614,22 @@ async function pgrestGET(path, opts = {}) {
   }
   const data = await r.json();
   return { data, headers: r.headers };
+}
+
+// Round 66 Phase 2e — RPC helper so the entry-release loader can read
+// public.get_entry_access_booking_state when the host has opted in.
+// Returns the same fetch-shaped Response the loader expects.
+async function callRPC(name, args, opts = {}) {
+  return fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
+    method: 'POST',
+    headers: {
+      ...supabaseAuthHeaders(SERVICE_KEY),
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...(opts.headers || {}),
+    },
+    body: JSON.stringify(args || {}),
+  });
 }
 
 // Insert one api_usage row. Called fire-and-forget after every successful

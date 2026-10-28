@@ -107,4 +107,14 @@ assert.ok(
   'handler must guard against missing booking fields',
 );
 
+// ── 9. The reservation SELECT that feeds this button must pull
+// guest_count + is_test so the RPC's "Reservation does not match
+// roster" check doesn't 500 for every booking whose guest_count>1
+// (seen in pilot — Daniele 2026-10-28 on trulloverdeulivo@gmail.com).
+assert.ok(
+  /\.select\('id,[^']*\bguest_count\b[^']*\bis_test\b[^']*booking_code[^']*'\)/.test(src)
+  || /\.select\('id,[^']*\bis_test\b[^']*\bguest_count\b[^']*booking_code[^']*'\)/.test(src),
+  'the ota_reservations SELECT that feeds the booking panel must include both guest_count and is_test — otherwise entry_access_confirm_roster rejects every click',
+);
+
 console.log('PASS round66-manual-release: button rendered only when entry_checkin_required=true; IT+EN labels & audit-disclosure tooltip; handler calls confirm_roster + set_release via sb.rpc; separate randomUUID request IDs; state_version threaded between the two RPCs; audit-disclosure confirm dialog in both languages; roster/release error paths both surfaced; incomplete-data guard.');

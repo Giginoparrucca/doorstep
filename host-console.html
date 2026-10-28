@@ -6273,8 +6273,15 @@ async function renderUpcomingReservationsPanel() {
     // Round 45 Step 4 — covered_by_reservation_id IS NULL so an OTA
     // echo linked to a direct booking doesn't show as a second row in
     // "Prossime prenotazioni" — the direct row already represents it.
+    // Round 66 Phase 2d — the "Rilascia accesso" / "Ripristina automatico"
+    // buttons call entry_access_confirm_roster which rejects a mismatch
+    // between p_count/p_is_test and the ota_reservations row. Pull both
+    // columns here so the button's data-expected-count and data-is-test
+    // reflect the authoritative row values; otherwise the first click
+    // 500s with "Reservation does not match roster" for every booking
+    // whose guest_count > 1.
     const { data, error } = await sb.from('ota_reservations')
-      .select('id, platform, guest_name, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code, checkin_reopened_at, room_id').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
+      .select('id, platform, guest_name, guest_count, is_test, checkin_date, checkout_date, reservation_url, summary, booking_code, keybox_code, checkin_reopened_at, room_id').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
       .eq('property_id', propertyId)
       .eq('entry_type', 'reservation')
       .eq('status', 'active')

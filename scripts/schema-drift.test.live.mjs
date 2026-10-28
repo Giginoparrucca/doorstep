@@ -19,7 +19,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { diff, formatFailure } = require('../lib/schema-drift.js');
+const { diff, formatFailure, parseRequiredNames } = require('../lib/schema-drift.js');
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '..');
@@ -73,7 +73,10 @@ async function readSchemaMigrations() {
 
 try {
   const applied = await readSchemaMigrations();
-  const result = diff({ files, applied });
+  // Extra names strengthen the reviewed-main probe before a pending
+  // migration-bearing PR merges. They cannot omit committed file checks.
+  const required = parseRequiredNames(process.env.SCHEMA_DRIFT_REQUIRED_MIGRATIONS);
+  const result = diff({ files, applied, required });
 
   if (!result.ok) {
     console.error(formatFailure({ missing: result.missing, projectRef }));
@@ -84,9 +87,10 @@ try {
     process.exit(1);
   }
 
+  for (const name of required) console.log(`PASS required migration: ${name}`);
   console.log(
     `PASS schema-drift live: ${files.length} committed migration file(s), ` +
-    `${applied.length} applied row(s) on project ${projectRef}; every committed ` +
+    `${applied.length} applied row(s) on project ${projectRef}; ${required.length} additional required name(s); every committed ` +
     `file has a matching applied name.`
   );
 } catch (err) {

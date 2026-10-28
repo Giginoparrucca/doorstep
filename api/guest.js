@@ -8,6 +8,7 @@ import handleCspReport from './_csp-report.js';
 // keybox_code read. Phase 2 adds the opt-in UI and the roster/time
 // enforcement for properties that opt in.
 import { entryReleaseAllows, evaluateGuestEntryRelease, projectGuestEntry } from './_entry-release-loader.js';
+import { submitEntryCheckin } from './_entry-submission-save.js';
 // api/guest.js — Round 34 chat gateway + Round 48 guest gateway.
 //
 // Round 48 Phase 2 renamed api/guest-chat.js → api/guest.js and
@@ -753,36 +754,45 @@ async function doCheckinInsert(res, propertyId, incomingBookingCode, sessionId, 
   row.is_test      = isTest === true;
   row.submitted_at = new Date().toISOString();
 
-  const insRes = await fetch(`${SUPABASE_URL}/rest/v1/checkins`, {
-    method: 'POST',
-    headers: {
-      ...supabaseAuthHeaders(SERVICE_KEY),
-      'Content-Type': 'application/json',
-      Prefer: 'return=representation',
-    },
-    body: JSON.stringify(row),
-  });
-  if (!insRes.ok) {
-    const t = await insRes.text().catch(() => '');
-    // Log the database code/constraint, but never the raw detail: Postgres
-    // constraint details can include the guest's entire failing row.
-    let dbError;
-    try { dbError = JSON.parse(t); } catch (_) {}
-    console.error('[guest] checkin_insert failed', {
-      status: insRes.status,
-      code: dbError?.code || null,
-      message: dbError?.message || 'Database insert rejected',
+  const transactional = await submitEntryCheckin({ callRPC, propertyId, bookingCode, isTest,
+    record: pickFields(inRecord, CHECKIN_WRITE_FIELDS),
+    submissionId: body.submission_id, ordinal: body.guest_ordinal });
+  if (transactional.error) return res.status(transactional.status).json({ error: transactional.error });
+  let inserted;
+  if (transactional.enabled) {
+    inserted = { id: transactional.id };
+  } else {
+    const insRes = await fetch(`${SUPABASE_URL}/rest/v1/checkins`, {
+      method: 'POST',
+      headers: {
+        ...supabaseAuthHeaders(SERVICE_KEY),
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify(row),
     });
-    return res.status(500).json({ error: 'checkin_insert failed', detail: t });
+    if (!insRes.ok) {
+      const t = await insRes.text().catch(() => '');
+      // Log the database code/constraint, but never the raw detail: Postgres
+      // constraint details can include the guest's entire failing row.
+      let dbError;
+      try { dbError = JSON.parse(t); } catch (_) {}
+      console.error('[guest] checkin_insert failed', {
+        status: insRes.status,
+        code: dbError?.code || null,
+        message: dbError?.message || 'Database insert rejected',
+      });
+      return res.status(500).json({ error: 'checkin_insert failed', detail: t });
+    }
+    [inserted] = await insRes.json();
   }
-  const [inserted] = await insRes.json();
 
   // Side effect A — clear checkin_reopened_at on checkins + ota_reservations.
   // Round 36 reopen flag: when a host unlocks the booking for the guest to
   // add a late arrival, this flag goes up on both tables; successful insert
   // clears it. The client used to attempt these updates with the anon key
   // but had no UPDATE policy — the update silently no-op'd. Now it works.
-  try {
+  if (!transactional.enabled) try {
     await Promise.all([
       fetch(`${SUPABASE_URL}/rest/v1/ota_reservations?property_id=eq.${encodeURIComponent(propertyId)}&booking_code=eq.${encodeURIComponent(bookingCode)}`, {
         method: 'PATCH',
@@ -842,7 +852,8 @@ async function doCheckinInsert(res, propertyId, incomingBookingCode, sessionId, 
     });
   } catch (_) {}
 
-  return res.status(200).json({ id: inserted.id, booking_code: bookingCode });
+  return res.status(200).json({ id: inserted.id, booking_code: bookingCode,
+    ...(transactional.enabled ? { expected_count: transactional.expected_count } : {}) });
 }
 
 // ── action: checkin_update ────────────────────────────────────────────
@@ -855,6 +866,7 @@ async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, is
 
   const patch = pickFields(fields, CHECKIN_WRITE_FIELDS);
   patch.guest_edited_at = new Date().toISOString();
+  patch.checkin_reopened_at = null;
 
   // Conditional PATCH. The filters pin us to the token's property +
   // booking, and alloggiati_status=not.in.(filed,filing) enforces
@@ -867,6 +879,7 @@ async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, is
   const r = await fetch(
     `${SUPABASE_URL}/rest/v1/checkins?id=eq.${encodeURIComponent(id)}` +
     `&property_id=eq.${encodeURIComponent(propertyId)}` +
+    `&is_test=eq.${isTest === true ? 'true' : 'false'}&deleted_at=is.null` +
     scope +
     `&alloggiati_status=not.in.(filed,filing)`,
     {
@@ -905,6 +918,7 @@ async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, is
         `${SUPABASE_URL}/rest/v1/checkins` +
         `?property_id=eq.${encodeURIComponent(propertyId)}` +
         `&booking_code=eq.${encodeURIComponent(bookingCode)}` +
+        `&is_test=eq.${isTest === true ? 'true' : 'false'}&deleted_at=is.null` +
         `&alloggiati_status=not.in.(filed,filing)` +
         `&id=neq.${encodeURIComponent(id)}`,
         {

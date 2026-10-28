@@ -36,6 +36,12 @@ const PROPERTY_FIELDS = [
   'show_fixed_lockbox_to_guest',
   'rotating_lockbox_enabled', 'use_per_guest_lockbox',
   'show_rotating_lockbox_to_guest',
+  // Round 66 Phase 2 — opt-in column + optional release-time pair.
+  // Default is false, so every property today still hits the policy's
+  // "entry_checkin_required == null || === false" legacy branch and the
+  // response stays byte-equivalent to the prior bookingHasCheckin() path.
+  'entry_checkin_required',
+  'entry_release_time', 'entry_release_timezone',
 ].join(',');
 
 const RESERVATION_FIELDS = [
@@ -109,14 +115,21 @@ export async function loadEntryReleaseSnapshot(opts) {
   );
   if (!propRows || propRows.length !== 1) return null;
   const propertyRow = propRows[0];
+  // Round 66 Phase 2 — the opt-in columns are now real on public.properties
+  // with a default of false. The policy's "entry_checkin_required == null
+  // || === false" branch continues to return legacy_available/locked
+  // identically to the prior bookingHasCheckin() path for every property
+  // today, since no host console surface yet lets a host set the column
+  // to true. When Phase 2 ships that UI, flipping the toggle fires the
+  // policy's roster/time path automatically — no further handler change.
+  //
+  // The policy expects `entry_timezone` on the snapshot, but the column
+  // is named `entry_release_timezone` on the properties row so the two
+  // sides don't collide with any pre-existing `properties.timezone` and
+  // because the column name itself describes what it does. Map it here.
   const property = {
     ...propertyRow,
-    // Phase 2 adds these columns; they are explicitly null here so the policy
-    // enters its "entry_checkin_required == null" branch and returns the
-    // legacy-behaviour result based on snapshot.legacy_has_checkin.
-    entry_checkin_required: null,
-    entry_release_time: null,
-    entry_timezone: null,
+    entry_timezone: propertyRow.entry_release_timezone ?? null,
   };
 
   // 2. OTA reservation (0 or 1 row expected; >1 is ambiguous and fails closed).
@@ -236,4 +249,29 @@ export async function projectGuestEntry(opts) {
   const snapshot = await loadEntryReleaseSnapshot(opts);
   if (!snapshot) return {};
   return projectEntryInstructions(snapshot);
+}
+
+/**
+ * Return the full policy result ({ state, reason, allow_entry, submitted,
+ * expected, release_at }) for the current snapshot. The guest app uses
+ * this to render locked / scheduled / released cards without needing to
+ * duplicate the policy's logic client-side.
+ *
+ * Returns a minimal unavailable result when the loader cannot assemble a
+ * snapshot (missing booking, failed read, etc.) so the caller can key off
+ * `state` without null-checking.
+ */
+export async function evaluateGuestEntryRelease(opts) {
+  const snapshot = await loadEntryReleaseSnapshot(opts);
+  if (!snapshot) {
+    return Object.freeze({
+      state: 'unavailable',
+      reason: 'no_snapshot',
+      allow_entry: false,
+      submitted: null,
+      expected: null,
+      release_at: null,
+    });
+  }
+  return evaluateEntryRelease(snapshot);
 }

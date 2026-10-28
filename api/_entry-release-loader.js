@@ -20,13 +20,19 @@
 // change. Phase 2 adds the opt-in column and surfaces the policy's roster/
 // time logic to properties that flip it ON.
 //
-// The loader does NOT read the Phase 1a entry_access.* tables yet. That
-// integration lands in Phase 2 together with the opt-in UI, so no code path
-// here reads data the host has not asked for.
+// Round 66 Phase 2e — when a host has opted in (entry_checkin_required=true)
+// AND a `callRPC` function is injected, the loader also calls the SECURITY
+// DEFINER `public.get_entry_access_booking_state(property, booking_code,
+// is_test)` RPC and feeds the policy a full ON-path snapshot: roster/slots
+// come from entry_access.slots, submissions come from entry_access.submissions
+// joined onto the live `checkins` rows, and the override object carries the
+// manual-release flag + audit evidence. If `callRPC` is not provided the
+// loader keeps its OFF-path behaviour so unit tests that only mock pgrestGET
+// still work byte-for-byte.
 //
-// Design: pgrestGET is injected so this module stays test-friendly and does
-// not duplicate api/guest.js's REST wiring. Callers pass the same pgrestGET
-// they already use for their own queries.
+// Design: pgrestGET and callRPC are both injected so this module stays test-
+// friendly and does not duplicate api/guest.js's REST wiring. Callers pass
+// the same pgrestGET + callRPC they already use for their own queries.
 
 import { createHash } from 'node:crypto';
 import { evaluateEntryRelease, projectEntryInstructions } from './_entry-release-policy.js';
@@ -88,6 +94,7 @@ async function readRows(pgrestGET, path, maxRows) {
  *
  * @param {Object}   opts
  * @param {Function} opts.pgrestGET          Reads from PostgREST (same shape as api/guest.js's).
+ * @param {Function} [opts.callRPC]          Posts to /rest/v1/rpc/<name>; required for the Phase 2 ON path.
  * @param {string}   opts.propertyId         Verified property id from the signed guest token.
  * @param {string}   opts.bookingCode        Verified booking code from the signed guest token.
  * @param {boolean}  opts.isTest             Verified is_test flag from the signed guest token.
@@ -95,7 +102,7 @@ async function readRows(pgrestGET, path, maxRows) {
  * @returns {Promise<Object|null>}           Snapshot or null if any required read failed.
  */
 export async function loadEntryReleaseSnapshot(opts) {
-  const { pgrestGET, propertyId, bookingCode, isTest, sessionValidUntil } = opts || {};
+  const { pgrestGET, callRPC, propertyId, bookingCode, isTest, sessionValidUntil } = opts || {};
   if (typeof pgrestGET !== 'function') return null;
   if (typeof propertyId !== 'string' || propertyId.length === 0) return null;
   if (typeof bookingCode !== 'string' || bookingCode.length === 0) return null;
@@ -169,11 +176,40 @@ export async function loadEntryReleaseSnapshot(opts) {
     if (roomRows && roomRows.length === 1) room = roomRows[0];
   }
 
-  // Synthesize a stable booking_id/identity_version for the OFF-path.
-  // Phase 2 switches these over to entry_access.bookings.{id,identity_version}
-  // once the host opts in.
-  const bookingId = reservation?.id || stableBookingId(propertyId, bookingCode, isTest);
-  const identityVersion = bookingId;
+  // Round 66 Phase 2e — when the host has opted in AND a callRPC is
+  // injected, fetch the entry_access state for this booking. If the
+  // RPC returns a row we drive booking_id/identity_version from it and
+  // synthesize roster/submissions/override; if it returns null the host
+  // opted in but no roster has been persisted yet, so we fall through
+  // to the OFF-path snapshot and let the policy's ON-branch fail closed
+  // to unavailable (unknown_roster) — the same fail-closed behaviour
+  // Phase 2 shipped with when the loader hadn't integrated yet.
+  let eaState = null;
+  if (property.entry_checkin_required === true && typeof callRPC === 'function') {
+    try {
+      const rpcRes = await callRPC('get_entry_access_booking_state', {
+        p_property_id: propertyId,
+        p_booking_code: bookingCode,
+        p_is_test: isTest === true,
+      });
+      if (!rpcRes || !rpcRes.ok) return null;
+      let parsed;
+      try { parsed = await rpcRes.json(); } catch (_) { return null; }
+      // The RPC returns the jsonb object itself (or null) wrapped in an
+      // array by PostgREST's "unnamed function" convention. Normalize.
+      if (Array.isArray(parsed)) parsed = parsed[0] ?? null;
+      if (parsed && typeof parsed === 'object') eaState = parsed;
+    } catch (_) {
+      // A failed RPC read fails closed — do not silently drop back to
+      // the legacy branch for a property that is opted in.
+      return null;
+    }
+  }
+
+  const bookingId = eaState?.booking_id
+    || reservation?.id
+    || stableBookingId(propertyId, bookingCode, isTest);
+  const identityVersion = eaState?.identity_version || bookingId;
 
   const scope = Object.freeze({
     session_valid: true,
@@ -194,25 +230,109 @@ export async function loadEntryReleaseSnapshot(opts) {
     identity_version: identityVersion,
     valid_until: sessionIso,
     room_id: reservation?.room_id || null,
-    expected_count: null,
-    arrival_date: reservation?.checkin_date || null,
+    expected_count: eaState?.expected_count ?? null,
+    arrival_date: eaState?.arrival_date || reservation?.checkin_date || null,
     keybox_code: reservation?.keybox_code || null,
   };
 
-  // Submissions scoped and identity-tagged so the policy's leader filter
-  // (guest_type in {single, head, group}) finds the right rows.
-  const submissions = checkinRows.map(row => ({
-    id: row.id,
-    property_id: row.property_id,
-    booking_id: bookingId,
-    is_test: row.is_test,
-    slot_id: row.id,
-    deleted_at: row.deleted_at,
-    guest_type: row.guest_type,
-    keybox_code: row.keybox_code || null,
-    submitted_at: row.submitted_at,
-    identity_version: identityVersion,
-  }));
+  // Build roster + submissions + override on the ON path. The policy's
+  // scoped() helper requires property_id/booking_id/is_test to match
+  // the scope exactly, so stamp every synthesized row with those.
+  let roster = null;
+  let override = null;
+  let submissions;
+  if (eaState) {
+    const slotList = Array.isArray(eaState.slots) ? eaState.slots : [];
+    // guest_type per slot — the policy accepts single/head/group/member/
+    // group_member. For a party of 1, use 'single' (one guest, no leader
+    // concept). For a party of 2+, slot 1 is the 'head' and the rest are
+    // 'member'. These match the categories the manual-override confirm
+    // path persists for the audit trail.
+    const guestTypeFor = (ordinal, total) => {
+      if (total === 1) return 'single';
+      if (ordinal === 1) return 'head';
+      return 'member';
+    };
+    const rosterSlots = slotList.map(s => ({
+      id: s.id,
+      required: true,
+      photo_required: false,
+      guest_type: guestTypeFor(s.ordinal, slotList.length),
+    }));
+    roster = {
+      property_id: propertyId,
+      booking_id: bookingId,
+      is_test: isTest === true,
+      confirmed: eaState.roster_confirmed === true,
+      identity_version: identityVersion,
+      version: eaState.roster_version || null,
+      source: eaState.roster_source || null,
+      slots: rosterSlots,
+    };
+
+    // Submissions: entry_access.submissions binds a slot to a check-in
+    // row. Translate each binding into the policy's submission shape
+    // using the live check-in row for its id/submitted_at/keybox_code.
+    const checkinById = new Map(checkinRows.map(row => [row.id, row]));
+    const slotById = new Map(slotList.map(s => [s.id, { ...s, guest_type: guestTypeFor(s.ordinal, slotList.length) }]));
+    const subBindings = Array.isArray(eaState.submissions) ? eaState.submissions : [];
+    submissions = [];
+    for (const binding of subBindings) {
+      const checkin = checkinById.get(binding.checkin_id);
+      const slot = slotById.get(binding.slot_id);
+      if (!checkin || !slot) continue;
+      submissions.push({
+        id: checkin.id,
+        property_id: propertyId,
+        booking_id: bookingId,
+        is_test: isTest === true,
+        slot_id: slot.id,
+        deleted_at: checkin.deleted_at,
+        guest_type: slot.guest_type,
+        keybox_code: checkin.keybox_code || null,
+        submitted_at: checkin.submitted_at,
+        identity_version: identityVersion,
+        validated: true,
+        validation_version: 'entry-v1',
+        source_revision: checkin.id,
+        validated_revision: checkin.id,
+        roster_version: eaState.roster_version || null,
+        reopened_at: null,
+        photo_verified: true,
+      });
+    }
+
+    const audit = eaState.override_audit;
+    override = {
+      property_id: propertyId,
+      booking_id: bookingId,
+      is_test: isTest === true,
+      identity_version: identityVersion,
+      active: eaState.released_manually === true,
+      actor_id: audit?.actor_id || null,
+      audit_id: audit?.id || eaState.manual_audit_id || null,
+      created_at: audit?.created_at || null,
+      audit_committed: audit?.id != null,
+    };
+  } else {
+    // OFF-path (unchanged): one synthesized "submission" per legacy
+    // check-in row, keyed by the check-in id. The policy's OFF branch
+    // short-circuits before touching these fields; they stay here so
+    // projectEntryInstructions can still find the single-head leader
+    // for the rotating-code fallback.
+    submissions = checkinRows.map(row => ({
+      id: row.id,
+      property_id: row.property_id,
+      booking_id: bookingId,
+      is_test: row.is_test,
+      slot_id: row.id,
+      deleted_at: row.deleted_at,
+      guest_type: row.guest_type,
+      keybox_code: row.keybox_code || null,
+      submitted_at: row.submitted_at,
+      identity_version: identityVersion,
+    }));
+  }
 
   return {
     scope,
@@ -220,9 +340,9 @@ export async function loadEntryReleaseSnapshot(opts) {
     legacy_has_checkin: legacyHasCheckin,
     property,
     booking,
-    roster: null,
+    roster,
     submissions,
-    override: null,
+    override,
     room_resolution: reservation?.room_id && room ? 'unique' : 'none',
     room: reservation?.room_id && room ? room : null,
   };

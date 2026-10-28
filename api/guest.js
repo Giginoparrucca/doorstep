@@ -350,6 +350,22 @@ async function pgrestGET(path, opts = {}) {
   });
 }
 
+// Round 66 Phase 2e — RPC helper so the entry-release loader can read
+// public.get_entry_access_booking_state (SECURITY DEFINER). Shape matches
+// pgrestGET so the loader can wrap either in identical try/catch logic.
+async function callRPC(name, args, opts = {}) {
+  return fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
+    method: 'POST',
+    headers: {
+      ...supabaseAuthHeaders(SERVICE_KEY),
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...(opts.headers || {}),
+    },
+    body: JSON.stringify(args || {}),
+  });
+}
+
 async function recordUsage(row) {
   if (!SERVICE_KEY) return;
   const r = await fetch(`${SUPABASE_URL}/rest/v1/api_usage`, {
@@ -447,7 +463,7 @@ async function doGuestKeybox(res, propertyId, bookingCode, isTest, sessionExpUni
     ? new Date(sessionExpUnixSec * 1000).toISOString()
     : null;
   const proj = await projectGuestEntry({
-    pgrestGET, propertyId, bookingCode, isTest, sessionValidUntil,
+    pgrestGET, callRPC, propertyId, bookingCode, isTest, sessionValidUntil,
   });
   const code = typeof proj.rotating_code === 'string' ? proj.rotating_code.trim() : null;
   return res.status(200).json({ code: code || null });
@@ -472,7 +488,7 @@ async function doProperty(res, propertyId, bookingCode, isTest, sessionExpUnixSe
     ? new Date(sessionExpUnixSec * 1000).toISOString()
     : null;
   const hasCheckin = bookingCode ? await entryReleaseAllows({
-    pgrestGET, propertyId, bookingCode, isTest, sessionValidUntil,
+    pgrestGET, callRPC, propertyId, bookingCode, isTest, sessionValidUntil,
   }) : false;
 
   const out = {};
@@ -517,7 +533,7 @@ async function doProperty(res, propertyId, bookingCode, isTest, sessionExpUnixSe
         ? new Date(sessionExpUnixSec * 1000).toISOString()
         : null;
       const policy = await evaluateGuestEntryRelease({
-        pgrestGET, propertyId, bookingCode, isTest, sessionValidUntil,
+        pgrestGET, callRPC, propertyId, bookingCode, isTest, sessionValidUntil,
       });
       resp.entry_release = {
         state: policy.state,
@@ -639,7 +655,7 @@ async function doCheckinList(res, propertyId, bookingCode, isTest, sessionExpUni
     ? new Date(sessionExpUnixSec * 1000).toISOString()
     : null;
   const allowKeyboxProjection = bookingCode ? await entryReleaseAllows({
-    pgrestGET, propertyId, bookingCode, isTest, sessionValidUntil,
+    pgrestGET, callRPC, propertyId, bookingCode, isTest, sessionValidUntil,
   }) : false;
 
   // Round 49 Phase 4 — when the property is in autofile 'live' mode,
@@ -914,7 +930,7 @@ async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, is
     ? new Date(sessionExpUnixSec * 1000).toISOString()
     : null;
   const allowKeyboxProjection = bookingCode ? await entryReleaseAllows({
-    pgrestGET, propertyId, bookingCode, isTest, sessionValidUntil,
+    pgrestGET, callRPC, propertyId, bookingCode, isTest, sessionValidUntil,
   }) : false;
   if (!allowKeyboxProjection) delete out.keybox_code;
 

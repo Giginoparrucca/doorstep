@@ -369,6 +369,157 @@ const checkinRow = (over = {}) => ({
   assert.equal(r.allow_entry, false, 'ON-path with unpersisted roster denies entry');
 }
 
+// ── 18b. Phase 2e ON path — manual release (released_manually=true) ─────
+// This is Daniele's pilot scenario: a host flips entry_checkin_required ON,
+// then presses "Release access" on the host console. entry_access.bookings
+// now carries released_manually=true + a manual_audit_id; the loader's
+// callRPC returns that state and the policy must return 'manual' / 'host_release'
+// with allow_entry=true, which the guest UI reads as "released".
+{
+  const EA_BOOKING_ID = 'db31d92b-c38d-446d-a7e3-0734372d047f';
+  const EA_IDENT = '8fccb0a2-6aa3-408e-9b43-ee41bdd69d89';
+  const AUDIT_ID = 'fab933db-99eb-4e10-88d7-5ee784e1cad6';
+  const ACTOR_ID = '77eb5ef0-7dbd-48e6-87b5-2affe29a92ec';
+  const pg = mockPgrest([
+    ['properties?', [propertyRow({ entry_checkin_required: true })]],
+    ['ota_reservations?', [reservationRow({ room_id: null })]],
+    ['checkins?', []],  // manual release: no live check-ins required
+  ]);
+  const callRPC = async (name, args) => {
+    assert.equal(name, 'get_entry_access_booking_state');
+    assert.deepEqual(args, { p_property_id: PROPERTY_ID, p_booking_code: BOOKING_CODE, p_is_test: false });
+    return { ok: true, json: async () => ({
+      booking_id: EA_BOOKING_ID, property_id: PROPERTY_ID, booking_code: BOOKING_CODE,
+      is_test: false, state_version: 'sv1', identity_version: EA_IDENT,
+      roster_version: 'rv1', roster_source: 'host', roster_confirmed: true,
+      expected_count: 8, arrival_date: '2026-11-01', departure_date: '2026-11-05',
+      reservation_id: RESERVATION_ID, released_manually: true, manual_audit_id: AUDIT_ID,
+      slots: Array.from({ length: 8 }, (_, i) => ({
+        id: `slot-${i + 1}`, ordinal: i + 1, created_at: '2026-10-28T03:22:40Z',
+      })),
+      submissions: [],
+      override_audit: { id: AUDIT_ID, actor_id: ACTOR_ID, action: 'entry_released', created_at: '2026-10-28T03:22:40Z' },
+    }) };
+  };
+  const snap = await loadEntryReleaseSnapshot({
+    pgrestGET: pg, callRPC, propertyId: PROPERTY_ID, bookingCode: BOOKING_CODE, isTest: false, sessionValidUntil: SESSION_VALID_UNTIL,
+  });
+  assert.ok(snap, 'ON-path snapshot built from RPC state');
+  assert.equal(snap.scope.booking_id, EA_BOOKING_ID, 'scope.booking_id driven by entry_access.bookings.id');
+  assert.equal(snap.booking.identity_version, EA_IDENT, 'booking.identity_version from RPC');
+  assert.equal(snap.booking.expected_count, 8, 'expected_count from RPC');
+  assert.equal(snap.roster.slots.length, 8, '8 roster slots materialized');
+  assert.equal(snap.roster.slots[0].guest_type, 'head', 'ordinal 1 → head for multi-slot booking');
+  assert.equal(snap.roster.slots[7].guest_type, 'member', 'ordinal 8 → member');
+  assert.equal(snap.override.active, true);
+  assert.equal(snap.override.actor_id, ACTOR_ID);
+  assert.equal(snap.override.audit_id, AUDIT_ID);
+  assert.equal(snap.override.audit_committed, true);
+  const r = evaluateEntryRelease(snap);
+  assert.equal(r.state, 'manual', 'manual release returns state=manual');
+  assert.equal(r.reason, 'host_release');
+  assert.equal(r.allow_entry, true, 'manual release allows entry');
+}
+
+// ── 18c. Phase 2e ON path — single-guest booking (expected_count=1) ─────
+// Edge case: a one-guest booking must map the sole slot to 'single' so
+// projectEntryInstructions can find it as a leader for the rotating-code
+// fallback. 'head' with no other slots would still work for the policy's
+// leader filter, but 'single' is the canonical shape.
+{
+  const EA_BOOKING_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa5';
+  const EA_IDENT = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb6';
+  const pg = mockPgrest([
+    ['properties?', [propertyRow({ entry_checkin_required: true, use_per_guest_lockbox: true, rotating_lockbox_enabled: false })]],
+    ['ota_reservations?', [reservationRow({ keybox_code: null, room_id: null })]],
+    ['checkins?', [checkinRow({ keybox_code: '7777', guest_type: 'single' })]],
+  ]);
+  const callRPC = async () => ({ ok: true, json: async () => ({
+    booking_id: EA_BOOKING_ID, property_id: PROPERTY_ID, booking_code: BOOKING_CODE,
+    is_test: false, state_version: 'sv2', identity_version: EA_IDENT,
+    roster_version: 'rv2', roster_source: 'reservation', roster_confirmed: true,
+    expected_count: 1, arrival_date: '2026-11-01', departure_date: '2026-11-02',
+    reservation_id: RESERVATION_ID, released_manually: false, manual_audit_id: null,
+    slots: [{ id: 'slot-only', ordinal: 1, created_at: '2026-10-28T03:22:40Z' }],
+    submissions: [{ slot_id: 'slot-only', checkin_id: CHECKIN_ID, bound_at: '2026-10-28T04:00:00Z' }],
+    override_audit: null,
+  }) });
+  const snap = await loadEntryReleaseSnapshot({
+    pgrestGET: pg, callRPC, propertyId: PROPERTY_ID, bookingCode: BOOKING_CODE, isTest: false, sessionValidUntil: SESSION_VALID_UNTIL,
+  });
+  assert.ok(snap);
+  assert.equal(snap.roster.slots[0].guest_type, 'single', 'single-slot booking → guest_type=single');
+  assert.equal(snap.override.active, false, 'released_manually=false → override.active=false');
+  assert.equal(snap.submissions.length, 1, 'binding → one submission');
+  assert.equal(snap.submissions[0].slot_id, 'slot-only');
+  assert.equal(snap.submissions[0].validated, true);
+  assert.equal(snap.submissions[0].validation_version, 'entry-v1');
+  const r = evaluateEntryRelease(snap);
+  assert.equal(r.state, 'available', 'all required slots submitted → available');
+  assert.equal(r.allow_entry, true);
+  const proj = projectEntryInstructions(snap);
+  assert.equal(proj.rotating_code, '7777', 'single-head leader keybox_code projected on ON-path');
+}
+
+// ── 18d. Phase 2e — RPC returns null (no entry_access row yet) ──────────
+// A host opted in but no RPC on the console has created a booking row yet
+// (edge case: pre-existing booking from before opt-in). The loader must
+// fall through to the OFF-path shape (roster=null) and the policy's ON
+// branch fails closed to unavailable.
+{
+  const pg = mockPgrest([
+    ['properties?', [propertyRow({ entry_checkin_required: true })]],
+    ['ota_reservations?', [reservationRow()]],
+    ['checkins?', [checkinRow()]],
+  ]);
+  const callRPC = async () => ({ ok: true, json: async () => null });
+  const snap = await loadEntryReleaseSnapshot({
+    pgrestGET: pg, callRPC, propertyId: PROPERTY_ID, bookingCode: BOOKING_CODE, isTest: false, sessionValidUntil: SESSION_VALID_UNTIL,
+  });
+  assert.ok(snap);
+  assert.equal(snap.roster, null, 'RPC null → roster stays null');
+  assert.equal(snap.override, null, 'RPC null → override stays null');
+  const r = evaluateEntryRelease(snap);
+  assert.equal(r.allow_entry, false, 'ON-path without entry_access row denies entry');
+}
+
+// ── 18e. Phase 2e — RPC call fails → fails closed (null snapshot) ──────
+// A failed RPC read must NOT silently drop back to the legacy branch for
+// a property that is opted in; that would release codes without the
+// host's audited consent.
+{
+  const pg = mockPgrest([
+    ['properties?', [propertyRow({ entry_checkin_required: true })]],
+    ['ota_reservations?', [reservationRow()]],
+    ['checkins?', [checkinRow()]],
+  ]);
+  const callRPC = async () => ({ ok: false, json: async () => null });
+  const snap = await loadEntryReleaseSnapshot({
+    pgrestGET: pg, callRPC, propertyId: PROPERTY_ID, bookingCode: BOOKING_CODE, isTest: false, sessionValidUntil: SESSION_VALID_UNTIL,
+  });
+  assert.equal(snap, null, 'failed RPC on opted-in property → null snapshot');
+}
+
+// ── 18f. Phase 2e — OFF path still works without callRPC injected ──────
+// Backwards compatibility: an older caller that didn't inject callRPC
+// must still get an OFF-path snapshot for properties that are not
+// opted in, byte-for-byte identical to the pre-Phase-2e behaviour.
+{
+  const pg = mockPgrest([
+    ['properties?', [propertyRow()]],
+    ['ota_reservations?', [reservationRow()]],
+    ['checkins?', [checkinRow()]],
+  ]);
+  const snap = await loadEntryReleaseSnapshot({
+    pgrestGET: pg, propertyId: PROPERTY_ID, bookingCode: BOOKING_CODE, isTest: false, sessionValidUntil: SESSION_VALID_UNTIL,
+  });
+  assert.ok(snap);
+  assert.equal(snap.roster, null);
+  assert.equal(snap.override, null);
+  const r = evaluateEntryRelease(snap);
+  assert.equal(r.state, 'legacy_available', 'no callRPC + OFF property → legacy_available');
+}
+
 // ── 19. evaluateGuestEntryRelease returns the full policy result ────────
 // Used by doProperty to populate `entry_release` on the response so the
 // guest UI can render locked / scheduled / released cards. Returns a
@@ -413,4 +564,4 @@ const checkinRow = (over = {}) => ({
   assert.equal(result.allow_entry, true);
 }
 
-console.log('PASS entry-release-loader: 19 scenarios across guards, OFF-path legacy equivalence (bookingHasCheckin), rotating-code projection parity with api/guest.js, room resolution with cross-property isolation, stableBookingId determinism, scope/booking/reads_complete shape, Phase 2 ON-path fail-closed check, and evaluateGuestEntryRelease shape for guest UI consumption.');
+console.log('PASS entry-release-loader: 24 scenarios across guards, OFF-path legacy equivalence (bookingHasCheckin), rotating-code projection parity with api/guest.js, room resolution with cross-property isolation, stableBookingId determinism, scope/booking/reads_complete shape, Phase 2 ON-path fail-closed check, Phase 2e manual-override release / single-guest automatic / RPC-null fallthrough / RPC-fail fail-closed / backwards-compat without callRPC, and evaluateGuestEntryRelease shape for guest UI consumption.');

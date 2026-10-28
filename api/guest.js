@@ -498,13 +498,28 @@ async function doProperty(res, propertyId, bookingCode, isTest, sessionExpUnixSe
   const sessionValidUntil = Number.isFinite(sessionExpUnixSec)
     ? new Date(sessionExpUnixSec * 1000).toISOString()
     : null;
-  const hasCheckin = bookingCode ? await entryReleaseAllows({
-    pgrestGET, callRPC, propertyId, bookingCode, isTest, sessionValidUntil,
-  }) : false;
+  // Use one decision for both secrets and the displayed release state.
+  // Separate reads could otherwise return a code alongside a later denial.
+  let policy = null;
+  if (bookingCode) {
+    try {
+      policy = await evaluateGuestEntryRelease({
+        pgrestGET, callRPC, propertyId, bookingCode, isTest, sessionValidUntil,
+      });
+    } catch (_) {
+      policy = {
+        state: 'unavailable', reason: 'policy_error',
+        allow_entry: false, submitted: null, expected: null, release_at: null,
+      };
+    }
+  }
+  const hasCheckin = policy?.allow_entry === true;
 
   const out = {};
   for (const k of PROPERTY_PUBLIC_FIELDS) {
     if (PROPERTY_POST_CHECKIN_FIELDS.has(k) && !hasCheckin) continue;
+    // Host visibility is a server boundary, including after manual release.
+    if (k === 'keybox_code' && row.show_fixed_lockbox_to_guest === false) continue;
     if (row[k] !== undefined) out[k] = row[k];
   }
 
@@ -538,28 +553,15 @@ async function doProperty(res, propertyId, bookingCode, isTest, sessionExpUnixSe
   // can treat the former as "proceed as today" and the latter as "show
   // the locked card." Shipped as a non-breaking addition; existing
   // clients that read only `checked_in` continue to work.
-  if (bookingCode) {
-    try {
-      const sessionValidUntil = Number.isFinite(sessionExpUnixSec)
-        ? new Date(sessionExpUnixSec * 1000).toISOString()
-        : null;
-      const policy = await evaluateGuestEntryRelease({
-        pgrestGET, callRPC, propertyId, bookingCode, isTest, sessionValidUntil,
-      });
-      resp.entry_release = {
-        state: policy.state,
-        reason: policy.reason,
-        allow_entry: policy.allow_entry === true,
-        submitted: policy.submitted ?? null,
-        expected: policy.expected ?? null,
-        release_at: policy.release_at ?? null,
-      };
-    } catch (_) {
-      resp.entry_release = {
-        state: 'unavailable', reason: 'policy_error',
-        allow_entry: false, submitted: null, expected: null, release_at: null,
-      };
-    }
+  if (policy) {
+    resp.entry_release = {
+      state: policy.state,
+      reason: policy.reason,
+      allow_entry: policy.allow_entry === true,
+      submitted: policy.submitted ?? null,
+      expected: policy.expected ?? null,
+      release_at: policy.release_at ?? null,
+    };
   }
   return res.status(200).json(resp);
 }

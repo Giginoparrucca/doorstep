@@ -7,6 +7,12 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Round 66 Phase 2g — Guest access refresh and cache lifecycle (in-progress — GPT, 29 October 2026)
+
+Daniele approved continuing after room-delivery release. Claimed `codex/round66-guest-refresh` from verified main `15ab818bdcbd13cb6fb2a6444b5cb01f0bbf45be`. Unify entry refresh after completion, focus/resume/back navigation and visible-page time checks; format release time in the property IANA timezone. Clear previously displayed access data during refresh, hidden/offline states and scope changes, fence stale requests, and prevent legacy rotating-code fallback from reviving old codes. Other tabs signal invalidation only, never send secrets or grant entry.
+
+Add deterministic controller and actual browser lifecycle journeys in IT/EN at mobile/desktop with timezone, failure, stale-response, storage and second-tab checks. Run full regression/green CI, then canonical deployment and live smoke. No migration, property activation or real guest/provider write. Host opt-in/admin audit and integrated pilot/rollback remain separate gates; preserve Round 63/65/67 ownership.
+
 ### Round 66 Phase 1d-c — Room delivery verified in production (partial shipped — PR #239 — GPT, 29 October 2026)
 
 [PR #239](https://github.com/Giginoparrucca/doorstep/pull/239) replaces the independent first-room guest lookup with the shared policy snapshot. ON property status, fixed code, access text and room code use that exact snapshot; subsequent room reads select display metadata only. OFF reconciles every returned current assignment and omits ambiguous rooms. Failed required reads and potentially truncated check-in rows withhold entry data. Property responses are private/no-store. No schema migration, property activation, physical code rotation or live guest/provider write.

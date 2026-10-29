@@ -9,9 +9,9 @@ submission validation, server-built AI context and saved-history/Q&A protection
 have shipped in partial deliveries. The installed versioned RPC supplies the
 coherent ON snapshot. Phase 1d-c reconciles the guest property's room response
 with that snapshot; see `docs/entry-release/ROOM_DELIVERY.md` and the latest
-CHANGELOG for exact gates. Do not replay installed migrations. Full guest
-refresh/timezone/cache, opt-in/admin review and integrated pilot/rollback evidence
-remain open; no additional property activation is authorized by these records.
+CHANGELOG for exact gates. Do not replay installed migrations. Guest refresh/timezone/cache lifecycle is implemented in Phase 2g;
+see `docs/entry-release/REFRESH.md` for test evidence and remaining conversation
+limits. Opt-in/admin review and integrated pilot/rollback evidence remain open; no additional property activation is authorized by these records.
 
 ## Outcome and host setup
 

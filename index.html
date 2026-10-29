@@ -1015,6 +1015,7 @@ function icon(name, cls) {
           <div class="home-card-label" data-i18n="checkin_time_label">Check-in time</div>
           <div class="home-card-value" id="checkinTime">&nbsp;</div>
           <div class="home-card-sub" id="accessMethod">&nbsp;</div>
+          <button type="button" id="entryRetry" class="btn btn-secondary" style="display:none;margin-top:8px;padding:6px 10px;font-size:0.75rem" onclick="fetchReservationKeybox()">Retry</button>
         </div>
         <div id="lockboxCodesWrap" style="display:none;flex-direction:column;gap:6px;"></div>
       </div>
@@ -1579,6 +1580,7 @@ function icon(name, cls) {
 })();
 </script>
 <script src="/vendor/supabase-2.118.0.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
+<script src="/lib/guest-entry-refresh.js?v=66g1"></script>
 <script>
 /* ══════════════════════════════════════
    SUPABASE CONNECTION
@@ -1594,6 +1596,7 @@ let propertyId = null;
 // bookingCode changes. Held in a module var + sessionStorage so it
 // survives page reloads within the same tab but dies with the tab.
 let _guestToken = null;
+let _guestTokenScope = null;
 let propertyData = null;
 let bookingCode = null;
 let existingCheckins = [];
@@ -1668,8 +1671,11 @@ const _guestSessionStart = Date.now();
 ══════════════════════════════════════ */
 const _WBNB_TOKEN_KEY = 'wbnb_guest_token';
 let _mintInFlight = null;
+let _mintScope = null;
 async function mintGuestToken(force = false) {
   if (!propertyId) return null;
+  const requestedScope = _guestScopeKey();
+  const requestedProperty = propertyId, requestedBooking = bookingCode, requestedTest = IS_TEST_SESSION;
   // Reuse a cached token from sessionStorage if it's still fresh
   // (safety margin: 5 minutes before the 12h exp). sessionStorage dies
   // with the tab, so a new tab always mints fresh.
@@ -1681,7 +1687,7 @@ async function mintGuestToken(force = false) {
         const expMs = new Date(obj.expires_at).getTime();
         const matches = obj.p === propertyId && obj.s === _guestSessionId && obj.b === (bookingCode || null) && obj.is_test === IS_TEST_SESSION;
         if (matches && expMs > Date.now() + 5 * 60 * 1000) {
-          _guestToken = obj.token;
+          _guestToken = obj.token; _guestTokenScope = requestedScope;
           return _guestToken;
         }
       }
@@ -1689,26 +1695,28 @@ async function mintGuestToken(force = false) {
   }
   // Collapse concurrent mints. Two initial fetches (scan + chat) on a
   // fresh session would otherwise both fire /api/guest-token.
-  if (_mintInFlight) return _mintInFlight;
-  _mintInFlight = (async () => {
+  if (_mintInFlight && _mintScope === requestedScope) return _mintInFlight;
+  _mintScope = requestedScope;
+  const pendingMint = (async () => {
     try {
       const r = await fetch('/api/guest-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          property_id: propertyId,
+          property_id: requestedProperty,
           session_id: _guestSessionId,
-          booking_code: bookingCode || null,
+          booking_code: requestedBooking || null,
           // Round 34.4: bake the test-mode flag into the token so every
           // downstream write (chat_messages via guest-chat, api_usage on
           // chat/scan) inherits it without trusting the request body.
-          is_test: IS_TEST_SESSION,
+          is_test: requestedTest,
         }),
       });
       if (!r.ok) { console.warn('[token] mint failed:', r.status); return null; }
       const body = await r.json();
+      if (requestedScope !== _guestScopeKey()) return null;
       if (body.is_test === true) { IS_TEST_SESSION = true; setupTestModeBanner(); }
-      _guestToken = body.token || null;
+      _guestToken = body.token || null; _guestTokenScope = _guestScopeKey();
       try {
         sessionStorage.setItem(_WBNB_TOKEN_KEY, JSON.stringify({
           token: _guestToken,
@@ -1721,10 +1729,11 @@ async function mintGuestToken(force = false) {
       console.warn('[token] mint exception:', e);
       return null;
     } finally {
-      _mintInFlight = null;
+      if (_mintScope === requestedScope) { _mintInFlight = null; _mintScope = null; }
     }
   })();
-  return _mintInFlight;
+  _mintInFlight = pendingMint;
+  return pendingMint;
 }
 
 // Round 34 helper, renamed in Round 48 Phase 2 — wraps /api/guest.
@@ -1736,11 +1745,13 @@ async function mintGuestToken(force = false) {
 // propertyId resolves).
 async function _guestCall(action, args) {
   if (!propertyId) return null;
+  const requestScope = _guestScopeKey();
   try {
     const r = await _authedAIFetch('/api/guest', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, ...(args || {}) }),
+      cache: 'no-store',
     });
     if (!r.ok) {
       let body = null;
@@ -1749,6 +1760,7 @@ async function _guestCall(action, args) {
       return { ok: false, status: r.status, error: body?.error || null, data: body };
     }
     const data = await r.json();
+    if (requestScope !== _guestScopeKey()) return {ok:false,status:0,error:'scope_changed',data:null};
     return { ok: true, status: r.status, data };
   } catch (e) {
     console.warn('[guest]', action, 'exception:', e);
@@ -1759,7 +1771,8 @@ async function _guestCall(action, args) {
 // Wrapper around fetch() for AI endpoints. Mints on first call, sends
 // Authorization: Bearer <token>, retries ONCE on 401 with a forced re-mint.
 async function _authedAIFetch(url, init) {
-  let token = _guestToken || await mintGuestToken(false);
+  const requestScope = _guestScopeKey();
+  let token = (_guestTokenScope === requestScope && _guestToken) || await mintGuestToken(false);
   const withAuth = (t) => ({
     ...init,
     headers: {
@@ -1768,7 +1781,7 @@ async function _authedAIFetch(url, init) {
     },
   });
   let resp = await fetch(url, withAuth(token));
-  if (resp.status === 401) {
+  if (resp.status === 401 && requestScope === _guestScopeKey()) {
     // Token stale / server rotated secret — mint once and retry.
     token = await mintGuestToken(true);
     resp = await fetch(url, withAuth(token));
@@ -2240,6 +2253,7 @@ function setLang(l) {
   if (existingCheckins.length > 0 && document.getElementById('welcomeBackPanel').style.display !== 'none') {
     showWelcomeBackState(existingCheckins);
   }
+  if (_entryLastResponse) applyGuestEntryResponse(_entryLastResponse);
 }
 
 /* ══════════════════════════════════════
@@ -2557,7 +2571,9 @@ async function lookupCheckin() {
     // gateway's token-scoped queries pick it up for the rest of the
     // session.
     if (foundCode) {
+      _entryRefresh.invalidate();
       bookingCode = foundCode;
+      _guestToken = null; _guestTokenScope = null;
       localStorage.setItem('wbnb_booking', foundCode);
       // Round 48: the token payload carries booking_code; re-mint so
       // every subsequent gateway call scopes to this booking.
@@ -2595,6 +2611,7 @@ async function lookupCheckin() {
     }
 
     existingCheckins = allGuests;
+    await _entryRefresh.refresh();
     showWelcomeBackState(allGuests);
     refreshLockboxDisplay();
 
@@ -3541,19 +3558,95 @@ function adoptEntryGuestCount(response) {
   totalGuests = Math.max(1, count - offset);
   if (count > 1 && selectedGuestType === 'single') selectedGuestType = 'family';
 }
-async function refreshEntryAfterSave() {
-  let r;
-  try { r = await _guestCall('property', {}); } catch (_) {}
-  if (r?.ok && r.data?.property) {
-    propertyData = r.data.property;
-  } else {
-    propertyData = { ...(propertyData || {}) };
-    for (const key of ['keybox_code','access_method','wifi_name','wifi_password']) delete propertyData[key];
-    r = { data: { property: propertyData, entry_release: { state: 'unavailable', allow_entry: false } } };
+// Entry payloads stay in memory only and are discarded before each fresh read.
+let _entryLastResponse = null;
+let _entryRefreshReady = false;
+function _guestScopeKey() {
+  return propertyId ? JSON.stringify([propertyId, bookingCode || null, IS_TEST_SESSION]) : null;
+}
+function clearGuestEntryView() {
+  _entryLastResponse = null;
+  reservationKeyboxCode = '';
+  for (const rows of [existingCheckins, savedGuests]) {
+    if (Array.isArray(rows)) for (const row of rows) if (row) delete row.keybox_code;
+  }
+  if (propertyData) {
+    for (const key of ['keybox_code','access_method','wifi_name','wifi_password','checkin_instructions','checkin_instructions_it','checkin_instructions_en']) delete propertyData[key];
+  }
+  for (const id of ['lockboxCodesWrap','roomDoorCode','checkinInstructionsText']) {
+    const node = document.getElementById(id);
+    if (node) { node.textContent = ''; node.style.display = 'none'; }
+  }
+  for (const dict of [T.en,T.it]) dict.wifi_pass = 'Password: —';
+  for (const id of ['wifiName','wifiPass']) {
+    const node = document.getElementById(id); if (node) node.textContent = id === 'wifiPass' ? 'Password: —' : '—';
+  }
+  renderGuestEntryState({data:{property:{},entry_release:{state:'unavailable',allow_entry:false}}});
+}
+function applyGuestEntryResponse(r) {
+  if (document.visibilityState === 'hidden' || navigator.onLine === false) { clearGuestEntryView(); return; }
+  propertyData = r.data.property;
+  _entryLastResponse = r;
+  const allowed = r.data.entry_release?.allow_entry === true;
+  reservationKeyboxCode = allowed && typeof r.data.rotating_code === 'string' ? r.data.rotating_code : '';
+  const room = r.data.room;
+  const el = id => document.getElementById(id);
+  if (el('roomCard')) el('roomCard').style.display = room ? '' : 'none';
+  if (el('roomName')) el('roomName').textContent = room?.name || '—';
+  if (el('roomDoorCode')) {
+    el('roomDoorCode').textContent = allowed && room?.door_code ? (lang === 'it' ? 'Codice porta: ' : 'Door code: ') + room.door_code : '';
+    el('roomDoorCode').style.display = allowed && room?.door_code ? '' : 'none';
+  }
+  if (el('wifiName')) el('wifiName').textContent = allowed ? propertyData.wifi_name || '—' : '—';
+  const wifi = 'Password: ' + (allowed ? propertyData.wifi_password || '—' : '—');
+  if (el('wifiPass')) el('wifiPass').textContent = wifi;
+  T.en.wifi_pass = wifi; T.it.wifi_pass = wifi;
+  const instructions = allowed ? (propertyData['checkin_instructions_' + lang]
+    || propertyData['checkin_instructions_' + (lang === 'it' ? 'en' : 'it')] || propertyData.checkin_instructions || '') : '';
+  if (el('checkinInstructionsText')) {
+    if (typeof guestLinkedText === 'function') el('checkinInstructionsText').innerHTML = guestLinkedText(instructions);
+    else el('checkinInstructionsText').textContent = instructions;
+    el('checkinInstructionsText').style.display = instructions ? 'block' : 'none';
   }
   renderGuestEntryState(r);
   refreshLockboxDisplay();
 }
+const _entryRefresh = GuestEntryRefresh.create({
+  scope: _guestScopeKey,
+  visible: () => _entryRefreshReady && document.visibilityState !== 'hidden' && navigator.onLine !== false,
+  load: () => _guestCall('property', {}), clear: clearGuestEntryView, apply: applyGuestEntryResponse,
+});
+async function refreshEntryAfterSave() {
+  await _entryRefresh.refresh();
+  try { localStorage.setItem('wbnb_entry_refresh', crypto.randomUUID()); } catch (_) {}
+}
+function startGuestEntryRefresh() {
+  _entryRefreshReady = true;
+  _entryRefresh.refresh();
+}
+window.addEventListener('focus', () => { if (_entryRefreshReady) _entryRefresh.refresh(); });
+document.addEventListener('visibilitychange', () => {
+  if (!_entryRefreshReady) return;
+  if (document.visibilityState === 'hidden') _entryRefresh.invalidate(); else _entryRefresh.refresh();
+});
+window.addEventListener('pagehide', () => _entryRefresh.invalidate());
+window.addEventListener('pageshow', () => { if (_entryRefreshReady) _entryRefresh.refresh(); });
+window.addEventListener('offline', () => _entryRefresh.invalidate());
+window.addEventListener('online', () => { if (_entryRefreshReady) _entryRefresh.refresh(); });
+window.addEventListener('storage', e => {
+  if (_entryRefreshReady && ['wbnb_entry_refresh','wbnb_booking','wbnb_property'].includes(e.key)) _entryRefresh.refresh();
+});
+window.addEventListener('popstate', () => {
+  _entryRefresh.invalidate(); _guestToken = null;
+  try { sessionStorage.removeItem(_WBNB_TOKEN_KEY); } catch (_) {}
+  window.location.reload();
+});
+// Remove known historical payload caches, preserving unrelated host/auth storage.
+try { for (const storage of [localStorage,sessionStorage]) {
+  for (const prefix of ['wbnb_','doorstep_']) for (const suffix of ['property_data','checkins','keybox_code','entry_codes']) {
+    try { storage.removeItem(prefix + suffix); } catch (_) {}
+  }
+} } catch (_) { /* storage may be disabled */ }
 function renderGuestEntryState(r) {
   const el = id => document.getElementById(id);
       if (el('accessMethod')) el('accessMethod').textContent = r?.data?.property?.access_method || 'Self check-in';
@@ -3569,6 +3662,10 @@ function renderGuestEntryState(r) {
       // start to arrive.
       try {
         const er = r?.data?.entry_release || null;
+        if (el('entryRetry')) {
+          el('entryRetry').textContent = lang === 'it' ? 'Riprova' : 'Retry';
+          el('entryRetry').style.display = er && ['unavailable','invalid'].includes(er.state) ? 'inline-block' : 'none';
+        }
         if (er && !er.allow_entry) {
           reservationKeyboxCode = '';
           for (const rows of [existingCheckins, savedGuests]) {
@@ -3579,20 +3676,19 @@ function renderGuestEntryState(r) {
           if (roomCode) { roomCode.textContent = ''; roomCode.style.display = 'none'; }
           const isIt = lang === 'it';
           let msg;
-          if (er.state === 'scheduled' && er.release_at) {
+          if (er.state === 'scheduled' && er.release_at && er.release_timezone) {
             const dt = new Date(er.release_at);
             if (Number.isFinite(dt.getTime())) {
-              // Property-timezone-aware wall-clock rendering is a
-              // Phase 2c-polish task; for the first cut we lean on the
-              // guest's browser locale, with the raw ISO fallback kept
-              // as a defensive string so nothing says "undefined."
+              try {
+              // Use the server-authorized property timezone, never device time.
               const timeStr = dt.toLocaleString(isIt ? 'it-IT' : 'en-GB', {
                 day: '2-digit', month: '2-digit', year: 'numeric',
-                hour: '2-digit', minute: '2-digit',
+                hour: '2-digit', minute: '2-digit', timeZone: er.release_timezone,
               });
               msg = isIt
-                ? `Le istruzioni di accesso saranno disponibili dalle ${timeStr}.`
-                : `Your entry instructions will be available from ${timeStr}.`;
+                ? `Le istruzioni di accesso saranno disponibili dalle ${timeStr} (${er.release_timezone}).`
+                : `Your entry instructions will be available from ${timeStr} (${er.release_timezone}).`;
+              } catch (_) { /* invalid timezone: use unavailable help below */ }
             }
           }
           if (!msg) {
@@ -5192,7 +5288,7 @@ async function init() {
         const coParts = co.split('-');
         el('checkoutTime').textContent = coParts.length === 2 ? `${coParts[0].slice(0,5)} — ${coParts[1].slice(0,5)}` : co.slice(0,5);
       }
-      renderGuestEntryState(r);
+      applyGuestEntryResponse(r);
       // Round 60 Phase 4 — show the Your-room card when the gateway
       // resolved a room for this booking. Name is always safe to show
       // (it's just the host's label like "Camera Blu"); door_code only
@@ -5200,21 +5296,6 @@ async function init() {
       // When no room came back (whole-property stay, or pre-Round-60
       // property) the card stays display:none and the Home layout
       // matches the pre-Round-60 shape exactly.
-      if (roomInfo && el('roomCard')) {
-        el('roomCard').style.display = '';
-        if (el('roomName')) el('roomName').textContent = roomInfo.name || '—';
-        const codeEl = el('roomDoorCode');
-        if (codeEl) {
-          if (roomInfo.door_code) {
-            const label = (lang === 'it' ? 'Codice porta: ' : 'Door code: ');
-            codeEl.textContent = label + roomInfo.door_code;
-            codeEl.style.display = '';
-          } else {
-            codeEl.textContent = '';
-            codeEl.style.display = 'none';
-          }
-        }
-      }
       if (el('hostName')) el('hostName').textContent = d.host_names || 'Your Host';
       if (el('hostAvatar')) el('hostAvatar').textContent = (d.host_names || 'H').charAt(0);
       // Round 41 Task 2 — read per-language column first, fall back to
@@ -5270,7 +5351,7 @@ async function init() {
       // Round 36.2.1: pull the rotating code assigned to this booking on
       // the ota_reservations row (if any). Non-blocking; refreshLockboxDisplay
       // re-runs when the RPC resolves.
-      fetchReservationKeybox();
+      // Rotating code is part of this same property snapshot.
 
       // Update i18n translations with DB data
       T.en.welcome_title = `Welcome to<br><em>${d.name}</em>`;
@@ -5438,6 +5519,8 @@ async function init() {
     console.log('🧪 Test mode — skipping existing check-in lookups; blank slate.');
   }
 
+  startGuestEntryRefresh();
+
   // Hide loading overlay
   const overlay = document.getElementById('loadingOverlay');
   if (overlay) { overlay.style.opacity = '0'; setTimeout(() => overlay.remove(), 400); }
@@ -5534,28 +5617,14 @@ function showResetToast(msg) {
 let reservationKeyboxCode = '';
 
 async function fetchReservationKeybox() {
-  const pid  = getStoredPropertyId() || propertyId;
-  const bc   = getBookingCode() || bookingCode;
-  reservationKeyboxCode = '';
-  refreshLockboxDisplay();
-  if (!pid || !bc) return;
-  try {
-    const r = await _guestCall('keybox', {});
-    if (pid !== (getStoredPropertyId() || propertyId) || bc !== (getBookingCode() || bookingCode)) return;
-    if (r?.ok && typeof r.data?.code === 'string') {
-      reservationKeyboxCode = r.data.code.trim();
-      refreshLockboxDisplay();
-    }
-  } catch (e) { /* non-fatal */ }
+  return _entryRefresh.refresh();
 }
 
 // Round 19 / 36.2 / 36.2.1: resolve the codes to show this guest.
 // Fixed code: property.keybox_code, shown only when show_fixed_lockbox_to_guest.
-// Rotating code: prefer the reservation's keybox_code (R36.2.1 —
-// generated at booking-link time so the host and guest see the same
-// value), else fall back to the head-of-family checkin row's
-// keybox_code. Shown only when rotating_lockbox_enabled AND
-// show_rotating_lockbox_to_guest.
+// Rotating code: use only the latest complete server property projection.
+// Never revive a code from older check-in rows after a denial or booking edit.
+// The server retains reservation/single-leader precedence and visibility gates.
 // Legacy behaviour: a property with the pre-R36.2 use_per_guest_lockbox
 // flag still opts into rotating; the show_ flags default to true when not
 // present in the row.
@@ -5587,13 +5656,6 @@ function _resolveLockboxCodes(propData) {
   if (rotating_enabled && show_rotating) {
     if (reservationKeyboxCode && !_isLockboxPlaceholder(reservationKeyboxCode)) {
       out.rotating = reservationKeyboxCode;
-    } else if (Array.isArray(existingCheckins) && existingCheckins.length > 0) {
-      const head = existingCheckins.find(c =>
-        c.guest_type === 'single' || c.guest_type === 'head' || c.guest_type === 'group'
-      ) || existingCheckins[0];
-      if (head && head.keybox_code && !_isLockboxPlaceholder(head.keybox_code)) {
-        out.rotating = head.keybox_code.trim();
-      }
     }
   }
   return out;

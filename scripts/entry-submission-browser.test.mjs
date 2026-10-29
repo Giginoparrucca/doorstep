@@ -27,11 +27,13 @@ try {
     await page.addScriptTag({content:`let lang=${JSON.stringify(language)},propertyId='property-fictional',bookingCode='BOOK-FICTIONAL',
       IS_TEST_SESSION=false,isReopenedCheckin=false,currentGuestIdx=0,totalGuests=1,selectedGuestType='single',existingCheckins=[],savedGuests=[],propertyData={},reservationKeyboxCode='';
       const T={en:{},it:{}};
+      ${fs.readFileSync(new URL('../lib/guest-entry-refresh.js',import.meta.url),'utf8')}
       async function _guestCall(action,body){const r=await fetch('/api/guest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,...body})});return {ok:r.ok,status:r.status,data:await r.json()};}
       ${fn('_isLockboxPlaceholder')}
       ${fn('_resolveLockboxCodes')}
       ${fn('refreshLockboxDisplay')}
-      ${helpers}`});
+      ${helpers}
+      _entryRefreshReady=true;`});
     const record={surname:'Fictional',name:'Guest'};
     const first=await page.evaluate(()=>entrySubmissionIdentity());
     assert.deepEqual(await page.evaluate(()=>{adoptEntryGuestCount({data:{expected_count:8}});return [totalGuests,selectedGuestType];}),[8,'family']);

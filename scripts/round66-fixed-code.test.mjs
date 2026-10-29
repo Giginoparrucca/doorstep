@@ -111,7 +111,9 @@ const completed = { checkins: [{ id: 'guest-1', property_id: pid, booking_code: 
   document_number:'FICTIONAL123',doc_issue_place:'London',arrival_date:'2099-01-01',departure_date:'2099-01-02',nights:1 }],
   state: { released_manually: false, submissions: [{ slot_id: 'slot-1', checkin_id: 'guest-1' }] } };
 assert.equal((await request(completed)).entry_release.state, 'available');
-denied(await request({ ...completed, property: { entry_release_time: '15:00', entry_release_timezone: 'Europe/Rome' } }), 'scheduled');
+const scheduled = await request({ ...completed, property: { entry_release_time: '15:00', entry_release_timezone: 'Europe/Rome' } });
+denied(scheduled,'scheduled');
+assert.equal(scheduled.entry_release.release_timezone,'Europe/Rome');
 const legacy = await request({ ...completed, property: { entry_checkin_required: false } });
 assert.equal(legacy.entry_release.state, 'legacy_available');
 assert.equal(legacy.property.keybox_code, 'FIXED-FICTIONAL');

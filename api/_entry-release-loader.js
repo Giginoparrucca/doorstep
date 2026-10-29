@@ -405,7 +405,8 @@ export async function evaluateGuestEntryRelease(opts) {
 // read may supply a label, never a different assignment or a fresh door code.
 export async function loadGuestPropertyAccess(opts) {
   const snapshot = await loadEntryReleaseSnapshot(opts);
-  const policy = snapshot ? evaluateEntryRelease(snapshot) : {
+  const now = Date.now();
+  const policy = snapshot ? evaluateEntryRelease(snapshot, now) : {
     state: 'unavailable', reason: 'no_snapshot', allow_entry: false,
     submitted: null, expected: null, release_at: null,
   };
@@ -429,5 +430,6 @@ export async function loadGuestPropertyAccess(opts) {
         && source.door_code.trim()) room.door_code = source.door_code.trim();
     }
   }
-  return { policy, entryProperty: snapshot?.property || {}, room };
+  return { policy, entryProperty: snapshot?.property || {}, room,
+    rotatingCode: snapshot ? projectEntryInstructions(snapshot, now).rotating_code || null : null };
 }

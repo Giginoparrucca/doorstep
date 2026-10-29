@@ -369,9 +369,7 @@ const PROPERTY_PUBLIC_FIELDS = [
   // fixed-code properties quietly rendered an empty lockbox tile. Add it
   // now, gated behind the entry-release policy via POST_CHECKIN_FIELDS.
   'keybox_code',
-  // index.html reads these via _propTextLang (per-language column, then the
-  // other language, then the legacy column). They were missing here, so
-  // host-written instructions never reached guests.
+  // Host text fields delivered by Claude's instructions fix (PR #240).
   'checkin_instructions', 'checkin_instructions_it', 'checkin_instructions_en',
   'checkout_instructions', 'checkout_instructions_it', 'checkout_instructions_en',
   'transport_info', 'transport_info_it', 'transport_info_en',
@@ -385,8 +383,6 @@ const PROPERTY_PUBLIC_FIELDS = [
 const PROPERTY_POST_CHECKIN_FIELDS = new Set([
   'wifi_name', 'wifi_password', 'access_method',
   'keybox_code',
-  // Check-in instructions describe how to get in (keybox location, door
-  // tricks), so they follow the same entry-release gate as the codes.
   'checkin_instructions', 'checkin_instructions_it', 'checkin_instructions_en',
 ]);
 // Columns the guest form writes. Narrows what checkin_insert and
@@ -475,10 +471,10 @@ async function doProperty(res, propertyId, bookingCode, isTest, sessionExpUnixSe
     : null;
   // Use one decision for both secrets and the displayed release state.
   // Separate reads could otherwise return a code alongside a later denial.
-  let policy = null, entryProperty = {}, room = null;
+  let policy = null, entryProperty = {}, room = null, rotatingCode = null;
   if (bookingCode) {
     try {
-      ({ policy, entryProperty, room } = await loadGuestPropertyAccess({
+      ({ policy, entryProperty, room, rotatingCode } = await loadGuestPropertyAccess({
         pgrestGET, callRPC, propertyId, bookingCode, isTest, sessionValidUntil,
       }));
     } catch (_) {
@@ -500,7 +496,7 @@ async function doProperty(res, propertyId, bookingCode, isTest, sessionExpUnixSe
   }
 
   // Room assignment and door code come from the same policy snapshot.
-  const resp = { property: out, checked_in: hasCheckin };
+  const resp = { property: out, checked_in: hasCheckin, rotating_code: hasCheckin ? rotatingCode || null : null };
   if (room) resp.room = room;
   // Round 66 Phase 2c — expose the policy's state/reason/counts/release_at
   // to the guest UI so it can render locked / scheduled / released cards
@@ -518,6 +514,7 @@ async function doProperty(res, propertyId, bookingCode, isTest, sessionExpUnixSe
       submitted: policy.submitted ?? null,
       expected: policy.expected ?? null,
       release_at: policy.release_at ?? null,
+      release_timezone: entryProperty.entry_timezone ?? null,
     };
   }
   return res.status(200).json(resp);

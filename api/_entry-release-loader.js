@@ -35,6 +35,7 @@
 // the same pgrestGET + callRPC they already use for their own queries.
 
 import { createHash } from 'node:crypto';
+import { validatePersistedEntrySubmission } from './_entry-submission-validation.js';
 import { evaluateEntryRelease, projectEntryInstructions } from './_entry-release-policy.js';
 
 const PROPERTY_FIELDS = [
@@ -150,18 +151,18 @@ export async function loadEntryReleaseSnapshot(opts) {
   );
   if (resRows === null) return null;
   if (resRows.length > 1) return null;
-  const reservation = resRows[0] || null;
+  let reservation = resRows[0] || null;
 
   // 3. Check-ins for the booking — used for legacy_has_checkin AND for the
   //    rotating-code "single leader" projection path.
-  const checkinRows = await readRows(
+  let checkinRows = await readRows(
     pgrestGET,
     `checkins?property_id=eq.${enc(propertyId)}` +
       `&booking_code=eq.${enc(bookingCode)}&is_test=eq.${isTestLiteral(isTest)}` +
       `&deleted_at=is.null&select=${CHECKIN_FIELDS}`,
   );
   if (checkinRows === null) return null;
-  const legacyHasCheckin = checkinRows.length > 0;
+  let legacyHasCheckin = checkinRows.length > 0;
 
   // 4. Room (only if the reservation names one and it exists for THIS property).
   let room = null;
@@ -187,7 +188,7 @@ export async function loadEntryReleaseSnapshot(opts) {
   let eaState = null;
   if (property.entry_checkin_required === true && typeof callRPC === 'function') {
     try {
-      const rpcRes = await callRPC('get_entry_access_booking_state', {
+      const rpcRes = await callRPC('get_entry_access_booking_snapshot', {
         p_property_id: propertyId,
         p_booking_code: bookingCode,
         p_is_test: isTest === true,
@@ -204,6 +205,23 @@ export async function loadEntryReleaseSnapshot(opts) {
       // the legacy branch for a property that is opted in.
       return null;
     }
+  }
+
+  // Versioned RPC reads the ON property, reservation, bindings, current guest
+  // rows and storage evidence under one database snapshot. Never fabricate
+  // validation or photo evidence from a binding or from earlier REST reads.
+  if (eaState) {
+    if (eaState.snapshot_version !== 2 || !eaState.property_snapshot
+      || eaState.property_snapshot.id !== propertyId
+      || eaState.property_snapshot.entry_checkin_required !== true
+      || !Array.isArray(eaState.current_rows)) return null;
+    Object.assign(property, eaState.property_snapshot, {
+      entry_timezone: eaState.property_snapshot.entry_release_timezone ?? null,
+    });
+    reservation = eaState.reservation_snapshot || null;
+    checkinRows = eaState.current_rows;
+    legacyHasCheckin = checkinRows.some(row => row.deleted_at == null);
+    room = eaState.room_snapshot || null;
   }
 
   // A saved release must still refer to the current active reservation.
@@ -238,12 +256,13 @@ export async function loadEntryReleaseSnapshot(opts) {
     is_test: isTest === true,
     booking_code: bookingCode,
     deleted_at: null,
-    status: 'active',
+    status: eaState?.status || 'active',
     identity_version: identityVersion,
     valid_until: sessionIso,
-    room_id: reservation?.room_id || null,
+    room_id: eaState?.resolved_room_id || reservation?.room_id || null,
     expected_count: eaState?.expected_count ?? null,
     arrival_date: eaState?.arrival_date || reservation?.checkin_date || null,
+    departure_date: eaState?.departure_date || reservation?.checkout_date || null,
     keybox_code: reservation?.keybox_code || null,
   };
 
@@ -268,8 +287,8 @@ export async function loadEntryReleaseSnapshot(opts) {
     const rosterSlots = slotList.map(s => ({
       id: s.id,
       required: true,
-      photo_required: false,
-      guest_type: guestTypeFor(s.ordinal, slotList.length),
+      photo_required: s.photo_required === true,
+      guest_type: s.guest_type || guestTypeFor(s.ordinal, slotList.length),
     }));
     roster = {
       property_id: propertyId,
@@ -286,31 +305,22 @@ export async function loadEntryReleaseSnapshot(opts) {
     // row. Translate each binding into the policy's submission shape
     // using the live check-in row for its id/submitted_at/keybox_code.
     const checkinById = new Map(checkinRows.map(row => [row.id, row]));
-    const slotById = new Map(slotList.map(s => [s.id, { ...s, guest_type: guestTypeFor(s.ordinal, slotList.length) }]));
+    const slotById = new Map(rosterSlots.map(slot => [slot.id, slot]));
     const subBindings = Array.isArray(eaState.submissions) ? eaState.submissions : [];
     submissions = [];
     for (const binding of subBindings) {
       const checkin = checkinById.get(binding.checkin_id);
       const slot = slotById.get(binding.slot_id);
-      if (!checkin || !slot) continue;
-      submissions.push({
-        id: checkin.id,
-        property_id: propertyId,
-        booking_id: bookingId,
-        is_test: isTest === true,
-        slot_id: slot.id,
-        deleted_at: checkin.deleted_at,
-        guest_type: slot.guest_type,
-        keybox_code: checkin.keybox_code || null,
-        submitted_at: checkin.submitted_at,
-        identity_version: identityVersion,
-        validated: true,
-        validation_version: 'entry-v1',
-        source_revision: checkin.id,
-        validated_revision: checkin.id,
-        roster_version: eaState.roster_version || null,
-        reopened_at: null,
-        photo_verified: true,
+      if (!slot) return null; // stale/foreign slot cannot silently disappear
+      if (!checkin || checkin.deleted_at != null) continue;
+      const validated = validatePersistedEntrySubmission(checkin, {
+        booking, roster, slot,
+        binding: { ...binding, booking_id: bookingId, property_id: propertyId },
+        photo: { verified: checkin.entry_photo_verified === true,
+          checkin_id: checkin.id, path: checkin.id_photo_path },
+      });
+      if (validated.submission) submissions.push({
+        ...validated.submission, keybox_code: checkin.keybox_code || null,
       });
     }
 
@@ -355,8 +365,8 @@ export async function loadEntryReleaseSnapshot(opts) {
     roster,
     submissions,
     override,
-    room_resolution: reservation?.room_id && room ? 'unique' : 'none',
-    room: reservation?.room_id && room ? room : null,
+    room_resolution: eaState?.room_resolution || (reservation?.room_id && room ? 'unique' : 'none'),
+    room: eaState ? room : (reservation?.room_id && room ? room : null),
   };
 }
 

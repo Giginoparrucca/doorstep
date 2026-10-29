@@ -5,8 +5,8 @@ import fs from 'node:fs';
 import { chromium } from 'playwright';
 
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-const start = html.indexOf("      try {\n        const er = r?.data?.entry_release");
-const end = html.indexOf('      // Round 60 Phase 4 — show the Your-room card', start);
+const start = html.indexOf('function renderGuestEntryState(');
+const end = html.indexOf('\n}\n', start) + 2;
 assert.ok(start > 0 && end > start);
 const card = html.slice(start, end);
 function fn(name) {
@@ -26,15 +26,16 @@ try {
       contentType: 'text/html', body: '<main><div id="accessMethod"></div><div id="lockboxCodesWrap"></div><div id="checkinInstructionsText"></div></main>',
     }));
     await page.goto('https://entry.example.invalid/');
-    await page.addScriptTag({ content: `let lang=${JSON.stringify(language)},propertyData=null,reservationKeyboxCode='',existingCheckins=[];const T={en:{},it:{}};
+    await page.addScriptTag({ content: `let lang=${JSON.stringify(language)},propertyData=null,reservationKeyboxCode='',existingCheckins=[],savedGuests=[];const T={en:{},it:{}};
       ${fn('_isLockboxPlaceholder')}
       ${fn('_resolveLockboxCodes')}
       ${fn('refreshLockboxDisplay')}
+      ${card}
       function renderResponse(r){
         propertyData=r.data.property;
         const el=id=>document.getElementById(id);
         el('accessMethod').textContent=propertyData.access_method||'Self check-in';
-        ${card}
+        renderGuestEntryState(r);
         refreshLockboxDisplay();
       }` });
     const manual = { data: { property: { keybox_code: 'FIXED-FICTIONAL', access_method: 'Fictional access' },

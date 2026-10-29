@@ -3506,6 +3506,140 @@ function checkinPrev() {
   }
 }
 
+// Retry identities contain only random IDs and token-scoped booking context.
+// They never store guest details, photos or access codes.
+const _entrySavedIds = new Map();
+const _entryPhotoUploads = new Map();
+function entrySubmissionIdentity() {
+  const offset = isReopenedCheckin ? (existingCheckins?.length || 0) : 0;
+  const ordinal = offset + currentGuestIdx + 1;
+  const key = ['wbnb_entry_submission', propertyId, bookingCode || 'walkin', IS_TEST_SESSION, ordinal].join(':');
+  let id;
+  try { id = sessionStorage.getItem(key); } catch (_) {}
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id || '')) {
+    id = crypto.randomUUID();
+    try { sessionStorage.setItem(key, id); } catch (_) {}
+  }
+  return { key, id, ordinal };
+}
+async function saveEntryGuest(record, identity) {
+  const priorId = _entrySavedIds.get(identity.key);
+  const response = priorId
+    ? await _guestCall('checkin_update', { id: priorId, fields: record })
+    : await _guestCall('checkin_insert', { record, submission_id: identity.id, guest_ordinal: identity.ordinal });
+  if (response?.ok) {
+    const id = priorId || response.data?.id;
+    if (id) _entrySavedIds.set(identity.key, id);
+    if (priorId) return { ...response, data: { ...response.data, id: priorId, booking_code: bookingCode } };
+  }
+  return response;
+}
+function adoptEntryGuestCount(response) {
+  const count = response?.data?.expected_count;
+  if (!Number.isInteger(count) || count < 1 || count > 50) return;
+  const offset = isReopenedCheckin ? (existingCheckins?.length || 0) : 0;
+  totalGuests = Math.max(1, count - offset);
+  if (count > 1 && selectedGuestType === 'single') selectedGuestType = 'family';
+}
+async function refreshEntryAfterSave() {
+  let r;
+  try { r = await _guestCall('property', {}); } catch (_) {}
+  if (r?.ok && r.data?.property) {
+    propertyData = r.data.property;
+  } else {
+    propertyData = { ...(propertyData || {}) };
+    for (const key of ['keybox_code','access_method','wifi_name','wifi_password']) delete propertyData[key];
+    r = { data: { property: propertyData, entry_release: { state: 'unavailable', allow_entry: false } } };
+  }
+  renderGuestEntryState(r);
+  refreshLockboxDisplay();
+}
+function renderGuestEntryState(r) {
+  const el = id => document.getElementById(id);
+      if (el('accessMethod')) el('accessMethod').textContent = r?.data?.property?.access_method || 'Self check-in';
+      // Round 66 Phase 2c — guest-side locked / scheduled card. When the
+      // policy denies entry (state=locked or scheduled or unavailable),
+      // overwrite the access_method text with the guest-facing message
+      // and force the lockbox-codes block hidden. For every property
+      // today the state is `legacy_available` when a check-in exists
+      // (nothing to override) and `locked` when no check-in exists
+      // yet (same as the current "no code shown" behaviour, but now
+      // explicit text explains why). Phase 2 opt-in ON path adds the
+      // scheduled / manual states; this branch handles them when they
+      // start to arrive.
+      try {
+        const er = r?.data?.entry_release || null;
+        if (er && !er.allow_entry) {
+          reservationKeyboxCode = '';
+          for (const rows of [existingCheckins, savedGuests]) {
+            if (Array.isArray(rows)) for (const row of rows) if (row) delete row.keybox_code;
+          }
+          if (propertyData) delete propertyData.keybox_code;
+          const roomCode = el('roomDoorCode');
+          if (roomCode) { roomCode.textContent = ''; roomCode.style.display = 'none'; }
+          const isIt = lang === 'it';
+          let msg;
+          if (er.state === 'scheduled' && er.release_at) {
+            const dt = new Date(er.release_at);
+            if (Number.isFinite(dt.getTime())) {
+              // Property-timezone-aware wall-clock rendering is a
+              // Phase 2c-polish task; for the first cut we lean on the
+              // guest's browser locale, with the raw ISO fallback kept
+              // as a defensive string so nothing says "undefined."
+              const timeStr = dt.toLocaleString(isIt ? 'it-IT' : 'en-GB', {
+                day: '2-digit', month: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit',
+              });
+              msg = isIt
+                ? `Le istruzioni di accesso saranno disponibili dalle ${timeStr}.`
+                : `Your entry instructions will be available from ${timeStr}.`;
+            }
+          }
+          if (!msg) {
+            if (er.state === 'locked') {
+              msg = isIt
+                ? 'Completa il check-in online per visualizzare le istruzioni di accesso.'
+                : 'Complete online check-in to view your entry instructions.';
+            } else {
+              // unavailable / invalid / anything else → generic deny.
+              msg = isIt
+                ? 'Istruzioni di accesso non disponibili. Contatta il tuo host.'
+                : 'Entry instructions unavailable. Please contact your host.';
+            }
+          }
+          if (el('accessMethod')) el('accessMethod').textContent = msg;
+          const lcw = el('lockboxCodesWrap');
+          if (lcw) lcw.style.display = 'none';
+          const cit = el('checkinInstructionsText');
+          if (cit) cit.style.display = 'none';
+        }
+        // Round 66 Phase 2f — "manual" release path. The host pressed
+        // "Rilascia accesso" on the console, so entry_access.bookings
+        // carries released_manually=true + an audit row and the policy
+        // returned state=manual with allow_entry=true. Add a small
+        // bilingual chip above the keybox code so the guest understands
+        // where the released code came from (host override, not the
+        // check-in form) and the host sees visible confirmation during
+        // pilot testing. Rendered under the access-method line so the
+        // existing lockbox tile continues to show the code itself.
+        if (er && er.state === 'manual' && er.allow_entry) {
+          const isIt = lang === 'it';
+          const chip = isIt
+            ? '✓ Il tuo host ha rilasciato il codice di accesso.'
+            : '✓ Your host has released the access code.';
+          const am = el('accessMethod');
+          if (am && !am.querySelector('.entry-released-note')) {
+            const note = document.createElement('div');
+            note.className = 'entry-released-note';
+            note.style.cssText = 'margin-top:6px;font-size:0.9em;color:var(--ok,#1a7f3c);';
+            note.textContent = chip;
+            am.appendChild(note);
+          }
+        }
+      } catch (_) { /* defensive — never block welcome rendering on policy */ }
+
+}
+
 async function saveCurrentGuest() {
   const btn = document.getElementById('btnNext');
   const originalText = btn.innerHTML;
@@ -3530,7 +3664,14 @@ async function saveCurrentGuest() {
   }
 
   try {
-    const idPath = await uploadFile(uploadedIdFile, 'id-photos');
+    const submissionIdentity = entrySubmissionIdentity();
+    let idPath = null;
+    const cachedPhoto = _entryPhotoUploads.get(submissionIdentity.id);
+    if (cachedPhoto?.file === uploadedIdFile) idPath = cachedPhoto.path;
+    else {
+      idPath = await uploadFile(uploadedIdFile, 'id-photos', submissionIdentity.id);
+      if (idPath) _entryPhotoUploads.set(submissionIdentity.id, { file: uploadedIdFile, path: idPath });
+    }
 
     // Determine Alloggiati guest type code
     let guestType;
@@ -3628,7 +3769,7 @@ async function saveCurrentGuest() {
       }
     }
 
-    console.log(`💾 Saving guest ${currentGuestIdx+1}/${totalGuests}:`, JSON.stringify(record));
+    console.log(`Saving guest ${currentGuestIdx+1}/${totalGuests}`);
     // Round 48 Phase 2 — insert via the guest gateway. The server
     // sets property_id, booking_code and is_test from the token
     // payload, so we strip them from the record first. Also:
@@ -3642,16 +3783,18 @@ async function saveCurrentGuest() {
     delete outboundRecord.property_id;
     delete outboundRecord.booking_code;
     delete outboundRecord.is_test;
-    const insertR = await _guestCall('checkin_insert', { record: outboundRecord });
+    const insertR = await saveEntryGuest(outboundRecord, submissionIdentity);
     if (!insertR || !insertR.ok) {
       const errMsg = insertR?.data?.error || insertR?.error || 'insert failed';
       const errFields = insertR?.data?.fields;
       console.error('❌ Gateway insert error:', insertR?.status, insertR?.data || insertR?.error);
       const saveError = new Error(errMsg);
       saveError.fields = errFields;
+      saveError.entryConflict = errMsg === 'entry_submission_conflict';
       throw saveError;
     }
     const insertedId = insertR.data?.id;
+    adoptEntryGuestCount(insertR);
     const mintedCode = insertR.data?.booking_code;
     // Walk-in — the token had no booking code; adopt the minted one
     // and re-mint the guest token so subsequent gateway calls scope
@@ -3697,6 +3840,7 @@ async function saveCurrentGuest() {
       document.getElementById('checkinBadge').style.display = 'none';
       renderReviewCards();
       showConsentCard();
+      await refreshEntryAfterSave();
       await fetchReservationKeybox();
       console.log(`✅ All ${savedGuests.length} guests checked in!`);
 
@@ -3721,7 +3865,10 @@ async function saveCurrentGuest() {
     btn.disabled = false;
     if (!err?.code) {
       const fields = Array.isArray(err?.fields) ? err.fields : [];
-      alert(T[lang].error_text + (fields.length ? '\n' + fields.join(', ') : ''));
+      alert(err.entryConflict
+        ? (lang === 'it' ? 'La prenotazione o l’elenco ospiti è cambiato. Ricarica la pagina per controllare i dati salvati. Se il problema continua, contatta il tuo host.'
+          : 'The booking or guest list has changed. Reload the page to check what was saved. If the problem continues, contact your host.')
+        : T[lang].error_text + (fields.length ? '\n' + fields.join(', ') : ''));
     }
   }
 }
@@ -3974,11 +4121,12 @@ async function saveGuestEdit(idx) {
   console.log(`✅ Guest ${idx + 1} updated`);
 }
 
-async function uploadFile(file, folder) {
+async function uploadFile(file, folder, submissionId) {
   if (!file) return null;
   try {
     const ext = file.name.split('.').pop();
-    const path = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    const prefix = submissionId ? `${propertyId}/${submissionId}/` : '';
+    const path = `${folder}/${prefix}${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
     const { data, error } = await sb.storage.from('documents').upload(path, file);
     if (error) { console.warn('Upload skipped:', error.message); return null; }
     return data.path;
@@ -5044,80 +5192,7 @@ async function init() {
         const coParts = co.split('-');
         el('checkoutTime').textContent = coParts.length === 2 ? `${coParts[0].slice(0,5)} — ${coParts[1].slice(0,5)}` : co.slice(0,5);
       }
-      if (el('accessMethod')) el('accessMethod').textContent = d.access_method || 'Self check-in';
-      // Round 66 Phase 2c — guest-side locked / scheduled card. When the
-      // policy denies entry (state=locked or scheduled or unavailable),
-      // overwrite the access_method text with the guest-facing message
-      // and force the lockbox-codes block hidden. For every property
-      // today the state is `legacy_available` when a check-in exists
-      // (nothing to override) and `locked` when no check-in exists
-      // yet (same as the current "no code shown" behaviour, but now
-      // explicit text explains why). Phase 2 opt-in ON path adds the
-      // scheduled / manual states; this branch handles them when they
-      // start to arrive.
-      try {
-        const er = r?.data?.entry_release || null;
-        if (er && !er.allow_entry) {
-          const isIt = lang === 'it';
-          let msg;
-          if (er.state === 'scheduled' && er.release_at) {
-            const dt = new Date(er.release_at);
-            if (Number.isFinite(dt.getTime())) {
-              // Property-timezone-aware wall-clock rendering is a
-              // Phase 2c-polish task; for the first cut we lean on the
-              // guest's browser locale, with the raw ISO fallback kept
-              // as a defensive string so nothing says "undefined."
-              const timeStr = dt.toLocaleString(isIt ? 'it-IT' : 'en-GB', {
-                day: '2-digit', month: '2-digit', year: 'numeric',
-                hour: '2-digit', minute: '2-digit',
-              });
-              msg = isIt
-                ? `Le istruzioni di accesso saranno disponibili dalle ${timeStr}.`
-                : `Your entry instructions will be available from ${timeStr}.`;
-            }
-          }
-          if (!msg) {
-            if (er.state === 'locked') {
-              msg = isIt
-                ? 'Completa il check-in online per visualizzare le istruzioni di accesso.'
-                : 'Complete online check-in to view your entry instructions.';
-            } else {
-              // unavailable / invalid / anything else → generic deny.
-              msg = isIt
-                ? 'Istruzioni di accesso non disponibili. Contatta il tuo host.'
-                : 'Entry instructions unavailable. Please contact your host.';
-            }
-          }
-          if (el('accessMethod')) el('accessMethod').textContent = msg;
-          const lcw = el('lockboxCodesWrap');
-          if (lcw) lcw.style.display = 'none';
-          const cit = el('checkinInstructionsText');
-          if (cit) cit.style.display = 'none';
-        }
-        // Round 66 Phase 2f — "manual" release path. The host pressed
-        // "Rilascia accesso" on the console, so entry_access.bookings
-        // carries released_manually=true + an audit row and the policy
-        // returned state=manual with allow_entry=true. Add a small
-        // bilingual chip above the keybox code so the guest understands
-        // where the released code came from (host override, not the
-        // check-in form) and the host sees visible confirmation during
-        // pilot testing. Rendered under the access-method line so the
-        // existing lockbox tile continues to show the code itself.
-        if (er && er.state === 'manual' && er.allow_entry) {
-          const isIt = lang === 'it';
-          const chip = isIt
-            ? '✓ Il tuo host ha rilasciato il codice di accesso.'
-            : '✓ Your host has released the access code.';
-          const am = el('accessMethod');
-          if (am && !am.querySelector('.entry-released-note')) {
-            const note = document.createElement('div');
-            note.className = 'entry-released-note';
-            note.style.cssText = 'margin-top:6px;font-size:0.9em;color:var(--ok,#1a7f3c);';
-            note.textContent = chip;
-            am.appendChild(note);
-          }
-        }
-      } catch (_) { /* defensive — never block welcome rendering on policy */ }
+      renderGuestEntryState(r);
       // Round 60 Phase 4 — show the Your-room card when the gateway
       // resolved a room for this booking. Name is always safe to show
       // (it's just the host's label like "Camera Blu"); door_code only

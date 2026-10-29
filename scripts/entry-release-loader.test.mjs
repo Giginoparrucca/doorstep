@@ -37,6 +37,7 @@ function mockPgrest(canned) {
     return { ok: true, json: async () => [] };
   }
   pgrestGET.calls = calls;
+  pgrestGET.data = canned;
   return pgrestGET;
 }
 
@@ -73,11 +74,23 @@ const checkinRow = (over = {}) => ({
   booking_code: BOOKING_CODE,
   is_test: false,
   deleted_at: null,
-  guest_type: 'head',
+  guest_type: 'head', surname: 'Synthetic', name: 'Person', sex: 'F', date_of_birth: '2000-01-01',
+  place_of_birth: 'London', birth_country: 'United Kingdom', citizenship: 'United Kingdom',
+  document_type: 'passport', document_number: 'FICTIONAL123', doc_issue_place: 'London',
+  arrival_date: '2026-11-01', departure_date: '2026-11-02', nights: 1,
   keybox_code: null,
   submitted_at: new Date(Date.now() - 3600 * 1000).toISOString(),
   ...over,
 });
+
+// Shape returned by the service-only coherent snapshot RPC.
+function snapshot(state, pg) {
+  const rows = table => pg.data.find(([match]) => String(match).includes(table))?.[1] || [];
+  const reservation = rows('ota_reservations?')[0] || null;
+  return { ...state, snapshot_version: 2, status: 'active',
+    property_snapshot: rows('properties?')[0], current_rows: rows('checkins?'),
+    reservation_snapshot: reservation, room_snapshot: null, room_resolution: 'none', resolved_room_id: null };
+}
 
 // ── 1. Guards ────────────────────────────────────────────────────────────
 {
@@ -386,9 +399,9 @@ const checkinRow = (over = {}) => ({
     ['checkins?', []],  // manual release: no live check-ins required
   ]);
   const callRPC = async (name, args) => {
-    assert.equal(name, 'get_entry_access_booking_state');
+    assert.equal(name, 'get_entry_access_booking_snapshot');
     assert.deepEqual(args, { p_property_id: PROPERTY_ID, p_booking_code: BOOKING_CODE, p_is_test: false });
-    return { ok: true, json: async () => ({
+    return { ok: true, json: async () => snapshot({
       booking_id: EA_BOOKING_ID, property_id: PROPERTY_ID, booking_code: BOOKING_CODE,
       is_test: false, state_version: 'sv1', identity_version: EA_IDENT,
       roster_version: 'rv1', roster_source: 'host', roster_confirmed: true,
@@ -399,7 +412,7 @@ const checkinRow = (over = {}) => ({
       })),
       submissions: [],
       override_audit: { id: AUDIT_ID, actor_id: ACTOR_ID, action: 'entry_released', created_at: '2026-10-28T03:22:40Z' },
-    }) };
+    }, pg) };
   };
   const snap = await loadEntryReleaseSnapshot({
     pgrestGET: pg, callRPC, propertyId: PROPERTY_ID, bookingCode: BOOKING_CODE, isTest: false, sessionValidUntil: SESSION_VALID_UNTIL,
@@ -434,7 +447,7 @@ const checkinRow = (over = {}) => ({
     ['ota_reservations?', [reservationRow({ keybox_code: null, room_id: null, checkout_date: '2026-11-02' })]],
     ['checkins?', [checkinRow({ keybox_code: '7777', guest_type: 'single' })]],
   ]);
-  const callRPC = async () => ({ ok: true, json: async () => ({
+  const callRPC = async () => ({ ok: true, json: async () => snapshot({
     booking_id: EA_BOOKING_ID, property_id: PROPERTY_ID, booking_code: BOOKING_CODE,
     is_test: false, state_version: 'sv2', identity_version: EA_IDENT,
     roster_version: 'rv2', roster_source: 'reservation', roster_confirmed: true,
@@ -443,7 +456,7 @@ const checkinRow = (over = {}) => ({
     slots: [{ id: 'slot-only', ordinal: 1, created_at: '2026-10-28T03:22:40Z' }],
     submissions: [{ slot_id: 'slot-only', checkin_id: CHECKIN_ID, bound_at: '2026-10-28T04:00:00Z' }],
     override_audit: null,
-  }) });
+  }, pg) });
   const snap = await loadEntryReleaseSnapshot({
     pgrestGET: pg, callRPC, propertyId: PROPERTY_ID, bookingCode: BOOKING_CODE, isTest: false, sessionValidUntil: SESSION_VALID_UNTIL,
   });

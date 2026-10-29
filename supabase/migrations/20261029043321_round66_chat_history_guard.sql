@@ -56,7 +56,13 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE p public.properties%ROWTYPE;
 BEGIN
   -- Serialize message insertion with opt-in, including direct host inserts.
-  SELECT * INTO p FROM public.properties WHERE id=NEW.property_id FOR SHARE;
+  IF TG_OP='INSERT' THEN
+    SELECT * INTO p FROM public.properties WHERE id=NEW.property_id FOR SHARE;
+  ELSE
+    -- Opt-in locks the property and then existing messages. An UPDATE already
+    -- holds its message row: do not take those locks in the reverse order.
+    SELECT * INTO p FROM public.properties WHERE id=NEW.property_id;
+  END IF;
   IF TG_OP='UPDATE' THEN
     NEW.entry_sensitive:=OLD.entry_sensitive OR NEW.entry_sensitive OR coalesce(p.entry_checkin_required,false);
     NEW.entry_identity_version:=OLD.entry_identity_version;

@@ -86,3 +86,23 @@ the actual complete guest page and host form/dialog/functions at IT/EN mobile/
 desktop, including races and failure paths. No real host activation, real guest
 write, actual provider call or authenticated hosted pilot is implied by these
 synthetic checks. Production smoke is read-only; skips remain explicit.
+
+## Round 66 acceptance map (29 October 2026)
+
+| Acceptance | Executable evidence |
+|---|---|
+| Shared booking/roster policy, complete current required guests, time/DST, invalid scope | `entry-release-policy.test.mjs`, `entry-submission-validation.test.mjs`, `entry-release-storage.test.mjs`, `entry-release-loader.test.mjs` |
+| Atomic writes, retries, reopened/deleted guests, scope/room isolation and all code projections | `entry-atomic-submissions.test.mjs`, `entry-round66-release.test.mjs`, `round66-fixed-code.test.mjs` |
+| Real owner/admin authorization, audit failure rollback, paired actors, stale/idempotent override | `entry-host-audit.test.mjs`, `entry-release-storage.test.mjs` |
+| Host opt-in review, page-wide edit/save/cancel, errors, timezone, pause | `property-edit-browser.test.mjs`, `unsaved-forms-browser.test.mjs`, `round66-host-console-optin.test.mjs` |
+| Booking status, explicit counts, release/restore, read-only admin and scope races | `entry-host-status-browser.test.mjs`, `admin-edit-audit-browser.test.mjs`, `admin-access-browser.test.mjs` |
+| Guest incomplete/completed/scheduled state, no premature codes in DOM/storage, refresh/back/offline/tabs | `entry-submission-browser.test.mjs`, `round66-fixed-code-browser.test.mjs`, `guest-entry-refresh-browser.test.mjs`, `guest-entry-refresh.test.mjs` |
+| Forged AI context, protected instructions/history, stale active streams and old Q&A | `entry-release-chat-directive.test.mjs`, `entry-chat-history.test.mjs`, `entry-chat-history-browser.test.mjs`, `guest-entry-refresh-browser.test.mjs`, `entry-round66-release.test.mjs` |
+| UI pause preserves existing protected delivery, codes and data | `environment.test.mjs`, `property-edit-browser.test.mjs`, `entry-host-status-browser.test.mjs`, `entry-round66-release.test.mjs` |
+| Compliance unchanged, direct anonymous access denied, production schema installed | Full-suite serializer byte goldens; `round65-grant-probes.test.live.mjs`; protected `schema-drift.test.live.mjs` with exact required migration names |
+| Guest links/reminders and arbitrary copied host content | Source inventory confirms host share/reminder paths send guest links rather than dedicated codes; mandatory activation content review covers arbitrary prose/attachments that software cannot certify |
+
+The first eight rows execute isolated fictional fixtures, including actual SQL,
+handlers and browser code as stated above. They do not certify a real hosted
+owner/admin session. Deployment, HTTP drift and live-smoke run evidence belongs
+in CHANGELOG; owner approval waiting is never a passing drift result.

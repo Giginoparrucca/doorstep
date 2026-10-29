@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
 import { submitEntryCheckin } from '../api/_entry-submission-save.js';
-import { loadEntryReleaseSnapshot, evaluateGuestEntryRelease, projectGuestEntry } from '../api/_entry-release-loader.js';
+import { loadEntryReleaseSnapshot, evaluateGuestEntryRelease, projectGuestEntry, loadGuestPropertyAccess } from '../api/_entry-release-loader.js';
 
 const db = new PGlite();
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -47,6 +47,9 @@ async function pgrestGET(path) {
   let sql = `select * from public.${table} where ${table === 'properties' ? 'id' : 'property_id'}=$1 and deleted_at is null`;
   const values = [property];
   if (booking) { values.push(booking); sql += ' and booking_code=$2 and is_test=false'; }
+  if (table === 'property_rooms' && params.get('id')) {
+    values.push(params.get('id').slice(3)); sql += ` and id=$${values.length}`;
+  }
   const rows = (await db.query(sql, values)).rows;
   return { ok: true, json: async () => rows };
 }
@@ -83,7 +86,7 @@ try {
       citizenship text,document_type text,document_number text,doc_issue_place text,arrival_date date,departure_date date,nights integer,
       id_photo_path text,docs_status text,residence_country text,residence_place text,submitted_at timestamptz,
       deleted_at timestamptz,keybox_code text,room_id uuid,checkin_reopened_at timestamptz);
-    create table public.property_rooms(id uuid primary key,property_id uuid,deleted_at timestamptz,door_code text);
+    create table public.property_rooms(id uuid primary key,property_id uuid,deleted_at timestamptz,door_code text,name text,beds integer);
     create schema storage; create table storage.objects(bucket_id text,name text);
   `);
   await db.query(`insert into properties(id,owner_id,entry_checkin_required,keybox_code,access_method)
@@ -123,6 +126,35 @@ try {
   await db.exec('drop trigger test_failure on entry_access.submissions');
   assert.equal((await save(3,third)).id,third); await state('available',3);
   assert.equal((await projectGuestEntry(args())).fixed_code,'FIXED-FICTIONAL'); checks++;
+  // Real installed SQL resolves all live check-in and reservation assignments.
+  // Feed that exact RPC output through the property projector, with no stub policy.
+  const roomA=id(80),roomB=id(81),foreignRoom=id(82);
+  await db.query("insert into property_rooms(id,property_id,door_code,name,beds) values($1,$4,'ROOM-A','Fictional A',2),($2,$4,'ROOM-B','Fictional B',3),($3,$5,'FOREIGN-ROOM','Foreign',1)",[roomA,roomB,foreignRoom,pid,other]);
+  await db.query('update ota_reservations set room_id=$1 where id=$2',[roomA,reservation]);
+  await db.query('update checkins set room_id=$1 where id=$2',[roomA,first]);
+  let access=await loadGuestPropertyAccess(args());
+  assert.equal(access.policy.state,'available');assert.equal(access.room.door_code,'ROOM-A');assert.equal(access.room.name,'Fictional A');checks++;
+  // Change the assignment/code after the coherent RPC returns. Only the exact
+  // earlier snapshot code may accompany that snapshot's allowed decision.
+  access=await loadGuestPropertyAccess({...args(),callRPC:async(...a)=>{
+    const result=await callRPC(...a);
+    await db.query('update checkins set room_id=$1 where id=$2',[roomB,first]);
+    await db.query("update property_rooms set door_code='ROOM-A-LATER' where id=$1",[roomA]);
+    return result;
+  }});
+  assert.equal(access.room.door_code,'ROOM-A');checks++;
+  access=await loadGuestPropertyAccess(args());
+  assert.equal(access.policy.state,'unavailable');assert.equal(access.policy.reason,'unknown_room');assert.equal(access.room,null);checks++;
+  await db.query('update ota_reservations set room_id=$1 where id=$2',[roomB,reservation]);
+  assert.equal((await loadGuestPropertyAccess(args())).room.door_code,'ROOM-B');checks++;
+  await db.query('update property_rooms set deleted_at=now() where id=$1',[roomB]);
+  access=await loadGuestPropertyAccess(args());assert.equal(access.policy.state,'unavailable');assert.equal(access.room,null);checks++;
+  await db.query('update ota_reservations set room_id=$1 where id=$2',[foreignRoom,reservation]);
+  await db.query('update checkins set room_id=$1 where id=$2',[foreignRoom,first]);
+  access=await loadGuestPropertyAccess(args());assert.equal(access.policy.state,'unavailable');assert.equal(access.room,null);checks++;
+  await db.query('update ota_reservations set room_id=null where id=$1',[reservation]);
+  await db.query('update checkins set room_id=null where id=$1',[first]);
+
   await db.query("update checkins set document_number='' where id=$1",[first]); await state('locked',2);
   await db.query("update checkins set document_number='FICTIONAL123',name='Valid correction',docs_status='pending' where id=$1",[first]); await state('available',3);
   await db.query('update checkins set checkin_reopened_at=now() where id=$1',[second]); await state('locked',2);

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { evaluateGuestEntryRelease } from '../api/_entry-release-loader.js';
+import { loadGuestPropertyAccess } from '../api/_entry-release-loader.js';
 
 const source = fs.readFileSync(new URL('../api/guest.js', import.meta.url), 'utf8');
 const start = source.indexOf('async function doProperty(');
@@ -31,13 +31,14 @@ async function request(options = {}) {
     ...options.state };
   Object.assign(state, { snapshot_version: 2, property_snapshot: property,
     current_rows: checkins, reservation_snapshot: options.reservations?.[0] || null,
-    room_snapshot: null, room_resolution: 'none', resolved_room_id: null });
+    room_snapshot: { id:'room-fictional', property_id:pid, door_code:'ROOM-FICTIONAL' }, room_resolution: 'unique', resolved_room_id: 'room-fictional' });
   let policyCalls = 0, status, body;
   const pgrestGET = async path => {
     if (path.startsWith('properties?')) {
       assert.ok(path.includes(`id=eq.${pid}`));
       return { ok: true, json: async () => [property] };
     }
+    if (path.startsWith('property_rooms?')) return { ok:true, json:async()=>[{ id:'room-fictional', property_id:pid, name:'Fictional room', beds:2 }] };
     assert.ok(path.includes(`property_id=eq.${pid}`));
     assert.ok(path.includes(`booking_code=eq.${code}`));
     assert.ok(path.includes('is_test=eq.false'));
@@ -51,21 +52,17 @@ async function request(options = {}) {
       assert.deepEqual(args, { p_property_id: pid, p_booking_code: code, p_is_test: false });
       return { ok: true, json: async () => options.noRoster ? null : state };
     },
-    evaluateGuestEntryRelease: async opts => {
+    loadGuestPropertyAccess: async opts => {
       policyCalls++;
       if (options.policyError) throw Error('fictional read error');
-      return evaluateGuestEntryRelease(opts);
+      return loadGuestPropertyAccess(opts);
     },
     // A second independent access decision is forbidden: state and secrets
     // must use the same evaluation even when an override changes mid-request.
     entryReleaseAllows: async () => { throw Error('duplicate decision'); },
-    resolveGuestRoom: async (_pid, _code, _isTest, allowed) => {
-      assert.equal(_pid, pid);
-      return { name: 'Fictional room', ...(allowed ? { door_code: 'ROOM-FICTIONAL' } : {}) };
-    },
   });
   vm.runInContext(handler, gateway);
-  await gateway.doProperty({ status(n) { status = n; return this; }, json(v) { body = v; } },
+  await gateway.doProperty({ setHeader() {}, status(n) { status = n; return this; }, json(v) { body = v; } },
     pid, options.noBooking ? null : code, false, options.expired ? 1 : future);
   assert.equal(status, 200);
   assert.equal(policyCalls, options.noBooking ? 0 : 1);

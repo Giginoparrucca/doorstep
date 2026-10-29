@@ -276,7 +276,7 @@ function snapshot(state, pg) {
   // treats this as unknown_room (unavailable). This is the same fail-closed behaviour
   // the handlers rely on today when a room read misses.
   assert.equal(snap.room, null);
-  assert.equal(snap.room_resolution, 'none');
+  assert.equal(snap.room_resolution, 'ambiguous');
   assert.equal(snap.booking.room_id, ROOM_ID);
   const r = evaluateEntryRelease(snap);
   // Policy's "room_resolution='none' but booking.room_id != null" → unavailable.

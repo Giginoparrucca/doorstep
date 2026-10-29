@@ -7,7 +7,7 @@ import handleCspReport from './_csp-report.js';
 // result is identical to the prior inlined bookingHasCheckin + ota
 // keybox_code read. Phase 2 adds the opt-in UI and the roster/time
 // enforcement for properties that opt in.
-import { entryReleaseAllows, evaluateGuestEntryRelease, projectGuestEntry } from './_entry-release-loader.js';
+import { entryReleaseAllows, loadGuestPropertyAccess, projectGuestEntry } from './_entry-release-loader.js';
 import { readEntryChat } from './_entry-chat-delivery.js';
 import { submitEntryCheckin } from './_entry-submission-save.js';
 // api/guest.js — Round 34 chat gateway + Round 48 guest gateway.
@@ -445,6 +445,8 @@ async function doGuestKeybox(res, propertyId, bookingCode, isTest, sessionExpUni
 }
 
 async function doProperty(res, propertyId, bookingCode, isTest, sessionExpUnixSec) {
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('Vary', 'Authorization, Origin');
   const r = await pgrestGET(
     `properties?id=eq.${encodeURIComponent(propertyId)}` +
     `&deleted_at=is.null&select=*&limit=1`
@@ -464,12 +466,12 @@ async function doProperty(res, propertyId, bookingCode, isTest, sessionExpUnixSe
     : null;
   // Use one decision for both secrets and the displayed release state.
   // Separate reads could otherwise return a code alongside a later denial.
-  let policy = null;
+  let policy = null, entryProperty = {}, room = null;
   if (bookingCode) {
     try {
-      policy = await evaluateGuestEntryRelease({
+      ({ policy, entryProperty, room } = await loadGuestPropertyAccess({
         pgrestGET, callRPC, propertyId, bookingCode, isTest, sessionValidUntil,
-      });
+      }));
     } catch (_) {
       policy = {
         state: 'unavailable', reason: 'policy_error',
@@ -483,30 +485,12 @@ async function doProperty(res, propertyId, bookingCode, isTest, sessionExpUnixSe
   for (const k of PROPERTY_PUBLIC_FIELDS) {
     if (PROPERTY_POST_CHECKIN_FIELDS.has(k) && !hasCheckin) continue;
     // Host visibility is a server boundary, including after manual release.
-    if (k === 'keybox_code' && row.show_fixed_lockbox_to_guest === false) continue;
-    if (row[k] !== undefined) out[k] = row[k];
+    if (k === 'keybox_code' && entryProperty.show_fixed_lockbox_to_guest === false) continue;
+    const value = ['keybox_code', 'access_method'].includes(k) ? entryProperty[k] : row[k];
+    if (value !== undefined) out[k] = value;
   }
 
-  // Round 60 Phase 4 — if this booking is linked to a room, surface
-  // its name on the welcome / arrival screen so the guest knows which
-  // room is theirs. The door_code is sensitive, so it's gated behind
-  // the same "check-in complete" wall as wifi + access_method.
-  //
-  // Resolution order (service-role path; scope is still the signed
-  // token's propertyId + bookingCode, never anything from the body):
-  //   1. If the booking has a `checkins.room_id`, use that.
-  //   2. Else if `ota_reservations.room_id` is set for this booking,
-  //      use that.
-  //   3. Else no room is attached — leave `room` out of the response
-  //      (guest UI treats "undefined" as "the whole property is the
-  //      booking", i.e. the pre-Round-60 shape).
-  //
-  // Cross-property isolation: we query property_rooms with BOTH id
-  // AND property_id = this property, so even if a hostile client
-  // somehow smuggled a room_id for another property into one of
-  // the stay tables (service-role insert bypasses RLS), the room
-  // name/door_code of a stranger would never surface here.
-  const room = await resolveGuestRoom(propertyId, bookingCode, isTest, hasCheckin);
+  // Room assignment and door code come from the same policy snapshot.
   const resp = { property: out, checked_in: hasCheckin };
   if (room) resp.room = room;
   // Round 66 Phase 2c — expose the policy's state/reason/counts/release_at
@@ -528,67 +512,6 @@ async function doProperty(res, propertyId, bookingCode, isTest, sessionExpUnixSe
     };
   }
   return res.status(200).json(resp);
-}
-
-async function resolveGuestRoom(propertyId, bookingCode, isTest, hasCheckin) {
-  if (!bookingCode) return null;
-  // (1) checkins.room_id — first non-null wins (walk-in groups may
-  // have multiple rows under the same booking_code; they share a room
-  // in practice, but take the first explicit assignment).
-  let roomId = null;
-  try {
-    const ciRes = await pgrestGET(
-      `checkins?property_id=eq.${encodeURIComponent(propertyId)}` +
-      `&booking_code=eq.${encodeURIComponent(bookingCode)}` +
-      `&is_test=eq.${isTest === true ? 'true' : 'false'}` +
-      `&deleted_at=is.null&room_id=not.is.null` +
-      `&select=room_id&limit=1`
-    );
-    if (ciRes.ok) {
-      const rows = await ciRes.json();
-      if (Array.isArray(rows) && rows.length > 0) roomId = rows[0].room_id || null;
-    }
-  } catch (_) { /* non-fatal — fall through to ota lookup */ }
-  // (2) ota_reservations.room_id for this booking.
-  if (!roomId) {
-    try {
-      const otaRes = await pgrestGET(
-        `ota_reservations?property_id=eq.${encodeURIComponent(propertyId)}` +
-        `&booking_code=eq.${encodeURIComponent(bookingCode)}` +
-        `&is_test=eq.${isTest === true ? 'true' : 'false'}` +
-        `&deleted_at=is.null&room_id=not.is.null` +
-        `&status=eq.active` +
-        `&select=room_id&limit=1`
-      );
-      if (otaRes.ok) {
-        const rows = await otaRes.json();
-        if (Array.isArray(rows) && rows.length > 0) roomId = rows[0].room_id || null;
-      }
-    } catch (_) { /* non-fatal */ }
-  }
-  if (!roomId) return null;
-  // Fetch the room, scoping to this property so a stray room_id can't
-  // leak another property's room name/door_code.
-  try {
-    const roomRes = await pgrestGET(
-      `property_rooms?id=eq.${encodeURIComponent(roomId)}` +
-      `&property_id=eq.${encodeURIComponent(propertyId)}` +
-      `&deleted_at=is.null&select=id,name,door_code,beds&limit=1`
-    );
-    if (!roomRes.ok) return null;
-    const rows = await roomRes.json();
-    if (!Array.isArray(rows) || !rows[0]) return null;
-    const room = rows[0];
-    const out = { id: room.id, name: room.name, beds: room.beds };
-    // Door code lives behind the same "check-in complete" wall as
-    // wifi / access_method. A pre-check-in guest only sees the room
-    // name so they know which room is theirs; the code shows up with
-    // the rest of the arrival detail once the group registered.
-    if (hasCheckin && room.door_code) out.door_code = room.door_code;
-    return out;
-  } catch (_) {
-    return null;
-  }
 }
 
 async function bookingHasCheckin(propertyId, bookingCode, isTest) {

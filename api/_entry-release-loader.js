@@ -1,38 +1,7 @@
-// Round 66 Phase 1b — snapshot loader for the entry-release policy.
-//
-// Reads a coherent snapshot of the authoritative state the policy needs:
-//   - property row (visibility flags, access_method, keybox_code; the new
-//     Phase 2 columns entry_checkin_required/entry_release_time/entry_timezone
-//     are explicitly set to null here because the column migration has not
-//     landed yet)
-//   - matched OTA reservation row (if any — may be absent for standalone
-//     guest-link bookings)
-//   - all live check-in rows for the booking (used to compute
-//     legacy_has_checkin + supply the rotating-code projection with its
-//     "single head" leader row)
-//   - the room row if the booking's resolved room is unambiguous
-//
-// For every property today (opt-in UI unavailable; column absent)
-// evaluateEntryRelease(snapshot) returns `legacy_available` when a check-in
-// exists and `locked` when none exists — the same binary gate the raw
-// bookingHasCheckin() call provides. Replacing bookingHasCheckin() with
-// entryReleaseAllows() in handlers is therefore a behaviour-preserving
-// change. Phase 2 adds the opt-in column and surfaces the policy's roster/
-// time logic to properties that flip it ON.
-//
-// Round 66 Phase 2e — when a host has opted in (entry_checkin_required=true)
-// AND a `callRPC` function is injected, the loader also calls the SECURITY
-// DEFINER `public.get_entry_access_booking_state(property, booking_code,
-// is_test)` RPC and feeds the policy a full ON-path snapshot: roster/slots
-// come from entry_access.slots, submissions come from entry_access.submissions
-// joined onto the live `checkins` rows, and the override object carries the
-// manual-release flag + audit evidence. If `callRPC` is not provided the
-// loader keeps its OFF-path behaviour so unit tests that only mock pgrestGET
-// still work byte-for-byte.
-//
-// Design: pgrestGET and callRPC are both injected so this module stays test-
-// friendly and does not duplicate api/guest.js's REST wiring. Callers pass
-// the same pgrestGET + callRPC they already use for their own queries.
+// Shared entry policy loader. ON properties use the versioned service-only
+// RPC for a coherent property/reservation/roster/submission/room snapshot.
+// OFF keeps the legacy check-in gate but reconciles all room assignments.
+// Callers inject scoped REST/RPC transports; failures withhold entry data.
 
 import { createHash } from 'node:crypto';
 import { validatePersistedEntrySubmission } from './_entry-submission-validation.js';
@@ -58,10 +27,10 @@ const RESERVATION_FIELDS = [
 
 const CHECKIN_FIELDS = [
   'id', 'property_id', 'booking_code', 'is_test', 'deleted_at',
-  'guest_type', 'keybox_code', 'submitted_at',
+  'guest_type', 'keybox_code', 'submitted_at', 'room_id',
 ].join(',');
 
-const ROOM_FIELDS = ['id', 'property_id', 'deleted_at', 'door_code'].join(',');
+const ROOM_FIELDS = ['id', 'property_id', 'deleted_at', 'door_code', 'name', 'beds'].join(',');
 
 // Derive a stable, UUID-shaped identifier for a standalone (no-reservation)
 // booking. The policy requires booking.booking_id to be a non-empty string;
@@ -162,20 +131,16 @@ export async function loadEntryReleaseSnapshot(opts) {
       `&deleted_at=is.null&select=${CHECKIN_FIELDS}`,
   );
   if (checkinRows === null) return null;
+  // PostgREST can cap an unpaginated result at 1000 rows. Never infer a
+  // unique assignment from a possibly truncated party.
+  if (checkinRows.length >= 1000) return null;
   let legacyHasCheckin = checkinRows.length > 0;
 
-  // 4. Room (only if the reservation names one and it exists for THIS property).
+  // ON rooms come only from the coherent RPC below. OFF must reconcile all
+  // current assignments too: a first-row/check-in precedence can select the
+  // wrong room when companions or the reservation disagree.
   let room = null;
-  if (reservation && reservation.room_id) {
-    const roomRows = await readRows(
-      pgrestGET,
-      `property_rooms?id=eq.${enc(reservation.room_id)}` +
-        `&property_id=eq.${enc(propertyId)}&deleted_at=is.null` +
-        `&select=${ROOM_FIELDS}&limit=1`,
-      1,
-    );
-    if (roomRows && roomRows.length === 1) room = roomRows[0];
-  }
+  let roomResolution = 'none', resolvedRoomId = null;
 
   // Round 66 Phase 2e — when the host has opted in AND a callRPC is
   // injected, fetch the entry_access state for this booking. If the
@@ -224,6 +189,23 @@ export async function loadEntryReleaseSnapshot(opts) {
     room = eaState.room_snapshot || null;
   }
 
+  if (property.entry_checkin_required !== true) {
+    const roomIds = new Set([reservation?.room_id, ...checkinRows.map(row => row.room_id)].filter(Boolean));
+    roomResolution = roomIds.size > 1 ? 'ambiguous' : roomIds.size === 1 ? 'unique' : 'none';
+    if (roomIds.size === 1) {
+      resolvedRoomId = [...roomIds][0];
+      const rows = await readRows(pgrestGET,
+        `property_rooms?id=eq.${enc(resolvedRoomId)}&property_id=eq.${enc(propertyId)}` +
+        `&deleted_at=is.null&select=${ROOM_FIELDS}&limit=1`, 1);
+      if (rows === null) return null;
+      room = rows[0] || null;
+      if (!room || room.id !== resolvedRoomId || room.property_id !== propertyId || room.deleted_at != null) {
+        room = null;
+        roomResolution = 'ambiguous';
+      }
+    }
+  }
+
   // A saved release must still refer to the current active reservation.
   // The active-only query returns no row after cancellation/deletion; do
   // not reinterpret its persisted override as a standalone booking. Date
@@ -259,7 +241,7 @@ export async function loadEntryReleaseSnapshot(opts) {
     status: eaState?.status || 'active',
     identity_version: identityVersion,
     valid_until: sessionIso,
-    room_id: eaState?.resolved_room_id || reservation?.room_id || null,
+    room_id: eaState ? eaState.resolved_room_id ?? null : resolvedRoomId,
     expected_count: eaState?.expected_count ?? null,
     arrival_date: eaState?.arrival_date || reservation?.checkin_date || null,
     departure_date: eaState?.departure_date || reservation?.checkout_date || null,
@@ -365,8 +347,8 @@ export async function loadEntryReleaseSnapshot(opts) {
     roster,
     submissions,
     override,
-    room_resolution: eaState?.room_resolution || (reservation?.room_id && room ? 'unique' : 'none'),
-    room: eaState ? room : (reservation?.room_id && room ? room : null),
+    room_resolution: eaState?.room_resolution || roomResolution,
+    room,
   };
 }
 
@@ -416,4 +398,36 @@ export async function evaluateGuestEntryRelease(opts) {
     });
   }
   return evaluateEntryRelease(snapshot);
+}
+
+// One snapshot/decision for the property response, including its room code.
+// The ON RPC intentionally carries no room display metadata. A later scoped
+// read may supply a label, never a different assignment or a fresh door code.
+export async function loadGuestPropertyAccess(opts) {
+  const snapshot = await loadEntryReleaseSnapshot(opts);
+  const policy = snapshot ? evaluateEntryRelease(snapshot) : {
+    state: 'unavailable', reason: 'no_snapshot', allow_entry: false,
+    submitted: null, expected: null, release_at: null,
+  };
+  let room = null;
+  const source = snapshot?.room;
+  if (snapshot && !['invalid', 'unavailable'].includes(policy.state)
+    && snapshot.room_resolution === 'unique' && source
+    && source.id === snapshot.booking.room_id && source.property_id === opts.propertyId
+    && source.deleted_at == null) {
+    let display = source;
+    if (snapshot.property.entry_checkin_required === true) {
+      const rows = await readRows(opts.pgrestGET,
+        `property_rooms?id=eq.${enc(source.id)}&property_id=eq.${enc(opts.propertyId)}` +
+        '&deleted_at=is.null&select=id,property_id,deleted_at,name,beds&limit=1', 1);
+      display = rows?.length === 1 ? rows[0] : null;
+    }
+    if (display && display.id === source.id && display.property_id === opts.propertyId
+      && display.deleted_at == null) {
+      room = { id: source.id, name: display.name, beds: display.beds };
+      if (policy.allow_entry === true && typeof source.door_code === 'string'
+        && source.door_code.trim()) room.door_code = source.door_code.trim();
+    }
+  }
+  return { policy, entryProperty: snapshot?.property || {}, room };
 }

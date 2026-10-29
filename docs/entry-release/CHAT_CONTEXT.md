@@ -43,11 +43,10 @@ to the model; it is not evidence of a live model's response or a signed-in pilot
 
 ## Remaining Phase 1d and Round 66 gates
 
-- Guest gateway history/poll/send and host replies still need protected delivery.
-- Existing and future reusable Q&A capture needs an explicit exclusion/purge
-  design for entry-sensitive conversations; this PR does not alter that job.
-- The guest property handler's independent room lookup needs reconciliation with
-  the shared snapshot, including ambiguous assignments.
+- Saved history/poll and reusable Q&A protection shipped separately in PR #238;
+  see `CHAT_HISTORY.md` for its conservative provenance limits.
+- Guest room delivery now uses the shared snapshot; see `ROOM_DELIVERY.md` for
+  ambiguity handling and actual SQL/gateway coverage.
 - Full focus/resume, timezone/DST, second-tab/cache, host opt-in review/admin audit,
   pilot and rollback journeys remain in the Round plan.
 - Host-authored public prose/rules/recommendations must not duplicate entry secrets;

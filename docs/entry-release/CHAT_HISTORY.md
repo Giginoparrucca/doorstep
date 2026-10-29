@@ -72,3 +72,11 @@ property is automatically enabled. Rollback retains the triggers, exclusion and
 secure delivery boundary; do not restore an unfiltered history endpoint or move
 quarantined Q&A back into reuse. Room lookup and the full cache/admin/pilot gates
 remain outside this subphase.
+
+## Completion continuation
+
+The final Round integration restricts protected saved text to currently eligible,
+provenance-matched host replies. Historical browser-originated AI/guest text is
+withheld even after release: its creation snapshot is not trustworthy. Access
+refreshes cancel/fence active replies and clear protected conversation memory.
+See `OPERATIONS.md` for host support, current admin auditing and safe pause/rollback.

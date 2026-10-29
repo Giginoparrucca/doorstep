@@ -92,6 +92,8 @@ try {
  await release(true);
  let response=await request();assert.equal(response.body.messages[0].message,'PRIVATE-HOST-CODE');
  assert.equal(response.body.messages[0].entry_content_version,undefined);assert.equal(response.body.messages[0].entry_identity_version,undefined);checks+=3;
+ await insert(pid,'bot','UNVERIFIED-BOT-SECRET');
+ response=await request();assert.equal(response.body.messages.find(m=>m.sender==='bot').entry_withheld,true);assert.ok(!JSON.stringify(response.body).includes('UNVERIFIED-BOT-SECRET'));checks++;
  await release(false);withheld(await request());await release(true);
  await db.query("update properties set keybox_code='CHANGED-PHYSICAL-CODE' where id=$1",[pid]);withheld(await request());
  await insert(pid,'host','CURRENT-HOST-CODE');response=await request();assert.equal(response.body.messages.at(-1).message,'CURRENT-HOST-CODE');checks++;

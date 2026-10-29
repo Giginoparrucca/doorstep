@@ -1618,7 +1618,15 @@ tr:hover td { background: rgba(250,246,240,0.6); }
               <input type="checkbox" id="propEntryCheckinRequired" onchange="onToggleEntryCheckinRequired()" style="width:18px;height:18px;cursor:pointer;">
               <span data-h="prop_entry_checkin_required">Show entry instructions only after check-in is complete</span>
             </label>
-            <div class="form-hint" data-h="prop_entry_checkin_required_hint" style="margin-left:28px;">When on, keybox code, door code and the "how to get in" text stay hidden in the guest app until every required guest has finished their online check-in. Wi-Fi and other info stay visible. Default is off.</div>
+            <div class="form-hint" data-h="prop_entry_checkin_required_hint" style="margin-left:28px;">When on, keybox code, door code and the "how to get in" text stay hidden in the guest app until every required guest has finished their online check-in. Wi-Fi follows the same access gate. Address, directions and host contact stay available. Default is off.</div>
+            <div id="entryUiPaused" role="status" style="display:none;margin-left:28px;font-size:0.8rem"></div>
+            <div id="entryContentReview" style="display:none;margin:12px 0 12px 28px;padding:12px;border:1px solid var(--border);border-radius:8px;">
+              <div id="entryReviewFields" style="font-size:0.8rem;white-space:pre-line;"></div>
+              <label style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;font-size:0.8rem;">
+                <input type="checkbox" id="entryContentReviewed" style="margin-top:3px;">
+                <span id="entryReviewText"></span>
+              </label>
+            </div>
             <div id="propEntryReleaseWrap" style="display:none;margin-top:10px;margin-left:28px;">
               <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;font-size:0.82rem;">
                 <input type="checkbox" id="propEntryReleaseTimeEnabled" onchange="onToggleEntryReleaseTime()" style="width:18px;height:18px;cursor:pointer;">
@@ -1632,6 +1640,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
                 <div>
                   <label for="propEntryReleaseTimezone" style="font-size:0.78rem;color:var(--ink-soft);display:block;" data-h="prop_entry_release_tz">Timezone</label>
                   <select id="propEntryReleaseTimezone" class="form-input" style="width:auto;padding:4px 8px;">
+                    <option value="">—</option>
                     <option value="Europe/Rome">Europe/Rome (Italia)</option>
                     <option value="Europe/London">Europe/London</option>
                     <option value="Europe/Berlin">Europe/Berlin</option>
@@ -4475,7 +4484,7 @@ const HT = {
     prop_show_rotating_lockbox: 'Show rotating code in the guest app',
     // Round 66 Phase 2b — opt-in: show entry instructions only after check-in
     prop_entry_checkin_required: 'Show entry instructions only after check-in is complete',
-    prop_entry_checkin_required_hint: 'When on, keybox code, door code and the "how to get in" text stay hidden in the guest app until every required guest has finished their online check-in. Wi-Fi and other info stay visible. Default is off.',
+    prop_entry_checkin_required_hint: 'When on, keybox code, door code and the "how to get in" text stay hidden in the guest app until every required guest has finished their online check-in. Wi-Fi follows the same access gate. Address, directions and host contact stay available. Default is off.',
     prop_entry_release_time_label: 'Also require arrival-day release time',
     prop_entry_release_time: 'Release from',
     prop_entry_release_tz: 'Timezone',
@@ -5063,7 +5072,7 @@ const HT = {
     prop_show_rotating_lockbox: "Mostra il codice rotante nell'app ospite",
     // Round 66 Phase 2b — opt-in: mostra istruzioni di accesso solo dopo check-in
     prop_entry_checkin_required: 'Mostra le istruzioni di accesso solo dopo il completamento del check-in',
-    prop_entry_checkin_required_hint: "Quando attivo, il codice del lockbox, il codice della porta e il testo \"come entrare\" restano nascosti nell'app ospite finché tutti i check-in richiesti non sono completati. Il Wi-Fi e le altre informazioni restano visibili. Predefinito: disattivo.",
+    prop_entry_checkin_required_hint: "Quando attivo, il codice del lockbox, il codice della porta e il testo \"come entrare\" restano nascosti nell'app ospite finché tutti i check-in richiesti non sono completati. Anche il Wi-Fi segue il blocco di accesso. Indirizzo, indicazioni e contatti restano disponibili. Predefinito: disattivo.",
     prop_entry_release_time_label: 'Richiedi anche un orario di rilascio nel giorno di arrivo',
     prop_entry_release_time: 'Rilascia dalle',
     prop_entry_release_tz: 'Fuso orario',
@@ -6579,13 +6588,14 @@ function _renderReservationCard(r, todayISO) {
       <button type="button" class="btn btn-secondary btn-sm" data-share-code="${encodeURIComponent(r.booking_code)}" onclick="openBookingShare(decodeURIComponent(this.dataset.shareCode))">${safe(hostLang === 'it' ? 'Condividi' : 'Share')}</button>
       ${reopenBtn}${reopenedNote}
       ${propertyData?.entry_checkin_required === true && r.booking_code && r.checkin_date && r.checkout_date ? `
+      ${entryStatusButton(r.booking_code,r.checkin_date,r.checkout_date,r.is_test===true,r.id,r.guest_count)}
       <button type="button"
         data-booking-code="${safe(r.booking_code)}"
         data-arrival="${safe(r.checkin_date)}"
         data-departure="${safe(r.checkout_date)}"
         data-is-test="${r.is_test === true ? 'true' : 'false'}"
         data-reservation-id="${safe(r.id || '')}"
-        data-expected-count="${safe(String(r.guest_count || 1))}"
+        data-expected-count="${safe(String(r.guest_count || ''))}"
         onclick="releaseEntryManually(this.dataset.bookingCode, this.dataset.arrival, this.dataset.departure, this.dataset.isTest === 'true', this.dataset.reservationId, Number(this.dataset.expectedCount))"
         title="${safe(hostLang === 'it' ? 'Rilascia manualmente il codice del lockbox per questa prenotazione — scavalca il check-in richiesto; l\'azione sarà registrata nell\'audit' : 'Manually release the lockbox code for this booking — bypasses the check-in requirement; the action is recorded in the audit log')}"
         style="padding:4px 10px;background:rgba(27,94,32,0.14);border:1px solid rgba(27,94,32,0.4);border-radius:6px;font-size:0.72rem;cursor:pointer;color:#1b5e20;font-family:inherit;font-weight:500;">🔓 ${safe(hostLang === 'it' ? 'Rilascia accesso' : 'Release access')}</button>
@@ -6595,7 +6605,7 @@ function _renderReservationCard(r, todayISO) {
         data-departure="${safe(r.checkout_date)}"
         data-is-test="${r.is_test === true ? 'true' : 'false'}"
         data-reservation-id="${safe(r.id || '')}"
-        data-expected-count="${safe(String(r.guest_count || 1))}"
+        data-expected-count="${safe(String(r.guest_count || ''))}"
         onclick="restoreAutomaticRelease(this.dataset.bookingCode, this.dataset.arrival, this.dataset.departure, this.dataset.isTest === 'true', this.dataset.reservationId, Number(this.dataset.expectedCount))"
         title="${safe(hostLang === 'it' ? 'Ripristina il rilascio automatico — il codice tornerà nascosto finché il check-in non è completato' : 'Restore automatic release — the code goes back to hidden until check-in is complete')}"
         style="padding:4px 10px;background:transparent;border:1px solid var(--border);border-radius:6px;font-size:0.72rem;cursor:pointer;color:var(--ink-soft);font-family:inherit;font-weight:500;">↩ ${safe(hostLang === 'it' ? 'Ripristina automatico' : 'Restore automatic')}</button>` : ''}
@@ -8092,6 +8102,7 @@ function renderCheckins() {
                     style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;font-size:0.85rem;color:var(--ink-soft);user-select:none;">${chevron}</span>
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                 ${groupPill}${uploadBtn}${markBtn}${reopenBtn}${groupStatusMsg}
+                ${propertyData?.entry_checkin_required===true&&!isSolo?entryStatusButton(bookingCode,arrival,rows[0].departure_date,rows[0].is_test===true,null,null):''}
               </div>
               <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                 <span style="font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;">${it ? 'Gruppo' : 'Group'}</span>
@@ -8557,11 +8568,13 @@ async function saveProperty(scope = 'property') {
   const settingsKeys = new Set(['tax_rate_eur','tax_max_nights','tax_max_nights_basis','tax_max_total_eur','tax_exempt_under_age','tax_rules','tax_declared_exemptions','tax_source_note','tax_verified_at','ical_feeds','reminder_email','timezone']);
   for (const key of Object.keys(update)) if (settingsKeys.has(key) !== (scope === 'settings')) delete update[key];
   if (scope === 'settings' && !_taxCfgValidatePeriods()) return false;
+  if (scope === 'property' && !validateEntrySetup(update)) return false;
   if (scope === 'property') Object.assign(update, await propertyEditor.prepareCover(sb, propertyId));
   const { data: saved, error } = await sb.from('properties').update(update).eq('id', propertyId).select('id').maybeSingle();
   if (!error && !saved) { toast(hostLang === 'it' ? 'Salvataggio non consentito.' : 'Save not permitted.'); return false; }
   if (error) { console.error('Save error:', error); toast('Error: ' + error.message); return false; }
   propertyData = { ...propertyData, ...structuredClone(update) };
+  if (scope === 'property') renderEntryContentReview();
   // Round 21: keep allProperties + switcher in sync after a save (name/city
   // may have changed, which the switcher displays)
   const idx = allProperties.findIndex(p => p.id === propertyId);
@@ -14949,6 +14962,61 @@ function onToggleRotatingLockbox() {
 // Preserve the old name for anything (auto-save, tests) that still calls it.
 const onTogglePerGuestLockbox = onToggleRotatingLockbox;
 
+async function readHostEntryState(code,isTest) {
+  const target=propertyId;
+  const {data,error}=await sb.auth.getSession();
+  if(error||!data?.session?.access_token)throw Error(hostLang==='it'?'Accedi di nuovo.':'Please sign in again.');
+  const r=await fetch('/api/guest',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json',Authorization:'Bearer '+data.session.access_token},
+    body:JSON.stringify({action:'host_entry_state',property_id:target,booking_code:code,is_test:isTest===true})});
+  if(!r.ok||target!==propertyId)throw Error(hostLang==='it'?'Stato accesso non disponibile. Riprova.':'Entry status unavailable. Please retry.');
+  const result=await r.json();if(target!==propertyId)throw Error('Booking scope changed');return result;
+}
+function entryStatusButton(code,arrival,departure,isTest,reservationId,count) {
+  const args=encodeURIComponent(JSON.stringify([code,arrival,departure,isTest,reservationId,count]));
+  return `<button type="button" class="btn btn-secondary" style="padding:5px 10px;font-size:0.75rem" data-entry-scope="${args}" onclick="event.stopPropagation();openEntryAccessStatus(...JSON.parse(decodeURIComponent(this.dataset.entryScope)))">${hostLang==='it'?'Stato accesso':'Entry status'}</button>`;
+}
+async function openEntryAccessStatus(code,arrival,departure,isTest,reservationId,count) {
+  document.getElementById('entryStatusDialog')?.close();document.getElementById('entryStatusDialog')?.remove();
+  const d=document.createElement('dialog');d.id='entryStatusDialog';d.style.cssText='width:min(440px,calc(100vw - 32px));border:1px solid var(--border);border-radius:12px;padding:20px;color:var(--ink);';
+  const it=hostLang==='it';
+  d.innerHTML=`<h3>${it?'Istruzioni di accesso':'Entry instructions'}</h3><p id="entryStatusSummary" role="status"></p>
+    <label>${it?'Ospiti richiesti':'Required guests'} <input id="entryRosterCount" type="number" required min="1" max="50" step="1" style="width:70px"></label>
+    <p style="font-size:0.8rem">${it?'Conferma tutti gli ospiti richiesti, inclusi minori. Il rilascio manuale scavalca check-in e orario; non risolve assegnazioni camera ambigue.':'Confirm all required guests, including minors. Manual release bypasses check-in and release time; it cannot resolve ambiguous room assignments.'}</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button id="entryRosterConfirm" type="button">${it?'Conferma ospiti':'Confirm roster'}</button><button id="entryStatusRelease" type="button">${it?'Rilascia accesso':'Release access'}</button><button id="entryStatusRestore" type="button">${it?'Ripristina automatico':'Restore automatic'}</button><button id="entryStatusRetry" type="button">${it?'Riprova':'Retry'}</button><button id="entryStatusClose" type="button">${it?'Chiudi':'Close'}</button></div>`;
+  document.body.appendChild(d);d.showModal();const target=propertyId;let current=null;
+  const status=d.querySelector('#entryStatusSummary'),input=d.querySelector('#entryRosterCount');
+  input.value=Number.isInteger(count)&&count>0?count:'';
+  const buttons=[...d.querySelectorAll('button')].filter(b=>!['entryStatusClose','entryStatusRetry'].includes(b.id));
+  const readonly=()=>!entryUiEnabled()||(IS_ADMIN_VIEW&&!_adminEditEnabled);
+  async function refresh() {
+    buttons.forEach(b=>b.disabled=true);status.textContent=it?'Verifica in corso…':'Checking…';
+    try {
+      current=await readHostEntryState(code,isTest);if(!d.isConnected||target!==propertyId)return;
+      const s=current.summary,r=current.reservation;
+      reservationId=s?.reservation_id??r?.id??reservationId;arrival=s?.arrival_date||r?.checkin_date||arrival;departure=s?.departure_date||r?.checkout_date||departure;
+      if(s?.expected_count||r?.guest_count)input.value=s?.expected_count||r.guest_count;
+      const p=current.entry_release;
+      const labels=it?{locked:'Bloccato — check-in incompleto',scheduled:'Programmato',available:'Disponibile — check-in completo',manual:'Rilasciato manualmente',unavailable:'Da verificare — ospiti, prenotazione o camera',invalid:'Prenotazione non valida',disabled:'Restrizione disattivata'}:{locked:'Locked — check-in incomplete',scheduled:'Scheduled',available:'Available — check-in complete',manual:'Released manually',unavailable:'Needs review — roster, booking or room',invalid:'Invalid booking',disabled:'Restriction off'};
+      status.textContent=(labels[p.state]||labels.unavailable)+(Number.isInteger(p.expected)?` · ${p.submitted??0}/${p.expected}`:'');
+      if(p.state==='scheduled'&&p.release_at&&p.release_timezone)status.textContent+=' · '+new Date(p.release_at).toLocaleString(it?'it-IT':'en-GB',{timeZone:p.release_timezone})+' ('+p.release_timezone+')';
+      buttons.forEach(b=>b.disabled=readonly());
+    }catch(_){current=null;status.textContent=it?'Stato non disponibile. Riprova o contatta il proprietario.':'Status unavailable. Retry or contact the owner.';}
+  }
+  d.querySelector('#entryStatusClose').onclick=()=>{d.close();d.remove();};d.querySelector('#entryStatusRetry').onclick=refresh;
+  d.querySelector('#entryRosterConfirm').onclick=async()=>{
+    if(readonly()||!current||target!==propertyId)return;
+    const n=Number(input.value);if(!Number.isInteger(n)||n<1||n>50){input.reportValidity();return;}
+    buttons.forEach(b=>b.disabled=true);
+    try {
+      const r=await sb.rpc('entry_access_confirm_roster',{p_property_id:target,p_booking_code:code,p_count:n,p_arrival:arrival,p_departure:departure,p_request_id:crypto.randomUUID(),p_reservation_id:reservationId||null,p_expected_version:current.summary?.state_version||null,p_is_test:isTest===true});
+      if(r.error)throw r.error;await refresh();
+    }catch(_){status.textContent=it?'Conferma non riuscita. Ricarica lo stato prima di riprovare.':'Confirmation failed. Reload status before retrying.';current=null;}
+  };
+  d.querySelector('#entryStatusRelease').onclick=async()=>{if(!readonly()&&current&&target===propertyId){await releaseEntryManually(code,arrival,departure,isTest,reservationId,Number(input.value));await refresh();}};
+  d.querySelector('#entryStatusRestore').onclick=async()=>{if(!readonly()&&current&&target===propertyId){await restoreAutomaticRelease(code,arrival,departure,isTest,reservationId,Number(input.value));await refresh();}};
+  await refresh();
+}
+
 // Round 66 Phase 2d — manual override for the entry-release gate.
 // Calls the authenticated-only RPC pair exposed by the Phase 1a
 // migration:
@@ -14967,14 +15035,16 @@ const onTogglePerGuestLockbox = onToggleRotatingLockbox;
 // but running it is still safe (idempotent) and keeps the roster in
 // sync with any arrival/departure changes since.
 async function releaseEntryManually(bookingCode, arrival, departure, isTest, reservationId, expectedCount) {
-  if (!bookingCode || !arrival || !departure) {
-    alert(hostLang === 'it' ? 'Dati prenotazione incompleti.' : 'Incomplete booking data.');
+  if (!entryUiEnabled())return;
+  if ((IS_ADMIN_VIEW && !_adminEditEnabled) || !Number.isInteger(expectedCount) || expectedCount<1 || expectedCount>50 || !bookingCode || !arrival || !departure) {
+    alert(hostLang === 'it' ? 'Conferma prima il numero di ospiti e le date.' : 'Confirm a valid guest count and booking dates first.');
     return;
   }
+  const targetProperty=propertyId;
   const isIt = hostLang === 'it';
   if (!confirm(isIt
-    ? 'Vuoi rilasciare manualmente le istruzioni di accesso per questa prenotazione?\n\nL\'azione scavalca il requisito di check-in e sarà registrata in modo immutabile nell\'audit (actor, timestamp, request fingerprint). Puoi ripristinare il rilascio automatico in qualsiasi momento.'
-    : 'Manually release entry instructions for this booking?\n\nThis bypasses the check-in requirement and is recorded immutably in the audit log (actor, timestamp, request fingerprint). You can restore automatic release at any time.')) {
+    ? 'Vuoi rilasciare manualmente le istruzioni di accesso per questa prenotazione?\n\nL\'azione scavalca il requisito di check-in e l’orario di rilascio e sarà registrata in modo immutabile nell\'audit (actor, timestamp, request fingerprint). Puoi ripristinare il rilascio automatico in qualsiasi momento.'
+    : 'Manually release entry instructions for this booking?\n\nThis bypasses the check-in and release-time requirements and is recorded immutably in the audit log (actor, timestamp, request fingerprint). You can restore automatic release at any time.')) {
     return;
   }
   const requestIdConfirm = (window.crypto && typeof window.crypto.randomUUID === 'function')
@@ -14985,15 +15055,17 @@ async function releaseEntryManually(bookingCode, arrival, departure, isTest, res
     : ('r66-' + Date.now() + '-' + Math.random().toString(36).slice(2));
   try {
     // 1. Ensure (or refresh) the entry_access.bookings row.
+    const current = await readHostEntryState(bookingCode,isTest);
+    if(targetProperty!==propertyId)return;
     const roster = await sb.rpc('entry_access_confirm_roster', {
-      p_property_id: propertyId,
+      p_property_id: targetProperty,
       p_booking_code: bookingCode,
-      p_count: Number.isFinite(expectedCount) && expectedCount >= 1 && expectedCount <= 50 ? Math.floor(expectedCount) : 1,
+      p_count: expectedCount,
       p_arrival: arrival,
       p_departure: departure,
       p_request_id: requestIdConfirm,
       p_reservation_id: reservationId || null,
-      p_expected_version: null,
+      p_expected_version: current.summary?.state_version || null,
       p_is_test: isTest === true,
     });
     if (roster.error) {
@@ -15001,6 +15073,7 @@ async function releaseEntryManually(bookingCode, arrival, departure, isTest, res
       alert((isIt ? 'Errore nel passo roster: ' : 'Roster step failed: ') + roster.error.message);
       return;
     }
+    if(targetProperty!==propertyId)return;
     const summary = roster.data || {};
     const bookingId = summary.booking_id;
     const stateVersion = summary.state_version;
@@ -15021,8 +15094,8 @@ async function releaseEntryManually(bookingCode, arrival, departure, isTest, res
       return;
     }
     alert(isIt
-      ? '✅ Rilasciato manualmente. L\'ospite vedrà le istruzioni di accesso al prossimo caricamento della pagina.'
-      : '✅ Released manually. The guest will see the entry instructions on next page load.');
+      ? '✅ Rilasciato manualmente. L\'ospite vedrà le istruzioni di accesso al prossimo aggiornamento dell’accesso.'
+      : '✅ Released manually. The guest will see the entry instructions after its next access refresh.');
   } catch (e) {
     console.error('[round66 release] unexpected error:', e);
     alert((isIt ? 'Errore imprevisto: ' : 'Unexpected error: ') + (e && e.message || e));
@@ -15037,10 +15110,12 @@ async function releaseEntryManually(bookingCode, arrival, departure, isTest, res
 // confirmed_automatic state means the policy returns legacy_available
 // / locked / scheduled based on roster + time, not the host's audit.
 async function restoreAutomaticRelease(bookingCode, arrival, departure, isTest, reservationId, expectedCount) {
-  if (!bookingCode || !arrival || !departure) {
-    alert(hostLang === 'it' ? 'Dati prenotazione incompleti.' : 'Incomplete booking data.');
+  if (!entryUiEnabled())return;
+  if ((IS_ADMIN_VIEW && !_adminEditEnabled) || !Number.isInteger(expectedCount) || expectedCount<1 || expectedCount>50 || !bookingCode || !arrival || !departure) {
+    alert(hostLang === 'it' ? 'Conferma prima il numero di ospiti e le date.' : 'Confirm a valid guest count and booking dates first.');
     return;
   }
+  const targetProperty=propertyId;
   const isIt = hostLang === 'it';
   if (!confirm(isIt
     ? 'Vuoi ripristinare il rilascio automatico per questa prenotazione?\n\nIl codice tornerà nascosto finché il check-in richiesto non è completato (e, se impostato, finché non arriva l\'orario di rilascio). I codici già visti dall\'ospite non possono essere richiamati.'
@@ -15054,15 +15129,17 @@ async function restoreAutomaticRelease(bookingCode, arrival, departure, isTest, 
     ? window.crypto.randomUUID()
     : ('r66-' + Date.now() + '-' + Math.random().toString(36).slice(2));
   try {
+    const current = await readHostEntryState(bookingCode,isTest);
+    if(targetProperty!==propertyId)return;
     const roster = await sb.rpc('entry_access_confirm_roster', {
-      p_property_id: propertyId,
+      p_property_id: targetProperty,
       p_booking_code: bookingCode,
-      p_count: Number.isFinite(expectedCount) && expectedCount >= 1 && expectedCount <= 50 ? Math.floor(expectedCount) : 1,
+      p_count: expectedCount,
       p_arrival: arrival,
       p_departure: departure,
       p_request_id: requestIdConfirm,
       p_reservation_id: reservationId || null,
-      p_expected_version: null,
+      p_expected_version: current.summary?.state_version || null,
       p_is_test: isTest === true,
     });
     if (roster.error) {
@@ -15070,6 +15147,7 @@ async function restoreAutomaticRelease(bookingCode, arrival, departure, isTest, 
       alert((isIt ? 'Errore nel passo roster: ' : 'Roster step failed: ') + roster.error.message);
       return;
     }
+    if(targetProperty!==propertyId)return;
     const summary = roster.data || {};
     const bookingId = summary.booking_id;
     const stateVersion = summary.state_version;
@@ -15089,8 +15167,8 @@ async function restoreAutomaticRelease(bookingCode, arrival, departure, isTest, 
       return;
     }
     alert(isIt
-      ? '✅ Rilascio automatico ripristinato. Il codice torna visibile solo a check-in completato.'
-      : '✅ Automatic release restored. The code will reappear only after check-in completes.');
+      ? '✅ Ripristinate le regole automatiche di check-in e orario.'
+      : '✅ Automatic check-in and release-time rules restored.');
   } catch (e) {
     console.error('[round66 restore] unexpected error:', e);
     alert((isIt ? 'Errore imprevisto: ' : 'Unexpected error: ') + (e && e.message || e));
@@ -15102,8 +15180,43 @@ async function restoreAutomaticRelease(bookingCode, arrival, departure, isTest, 
 // reveal the optional "release time" controls; otherwise hide them AND
 // the release-time toggle itself so the saved payload cleanly carries
 // null for both time and timezone (the DB CHECK requires them paired).
+function entryUiEnabled() { return typeof APP_CONFIG==='undefined'||APP_CONFIG.entryReleaseUiEnabled!==false; }
+function renderEntryContentReview() {
+  const available=entryUiEnabled();
+  for(const id of ['propEntryCheckinRequired','propEntryReleaseTimeEnabled','propEntryReleaseTime','propEntryReleaseTimezone']){const input=document.getElementById(id);if(input)input.disabled=!available;}
+  const notice=document.getElementById('entryUiPaused');if(notice){notice.style.display=available?'none':'block';notice.textContent=hostLang==='it'?'Modifiche di accesso temporaneamente sospese. Le regole già impostate restano attive.':'Access changes temporarily paused. Existing guest access rules remain active.';}
+  const box=document.getElementById('entryContentReview');if(!box)return;
+  const enabling=!!document.getElementById('propEntryCheckinRequired')?.checked && propertyData?.entry_checkin_required!==true;
+  box.style.display=enabling?'block':'none';
+  const it=hostLang==='it';
+  document.getElementById('entryReviewFields').textContent=it
+    ? 'Campi protetti: istruzioni di accesso e check-in (IT/EN), codice fisso, codice per prenotazione, codice della camera e Wi-Fi.\nI codici già visualizzati o copiati non possono essere richiamati.'
+    : 'Protected fields: access/check-in instructions (IT/EN), fixed code, booking code, room door code and Wi-Fi.\nCodes already viewed or copied cannot be recalled.';
+  document.getElementById('entryReviewText').textContent=it
+    ? 'Ho controllato messaggi di benvenuto, regole, consigli, allegati e messaggi automatici. I codici di accesso sono solo nei campi protetti. Il sistema non può trovare automaticamente tutte le copie.'
+    : 'I reviewed welcome text, rules, recommendations, attachments and automated messages. Entry secrets are only in protected fields. The system cannot automatically find every copy.';
+}
+function validateEntrySetup(update) {
+  if(!entryUiEnabled()&&['entry_checkin_required','entry_release_time','entry_release_timezone'].some(k=>(update[k]??(k==='entry_checkin_required'?false:null))!==(propertyData?.[k]??(k==='entry_checkin_required'?false:null)))){toast(hostLang==='it'?'Impostazioni di accesso temporaneamente non disponibili. Contatta il supporto.':'Access settings temporarily unavailable. Contact support.');return false;}
+  if(update.entry_checkin_required===true && propertyData?.entry_checkin_required!==true && !document.getElementById('entryContentReviewed')?.checked){
+    toast(hostLang==='it'?'Controlla i contenuti pubblicati e conferma la revisione prima di attivare.':'Review published content and confirm the review before enabling.');return false;
+  }
+  if(update.entry_checkin_required===true && document.getElementById('propEntryReleaseTimeEnabled')?.checked){
+    const time=document.getElementById('propEntryReleaseTime')?.value,zone=document.getElementById('propEntryReleaseTimezone')?.value;
+    try {if(!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(time||'')||!zone||/^[+-]/.test(zone))throw Error();new Intl.DateTimeFormat('en',{timeZone:zone}).format();}
+    catch(_){toast(hostLang==='it'?'Scegli un orario valido e il fuso della proprietà.':'Choose a valid time and the property timezone.');return false;}
+  }
+  return true;
+}
+function setupEntryContentReview() {
+  const ack=document.getElementById('entryContentReviewed');if(ack)ack.checked=false;
+  const root=document.getElementById('propertyFormBody');
+  if(root&&!root.dataset.entryReviewWired){root.dataset.entryReviewWired='1';root.addEventListener('input',event=>{if(event.target.id!=='entryContentReviewed'&&ack)ack.checked=false;});}
+  renderEntryContentReview();
+}
 function onToggleEntryCheckinRequired() {
   const enabled = !!document.getElementById('propEntryCheckinRequired')?.checked;
+  renderEntryContentReview();
   const wrap = document.getElementById('propEntryReleaseWrap');
   if (wrap) wrap.style.display = enabled ? 'block' : 'none';
   if (!enabled) {
@@ -15540,25 +15653,26 @@ function setConsoleReadOnly(ro) {
 }
 
 async function toggleAdminEdit(on) {
-  _adminEditEnabled = on;
-  setConsoleReadOnly(!on);
-  const label = document.getElementById('adminViewLabel');
-  if (label) {
-    const nm = propertyData?.name || 'property';
-    label.textContent = on
-      ? (hostLang === 'it' ? `⚠ Vista admin · ${nm} — MODIFICA ATTIVA` : `⚠ Admin view · ${nm} — EDITING ENABLED`)
-      : (hostLang === 'it' ? `Vista admin · ${nm} — sola lettura` : `Admin view · ${nm} — read-only`);
-  }
-  // Log the elevation to editing so edits are attributable.
-  if (on) {
-    try {
-      const { data: { user } } = await sb.auth.getUser();
-      await sb.from('admin_impersonation_log').insert({
-        admin_id: user?.id, admin_email: user?.email || null,
-        property_id: propertyId, action: 'enable_edit',
-      });
-    } catch (e) { console.warn('Impersonation edit-log failed:', e); }
-  }
+  const epoch=(toggleAdminEdit.epoch||0)+1;toggleAdminEdit.epoch=epoch;
+  const target=propertyId,label=document.getElementById('adminViewLabel'),toggle=document.getElementById('adminEditToggle');
+  _adminEditEnabled=false;setConsoleReadOnly(true);
+  if(toggle){toggle.checked=false;toggle.disabled=!!on;}
+  if(!on){if(label)label.textContent=hostLang==='it'?'Vista admin — sola lettura':'Admin view — read-only';return false;}
+  try {
+    const auth=await sb.auth.getUser();const user=auth.data?.user;
+    if(auth.error||!user?.id)throw Error('Authentication required');
+    const audit=await sb.from('admin_impersonation_log').insert({admin_id:user.id,admin_email:user.email||null,property_id:target,action:'enable_edit'});
+    if(audit?.error)throw audit.error;
+    const current=await sb.auth.getUser();
+    if(epoch!==toggleAdminEdit.epoch||target!==propertyId||!IS_ADMIN_VIEW||current.error||current.data?.user?.id!==user.id)return false;
+    _adminEditEnabled=true;setConsoleReadOnly(false);
+    if(toggle)toggle.checked=true;
+    if(label)label.textContent=hostLang==='it'?'Vista admin — modifica registrata':'Admin view — editing audited';
+    return true;
+  }catch(_){
+    if(epoch===toggleAdminEdit.epoch&&label)label.textContent=hostLang==='it'?'Audit non disponibile — modifica bloccata':'Audit unavailable — editing blocked';
+    return false;
+  }finally{if(epoch===toggleAdminEdit.epoch&&toggle)toggle.disabled=false;}
 }
 
 // Round 21: render the property switcher dropdown from allProperties
@@ -15866,6 +15980,7 @@ function fillPropertyForm(data) {
   if (el('propShowFixedLockboxToGuest'))    el('propShowFixedLockboxToGuest').checked    = data.show_fixed_lockbox_to_guest    !== false;
   if (el('propRotatingLockboxEnabled'))     el('propRotatingLockboxEnabled').checked     = !!data.rotating_lockbox_enabled;
   if (el('propShowRotatingLockboxToGuest')) el('propShowRotatingLockboxToGuest').checked = data.show_rotating_lockbox_to_guest !== false;
+  setupEntryContentReview();
   // Round 66 Phase 2b — opt-in gate.
   if (el('propEntryCheckinRequired')) {
     el('propEntryCheckinRequired').checked = data.entry_checkin_required === true;
@@ -15888,6 +16003,8 @@ function fillPropertyForm(data) {
     }
     sel.value = data.entry_release_timezone;
   }
+  if (el('propEntryReleaseTimezone') && !data.entry_release_timezone) el('propEntryReleaseTimezone').value = data.timezone || '';
+  renderEntryContentReview();
   if (typeof onToggleEntryCheckinRequired === 'function') onToggleEntryCheckinRequired();
   if (typeof onToggleEntryReleaseTime === 'function') onToggleEntryReleaseTime();
   // Round 36.2.5 — restore the rotating-code length picker; the DB

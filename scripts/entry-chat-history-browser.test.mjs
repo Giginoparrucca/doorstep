@@ -12,7 +12,7 @@ try{
   const placeholder=lang==='it'?'Messaggio precedente non disponibile. Completa il check-in o contatta il tuo host per assistenza.':'Earlier message unavailable. Complete check-in or contact your host for help.';
   const html=`<div id="chatMessages"></div><div id="chatSuggestions"></div><script>
     const propertyId='fictional-property',propertyData={host_names:'Fictional host'},lang=${JSON.stringify(lang)};
-    let chatEscalated=false,projected=[];
+    let chatEscalated=false,projected=[],_entryConversationGeneration=0;function _guestScopeKey(){return 'fixture';}
     function startHostChatListener(){}function showEscalatedBanner(){}
     function addBubble(message,kind){const p=document.createElement('p');p.textContent=message;p.className=kind;document.getElementById('chatMessages').appendChild(p);}
     async function _guestCall(action,args){if(args.lang!==lang)throw Error('Missing language');return {data:{messages:projected}};}

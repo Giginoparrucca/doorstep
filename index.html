@@ -3560,11 +3560,22 @@ function adoptEntryGuestCount(response) {
 }
 // Entry payloads stay in memory only and are discarded before each fresh read.
 let _entryLastResponse = null;
+let _entryProtectedChat = false, _entryConversationGeneration = 0, _entryChatAbort = null, _entryConversationScope = null;
 let _entryRefreshReady = false;
 function _guestScopeKey() {
   return propertyId ? JSON.stringify([propertyId, bookingCode || null, IS_TEST_SESSION]) : null;
 }
+function resetEntryConversation() {
+  _entryConversationGeneration++;
+  if(_entryChatAbort){_entryChatAbort.abort();_entryChatAbort=null;}
+  try {chatHistory=[];} catch(_) {}
+  const box=document.getElementById('chatMessages');if(box)box.textContent='';
+  const follow=document.getElementById('chatFollowups');if(follow)follow.textContent='';
+}
 function clearGuestEntryView() {
+  const scope=_guestScopeKey();
+  if(_entryProtectedChat||(_entryConversationScope&&scope!==_entryConversationScope))resetEntryConversation();
+  _entryConversationScope=scope;
   _entryLastResponse = null;
   reservationKeyboxCode = '';
   for (const rows of [existingCheckins, savedGuests]) {
@@ -3585,6 +3596,8 @@ function clearGuestEntryView() {
 }
 function applyGuestEntryResponse(r) {
   if (document.visibilityState === 'hidden' || navigator.onLine === false) { clearGuestEntryView(); return; }
+  if(r.data.entry_release?.protected_chat===true&&!_entryProtectedChat)resetEntryConversation();
+  _entryProtectedChat=r.data.entry_release?.protected_chat===true;
   propertyData = r.data.property;
   _entryLastResponse = r;
   const allowed = r.data.entry_release?.allow_entry === true;
@@ -3610,6 +3623,7 @@ function applyGuestEntryResponse(r) {
   }
   renderGuestEntryState(r);
   refreshLockboxDisplay();
+  if(_entryProtectedChat)checkExistingChat();
 }
 const _entryRefresh = GuestEntryRefresh.create({
   scope: _guestScopeKey,
@@ -4842,6 +4856,9 @@ function renderChatText(text) {
 }
 
 async function sendChat() {
+  const generation=_entryConversationGeneration, scope=_guestScopeKey();
+  const active=()=>generation===_entryConversationGeneration&&scope===_guestScopeKey();
+  const abort=new AbortController();if(_entryChatAbort)_entryChatAbort.abort();_entryChatAbort=abort;
   const input = document.getElementById('chatInput');
   const msg = input.value.trim();
   const hasImage = !!pendingImage;
@@ -4907,6 +4924,7 @@ async function sendChat() {
     // never include them in the body. propertyContext + stayContext stay
     // (they're content, not identity).
     const response = await _authedAIFetch('/api/chat', {
+      signal: abort.signal,
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -4918,6 +4936,7 @@ async function sendChat() {
         stream: true,
       }),
     });
+    if(!active())return;
     if (!response.ok || !response.body) throw new Error('API error ' + response.status);
 
     const reader = response.body.getReader();
@@ -4928,6 +4947,7 @@ async function sendChat() {
 
     while (true) {
       const { done, value } = await reader.read();
+      if(!active()){await reader.cancel();return;}
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
 
@@ -4959,6 +4979,7 @@ async function sendChat() {
       }
     }
 
+    if(!active())return;
     botBubble.classList.remove('streaming');
 
     // Round 34.1: strip [ESCALATE] regardless of the escalated flag.
@@ -4990,6 +5011,7 @@ async function sendChat() {
       renderFollowups(followups);
     }
   } catch (err) {
+    if(!active()||abort.signal.aborted)return;
     botBubble.classList.remove('streaming');
     console.error('Chat error:', err);
     const fallback = lang === 'it'
@@ -5066,9 +5088,11 @@ function startHostChatListener() {
 
   const pollForReplies = async () => {
     if (!propertyId) return;
+    const generation=_entryConversationGeneration,scope=_guestScopeKey();
     try {
       const cursor = localStorage.getItem('wbnb_chat_seen') || new Date(0).toISOString();
       const r = await _guestCall('poll', { since: cursor, lang });
+      if(generation!==_entryConversationGeneration||scope!==_guestScopeKey())return;
       const newMsgs = (r && r.data && r.data.messages) || [];
       if (newMsgs.length === 0) return;
 
@@ -5115,11 +5139,13 @@ function startHostChatListener() {
 
 async function checkExistingChat() {
   if (!propertyId) return;
+  const generation=_entryConversationGeneration, scope=_guestScopeKey();
   try {
     // Round 48: reads go through /api/guest which server-side
     // scopes by property_id + booking_code from the token payload.
     // Filters is_test=false + deleted_at IS NULL for us.
     const r = await _guestCall('history', { lang });
+    if(generation!==_entryConversationGeneration||scope!==_guestScopeKey())return;
     const data = (r && r.data && r.data.messages) || [];
     if (data && data.length > 0) {
       const msgEl = document.getElementById('chatMessages');

@@ -27,7 +27,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_PRODUCTION_SERVICE_ROLE_KEY }}
           # Preflight the pending Round 66 migration before its source PR merges.
           # This adds a required name; main-only checkout/review/credentials stay intact.
-          SCHEMA_DRIFT_REQUIRED_MIGRATIONS: '["round66_atomic_submissions","round66_chat_history_guard"]'
+          SCHEMA_DRIFT_REQUIRED_MIGRATIONS: '["round66_atomic_submissions","round66_chat_history_guard","round66_host_entry_audit"]'
           SPOT_SMOKE_ORIGIN: https://app.welcomebnb.it
           TAX_SMOKE_ORIGIN: https://app.welcomebnb.it
           SECURITY_SMOKE_ORIGIN: https://app.welcomebnb.it

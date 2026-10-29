@@ -21,10 +21,10 @@ try {for(const width of [390,1280])for(const lang of ['it','en']){
  for(const src of ['lib/tax-date-rates.js','lib/cover-layout.js','host-unsaved-changes.js','host-property-editor.js'])await page.addScriptTag({path:new URL('../'+src,import.meta.url).pathname});
  const ht=html.slice(html.indexOf('const HT ='),html.indexOf('\nfunction h('));
  const declaration=html.slice(html.indexOf('const propertyEditor ='),html.indexOf('function startPropertyEdit('));
- const funcs=['h','_i18nHydrateField','_i18nRenderPill','_i18nSetLang','_i18nCollect','_numOrNull','fillPropertyForm','_setPropertyEditControls','startPropertyEdit','cancelPropertyEdit','savePropertyEdit','saveProperty','startSettingsEdit','cancelSettingsEdit','saveSettingsEdit','_setSettingsEditControls','showPanel','switchProperty','handleCoverUpload','chooseCoverPhoto','_taxCfgRulesForSave','_taxCfgHydratePeriods','_taxCfgValidatePeriods','_taxCfgRenderPeriods','addTaxRatePeriod','removeTaxRatePeriod','_taxCfgOnPeriodInput'].map(fn).join('\n');
+ const funcs=['h','_i18nHydrateField','_i18nRenderPill','_i18nSetLang','_i18nCollect','_numOrNull','fillPropertyForm','_setPropertyEditControls','startPropertyEdit','cancelPropertyEdit','savePropertyEdit','saveProperty','startSettingsEdit','cancelSettingsEdit','saveSettingsEdit','_setSettingsEditControls','showPanel','switchProperty','handleCoverUpload','chooseCoverPhoto','_taxCfgRulesForSave','_taxCfgHydratePeriods','_taxCfgValidatePeriods','_taxCfgRenderPeriods','addTaxRatePeriod','removeTaxRatePeriod','_taxCfgOnPeriodInput'].concat(['entryUiEnabled','validateEntrySetup','renderEntryContentReview','setupEntryContentReview','onToggleEntryCheckinRequired','onToggleEntryReleaseTime']).map(fn).join('\n');
  await page.addScriptTag({content:`
  var allRooms=[];var _regionalExportController=null,settingsEditMode=false,rulesEditMode=false,recosEditMode=false;
- var hostLang=${JSON.stringify(lang)},propertyId='p1',propertyData={id:'p1',name:'Fictional farmhouse',city:'Roma',region:'Lazio',property_type:'villa',host_names:'Sample host',hero_image_url:'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600"><rect width="400" height="600" fill="#9d572e"/><rect x="400" width="400" height="600" fill="#83a880"/><rect x="800" width="400" height="600" fill="#6f94b5"/></svg>'),hero_image_layout:{zoom:1.2,x:40,y:60},welcome_message_it:'Benvenuti',welcome_message_en:'Welcome'},allProperties=[],propertyEditMode=false,_taxRulesDraft=[],_taxRatePeriodsDraft=[],_taxDeclaredDraft=[],IS_ADMIN_VIEW=false,_adminEditEnabled=false;
+ var APP_CONFIG={entryReleaseUiEnabled:true};var hostLang=${JSON.stringify(lang)},propertyId='p1',propertyData={id:'p1',name:'Fictional farmhouse',city:'Roma',region:'Lazio',property_type:'villa',host_names:'Sample host',hero_image_url:'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600"><rect width="400" height="600" fill="#9d572e"/><rect x="400" width="400" height="600" fill="#83a880"/><rect x="800" width="400" height="600" fill="#6f94b5"/></svg>'),hero_image_layout:{zoom:1.2,x:40,y:60},welcome_message_it:'Benvenuti',welcome_message_en:'Welcome'},allProperties=[],propertyEditMode=false,_taxRulesDraft=[],_taxRatePeriodsDraft=[],_taxDeclaredDraft=[],IS_ADMIN_VIEW=false,_adminEditEnabled=false;
  allProperties=[propertyData,{id:'p2',name:'Second fixture',property_type:'apartment'}];
  window.writes=[];window.uploads=[];window.failSave=false;window.failUpload=false;window.zeroRows=false;window.saveDelay=0;window.notices=[];
  const sb={from(table){let update,id;const q={update(v){update=v;return q;},insert(v){update=v;id=v.id;return q;},eq(k,v){if(k==='id')id=v;return q;},select(){return q;},async single(){await new Promise(r=>setTimeout(r,window.saveDelay));writes.push({table,id,update});window.roomAttempts=(window.roomAttempts||0)+1;return {data:window.zeroRoomRows?null:{id,...update},error:window.failRoomAt===window.roomAttempts?{message:'Room fixture failed'}:null};},async maybeSingle(){await new Promise(r=>setTimeout(r,window.saveDelay));writes.push({table,id,update});return {data:window.zeroRows?null:{id},error:window.failSave?{message:'Fixture save failed'}:null};}};return q;},storage:{from(){return {async upload(path,file){uploads.push({path,type:file.type});return {error:window.failUpload?{message:'Fixture storage failed'}:null};},getPublicUrl(path){return {data:{publicUrl:'https://images.example.invalid/'+path}};}};}}};
@@ -137,6 +137,32 @@ try {for(const width of [390,1280])for(const lang of ['it','en']){
  assert.ok(geometry.clear,'saved toast clears Help button');assert.ok(geometry.fits,'toast stays inside viewport');
  await page.screenshot({path:path.join(out,`rooms-saved-${width}-${lang}.png`)});
  console.log(`PASS ${width}px ${lang}: room View/Edit, draft add/edit/delete, Cancel, dirty navigation, Save, zero-row denial, partial failure/retry and toast/Help geometry`);
+ // Actual opt-in review uses the same page-wide Save/Cancel path.
+ await openEdit();await page.locator('#propEntryCheckinRequired').check();
+ assert.equal(await page.locator('#entryContentReview').isVisible(),true);
+ const beforeReview=await page.evaluate(()=>writes.length);
+ await page.locator('#propertySaveBtn').click();await page.waitForFunction(()=>_propertySavePending===null);
+ assert.equal(await page.evaluate(()=>writes.length),beforeReview,'unchecked review prevents persistence');
+ await page.locator('#entryContentReviewed').check();await page.locator('#propName').fill('Reviewed property');
+ assert.equal(await page.locator('#entryContentReviewed').isChecked(),false,'a changed draft requires fresh review');
+ await page.locator('#entryContentReviewed').check();await page.locator('#propertyCancelBtn').click();
+ assert.equal(await page.locator('#propEntryCheckinRequired').isChecked(),false);assert.equal(await page.locator('#entryContentReviewed').isChecked(),false);
+ await openEdit();await page.locator('#propEntryCheckinRequired').check();await page.locator('#propEntryReleaseTimeEnabled').check();
+ await page.locator('#propEntryReleaseTimezone').selectOption('');await page.locator('#entryContentReviewed').check();
+ await page.locator('#propertySaveBtn').click();await page.waitForFunction(()=>_propertySavePending===null);
+ assert.equal(await page.evaluate(()=>writes.length),beforeReview,'missing property timezone blocks a timed restriction');
+ await page.locator('#propEntryReleaseTimezone').selectOption('Europe/Rome');await page.locator('#entryContentReviewed').check();
+ await page.evaluate(()=>window.failSave=true);await page.locator('#propertySaveBtn').click();await page.waitForFunction(()=>_propertySavePending===null);
+ assert.equal(await page.evaluate(()=>propertyData.entry_checkin_required),false,'failed write preserves OFF');
+ await page.evaluate(()=>window.failSave=false);await page.locator('#propertySaveBtn').click();await page.waitForFunction(()=>_propertySavePending===null);
+ assert.equal(await page.evaluate(()=>propertyData.entry_checkin_required),true);assert.equal(await page.evaluate(()=>propertyData.entry_release_timezone),'Europe/Rome');
+ assert.equal(await page.locator('#entryContentReview').isVisible(),false);assert.equal(await page.locator('#propEntryCheckinRequired').isDisabled(),true);
+ await openEdit();const beforePause=await page.evaluate(()=>writes.length);
+ await page.evaluate(()=>{APP_CONFIG.entryReleaseUiEnabled=false;renderEntryContentReview();});assert.equal(await page.locator('#propEntryCheckinRequired').isDisabled(),true);
+ await page.evaluate(()=>{document.getElementById('propEntryCheckinRequired').checked=false;});await page.locator('#propertySaveBtn').click();await page.waitForFunction(()=>_propertySavePending===null);
+ assert.equal(await page.evaluate(()=>writes.length),beforePause,'paused UI cannot disable the secure restriction');assert.equal(await page.evaluate(()=>propertyData.entry_checkin_required),true);
+ await page.locator('#propertyCancelBtn').click();await page.evaluate(()=>{APP_CONFIG.entryReleaseUiEnabled=true;renderEntryContentReview();});
+
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no mobile overflow');assert.deepEqual(errors,[]);
  await page.close();console.log(`PASS ${width}px ${lang}: actual form/router save, deny/failed/zero-row save, all prompt actions, bilingual dirtiness, property switch, keyboard framing, invalid/decode/upload failures, draft/cancel/retry, save concurrency, admin denial and unload guard`);
 }

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { deploymentConfig } from '../lib/deployment-config.mjs';
 const prod = deploymentConfig({});
+assert.equal(prod.functions['api/chat.js'].includeFiles, 'lib/**', 'chat must package the shared entry validator tables');
 assert.deepEqual(prod.crons, [
   { path: '/api/ical-sync', schedule: '0 4 * * *' },
   { path: '/api/send-arrival-reminders', schedule: '0 5 * * *' },

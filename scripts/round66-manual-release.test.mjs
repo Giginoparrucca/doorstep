@@ -83,11 +83,11 @@ assert.ok(
 
 // ── 6. Explicit confirmation dialog with audit disclosure ──────────
 assert.ok(
-  /scavalca il requisito di check-in e sarà registrata in modo immutabile/.test(src),
+  /scavalca il requisito di check-in e l’orario di rilascio e sarà registrata in modo immutabile/.test(src),
   'IT confirmation dialog must warn about the audited override',
 );
 assert.ok(
-  /bypasses the check-in requirement and is recorded immutably/.test(src),
+  /bypasses the check-in and release-time requirements and is recorded immutably/.test(src),
   'EN confirmation dialog must warn about the audited override',
 );
 
@@ -103,7 +103,7 @@ assert.ok(
 
 // ── 8. Guard against incomplete booking data ──────────────────────
 assert.ok(
-  /if\s*\(!bookingCode\s*\|\|\s*!arrival\s*\|\|\s*!departure\)/.test(src),
+  /!bookingCode\s*\|\|\s*!arrival\s*\|\|\s*!departure/.test(src),
   'handler must guard against missing booking fields',
 );
 

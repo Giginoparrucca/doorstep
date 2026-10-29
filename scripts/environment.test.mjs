@@ -33,7 +33,10 @@ for (const override of [
 assert.throws(() => readEnvironment({ VERCEL_PROJECT_PRODUCTION_URL: 'demo.welcomebnb.it' }));
 assert.throws(() => readEnvironment({ APP_ENV: 'production', SUPABASE_URL: demo.SUPABASE_URL }));
 const pub = publicConfiguration(readEnvironment(demo));
-assert.deepEqual(Object.keys(pub).sort(), ['mode','projectRef','supabaseUrl','publicKey','appOrigin','allowedOrigins','support'].sort());
+assert.deepEqual(Object.keys(pub).sort(), ['mode','projectRef','supabaseUrl','publicKey','appOrigin','allowedOrigins','support','entryReleaseUiEnabled'].sort());
+assert.equal(publicConfiguration(readEnvironment({})).entryReleaseUiEnabled,true);
+assert.equal(publicConfiguration(readEnvironment({ENTRY_RELEASE_UI_ENABLED:'false'})).entryReleaseUiEnabled,false);
+assert.equal(publicConfiguration(readEnvironment({ENTRY_RELEASE_UI_ENABLED:'invalid'})).entryReleaseUiEnabled,false);
 assert.ok(pub.support && typeof pub.support === 'object', 'public config carries support object');
 assert.ok(Object.prototype.hasOwnProperty.call(pub.support, 'whatsapp'));
 assert.ok(Object.prototype.hasOwnProperty.call(pub.support, 'email'));

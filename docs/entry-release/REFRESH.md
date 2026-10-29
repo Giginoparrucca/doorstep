@@ -58,3 +58,7 @@ in `CHAT_HISTORY.md`; full conversation/browser integration remains an integrate
 pilot/rollback gate. Host opt-in content review, admin/audit journeys and safe
 activation remain separate Round 66 acceptance work. No property is auto-enabled,
 no physical lock is changed, and no real guest/provider write is part of tests.
+
+Final integration: protected access refresh now also clears conversation memory,
+aborts/fences pending AI responses and re-fetches provenance-filtered host history.
+`OPERATIONS.md` records the conservative historical AI/guest-message behavior.

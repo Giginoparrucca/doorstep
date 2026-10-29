@@ -115,3 +115,13 @@ Rollback must preserve the restriction for opted-in properties: roll back UI/act
 ## Documentation-only publication record
 
 26 October 2026 — GPT: plan prepared and queued after Round 65; no implementation, schema migration, host activation or runtime test claimed. Checks for this delivery: Markdown structure, roadmap link, unique round numbering and publication read-back. Next step: implement only after the new-round gate, coordinating with Round 65 security work.
+
+## Final completion work (29 October 2026)
+
+Daniele requested completion of all remaining phases. `OPERATIONS.md` documents
+host content review, current owner/admin audits, optimistic roster/override flows,
+conversation invalidation, fictional integrated pilot and secure pause/rollback.
+The final host/admin migration is `20261029105517_round66_host_entry_audit.sql`.
+Do not mark the Round shipped until the exact production migration gate, complete
+combined CI, deployed commit/assets and postdeploy live smoke are recorded. No
+live property is activated by this work; production smoke remains read-only.

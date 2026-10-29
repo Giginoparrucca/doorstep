@@ -8,6 +8,7 @@ import handleCspReport from './_csp-report.js';
 // keybox_code read. Phase 2 adds the opt-in UI and the roster/time
 // enforcement for properties that opt in.
 import { entryReleaseAllows, loadGuestPropertyAccess, projectGuestEntry } from './_entry-release-loader.js';
+import { hostEntryState } from './_entry-host-state.js';
 import { readEntryChat } from './_entry-chat-delivery.js';
 import { submitEntryCheckin } from './_entry-submission-save.js';
 // api/guest.js — Round 34 chat gateway + Round 48 guest gateway.
@@ -123,6 +124,8 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(allowed ? 200 : 403).end();
   if (!allowed) return res.status(403).json({ error: 'Origin not allowed' });
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
+
+  if (req.body?.action === 'host_entry_state') return hostEntryState(req,res);
 
   // Token auth. Everything below trusts only the token payload.
   const auth = req.headers['authorization'] || req.headers['Authorization'];
@@ -515,6 +518,7 @@ async function doProperty(res, propertyId, bookingCode, isTest, sessionExpUnixSe
       expected: policy.expected ?? null,
       release_at: policy.release_at ?? null,
       release_timezone: entryProperty.entry_timezone ?? null,
+      protected_chat: entryProperty.entry_checkin_required === true || row.entry_chat_protected === true,
     };
   }
   return res.status(200).json(resp);

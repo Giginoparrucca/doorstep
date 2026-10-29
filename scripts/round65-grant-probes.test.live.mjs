@@ -9,6 +9,7 @@ const probes=[
  ['enqueue_orphan_documents',{p_dry_run:true,p_days:7}],
  ['list_hosts_for_admin',{}],
  ['save_guest_marketing_consent',{p_property_id:'00000000-0000-4000-8000-000000000000',p_booking_code:'SYNTHETIC-NOT-A-BOOKING',p_email:null,p_phone:null,p_consent:false}],
+ ['entry_access_host_state',{p_property_id:'00000000-0000-4000-8000-000000000000',p_booking_code:'SYNTHETIC-NOT-A-BOOKING',p_is_test:false}],
 ];
 async function call(name,body,key){
  return fetch(base+name,{method:'POST',headers:{...supabaseAuthHeaders(key),'Content-Type':'application/json'},
@@ -20,7 +21,7 @@ for(const [name,body]of probes){
  assert.equal((await response.json()).code,'42501',name+' privilege denial');
 }
 const service=process.env.SUPABASE_SERVICE_ROLE_KEY;
-if(!service){console.error('SKIP service-role grant probes need SUPABASE_SERVICE_ROLE_KEY; four anonymous denials passed');process.exit(77);}
+if(!service){console.error('SKIP service-role grant probes need SUPABASE_SERVICE_ROLE_KEY; five anonymous denials passed');process.exit(77);}
 for(const [name,body]of probes.slice(0,3)){
  const response=await call(name,body,service);assert.equal(response.status,200,name+' dry/read-only service call');
  // Do not log counts or the admin function's response rows.

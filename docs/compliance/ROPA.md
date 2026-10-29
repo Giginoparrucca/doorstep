@@ -167,7 +167,7 @@ evidence:
 The Round 67 plan proposed recording this finding as "structurally unreachable". Checking the current code does not support that wording:
 
 - `index.html:1398` says the card is "Only shown to the main guest (see showConsentCard())".
-- `showConsentCard()` is defined at `index.html:4075` and has exactly one call site, `index.html:3938`, on the success screen after the check-in party is saved on that device.
+- `showConsentCard()` is defined at `index.html:4089` and has exactly one call site, `index.html:3952`, on the success screen after the check-in party is saved on that device.
 - `showConsentCard()` itself checks neither who is the lead guest nor anyone's age. "Main guest" is a consequence of the usual flow (one adult completes the group's check-in), not an enforced rule.
 
 What does hold: Art. 8 applies to information-society services offered **directly** to a child, and in Italy only below 14 (d.lgs. 196/2003 art. 2-quinquies). Check-in is normally completed by an adult who registers the whole party, and the form is per booking. So the risk is **low but not zero**: a teenager completing their own check-in on their own device would see the form.
@@ -396,3 +396,5 @@ evidence:
 3. **DPAs accepted** with Anthropic and Resend.
 4. **HIGH-GDPR-3:** accept the residual risk or add an 18+ confirmation to the consent card.
 5. **Controller/processor framing** above, and the legitimate-interest balancing for Q&A reuse and analytics.
+
+Round 66 completion update: entry exceptions now check current authenticated owner/admin identity in the database. Admin exceptions write the existing impersonation log and immutable booking audit atomically; failed auditing blocks the mutation. Host status is projected by `api/_entry-host-state.js` without guest records or codes in the response. Existing retention decisions above remain owner decisions.

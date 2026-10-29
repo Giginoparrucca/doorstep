@@ -13,9 +13,9 @@ try {
   const context=await browser.newContext({viewport:{width,height:900},timezoneId:'Asia/Singapore'});
   const errors=[],requests=[],tokens=new Map();let tokenId=0,fail=false,hold=null,reply;
   const denied=(state='locked',extra={})=>({property:{id:pid,name:'Fictional House',host_names:'Fictional Host',rotating_lockbox_enabled:true},
-    entry_release:{state,allow_entry:false,...extra},rotating_code:null});
+    entry_release:{state,allow_entry:false,protected_chat:true,...extra},rotating_code:null});
   const released=()=>({property:{...denied().property,keybox_code:'FIXED-FICTIONAL',access_method:'ENTRY-FICTIONAL',wifi_name:'WIFI-NAME',wifi_password:'WIFI-FICTIONAL',checkin_instructions_it:'ISTRUZIONI-FICTIONAL',checkin_instructions_en:'INSTRUCTIONS-FICTIONAL'},
-    room:{id:'room-a',name:'Fictional Room',door_code:'ROOM-FICTIONAL'},rotating_code:'ROTATING-FICTIONAL',entry_release:{state:'available',allow_entry:true}});
+    room:{id:'room-a',name:'Fictional Room',door_code:'ROOM-FICTIONAL'},rotating_code:'ROTATING-FICTIONAL',entry_release:{state:'available',allow_entry:true,protected_chat:true}});
   reply=denied();
   await context.route('**/*',async route=>{
    const u=new URL(route.request().url());
@@ -28,7 +28,7 @@ try {
    }
    if(u.pathname==='/api/guest') {
     const b=route.request().postDataJSON(),token=route.request().headers().authorization?.replace('Bearer ','');
-    const scope=tokens.get(token);assert.ok(scope,'gateway request uses minted scope');requests.push({action:b.action,scope});
+    const scope=tokens.get(token);assert.ok(scope,'gateway request uses minted scope');requests.push({action:b.action,scope,sender:b.sender,message:b.message});
     let data={};
     if(b.action==='property') {data=structuredClone(reply);if(hold){const pending=hold;hold=null;await pending;}return route.fulfill({status:fail?503:200,contentType:'application/json',body:JSON.stringify(data)});}
     if(b.action==='history'||b.action==='poll')data={messages:[]};
@@ -93,6 +93,26 @@ try {
   await page.waitForFunction(()=>document.getElementById('lockboxCodesWrap').textContent==='');
   reply=denied();await page.evaluate(()=>_entryRefresh.refresh());finish();await page.evaluate(()=>window.oldRefresh);
   assert.equal(await page.locator('#lockboxCodesWrap').textContent(),'');
+  // An AI reply started under an old access state cannot reappear/save after refresh.
+  reply=released();await page.evaluate(()=>_entryRefresh.refresh());
+  await page.evaluate(()=>{
+    const original=window.fetch;
+    window.fetch=async(url,options)=>{
+      if(url==='/api/chat')return new Response(new ReadableStream({start(c){
+        window.fixtureStream=c;window.fixtureSignal=options.signal;
+        c.enqueue(new TextEncoder().encode('data: '+JSON.stringify({type:'text',text:'Public test reply'})+'\\n\\n'));
+      }}),{headers:{'Content-Type':'text/event-stream'}});
+      return original(url,options);
+    };
+    document.getElementById('chatInput').value='Fictional question';window.fixtureChatRun=sendChat();
+  });
+  await page.waitForFunction(()=>window.fixtureStream!==undefined);
+  reply=denied();await page.evaluate(()=>_entryRefresh.refresh());
+  assert.equal(await page.evaluate(()=>window.fixtureSignal.aborted),true);
+  await page.evaluate(()=>{fixtureStream.enqueue(new TextEncoder().encode('data: '+JSON.stringify({type:'text',text:'OLD-AI-CODE-FICTIONAL'})+'\\n\\n'));fixtureStream.close();});
+  await page.evaluate(()=>window.fixtureChatRun);
+  assert.ok(!(await page.content()).includes('OLD-AI-CODE-FICTIONAL'));
+  assert.ok(!requests.some(r=>r.sender==='bot'&&String(r.message).includes('OLD-AI-CODE-FICTIONAL')));
   // Separate tab invalidates this tab; the signal itself contains no access value.
   const second=await context.newPage();await second.goto(origin+'/?p='+pid+'&b=BOOK-A');
   await second.waitForFunction(()=>_entryRefreshReady);

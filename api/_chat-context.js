@@ -2,16 +2,19 @@
 import { loadEntryReleaseSnapshot } from './_entry-release-loader.js';
 import { evaluateEntryRelease, projectEntryInstructions } from './_entry-release-policy.js';
 
+const ENTRY_TEXT_FIELDS = ['checkin_instructions','checkin_instructions_it','checkin_instructions_en'];
 const PUBLIC_FIELDS = [
   'id', 'name', 'address', 'city', 'zip', 'region', 'country', 'maps_link',
   'checkin_time', 'checkout_time', 'host_names', 'host_phone',
+  'checkout_instructions','checkout_instructions_it','checkout_instructions_en',
+  'transport_info','transport_info_it','transport_info_en',
   'welcome_message', 'welcome_message_it', 'welcome_message_en',
 ];
 
 export async function buildServerChatContext({ pgrestGET, callRPC, payload }) {
   const propertyId = payload.p;
   const response = await pgrestGET('properties?id=eq.' + encodeURIComponent(propertyId)
-    + '&deleted_at=is.null&select=' + [...PUBLIC_FIELDS, 'wifi_name', 'wifi_password', 'entry_checkin_required'].join(',') + '&limit=1');
+    + '&deleted_at=is.null&select=' + [...PUBLIC_FIELDS, ...ENTRY_TEXT_FIELDS, 'wifi_name', 'wifi_password', 'entry_checkin_required'].join(',') + '&limit=1');
   if (!response?.ok) throw new Error('chat property unavailable');
   const rows = await response.json();
   if (!Array.isArray(rows) || rows.length !== 1 || rows[0].id !== propertyId) {
@@ -28,6 +31,7 @@ export async function buildServerChatContext({ pgrestGET, callRPC, payload }) {
   const policy = snapshot ? evaluateEntryRelease(snapshot) : { allow_entry: false, state: 'unavailable' };
   const entry = snapshot ? projectEntryInstructions(snapshot) : {};
   if (policy.allow_entry === true) {
+    for (const field of ENTRY_TEXT_FIELDS) if(row[field]!=null) property[field]=row[field];
     if (row.wifi_name != null) property.wifi_name = row.wifi_name;
     if (row.wifi_password != null) property.wifi_password = row.wifi_password;
   }

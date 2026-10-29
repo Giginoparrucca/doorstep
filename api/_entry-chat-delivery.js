@@ -32,7 +32,7 @@ export async function readEntryChat({ callRPC, propertyId, bookingCode, isTest, 
   let withheld = false;
   const messages = data.messages.map(row => {
     const visible = !data.enabled && row.entry_sensitive === false
-      || data.enabled && allow && row.entry_sensitive === true
+      || data.enabled && allow && row.sender === 'host' && row.entry_sensitive === true
         && row.entry_identity_version === snapshot.booking.identity_version
         && typeof data.content_version === 'string' && data.content_version.length > 0
         && row.entry_content_version === data.content_version;
@@ -42,8 +42,8 @@ export async function readEntryChat({ callRPC, propertyId, bookingCode, isTest, 
       withheld = true;
       out.entry_withheld = true;
       out.message = lang === 'it'
-        ? 'Messaggio precedente non disponibile. Completa il check-in o contatta il tuo host per assistenza.'
-        : 'Earlier message unavailable. Complete check-in or contact your host for help.';
+        ? 'Messaggio precedente non disponibile per sicurezza. Fai di nuovo la domanda o contatta il tuo host.'
+        : 'Earlier message unavailable for security. Ask again or contact your host for help.';
     }
     return out;
   });

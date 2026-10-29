@@ -13,7 +13,7 @@ let checks = 0;
 async function run(options = {}) {
   const property = { id: pid, name: 'Fictional rental', city: 'Fictional town', deleted_at: null,
     entry_checkin_required: true, keybox_code: 'PRIVATE-FIXED', access_method: 'PRIVATE-ACCESS',
-    wifi_password: 'PRIVATE-WIFI', show_fixed_lockbox_to_guest: true, ...options.property };
+    wifi_password: 'PRIVATE-WIFI', checkin_instructions_it:'PRIVATE-CHECKIN-IT',checkin_instructions_en:'PRIVATE-CHECKIN-EN', show_fixed_lockbox_to_guest: true, ...options.property };
   const state = { snapshot_version: 2, property_snapshot: property, current_rows: [],
     reservation_snapshot: null, room_snapshot: null, room_resolution: 'none',
     booking_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb2', property_id: pid,
@@ -71,7 +71,7 @@ try {
       const { res, upstream } = await run({ ...options, stream });
       assert.equal(res.statusCode, 200);
       assert.ok(upstream);
-      for (const secret of ['PRIVATE-FIXED', 'PRIVATE-ACCESS', 'PRIVATE-WIFI', 'HISTORICAL-CODE']) assert.ok(!JSON.stringify(upstream).includes(secret));
+      for (const secret of ['PRIVATE-FIXED', 'PRIVATE-ACCESS', 'PRIVATE-WIFI', 'PRIVATE-CHECKIN-IT','PRIVATE-CHECKIN-EN', 'HISTORICAL-CODE']) assert.ok(!JSON.stringify(upstream).includes(secret));
       assert.match(upstream.system[1].text, /MUST NOT share/);
       assert.deepEqual(upstream.messages, [{ role: 'user', content: 'Where are the keys?' }]);
     }
@@ -79,6 +79,8 @@ try {
     assert.match(upstream.system[1].text, /PRIVATE-FIXED/);
     assert.match(upstream.system[1].text, /PRIVATE-ACCESS/);
     assert.match(upstream.system[1].text, /PRIVATE-WIFI/);
+    assert.match(upstream.system[1].text,/PRIVATE-CHECKIN-IT/);
+    assert.match(upstream.system[1].text,/PRIVATE-CHECKIN-EN/);
     assert.match(upstream.system[1].text, /2099-01-01/);
     assert.ok(!JSON.stringify(upstream).includes('HISTORICAL-CODE'));
     const hidden = await run({ released: true, property: { show_fixed_lockbox_to_guest: false }, stream });

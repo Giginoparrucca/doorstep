@@ -42,7 +42,7 @@ try {
   await page.clock.install({time:new Date('2026-10-25T00:30:00Z')});
   await page.addInitScript(()=>{localStorage.setItem('wbnb_property_data','LEGACY-FICTIONAL');sessionStorage.setItem('doorstep_keybox_code','LEGACY-FICTIONAL');});
   await page.goto(origin+'/?p='+pid+'&b=BOOK-A');
-  await page.waitForFunction(()=>_entryRefreshReady && _entryLastResponse?.data.entry_release.state==='locked');
+  await page.waitForFunction(()=>typeof _entryRefreshReady!=='undefined' && _entryRefreshReady && _entryLastResponse?.data.entry_release.state==='locked');
   await page.evaluate(l=>{setLang(l);goTo('welcome');},language);
   assert.match(await page.locator('#accessMethod').textContent(),language==='it'?/Completa il check-in/:/Complete online check-in/);
   assert.ok(!(await page.content()).includes('FIXED-FICTIONAL'));
@@ -115,7 +115,7 @@ try {
   assert.ok(!requests.some(r=>r.sender==='bot'&&String(r.message).includes('OLD-AI-CODE-FICTIONAL')));
   // Separate tab invalidates this tab; the signal itself contains no access value.
   const second=await context.newPage();await second.goto(origin+'/?p='+pid+'&b=BOOK-A');
-  await second.waitForFunction(()=>_entryRefreshReady);
+  await second.waitForFunction(()=>typeof _entryRefreshReady!=='undefined' && _entryRefreshReady);
   reply=released();await second.evaluate(()=>refreshEntryAfterSave());
   await page.waitForFunction(()=>document.getElementById('roomDoorCode').textContent.includes('ROOM-FICTIONAL'));
   const store=await page.evaluate(()=>JSON.stringify({...localStorage,...sessionStorage}));
@@ -126,7 +126,7 @@ try {
   await Promise.all([page.waitForNavigation({waitUntil:'load'}),page.evaluate(()=>{
     history.pushState(null,'','?p='+propertyId+'&b=BOOK-B');window.dispatchEvent(new PopStateEvent('popstate'));
   })]);
-  await page.waitForFunction(()=>_entryRefreshReady && _entryLastResponse?.data.entry_release.state==='locked');
+  await page.waitForFunction(()=>typeof _entryRefreshReady!=='undefined' && _entryRefreshReady && _entryLastResponse?.data.entry_release.state==='locked');
   assert.ok(requests.some(r=>r.scope.booking_code==='BOOK-B'));
   assert.ok(!(await page.content()).includes('FIXED-FICTIONAL'));
   // Real visibility callback is also exercised, without granting from the event.

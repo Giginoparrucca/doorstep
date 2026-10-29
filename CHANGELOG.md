@@ -7,6 +7,10 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Round 66 Phase 3 — Post-merge browser startup wait (in-progress — GPT, 29 October 2026)
+
+Post-merge regression [40889774358](https://github.com/Giginoparrucca/doorstep/actions/runs/40889774358) reported **PASS 111 / FAIL 1 / SKIP 3**: `guest-entry-refresh-browser.test.mjs` evaluates `_entryRefreshReady` immediately after booking navigation, before the new document defines it. The same source passed the pre-merge full suite; production deployment/assets and read-only smoke passed as recorded below. Final close-out is held while the actual browser fixture is corrected to wait safely for document startup without weakening any access assertions, then full regression/CI is rerun. No runtime behavior or property setting change is planned.
+
 ### Round 66 — All three phases shipped and verified (PR #248 — GPT, 29 October 2026)
 
 Round 66 is complete. Hosts can deliberately enable entry instructions after all required guests complete check-in, optionally set an arrival-day release time, review booking status, and release/restore access manually with actor-bound auditing. Guest/API/AI/history delivery shares the server policy. Existing property settings remain unchanged; this release does not automatically activate any property.

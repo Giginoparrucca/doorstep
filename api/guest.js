@@ -369,6 +369,10 @@ const PROPERTY_PUBLIC_FIELDS = [
   // fixed-code properties quietly rendered an empty lockbox tile. Add it
   // now, gated behind the entry-release policy via POST_CHECKIN_FIELDS.
   'keybox_code',
+  // Host text fields delivered by Claude's instructions fix (PR #240).
+  'checkin_instructions', 'checkin_instructions_it', 'checkin_instructions_en',
+  'checkout_instructions', 'checkout_instructions_it', 'checkout_instructions_en',
+  'transport_info', 'transport_info_it', 'transport_info_en',
 ];
 // Fields revealed only AFTER the entry-release policy allows entry. For
 // every OFF-path property that resolves to legacy_available|locked, this
@@ -379,6 +383,7 @@ const PROPERTY_PUBLIC_FIELDS = [
 const PROPERTY_POST_CHECKIN_FIELDS = new Set([
   'wifi_name', 'wifi_password', 'access_method',
   'keybox_code',
+  'checkin_instructions', 'checkin_instructions_it', 'checkin_instructions_en',
 ]);
 // Columns the guest form writes. Narrows what checkin_insert and
 // checkin_update accept so no caller can set alloggiati_status,

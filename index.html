@@ -3571,7 +3571,7 @@ function clearGuestEntryView() {
     if (Array.isArray(rows)) for (const row of rows) if (row) delete row.keybox_code;
   }
   if (propertyData) {
-    for (const key of ['keybox_code','access_method','wifi_name','wifi_password']) delete propertyData[key];
+    for (const key of ['keybox_code','access_method','wifi_name','wifi_password','checkin_instructions','checkin_instructions_it','checkin_instructions_en']) delete propertyData[key];
   }
   for (const id of ['lockboxCodesWrap','roomDoorCode','checkinInstructionsText']) {
     const node = document.getElementById(id);
@@ -3601,6 +3601,13 @@ function applyGuestEntryResponse(r) {
   const wifi = 'Password: ' + (allowed ? propertyData.wifi_password || '—' : '—');
   if (el('wifiPass')) el('wifiPass').textContent = wifi;
   T.en.wifi_pass = wifi; T.it.wifi_pass = wifi;
+  const instructions = allowed ? (propertyData['checkin_instructions_' + lang]
+    || propertyData['checkin_instructions_' + (lang === 'it' ? 'en' : 'it')] || propertyData.checkin_instructions || '') : '';
+  if (el('checkinInstructionsText')) {
+    if (typeof guestLinkedText === 'function') el('checkinInstructionsText').innerHTML = guestLinkedText(instructions);
+    else el('checkinInstructionsText').textContent = instructions;
+    el('checkinInstructionsText').style.display = instructions ? 'block' : 'none';
+  }
   renderGuestEntryState(r);
   refreshLockboxDisplay();
 }

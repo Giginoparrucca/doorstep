@@ -14,7 +14,7 @@ try {
   const errors=[],requests=[],tokens=new Map();let tokenId=0,fail=false,hold=null,reply;
   const denied=(state='locked',extra={})=>({property:{id:pid,name:'Fictional House',host_names:'Fictional Host',rotating_lockbox_enabled:true},
     entry_release:{state,allow_entry:false,...extra},rotating_code:null});
-  const released=()=>({property:{...denied().property,keybox_code:'FIXED-FICTIONAL',access_method:'ENTRY-FICTIONAL',wifi_name:'WIFI-NAME',wifi_password:'WIFI-FICTIONAL'},
+  const released=()=>({property:{...denied().property,keybox_code:'FIXED-FICTIONAL',access_method:'ENTRY-FICTIONAL',wifi_name:'WIFI-NAME',wifi_password:'WIFI-FICTIONAL',checkin_instructions_it:'ISTRUZIONI-FICTIONAL',checkin_instructions_en:'INSTRUCTIONS-FICTIONAL'},
     room:{id:'room-a',name:'Fictional Room',door_code:'ROOM-FICTIONAL'},rotating_code:'ROTATING-FICTIONAL',entry_release:{state:'available',allow_entry:true}});
   reply=denied();
   await context.route('**/*',async route=>{
@@ -53,6 +53,7 @@ try {
   assert.match(await page.locator('#lockboxCodesWrap').textContent(),/ROTATING-FICTIONAL/);
   assert.match(await page.locator('#roomDoorCode').textContent(),/ROOM-FICTIONAL/);
   assert.match(await page.locator('#wifiPass').textContent(),/WIFI-FICTIONAL/);
+  assert.match(await page.locator('#checkinInstructionsText').textContent(),/FICTIONAL/);
   if(process.env.ENTRY_QA_DIR){fs.mkdirSync(process.env.ENTRY_QA_DIR,{recursive:true});await page.locator('#checkinCard').scrollIntoViewIfNeeded();await page.screenshot({path:process.env.ENTRY_QA_DIR+`/entry-${language}-${width}.png`});}
   // Focus clears immediately, before a delayed denial arrives.
   let finish;hold=new Promise(r=>finish=r);reply=denied();
@@ -98,7 +99,7 @@ try {
   reply=released();await second.evaluate(()=>refreshEntryAfterSave());
   await page.waitForFunction(()=>document.getElementById('roomDoorCode').textContent.includes('ROOM-FICTIONAL'));
   const store=await page.evaluate(()=>JSON.stringify({...localStorage,...sessionStorage}));
-  for(const value of ['FIXED-FICTIONAL','ROTATING-FICTIONAL','ROOM-FICTIONAL','WIFI-FICTIONAL','LEGACY-FICTIONAL'])assert.ok(!store.includes(value));
+  for(const value of ['FIXED-FICTIONAL','ROTATING-FICTIONAL','ROOM-FICTIONAL','WIFI-FICTIONAL','ISTRUZIONI-FICTIONAL','INSTRUCTIONS-FICTIONAL','LEGACY-FICTIONAL'])assert.ok(!store.includes(value));
   assert.ok(requests.every(r=>r.scope.property_id===pid && r.scope.booking_code==='BOOK-A'));
   // A booking navigation invalidates the old view and mints the new token scope.
   reply=denied();

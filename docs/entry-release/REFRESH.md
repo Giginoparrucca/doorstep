@@ -7,7 +7,7 @@ server decision shortly after the supplied absolute instant. A timer, browser
 clock or another tab's signal never grants entry by itself.
 
 Every refresh immediately removes previously displayed fixed/rotating/room codes,
-access text and Wi-Fi values, including translation values and old check-in-row
+access/check-in instruction text and Wi-Fi values, including translation values and old check-in-row
 code copies. Hidden/pagehide/offline events invalidate pending responses and clear
 these surfaces. Failed or 15-second timed-out reads remain unavailable, with
 Retry/contact-host guidance and a modest retry timer. Older and changed-scope

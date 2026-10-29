@@ -466,10 +466,10 @@ async function doProperty(res, propertyId, bookingCode, isTest, sessionExpUnixSe
     : null;
   // Use one decision for both secrets and the displayed release state.
   // Separate reads could otherwise return a code alongside a later denial.
-  let policy = null, entryProperty = {}, room = null;
+  let policy = null, entryProperty = {}, room = null, rotatingCode = null;
   if (bookingCode) {
     try {
-      ({ policy, entryProperty, room } = await loadGuestPropertyAccess({
+      ({ policy, entryProperty, room, rotatingCode } = await loadGuestPropertyAccess({
         pgrestGET, callRPC, propertyId, bookingCode, isTest, sessionValidUntil,
       }));
     } catch (_) {
@@ -491,7 +491,7 @@ async function doProperty(res, propertyId, bookingCode, isTest, sessionExpUnixSe
   }
 
   // Room assignment and door code come from the same policy snapshot.
-  const resp = { property: out, checked_in: hasCheckin };
+  const resp = { property: out, checked_in: hasCheckin, rotating_code: hasCheckin ? rotatingCode || null : null };
   if (room) resp.room = room;
   // Round 66 Phase 2c — expose the policy's state/reason/counts/release_at
   // to the guest UI so it can render locked / scheduled / released cards
@@ -509,6 +509,7 @@ async function doProperty(res, propertyId, bookingCode, isTest, sessionExpUnixSe
       submitted: policy.submitted ?? null,
       expected: policy.expected ?? null,
       release_at: policy.release_at ?? null,
+      release_timezone: entryProperty.entry_timezone ?? null,
     };
   }
   return res.status(200).json(resp);

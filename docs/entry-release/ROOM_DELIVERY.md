@@ -41,6 +41,7 @@ its policy/copy reconciliation remains a broader Round acceptance item.
 
 No migration, property activation, physical code change or real guest/provider
 write belongs to this delivery. This is a server-side room-delivery subphase;
-focus/resume/scheduled-time/second-tab/cache journeys, host opt-in/admin audit,
-full integrated pilot and rollback remain open. Rollback must preserve the shared
+the dedicated-entry focus/resume/scheduled-time/second-tab/cache continuation
+is documented in `REFRESH.md`. Host opt-in/admin audit, full conversation
+integration, pilot and rollback remain open. Rollback must preserve the shared
 server boundary for opted-in properties; do not restore first-room disclosure.

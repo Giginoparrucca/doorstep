@@ -23,7 +23,8 @@ try{for(const width of [390,1440])for(const language of ['it','en']){
  });
  await page.goto('https://round65-consent.example.invalid/');
  await page.addStyleTag({content:styles+' body{display:block;padding:16px}'});await page.locator('body').evaluate((el,markup)=>el.innerHTML=markup,markup);
- await page.addScriptTag({content:`let lang=${JSON.stringify(language)},IS_TEST_SESSION=false,propertyId='fictional-property';${translations}
+ await page.addScriptTag({content:`let lang=${JSON.stringify(language)},IS_TEST_SESSION=false,propertyId='fictional-property',bookingCode=null;${translations}
+ ${fn('_guestScopeKey')}
  function trackGuest(){} async function _authedAIFetch(url,init){return fetch(url,{...init,headers:{...init.headers,Authorization:'Bearer fictional-token'}});}
  ${fn('_guestCall')}\n${fn('toggleConsentFields')}\n${fn('saveMarketingConsent')}
  document.getElementById('consentCard').style.display='block';document.querySelectorAll('[data-i18n]').forEach(el=>el.textContent=T[lang][el.dataset.i18n]||el.textContent);`});

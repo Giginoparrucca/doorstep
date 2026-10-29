@@ -47,13 +47,8 @@ const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
 assert.ok(!/sb\.rpc\(['"]get_reservation_keybox/.test(html));
 const start=html.indexOf('async function fetchReservationKeybox(');
 const client=html.slice(start,html.indexOf('\n}\n',start)+2);
-const ctx=vm.createContext({propertyId:property,bookingCode:booking,storedProperty:property,storedBooking:booking,
-  reservationKeyboxCode:'OLD-CODE',refreshLockboxDisplay(){},getStoredPropertyId(){return ctx.storedProperty},
-  getBookingCode(){return ctx.storedBooking}});
+let delegated=0;
+const ctx=vm.createContext({_entryRefresh:{refresh:async()=>{delegated++;return true;}}});
 vm.runInContext(client,ctx);
-ctx._guestCall=async(action,args)=>{assert.equal(action,'keybox');assert.deepEqual(Object.keys(args),[]);return {ok:true,data:{code:'NEW-FICTIONAL'}}};
-await ctx.fetchReservationKeybox();assert.equal(ctx.reservationKeyboxCode,'NEW-FICTIONAL');checks++;
-ctx._guestCall=async()=>({ok:false});await ctx.fetchReservationKeybox();assert.equal(ctx.reservationKeyboxCode,'');checks++;
-ctx.reservationKeyboxCode='OLD';ctx._guestCall=async()=>{ctx.storedProperty='other';return {ok:true,data:{code:'STALE'}}};
-await ctx.fetchReservationKeybox();assert.equal(ctx.reservationKeyboxCode,'');checks++;
+assert.equal(await ctx.fetchReservationKeybox(),true);assert.equal(delegated,1);checks++;
 console.log(`PASS ${checks} actual keybox gateway/client auth, tenant/test, visibility, error and stale-response cases; no real codes used.`);

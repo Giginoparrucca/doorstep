@@ -32,19 +32,10 @@ assert.ok(
   'loader must return an unavailable fallback with reason=no_snapshot',
 );
 
-// ── 2. doProperty imports and calls evaluateGuestEntryRelease ───────
-assert.ok(
-  /import\s*\{[^}]*evaluateGuestEntryRelease[^}]*\}\s*from\s*['"]\.\/_entry-release-loader\.js['"]/.test(guestApi),
-  'api/guest.js must import evaluateGuestEntryRelease',
-);
-assert.ok(
-  /resp\.entry_release\s*=\s*\{[\s\S]{0,500}state:\s*policy\.state[\s\S]{0,500}release_at:\s*policy\.release_at/.test(guestApi),
-  'doProperty must attach entry_release to the response',
-);
-assert.ok(
-  /state:\s*'unavailable',\s*reason:\s*'policy_error'/.test(guestApi),
-  'doProperty must fall closed to unavailable/policy_error on loader throws',
-);
+// Property delivery shares one snapshot for permission and room/code selection.
+assert.ok(/import\s*\{[^}]*loadGuestPropertyAccess[^}]*\}\s*from\s*['"]\.\/_entry-release-loader\.js['"]/.test(guestApi));
+assert.ok(/resp\.entry_release\s*=\s*\{[\s\S]{0,500}state: policy\.state[\s\S]{0,500}release_at: policy\.release_at/.test(guestApi));
+assert.ok(/state: 'unavailable',\s*reason: 'policy_error'/.test(guestApi));
 
 // ── 3. Guest UI reads entry_release from the response ────────────────
 assert.ok(

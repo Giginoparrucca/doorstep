@@ -8,6 +8,7 @@ import handleCspReport from './_csp-report.js';
 // keybox_code read. Phase 2 adds the opt-in UI and the roster/time
 // enforcement for properties that opt in.
 import { entryReleaseAllows, evaluateGuestEntryRelease, projectGuestEntry } from './_entry-release-loader.js';
+import { readEntryChat } from './_entry-chat-delivery.js';
 import { submitEntryCheckin } from './_entry-submission-save.js';
 // api/guest.js — Round 34 chat gateway + Round 48 guest gateway.
 //
@@ -111,8 +112,6 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const MAX_MESSAGE_LEN = 4000;
 const SEND_HOURLY_LIMIT_PER_SESSION = 60;
-const HISTORY_LIMIT = 50;
-const POLL_LIMIT    = 5;
 
 export default async function handler(req, res) {
   // Public, diagnostics-only rewrite; no guest action or database access.
@@ -154,9 +153,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    if (action === 'history')          return await doHistory(res, propertyId, bookingCode);
+    if (action === 'history')          return await doHistory(res, propertyId, bookingCode, isTest, v.payload.exp, body.lang);
     if (action === 'send')             return await doSend(res, propertyId, bookingCode, sessionId, body, isTest);
-    if (action === 'poll')             return await doPoll(res, propertyId, bookingCode, body);
+    if (action === 'poll')             return await doPoll(res, propertyId, bookingCode, body, isTest, v.payload.exp);
     // Round 48 Phase 2 — guest-visible resources
     if (action === 'property')         return await doProperty(res, propertyId, bookingCode, isTest, v.payload.exp);
     if (action === 'keybox')           return await doGuestKeybox(res, propertyId, bookingCode, isTest, v.payload.exp);
@@ -175,22 +174,16 @@ export default async function handler(req, res) {
 }
 
 // ── action: history ───────────────────────────────────────────────────
-async function doHistory(res, propertyId, bookingCode) {
-  const clauses = buildScopeClauses(propertyId, bookingCode);
-  const path = `chat_messages?select=id,sender,message,booking_code,created_at`
-             + `&${clauses}`
-             + `&order=created_at.asc&limit=${HISTORY_LIMIT}`;
-  const r = await pgrestGET(path);
-  if (!r.ok) {
-    const t = await r.text().catch(() => '');
-    return res.status(500).json({ error: 'history query failed', detail: t });
-  }
-  const rows = await r.json();
-  return res.status(200).json({ messages: rows });
+async function doHistory(res, propertyId, bookingCode, isTest, sessionExp, lang) {
+  res.setHeader('Cache-Control', 'private, no-store');
+  try {
+    return res.status(200).json(await readEntryChat({ callRPC, propertyId, bookingCode, isTest, sessionExp, lang }));
+  } catch (_) { return res.status(503).json({ error: 'Chat temporarily unavailable' }); }
 }
 
 // ── action: send ──────────────────────────────────────────────────────
 async function doSend(res, propertyId, bookingCode, sessionId, body, isTest) {
+  res.setHeader('Cache-Control', 'private, no-store');
   const message = String(body.message || '').trim();
   const sender  = String(body.sender  || 'guest').toLowerCase();
 
@@ -233,8 +226,7 @@ async function doSend(res, propertyId, bookingCode, sessionId, body, isTest) {
     body: JSON.stringify(row),
   });
   if (!insRes.ok) {
-    const t = await insRes.text().catch(() => '');
-    return res.status(500).json({ error: 'insert failed', detail: t });
+    return res.status(500).json({ error: 'insert failed' });
   }
   const [inserted] = await insRes.json();
 
@@ -271,42 +263,13 @@ async function doSend(res, propertyId, bookingCode, sessionId, body, isTest) {
 // ── action: poll ──────────────────────────────────────────────────────
 // Returns host/system messages newer than the cursor. The guest UI uses
 // this to render responses without a full page refresh.
-async function doPoll(res, propertyId, bookingCode, body) {
+async function doPoll(res, propertyId, bookingCode, body, isTest, sessionExp) {
+  res.setHeader('Cache-Control', 'private, no-store');
   const since = String(body.since || '').trim();
-  if (!since || Number.isNaN(new Date(since).getTime())) {
-    return res.status(400).json({ error: 'since (ISO timestamp) required' });
-  }
-  const clauses = buildScopeClauses(propertyId, bookingCode);
-  // sender=in.(host,system) — only server-side / host replies. The guest's
-  // own messages are already on their screen.
-  const path = `chat_messages?select=id,sender,message,booking_code,created_at`
-             + `&${clauses}`
-             + `&sender=in.(host,system)`
-             + `&created_at=gt.${encodeURIComponent(since)}`
-             + `&order=created_at.asc&limit=${POLL_LIMIT}`;
-  const r = await pgrestGET(path);
-  if (!r.ok) {
-    const t = await r.text().catch(() => '');
-    return res.status(500).json({ error: 'poll query failed', detail: t });
-  }
-  const rows = await r.json();
-  return res.status(200).json({ messages: rows });
-}
-
-// ── Scope: build PostgREST clauses that pin the query to the token's
-// property + booking-code bucket, and hide test/soft-deleted rows.
-// If the token carries a booking_code, filter to it exactly. Otherwise
-// filter to the empty-string/null bucket (Round 28: the column had a
-// non-null default and legacy rows exist).
-function buildScopeClauses(propertyId, bookingCode) {
-  const base = `property_id=eq.${encodeURIComponent(propertyId)}`
-             + `&is_test=eq.false`
-             + `&deleted_at=is.null`;
-  if (bookingCode) {
-    return base + `&booking_code=eq.${encodeURIComponent(bookingCode)}`;
-  }
-  // Pre-checkin / no-code guest: match null OR empty string.
-  return base + `&or=(booking_code.is.null,booking_code.eq.)`;
+  if (!since || Number.isNaN(new Date(since).getTime())) return res.status(400).json({ error: 'since (ISO timestamp) required' });
+  try {
+    return res.status(200).json(await readEntryChat({ callRPC, propertyId, bookingCode, isTest, sessionExp, since, lang: body.lang }));
+  } catch (_) { return res.status(503).json({ error: 'Chat temporarily unavailable' }); }
 }
 
 // ── Rate limit: 60 sends/session/rolling hour, via api_usage row count

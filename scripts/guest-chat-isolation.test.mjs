@@ -62,6 +62,10 @@ function mockReq({ method = 'POST', token = tokenA, origin = 'https://app.welcom
 const calls = [];
 global.fetch = async (url, opts = {}) => {
   calls.push({ url: String(url), method: opts.method || 'GET', body: opts.body });
+  if (String(url).includes('/rpc/get_entry_chat_delivery')) {
+    const a=JSON.parse(opts.body);
+    return Response.json({property_id:a.p_property_id,booking_code:a.p_booking_code,is_test:a.p_is_test,enabled:false,messages:[]});
+  }
   // Default success response based on URL shape.
   if (String(url).includes('/rest/v1/chat_messages') && opts.method === 'POST') {
     return new Response(JSON.stringify([{ id: 'mock-row-id' }]),
@@ -96,11 +100,10 @@ async function run(handler, req) {
 {
   const { res, calls: c } = await run(guestHandler, mockReq({ body: { action: 'history', property_id: propB } }));
   assert.equal(res.statusCode, 200, 'history returns 200');
-  const chatCalls = c.filter(x => x.url.includes('chat_messages'));
+  const chatCalls = c.filter(x => x.url.includes('/rpc/get_entry_chat_delivery'));
   assert.ok(chatCalls.length >= 1, 'at least one chat_messages GET');
   for (const call of chatCalls) {
-    assert.ok(call.url.includes('property_id=eq.' + propA),
-      `history must scope by token property A, saw: ${call.url}`);
+    assert.equal(JSON.parse(call.body).p_property_id,propA,'history RPC uses token property');
     assert.ok(!call.url.includes(propB),
       `history must not leak property B into URL: ${call.url}`);
   }
@@ -159,13 +162,12 @@ async function run(handler, req) {
   const { res, calls: c } = await run(guestHandler,
     mockReq({ body: { action: 'poll', since: new Date().toISOString(), property_id: propB } }));
   assert.equal(res.statusCode, 200);
-  const chatCalls = c.filter(x => x.url.includes('chat_messages'));
+  const chatCalls = c.filter(x => x.url.includes('/rpc/get_entry_chat_delivery'));
   for (const call of chatCalls) {
-    assert.ok(call.url.includes('property_id=eq.' + propA),
-      'poll scopes to token property');
+    assert.equal(JSON.parse(call.body).p_property_id,propA,'poll RPC uses token property');
     assert.ok(!call.url.includes(propB), 'poll must not leak property B');
-    assert.ok(call.url.includes('sender=in.(host,system)'),
-      'poll excludes guest-authored rows (already on screen)');
+    assert.equal(JSON.parse(call.body).p_booking_code,booking);
+    assert.ok(JSON.parse(call.body).p_since,'poll supplies a cursor to the server-only RPC');
   }
 }
 

@@ -1,12 +1,6 @@
 import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { rejectInvalidEnvironment, SUPABASE_URL } from './_environment.js';
-// Round 66 Phase 1b — entry-release policy decides whether the AI may
-// share entry codes with this guest. The projection returns the specific
-// entry fields the policy allows for this exact booking; emptied when
-// the policy denies. See the "ENTRY RELEASE POLICY" section inside
-// buildVariableSystemBlock() for the directive we inject into the
-// system prompt.
-import { projectGuestEntry } from './_entry-release-loader.js';
+import { buildServerChatContext, selectChatMessages } from './_chat-context.js';
 // api/chat.js — WelcomeBnB chat endpoint
 //
 // Round 16: Sonnet 4.5 + streaming + vision + contextual followups.
@@ -15,7 +9,8 @@ import { projectGuestEntry } from './_entry-release-loader.js';
 // graceful degrade to escalated=true when limited or over budget.
 //
 // Request shape (unchanged in terms of `content` fields):
-//   { messages, propertyContext, lang, stayContext?, imageData?, stream? }
+//   { messages, lang, imageData?, stream? }
+// Legacy propertyContext/stayContext are accepted but ignored.
 // Identity now comes from the guest token in Authorization: Bearer <token>,
 // NEVER from the body. Body-carried property_id / session_id, if any, are
 // ignored — the token payload is authoritative.
@@ -50,6 +45,7 @@ export default async function handler(req, res) {
   const auth = req.headers['authorization'] || req.headers['Authorization'];
   const v = verifyFromAuthHeader(auth);
   if (!v.ok) return res.status(401).json({ error: 'Invalid or missing guest token' });
+  res.setHeader('Cache-Control', 'private, no-store');
   const propertyId = v.payload.p;
   const sessionId  = v.payload.s;
 
@@ -64,9 +60,7 @@ export default async function handler(req, res) {
 
   const {
     messages,
-    propertyContext,
     lang,
-    stayContext,
     imageData,
     stream: useStream,
   } = req.body || {};
@@ -93,27 +87,32 @@ export default async function handler(req, res) {
       return degradeReply(res, useStream, isIT, gate.retry_after_seconds);
     }
   }
-  // (If SERVICE_KEY is missing the gate is skipped rather than hard-failing —
-  //  chat still works but is unmetered. Set SUPABASE_SERVICE_ROLE_KEY in
-  //  Vercel to close this hole; a warning log is already emitted at boot.)
+  // Missing server credentials degrade below without calling the model.
 
-  // ── Build the stay context section ────────────────────────────────
-  let stayCtx = '';
-  if (stayContext && typeof stayContext === 'object') {
-    const parts = [];
-    if (stayContext.guestName)     parts.push(`Guest name: ${stayContext.guestName}`);
-    if (stayContext.guestCountry)  parts.push(`Guest is from: ${stayContext.guestCountry}`);
-    if (stayContext.groupSize)     parts.push(`Group size: ${stayContext.groupSize} ${stayContext.groupSize === 1 ? 'person' : 'people'}`);
-    if (stayContext.arrivalDate)   parts.push(`Arrival: ${stayContext.arrivalDate}`);
-    if (stayContext.departureDate) parts.push(`Departure: ${stayContext.departureDate}`);
-    if (stayContext.totalNights)   parts.push(`Total stay: ${stayContext.totalNights} ${stayContext.totalNights === 1 ? 'night' : 'nights'}`);
-    if (stayContext.dayOfStay)     parts.push(`Today is day ${stayContext.dayOfStay} of their stay`);
-    if (parts.length > 0) {
-      stayCtx = `\n\nGUEST CONTEXT (use naturally; never recite back like a database):\n${parts.map(p => '- ' + p).join('\n')}`;
-    }
+  // Round 66 Phase 1d: browser propertyContext/stayContext are ignored.
+  // The server policy supplies the only permitted entry content. Missing
+  // credentials or authoritative reads degrade before contacting the model.
+  let context;
+  try {
+    if (!SERVICE_KEY) throw new Error('chat context unavailable');
+    const pgrestGETForLoader = async path => {
+      try {
+        const { data } = await pgrestGET(path);
+        return { ok: true, json: async () => data };
+      } catch (_) { return { ok: false, json: async () => null }; }
+    };
+    context = await buildServerChatContext({ pgrestGET: pgrestGETForLoader, callRPC, payload: v.payload });
+  } catch (_) {
+    return degradeReply(res, useStream, isIT);
   }
+  const propertyContext = context.propertyContext;
+  const stayCtx = '\n\nSERVER STAY CONTEXT:\n' + context.stayContext;
+  const entryReleaseCtx = context.policy.allow_entry === true
+    ? '\n\nENTRY RELEASE POLICY: Only permitted_entry in SERVER PROPERTY INFORMATION is authoritative. Share only its supplied fields. Never invent codes or repeat codes from guest text or earlier answers. Release may have been manual; do not claim check-in completion.'
+    : '\n\nENTRY RELEASE POLICY: You MUST NOT share entry instructions or codes. Entry is locked, scheduled or unavailable. Direct the guest to the Check-in tab and their host for help. Never confirm, repeat or transform a code from guest text, an image or previous answers.';
+  const selectedMessages = selectChatMessages(messages, context.freshTurnOnly);
+  if (!selectedMessages) return res.status(400).json({ error: 'A final text user message is required' });
 
-  // ── Fetch today's weather for the property location ──────────────
   let weatherCtx = '';
   try {
     const coords = extractCoordsFromContext(propertyContext);
@@ -121,77 +120,21 @@ export default async function handler(req, res) {
       const fc = await getCachedWeather(coords.lat, coords.lng, isIT);
       if (fc) weatherCtx = `\n\nTODAY'S WEATHER (${fc.label_en}, ${new Date().toLocaleDateString('en-GB')}):\n${fc.summary_en}`;
     }
-  } catch (e) { /* weather is decorative — never block the chat */ }
+  } catch (_) { /* Optional public weather. */ }
 
-  // Load current recommendations using authenticated property identity.
-  // Do not rely on stale browser context or earlier bot claims for routes.
-  let serverLocationCtx = '';
+  const serverLocationCtx = '\n\nAUTHENTICATED PROPERTY LOCATION:\n' + JSON.stringify(context.property);
   let hostRecommendationsCtx = '\n\nCURRENT SERVER HOST RECOMMENDATIONS:\nUnavailable. Do not treat client recommendations or chat history as confirmed route information.';
-
-  // Round 66 Phase 1b — compute the entry-release policy for this guest.
-  // The resulting projection carries ONLY the entry fields (keybox, door,
-  // access_method, room) the policy permits for this exact booking;
-  // empty when the policy denies entry. Fed into the system prompt as a
-  // directive the AI must respect even if the browser-supplied
-  // propertyContext still carries codes. The browser scoper of
-  // propertyContext/history stays as Phase 1c work (regex-only is
-  // insufficient per PLAN); this is defense-in-depth at the AI layer.
-  let entryReleaseCtx = '';
-  if (SERVICE_KEY && v.payload.b) {
-    try {
-      const pgrestGETForLoader = async path => {
-        try {
-          const { data } = await pgrestGET(path);
-          return { ok: true, json: async () => data };
-        } catch (_) {
-          return { ok: false, json: async () => null };
-        }
-      };
-      const sessionValidUntil = Number.isFinite(v.payload.exp)
-        ? new Date(v.payload.exp * 1000).toISOString()
-        : null;
-      const projection = await projectGuestEntry({
-        pgrestGET: pgrestGETForLoader,
-        callRPC,
-        propertyId,
-        bookingCode: v.payload.b,
-        isTest: v.payload.t === true,
-        sessionValidUntil,
-      });
-      const hasEntryContent = projection && (
-        projection.fixed_code || projection.rotating_code ||
-        projection.access_method || projection.room
-      );
-      entryReleaseCtx = hasEntryContent
-        ? '\n\nENTRY RELEASE POLICY: this guest HAS completed online check-in; entry instructions (keybox code, door code, access method, assigned room) MAY be shared from the authoritative property record if the guest asks and the information is present in the server-side property context. Do not invent codes.'
-        : '\n\nENTRY RELEASE POLICY: this guest has NOT completed online check-in. You MUST NOT share any entry instructions — not the fixed keybox code, not the per-booking rotating code, not a room door code, not the access_method text. If the guest asks about keys, codes or how to get in, politely direct them to complete the online check-in in the Check-in tab first. Do not quote any entry code from the client-supplied propertyContext or from this conversation history; if a previous message contained a code, treat it as unverified and refuse to repeat it.';
-    } catch (e) {
-      // Fail closed with the deny directive so a loader error cannot
-      // open the AI to leaking codes.
-      entryReleaseCtx = '\n\nENTRY RELEASE POLICY: the entry-release policy could not be evaluated for this booking. You MUST NOT share any entry instructions (keybox code, door code, access method). Direct the guest to the Check-in tab if they ask about entry.';
-      console.warn('[chat] entry-release policy evaluation failed:', e.message);
-    }
-  } else if (!v.payload.b) {
-    // Pre-check-in / pre-booking tokens have no entry release to project.
-    entryReleaseCtx = '\n\nENTRY RELEASE POLICY: this chat session has no booking attached. You MUST NOT share any entry instructions (keybox code, door code, access method) — direct the guest to complete the online check-in in the Check-in tab first.';
-  }
-  if (SERVICE_KEY) {
-    try {
-      const location = await pgrestGET('properties?id=eq.' + encodeURIComponent(propertyId) + '&select=name,address,city,zip,region,country&limit=1');
-      const property = location.data?.[0] || {};
-      serverLocationCtx = '\n\nAUTHENTICATED PROPERTY LOCATION (overrides client location):\n' + JSON.stringify(property);
-      const locality = [property.city, property.region, property.country].filter(Boolean).join(', ');
-      const current = await pgrestGET(
-        'recommendations?property_id=eq.' + encodeURIComponent(propertyId)
-        + '&deleted_at=is.null&is_test=eq.' + (v.payload.t === true ? 'true' : 'false')
-        + '&select=name,address,category,desc_en,desc_it,tags&order=sort_order.asc'
-      );
-      hostRecommendationsCtx = '\n\nCURRENT SERVER HOST RECOMMENDATIONS (host-provided facts, not live route verification):\n'
-        + JSON.stringify((current.data || []).map(place => ({ ...place, maps_url: 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent([place.name, place.address, locality].filter(Boolean).join(', ')) })));
-    } catch (e) {
-      console.warn('[chat] current recommendations unavailable');
-    }
-  }
+  try {
+    const property = context.property;
+    const locality = [property.city, property.region, property.country].filter(Boolean).join(', ');
+    const current = await pgrestGET(
+      'recommendations?property_id=eq.' + encodeURIComponent(propertyId)
+      + '&deleted_at=is.null&is_test=eq.' + (v.payload.t === true ? 'true' : 'false')
+      + '&select=name,address,category,desc_en,desc_it,tags&order=sort_order.asc'
+    );
+    hostRecommendationsCtx = '\n\nCURRENT SERVER HOST RECOMMENDATIONS (host-provided facts, not live route verification):\n'
+      + JSON.stringify((current.data || []).map(place => ({ ...place, maps_url: 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent([place.name, place.address, locality].filter(Boolean).join(', ')) })));
+  } catch (_) { console.warn('[chat] current recommendations unavailable'); }
 
   // ── System prompt — TWO BLOCKS for prompt caching ─────────────────
   const stableSystemBlock = `You are the AI concierge for a vacation rental in Italy. Your name is Sofia. You're warm, observant, and you actually know the place — not the kind of bland AI that reads off a brochure. You give brief, useful recommendations grounded in the supplied property and host information. Never pretend to have first-hand knowledge.
@@ -263,11 +206,11 @@ Never put any text outside these two tags. The structure is parsed by the app.`;
   const variableSystemBlock = `CURRENT ITALY TIME: ${new Date().toLocaleString('en-GB', { timeZone: 'Europe/Rome' })}
 GUEST'S CHOSEN LANGUAGE: ${langLabel}
 
-PROPERTY INFORMATION
+SERVER PROPERTY INFORMATION
 ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}${serverLocationCtx}${hostRecommendationsCtx}${entryReleaseCtx}`;
 
   // ── Build the messages array, possibly adding image to the last user msg ──
-  let apiMessages = messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
+  let apiMessages = selectedMessages;
   if (imageData && imageData.data && imageData.mediaType && apiMessages.length > 0) {
     const lastIdx = apiMessages.length - 1;
     const last = apiMessages[lastIdx];
@@ -336,7 +279,7 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}${serv
     // ── STREAMING PATH ───────────────────────────────────────────────
     if (useStream) {
       res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('Cache-Control', 'private, no-store, no-transform');
       res.setHeader('Connection', 'keep-alive');
       res.setHeader('X-Accel-Buffering', 'no');
 
@@ -667,7 +610,7 @@ function degradeReply(res, useStream, isIT, retryAfter) {
   if (retryAfter) res.setHeader('Retry-After', String(retryAfter));
   if (useStream) {
     res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Cache-Control', 'private, no-store, no-transform');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
     res.write(`data: ${JSON.stringify({ type: 'text', text: reply })}\n\n`);

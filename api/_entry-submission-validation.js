@@ -2,8 +2,8 @@
 // parser or auth mechanism; the snapshot loader must supply authoritative rows,
 // stable slot bindings and storage evidence from one consistent read.
 import { createHash } from 'node:crypto';
-import { createRequire } from 'node:module';
-const records = createRequire(import.meta.url)('../lib/alloggiati-records.js');
+// Static import keeps the shared CommonJS tables visible to deployment tracing.
+import records from '../lib/alloggiati-records.js';
 const text = v => typeof v === 'string' && v.trim().length > 0;
 const day = v => typeof v === 'string' && /^\d{4}-\d\d-\d\d$/.test(v)
   && Number.isFinite(Date.parse(v)) && new Date(v).toISOString().slice(0,10) === v;

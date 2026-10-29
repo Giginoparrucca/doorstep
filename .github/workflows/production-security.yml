@@ -27,10 +27,11 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_PRODUCTION_SERVICE_ROLE_KEY }}
           # Preflight the pending Round 66 migration before its source PR merges.
           # This adds a required name; main-only checkout/review/credentials stay intact.
-          SCHEMA_DRIFT_REQUIRED_MIGRATIONS: '["round66_atomic_submissions"]'
+          SCHEMA_DRIFT_REQUIRED_MIGRATIONS: '["round66_atomic_submissions","round66_chat_history_guard"]'
           SPOT_SMOKE_ORIGIN: https://app.welcomebnb.it
           TAX_SMOKE_ORIGIN: https://app.welcomebnb.it
           SECURITY_SMOKE_ORIGIN: https://app.welcomebnb.it
+          CHAT_SMOKE_ORIGIN: https://app.welcomebnb.it
         run: |
           test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo "Protected production credential is missing"; exit 1; }
           npm run test:live

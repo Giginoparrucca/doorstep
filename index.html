@@ -4566,7 +4566,7 @@ async function saveChatMsg(sender, message) {
   // Round 48: chat writes stay on /api/guest (Round 48 rename of
   // /api/guest-chat). property_id + booking_code are derived server-
   // side from the guest token, so we only pass sender + message.
-  console.log('💬 Saving chat:', sender, message.substring(0, 50));
+  console.log('💬 Saving chat:', sender);
   const r = await _guestCall('send', { sender, message });
   if (!r || !r.ok) console.error('💬 Chat save FAILED', r);
   else console.log('💬 Chat saved OK', r.data?.id);
@@ -4958,7 +4958,7 @@ function startHostChatListener() {
   // scopes by the token payload — booking_code is respected too, so a
   // guest with a booking code only sees messages tagged with it.
   const setCursor = async () => {
-    const h = await _guestCall('history', {});
+    const h = await _guestCall('history', { lang });
     const msgs = (h && h.data && h.data.messages) || [];
     if (msgs.length > 0) {
       localStorage.setItem('wbnb_chat_seen', msgs[msgs.length - 1].created_at);
@@ -4972,14 +4972,14 @@ function startHostChatListener() {
     if (!propertyId) return;
     try {
       const cursor = localStorage.getItem('wbnb_chat_seen') || new Date(0).toISOString();
-      const r = await _guestCall('poll', { since: cursor });
+      const r = await _guestCall('poll', { since: cursor, lang });
       const newMsgs = (r && r.data && r.data.messages) || [];
       if (newMsgs.length === 0) return;
 
       console.log('🔄 New messages:', newMsgs.length);
       newMsgs.forEach(m => {
         if (m.sender === 'host') {
-          console.log('🏠 Host reply:', m.message);
+          console.log('🏠 Host reply received');
           addBubble(`**${propertyData?.host_names || 'Host'}:** ${m.message}`, 'bot');
         }
         if (m.sender === 'system' && (m.message.includes('resolved') || m.message.includes('returned to AI'))) {
@@ -5023,7 +5023,7 @@ async function checkExistingChat() {
     // Round 48: reads go through /api/guest which server-side
     // scopes by property_id + booking_code from the token payload.
     // Filters is_test=false + deleted_at IS NULL for us.
-    const r = await _guestCall('history', {});
+    const r = await _guestCall('history', { lang });
     const data = (r && r.data && r.data.messages) || [];
     if (data && data.length > 0) {
       const msgEl = document.getElementById('chatMessages');

@@ -7,6 +7,12 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Round 66 Phase 1d-c — Reconcile guest room delivery (in-progress — GPT, 29 October 2026)
+
+Daniele requested the next phase after saved-history/Q&A release. Claimed `codex/round66-room-projection` from verified main `1f5468b3c701d7636d6c489f24a1d314a2940913`. Replace the guest property's independent first-room lookup with the same loaded snapshot used for entry eligibility. Conflicting assignments, foreign/deleted rooms and failed reads must not select an arbitrary room or disclose its code. Preserve unambiguous OFF room labels and existing visibility rules. Dedicated property entry text/fixed codes must also come from the evaluated snapshot, rather than an earlier property row.
+
+No migration or host activation is planned. Add actual gateway/loader tests for ON/OFF ambiguity, room changes between reads, token/test isolation and denial paths; run full regression and green PR CI, then verify canonical deployment and read-only smoke. Broader guest refresh/timezone/cache, opt-in/admin audit and integrated pilot/rollback gates remain open; preserve Round 63/65/67 ownership.
+
 ### Round 66 Phase 1d-b — Saved-chat protection released (partial shipped — PR #238 — GPT, 29 October 2026)
 
 Owner completed the existing GitHub Production environment review. Protected main run [40831720680](https://github.com/Giginoparrucca/doorstep/actions/runs/40831720680), job 123307234942, passed **PASS 7 / FAIL 0 / SKIP 2** at reviewed `fe2a1e9a486dadc6ae8ebdcc6ad8b05db1c6fffd`. Actual logs explicitly require both `round66_atomic_submissions` and `round66_chat_history_guard`; production HTTP schema drift, service grants, Auth/Storage, headers, chat startup, SPOT and tax checks passed. Skips: absent hosted demo origin and provisioned provider read opt-in. No approval protection was bypassed or approved by the agent.

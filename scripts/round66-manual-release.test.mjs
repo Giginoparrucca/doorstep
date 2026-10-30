@@ -12,20 +12,22 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const src = fs.readFileSync(path.resolve(here, '..', 'host-console.html'), 'utf8');
 
-// ── 1. Button exists and is gated on the opt-in column ──────────────
-assert.ok(
-  /propertyData\?\.entry_checkin_required\s*===\s*true/.test(src),
-  'release button must only render when propertyData.entry_checkin_required === true',
-);
-assert.ok(
-  /onclick="releaseEntryManually\(/.test(src),
-  'button must dispatch to releaseEntryManually',
-);
-// data-attributes carry everything the RPC call needs so no fetch is
-// required between the click and the server call
-for (const attr of ['data-booking-code', 'data-arrival', 'data-departure', 'data-is-test', 'data-reservation-id', 'data-expected-count']) {
-  assert.ok(src.includes(attr + '='), `button must carry ${attr}`);
-}
+// ── 1. Status-aware control, gated on the opt-in column ───────────
+// Since 30 Oct 2026 the two buttons are built by one shared control that
+// reads the booking's server state, shows it as a badge and enables only
+// the applicable action. Reservation rows/calendar detail and the dashboard
+// (needs attention / currently staying) all render it.
+assert.ok(/propertyData\?\.entry_checkin_required\s*===\s*true/.test(src),
+  'release controls only render when propertyData.entry_checkin_required === true');
+assert.ok(/function entryReleaseControls\(code, isTest\)/.test(src), 'shared control exists');
+assert.ok(/\$\{entryReleaseControls\(r\.booking_code, r\.is_test === true\)\}/.test(src), 'reservation rows render it');
+assert.ok(/propertyData\?\.entry_checkin_required === true \? entryReleaseControls\(r\.code, false\)/.test(src), 'dashboard rows render it');
+assert.ok(/readHostEntryState\(code, isTest\)/.test(src), 'state comes from the server, not the row');
+assert.ok(/s\.released_manually === true \|\| er\.state === 'manual'/.test(src), 'released state recognised');
+assert.ok(/Codice rilasciato manualmente/.test(src) && /Code released manually/.test(src), 'released badge IT/EN');
+assert.ok(/!view\.released, releaseEntryManually\)/.test(src), 'release enabled only when not released');
+assert.ok(/view\.released, restoreAutomaticRelease\)/.test(src), 'restore enabled only when released');
+assert.ok(/b\.disabled = readonly \|\| !enabled/.test(src), 'read-only views cannot act');
 
 // ── 2. The IT and EN labels and tooltip text are present ──────────
 assert.ok(/Rilascia accesso/.test(src), 'IT button label present');
@@ -51,10 +53,6 @@ assert.ok(
 assert.ok(
   /p_release:\s*false/.test(src),
   'restoreAutomaticRelease must call set_release with p_release=false',
-);
-assert.ok(
-  /onclick="restoreAutomaticRelease\(/.test(src),
-  'Restore button must dispatch to restoreAutomaticRelease',
 );
 assert.ok(/Ripristina automatico/.test(src), 'IT restore button label present');
 assert.ok(/Restore automatic/.test(src), 'EN restore button label present');
@@ -117,4 +115,4 @@ assert.ok(
   'the ota_reservations SELECT that feeds the booking panel must include both guest_count and is_test — otherwise entry_access_confirm_roster rejects every click',
 );
 
-console.log('PASS round66-manual-release: button rendered only when entry_checkin_required=true; IT+EN labels & audit-disclosure tooltip; handler calls confirm_roster + set_release via sb.rpc; separate randomUUID request IDs; state_version threaded between the two RPCs; audit-disclosure confirm dialog in both languages; roster/release error paths both surfaced; incomplete-data guard.');
+console.log('PASS round66-manual-release: status-aware controls (reservation rows, calendar detail, dashboard) only when entry_checkin_required=true, enabling only the applicable action; IT+EN labels & audit-disclosure tooltip; handler calls confirm_roster + set_release via sb.rpc; separate randomUUID request IDs; state_version threaded between the two RPCs; audit-disclosure confirm dialog in both languages; roster/release error paths both surfaced; incomplete-data guard.');

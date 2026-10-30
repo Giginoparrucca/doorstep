@@ -7,6 +7,10 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Hotfix — Province of birth back under country of birth (Claude, 30 October 2026)
+
+Daniele's pilot feedback: in the guest check-in form, "Province of Birth" (shown only for guests born in Italy) appeared after the residence and invoice fields, which Round 68 had inserted above it. Moved the unchanged `#provinceGroup` block in `index.html` to directly follow the Country of Birth / Citizenship row; the field order is now birth details → province of birth → residence → invoice → document. Markup-only move (44 lines out, the same 44 in), no logic change. Visually checked at 390 px (Italian-born guest: province shown and pre-filled BA). Local `npm run test:all`: **PASS 117 / FAIL 0 / SKIP 3** (standing skips).
+
 ### Hotfix — Manual code release shows its state everywhere (Claude, 30 October 2026)
 
 Daniele's pilot feedback on the Round 66 host controls: the reservation detail (opened from the calendar) gave no sign that a code had already been released manually, both "Rilascia accesso" and "Ripristina automatico" were always clickable, and the dashboard's "Currently staying" card had no release controls at all on the arrival day.

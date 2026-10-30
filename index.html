@@ -1285,6 +1285,50 @@ function icon(name, cls) {
         <input class="form-input" type="text" id="citizenship" list="wbnbCountryList" autocomplete="off" data-i18n-placeholder="citizenship_hint">
       </div>
     </div>
+    <!-- Province — shows ONLY when born in Italy (not based on citizenship) -->
+    <div class="form-group" id="provinceGroup" style="display:none;">
+      <label class="form-label" data-i18n="province_label">Province of Birth <span class="req">*</span></label>
+      <select class="form-select" id="birthProvince">
+        <option value="">—</option>
+        <option value="AG">Agrigento (AG)</option><option value="AL">Alessandria (AL)</option><option value="AN">Ancona (AN)</option>
+        <option value="AO">Aosta (AO)</option><option value="AR">Arezzo (AR)</option><option value="AP">Ascoli Piceno (AP)</option>
+        <option value="AT">Asti (AT)</option><option value="AV">Avellino (AV)</option><option value="BA">Bari (BA)</option>
+        <option value="BT">Barletta-Andria-Trani (BT)</option><option value="BL">Belluno (BL)</option><option value="BN">Benevento (BN)</option>
+        <option value="BG">Bergamo (BG)</option><option value="BI">Biella (BI)</option><option value="BO">Bologna (BO)</option>
+        <option value="BZ">Bolzano (BZ)</option><option value="BS">Brescia (BS)</option><option value="BR">Brindisi (BR)</option>
+        <option value="CA">Cagliari (CA)</option><option value="CL">Caltanissetta (CL)</option><option value="CB">Campobasso (CB)</option>
+        <option value="CE">Caserta (CE)</option><option value="CT">Catania (CT)</option><option value="CZ">Catanzaro (CZ)</option>
+        <option value="CH">Chieti (CH)</option><option value="CO">Como (CO)</option><option value="CS">Cosenza (CS)</option>
+        <option value="CR">Cremona (CR)</option><option value="KR">Crotone (KR)</option><option value="CN">Cuneo (CN)</option>
+        <option value="EN">Enna (EN)</option><option value="FM">Fermo (FM)</option><option value="FE">Ferrara (FE)</option>
+        <option value="FI">Firenze (FI)</option><option value="FG">Foggia (FG)</option><option value="FC">Forlì-Cesena (FC)</option>
+        <option value="FR">Frosinone (FR)</option><option value="GE">Genova (GE)</option><option value="GO">Gorizia (GO)</option>
+        <option value="GR">Grosseto (GR)</option><option value="IM">Imperia (IM)</option><option value="IS">Isernia (IS)</option>
+        <option value="SP">La Spezia (SP)</option><option value="AQ">L'Aquila (AQ)</option><option value="LT">Latina (LT)</option>
+        <option value="LE">Lecce (LE)</option><option value="LC">Lecco (LC)</option><option value="LI">Livorno (LI)</option>
+        <option value="LO">Lodi (LO)</option><option value="LU">Lucca (LU)</option><option value="MC">Macerata (MC)</option>
+        <option value="MN">Mantova (MN)</option><option value="MS">Massa-Carrara (MS)</option><option value="MT">Matera (MT)</option>
+        <option value="ME">Messina (ME)</option><option value="MI">Milano (MI)</option><option value="MO">Modena (MO)</option>
+        <option value="MB">Monza e Brianza (MB)</option><option value="NA">Napoli (NA)</option><option value="NO">Novara (NO)</option>
+        <option value="NU">Nuoro (NU)</option><option value="OR">Oristano (OR)</option><option value="PD">Padova (PD)</option>
+        <option value="PA">Palermo (PA)</option><option value="PR">Parma (PR)</option><option value="PV">Pavia (PV)</option>
+        <option value="PG">Perugia (PG)</option><option value="PU">Pesaro e Urbino (PU)</option><option value="PE">Pescara (PE)</option>
+        <option value="PC">Piacenza (PC)</option><option value="PI">Pisa (PI)</option><option value="PT">Pistoia (PT)</option>
+        <option value="PN">Pordenone (PN)</option><option value="PZ">Potenza (PZ)</option><option value="PO">Prato (PO)</option>
+        <option value="RG">Ragusa (RG)</option><option value="RA">Ravenna (RA)</option><option value="RC">Reggio Calabria (RC)</option>
+        <option value="RE">Reggio Emilia (RE)</option><option value="RI">Rieti (RI)</option><option value="RN">Rimini (RN)</option>
+        <option value="RM">Roma (RM)</option><option value="RO">Rovigo (RO)</option><option value="SA">Salerno (SA)</option>
+        <option value="SS">Sassari (SS)</option><option value="SV">Savona (SV)</option><option value="SI">Siena (SI)</option>
+        <option value="SR">Siracusa (SR)</option><option value="SO">Sondrio (SO)</option><option value="SU">Sud Sardegna (SU)</option>
+        <option value="TA">Taranto (TA)</option><option value="TE">Teramo (TE)</option><option value="TR">Terni (TR)</option>
+        <option value="TO">Torino (TO)</option><option value="TP">Trapani (TP)</option><option value="TN">Trento (TN)</option>
+        <option value="TV">Treviso (TV)</option><option value="TS">Trieste (TS)</option><option value="UD">Udine (UD)</option>
+        <option value="VA">Varese (VA)</option><option value="VE">Venezia (VE)</option><option value="VB">Verbano-Cusio-Ossola (VB)</option>
+        <option value="VC">Vercelli (VC)</option><option value="VR">Verona (VR)</option><option value="VV">Vibo Valentia (VV)</option>
+        <option value="VI">Vicenza (VI)</option><option value="VT">Viterbo (VT)</option>
+      </select>
+    </div>
+
     <!-- Round 31 — shared country autocomplete for birth_country + citizenship.
          Populated from wbnbCountryPickerOptions() on load. The submit handler
          rejects any value that doesn't resolve to a canonical country. -->
@@ -1337,50 +1381,6 @@ function icon(name, cls) {
           </div>
         </div>
       </div>
-    </div>
-
-    <!-- Province — shows ONLY when born in Italy (not based on citizenship) -->
-    <div class="form-group" id="provinceGroup" style="display:none;">
-      <label class="form-label" data-i18n="province_label">Province of Birth <span class="req">*</span></label>
-      <select class="form-select" id="birthProvince">
-        <option value="">—</option>
-        <option value="AG">Agrigento (AG)</option><option value="AL">Alessandria (AL)</option><option value="AN">Ancona (AN)</option>
-        <option value="AO">Aosta (AO)</option><option value="AR">Arezzo (AR)</option><option value="AP">Ascoli Piceno (AP)</option>
-        <option value="AT">Asti (AT)</option><option value="AV">Avellino (AV)</option><option value="BA">Bari (BA)</option>
-        <option value="BT">Barletta-Andria-Trani (BT)</option><option value="BL">Belluno (BL)</option><option value="BN">Benevento (BN)</option>
-        <option value="BG">Bergamo (BG)</option><option value="BI">Biella (BI)</option><option value="BO">Bologna (BO)</option>
-        <option value="BZ">Bolzano (BZ)</option><option value="BS">Brescia (BS)</option><option value="BR">Brindisi (BR)</option>
-        <option value="CA">Cagliari (CA)</option><option value="CL">Caltanissetta (CL)</option><option value="CB">Campobasso (CB)</option>
-        <option value="CE">Caserta (CE)</option><option value="CT">Catania (CT)</option><option value="CZ">Catanzaro (CZ)</option>
-        <option value="CH">Chieti (CH)</option><option value="CO">Como (CO)</option><option value="CS">Cosenza (CS)</option>
-        <option value="CR">Cremona (CR)</option><option value="KR">Crotone (KR)</option><option value="CN">Cuneo (CN)</option>
-        <option value="EN">Enna (EN)</option><option value="FM">Fermo (FM)</option><option value="FE">Ferrara (FE)</option>
-        <option value="FI">Firenze (FI)</option><option value="FG">Foggia (FG)</option><option value="FC">Forlì-Cesena (FC)</option>
-        <option value="FR">Frosinone (FR)</option><option value="GE">Genova (GE)</option><option value="GO">Gorizia (GO)</option>
-        <option value="GR">Grosseto (GR)</option><option value="IM">Imperia (IM)</option><option value="IS">Isernia (IS)</option>
-        <option value="SP">La Spezia (SP)</option><option value="AQ">L'Aquila (AQ)</option><option value="LT">Latina (LT)</option>
-        <option value="LE">Lecce (LE)</option><option value="LC">Lecco (LC)</option><option value="LI">Livorno (LI)</option>
-        <option value="LO">Lodi (LO)</option><option value="LU">Lucca (LU)</option><option value="MC">Macerata (MC)</option>
-        <option value="MN">Mantova (MN)</option><option value="MS">Massa-Carrara (MS)</option><option value="MT">Matera (MT)</option>
-        <option value="ME">Messina (ME)</option><option value="MI">Milano (MI)</option><option value="MO">Modena (MO)</option>
-        <option value="MB">Monza e Brianza (MB)</option><option value="NA">Napoli (NA)</option><option value="NO">Novara (NO)</option>
-        <option value="NU">Nuoro (NU)</option><option value="OR">Oristano (OR)</option><option value="PD">Padova (PD)</option>
-        <option value="PA">Palermo (PA)</option><option value="PR">Parma (PR)</option><option value="PV">Pavia (PV)</option>
-        <option value="PG">Perugia (PG)</option><option value="PU">Pesaro e Urbino (PU)</option><option value="PE">Pescara (PE)</option>
-        <option value="PC">Piacenza (PC)</option><option value="PI">Pisa (PI)</option><option value="PT">Pistoia (PT)</option>
-        <option value="PN">Pordenone (PN)</option><option value="PZ">Potenza (PZ)</option><option value="PO">Prato (PO)</option>
-        <option value="RG">Ragusa (RG)</option><option value="RA">Ravenna (RA)</option><option value="RC">Reggio Calabria (RC)</option>
-        <option value="RE">Reggio Emilia (RE)</option><option value="RI">Rieti (RI)</option><option value="RN">Rimini (RN)</option>
-        <option value="RM">Roma (RM)</option><option value="RO">Rovigo (RO)</option><option value="SA">Salerno (SA)</option>
-        <option value="SS">Sassari (SS)</option><option value="SV">Savona (SV)</option><option value="SI">Siena (SI)</option>
-        <option value="SR">Siracusa (SR)</option><option value="SO">Sondrio (SO)</option><option value="SU">Sud Sardegna (SU)</option>
-        <option value="TA">Taranto (TA)</option><option value="TE">Teramo (TE)</option><option value="TR">Terni (TR)</option>
-        <option value="TO">Torino (TO)</option><option value="TP">Trapani (TP)</option><option value="TN">Trento (TN)</option>
-        <option value="TV">Treviso (TV)</option><option value="TS">Trieste (TS)</option><option value="UD">Udine (UD)</option>
-        <option value="VA">Varese (VA)</option><option value="VE">Venezia (VE)</option><option value="VB">Verbano-Cusio-Ossola (VB)</option>
-        <option value="VC">Vercelli (VC)</option><option value="VR">Verona (VR)</option><option value="VV">Vibo Valentia (VV)</option>
-        <option value="VI">Vicenza (VI)</option><option value="VT">Viterbo (VT)</option>
-      </select>
     </div>
 
     <div id="documentSection">

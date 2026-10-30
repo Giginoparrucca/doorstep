@@ -14,7 +14,8 @@ const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const pid = id(10), other = id(20), off = id(30), reservation = id(40), owner = id(1);
 const code = 'FICTIONAL-ATOMIC';
 const migrations = ['20261027041500_round66_entry_roster_audit.sql',
-  '20261028033000_round66_entry_access_state_rpc.sql', '20261028082453_round66_atomic_submissions.sql','20261029105517_round66_host_entry_audit.sql'];
+  '20261028033000_round66_entry_access_state_rpc.sql', '20261028082453_round66_atomic_submissions.sql','20261029105517_round66_host_entry_audit.sql',
+  '20261030090000_round68_invoice_fields.sql'];
 const scope = { propertyId: pid, bookingCode: code, isTest: false,
   sessionValidUntil: new Date(Date.now() + 86400000).toISOString() };
 let checks = 0;
@@ -59,6 +60,7 @@ const args = () => ({ ...scope, pgrestGET, callRPC });
 const row = (ordinal=1) => ({ guest_type: ordinal===1 ? 'head' : 'member', surname: 'Synthetic',
   name: 'Guest'+ordinal, sex: 'F', date_of_birth: ordinal===1 ? '1980-01-01' : '2020-01-01',
   place_of_birth: 'London', birth_country: 'United Kingdom', birth_province: 'EE', citizenship: 'United Kingdom',
+  residence_country: 'United Kingdom',
   document_type: ordinal===1 ? 'passport' : '', document_number: ordinal===1 ? 'FICTIONAL123' : '',
   doc_issue_place: ordinal===1 ? 'London' : '', arrival_date: '2026-11-01', departure_date: '2026-11-05',
   nights: 4, id_photo_path: null, docs_status: 'pending' });
@@ -98,7 +100,7 @@ async function state(expected, submitted) {
   await db.query(`insert into ota_reservations(id,property_id,booking_code,is_test,status,entry_type,guest_count,checkin_date,checkout_date)
     values($1,$2,$3,false,'active','reservation',3,'2026-11-01','2026-11-05')`, [reservation,pid,code]);
   for (const file of migrations) await db.exec(fs.readFileSync(new URL('../../supabase/migrations/'+file, import.meta.url), 'utf8'));
-  await db.exec(fs.readFileSync(new URL('../../supabase/migrations/'+migrations.at(-1), import.meta.url), 'utf8'));
+  for (const file of migrations.slice(-2)) await db.exec(fs.readFileSync(new URL('../../supabase/migrations/'+file, import.meta.url), 'utf8'));
 
 return {db,id,pid,other,off,reservation,owner,code,scope,args,save,row,callRPC,pgrestGET,asRole};
 }

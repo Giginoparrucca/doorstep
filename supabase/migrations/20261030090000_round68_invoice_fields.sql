@@ -11,6 +11,10 @@ ALTER TABLE public.checkins
   ADD COLUMN IF NOT EXISTS residence_postcode text,
   ADD COLUMN IF NOT EXISTS residence_province text;
 ALTER TABLE public.checkins
+  DROP CONSTRAINT IF EXISTS checkins_fiscal_code_format,
+  DROP CONSTRAINT IF EXISTS checkins_residence_province_format,
+  DROP CONSTRAINT IF EXISTS checkins_residence_address_length,
+  DROP CONSTRAINT IF EXISTS checkins_residence_postcode_length,
   ADD CONSTRAINT checkins_fiscal_code_format CHECK (fiscal_code IS NULL OR fiscal_code ~ '^[A-Z0-9]{16}$'),
   ADD CONSTRAINT checkins_residence_province_format CHECK (residence_province IS NULL OR residence_province ~ '^[A-Z]{2}$'),
   ADD CONSTRAINT checkins_residence_address_length CHECK (residence_address IS NULL OR char_length(residence_address) <= 120),

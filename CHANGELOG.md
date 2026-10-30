@@ -7,6 +7,14 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Round 68 — Residence required for regional statistics + optional invoice details (confirmed 2026-10-30)
+
+Daniele confirmed the plain-language recap on 30 October 2026. Specification: `PLAN_round68_residence_invoice_fields.md`. Residence (country, plus comune for Italian residents) becomes required for every guest on every property, with postcode also required in Alto Adige; the main guest gets an optional collapsible invoice section (codice fiscale, address, postcode, provincia). No change to Alloggiati/SPOT/ROSS1000/tax outputs, retention jobs or the Round 66 entry-release gate. Runs alongside open Round 67 phases (Claude), Round 65 Phase 7–8 and Round 63 Phase 3–6 (GPT); their ownership is unchanged.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 1 — Residence rule + invoice fields | in-progress — Claude Opus 5.5 | Migration (4 nullable `checkins` columns + atomic submission function + filed-lock exemption, schema-drift live evidence), `lib/codice-fiscale.js`, guest form + server rule, host modal, ROPA/privacy line, unit + browser + API tests, full `npm run test:all`, PR CI, deploy and `npm run test:live`. |
+
 ### Round 66 Phase 3 — Final close-out verified after startup-test correction (PR #249 — GPT, 29 October 2026)
 
 Round 66 is complete and live. [PR #249](https://github.com/Giginoparrucca/doorstep/pull/249) corrects only the browser fixture's three startup polls: after navigation, an undefined readiness variable now means “keep waiting” rather than a ReferenceError. All existing access, stale-response, storage and navigation assertions remain. The earlier post-merge run [40889774358](https://github.com/Giginoparrucca/doorstep/actions/runs/40889774358) reported **PASS 111 / FAIL 1 / SKIP 3**; that fixture race is resolved, not ignored.

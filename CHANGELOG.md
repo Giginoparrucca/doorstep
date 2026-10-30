@@ -7,6 +7,14 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Ops — Production database outage from exhausted Disk IO budget (Claude, 30 October 2026)
+
+From about 08:40 UTC on 30 October the production Supabase database (`jcjwaqqabgwqhhzhfbts`, Free plan, **Nano** compute) slowed down, and from about 09:35 it was unusable: trivial catalog queries took 13 s or hit the statement timeout, checkpoints needed 45–60 s to write a few buffers, PostgREST kept reconnecting and Auth returned 504/522, so host sign-in, guest pages and the 10-minute Alloggiati autofile tick all failed. Supabase reported no platform incident. On 28 October Supabase had emailed that the project was depleting its Disk IO Budget.
+
+Cause: the Nano instance's disk IO budget, not application load. `pg_stat_statements` (covering 12–30 October) shows the app's own work is small: roughly 160 analytics events and 146 cron runs per day, about 30 k blocks dirtied in 18 days, database size 32 MB. The platform's own background IO (WAL archiving with `archive_timeout=120`, 5-minute checkpoints, monitoring) is enough to drain the Nano budget once there is steady activity.
+
+Fix (owner action, Daniele): upgraded to the **Pro plan** and moved compute to **Small** (2 GB). After the restart: database responding (shared_buffers 512 MB), Auth token endpoint about 0.7 s, post-recovery `npm run test:live` **PASS 4 / FAIL 0 / SKIP 5**. No data change and no code change. Optional follow-ups: watch the daily Disk IO chart for a few days (Micro may be enough later), and add a purge for `cron.job_run_details` (it grows about 146 rows a day and is never cleaned).
+
 ### Round 68 — Residence required for regional statistics + optional invoice details (confirmed 2026-10-30)
 
 Daniele confirmed the plain-language recap on 30 October 2026. Specification: `PLAN_round68_residence_invoice_fields.md`. Residence (country, plus comune for Italian residents) becomes required for every guest on every property, with postcode also required in Alto Adige; the main guest gets an optional collapsible invoice section (codice fiscale, address, postcode, provincia). No change to Alloggiati/SPOT/ROSS1000/tax outputs, retention jobs or the Round 66 entry-release gate. Runs alongside open Round 67 phases (Claude), Round 65 Phase 7–8 and Round 63 Phase 3–6 (GPT); their ownership is unchanged.

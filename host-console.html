@@ -6098,7 +6098,10 @@ async function renderDashboard() {
                 style="position:absolute;top:8px;right:8px;background:transparent;border:none;cursor:pointer;color:var(--ink-soft);font-size:0.78rem;line-height:1;padding:6px 8px;border-radius:6px;transition:all 0.15s;"
                 onmouseover="this.style.background='rgba(224,90,90,0.08)';this.style.color='#c84545'"
                 onmouseout="this.style.background='transparent';this.style.color='var(--ink-soft)'">🗑</button>
-        <button class="btn btn-secondary btn-sm" style="margin-top:8px" data-share-code="${encodeURIComponent(r.code)}" onclick="openBookingShare(decodeURIComponent(this.dataset.shareCode))">${safe(hostLang === 'it' ? 'Condividi' : 'Share')}</button>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:8px;">
+          <button class="btn btn-secondary btn-sm" data-share-code="${encodeURIComponent(r.code)}" onclick="openBookingShare(decodeURIComponent(this.dataset.shareCode))">${safe(hostLang === 'it' ? 'Condividi' : 'Share')}</button>
+          ${propertyData?.entry_checkin_required === true ? entryReleaseControls(r.code, false) : ''}
+        </div>
         ${dateRow}
         ${statRow ? `<div style="font-size:0.78rem;color:var(--ink-soft);margin-top:3px;">${statRow}</div>` : ''}
         ${recoLine}
@@ -6616,26 +6619,7 @@ function _renderReservationCard(r, todayISO) {
       ${reopenBtn}${reopenedNote}
       ${propertyData?.entry_checkin_required === true && r.booking_code && r.checkin_date && r.checkout_date ? `
       ${entryStatusButton(r.booking_code,r.checkin_date,r.checkout_date,r.is_test===true,r.id,r.guest_count)}
-      <button type="button"
-        data-booking-code="${safe(r.booking_code)}"
-        data-arrival="${safe(r.checkin_date)}"
-        data-departure="${safe(r.checkout_date)}"
-        data-is-test="${r.is_test === true ? 'true' : 'false'}"
-        data-reservation-id="${safe(r.id || '')}"
-        data-expected-count="${safe(String(r.guest_count || ''))}"
-        onclick="releaseEntryManually(this.dataset.bookingCode, this.dataset.arrival, this.dataset.departure, this.dataset.isTest === 'true', this.dataset.reservationId, Number(this.dataset.expectedCount))"
-        title="${safe(hostLang === 'it' ? 'Rilascia manualmente il codice del lockbox per questa prenotazione — scavalca il check-in richiesto; l\'azione sarà registrata nell\'audit' : 'Manually release the lockbox code for this booking — bypasses the check-in requirement; the action is recorded in the audit log')}"
-        style="padding:4px 10px;background:rgba(27,94,32,0.14);border:1px solid rgba(27,94,32,0.4);border-radius:6px;font-size:0.72rem;cursor:pointer;color:#1b5e20;font-family:inherit;font-weight:500;">🔓 ${safe(hostLang === 'it' ? 'Rilascia accesso' : 'Release access')}</button>
-      <button type="button"
-        data-booking-code="${safe(r.booking_code)}"
-        data-arrival="${safe(r.checkin_date)}"
-        data-departure="${safe(r.checkout_date)}"
-        data-is-test="${r.is_test === true ? 'true' : 'false'}"
-        data-reservation-id="${safe(r.id || '')}"
-        data-expected-count="${safe(String(r.guest_count || ''))}"
-        onclick="restoreAutomaticRelease(this.dataset.bookingCode, this.dataset.arrival, this.dataset.departure, this.dataset.isTest === 'true', this.dataset.reservationId, Number(this.dataset.expectedCount))"
-        title="${safe(hostLang === 'it' ? 'Ripristina il rilascio automatico — il codice tornerà nascosto finché il check-in non è completato' : 'Restore automatic release — the code goes back to hidden until check-in is complete')}"
-        style="padding:4px 10px;background:transparent;border:1px solid var(--border);border-radius:6px;font-size:0.72rem;cursor:pointer;color:var(--ink-soft);font-family:inherit;font-weight:500;">↩ ${safe(hostLang === 'it' ? 'Ripristina automatico' : 'Restore automatic')}</button>` : ''}
+      ${entryReleaseControls(r.booking_code, r.is_test === true)}` : ''}
     </div>` : '';
   const html = `
     <div style="background:var(--white);border:1px solid rgba(107,122,144,0.10);border-left:3px solid ${style.color};border-radius:8px;padding:10px 14px;margin-bottom:8px;">
@@ -15064,6 +15048,112 @@ async function readHostEntryState(code,isTest) {
   if(!r.ok||target!==propertyId)throw Error(hostLang==='it'?'Stato accesso non disponibile. Riprova.':'Entry status unavailable. Please retry.');
   const result=await r.json();if(target!==propertyId)throw Error('Booking scope changed');return result;
 }
+// Status-aware manual release control. The server is the source of truth:
+// each placeholder reads the booking's entry state, shows it as a badge and
+// enables only the action that applies (release when not released, restore
+// when released). Filled in by hydrateEntryReleaseControls() wherever it is
+// rendered (reservation rows, calendar detail, dashboard).
+function entryReleaseControls(code, isTest) {
+  if (!code) return '';
+  return `<span class="entry-release-controls" data-entry-code="${encodeURIComponent(code)}" data-entry-test="${isTest === true ? 'true' : 'false'}" style="display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;"></span>`;
+}
+function _entryReleaseView(state, it) {
+  const er = state?.entry_release || {}, s = state?.summary || {};
+  if (s.released_manually === true || er.state === 'manual') {
+    return { released: true, tone: 'ok', text: it ? '🔓 Codice rilasciato manualmente' : '🔓 Code released manually' };
+  }
+  const map = {
+    available: ['ok', it ? '✅ Codice visibile: check-in completo' : '✅ Code visible: check-in complete'],
+    scheduled: ['wait', it ? '🕒 Codice programmato' : '🕒 Code scheduled'],
+    locked: ['wait', it ? '🔒 Codice nascosto: check-in incompleto' : '🔒 Code hidden: check-in incomplete'],
+  };
+  const [tone, text] = map[er.state] || ['warn', it ? '⚠️ Codice nascosto: da verificare' : '⚠️ Code hidden: needs review'];
+  return { released: false, tone, text };
+}
+function _renderEntryReleaseControls(node, code, isTest, state) {
+  const it = hostLang === 'it';
+  node.textContent = '';
+  if (state && state.entry_release?.state === 'disabled') return;
+  const badge = document.createElement('span');
+  badge.className = 'entry-release-badge';
+  badge.setAttribute('role', 'status');
+  badge.style.cssText = 'font-size:0.72rem;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap;';
+  if (!state) {
+    badge.textContent = it ? '⚠️ Stato codice non disponibile' : '⚠️ Code status unavailable';
+    badge.style.background = 'rgba(224,90,90,0.10)'; badge.style.color = '#b03939';
+    node.appendChild(badge);
+    return;
+  }
+  const view = _entryReleaseView(state, it);
+  const colors = { ok: ['rgba(27,94,32,0.12)', '#1b5e20'], wait: ['rgba(232,184,75,0.18)', '#7d5e10'], warn: ['rgba(224,90,90,0.10)', '#b03939'] };
+  [badge.style.background, badge.style.color] = colors[view.tone];
+  badge.textContent = view.text;
+  node.appendChild(badge);
+  const readonly = !entryUiEnabled() || (IS_ADMIN_VIEW && !_adminEditEnabled);
+  const s = state.summary || {}, r = state.reservation || {};
+  const arrival = s.arrival_date || r.checkin_date, departure = s.departure_date || r.checkout_date;
+  const count = Number(s.expected_count || r.guest_count), reservationId = s.reservation_id || r.id || null;
+  const mk = (cls, label, title, enabled, action) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = cls; b.textContent = label; b.title = title;
+    b.disabled = readonly || !enabled;
+    b.style.cssText = 'padding:4px 10px;border-radius:6px;font-size:0.72rem;font-family:inherit;font-weight:500;cursor:pointer;';
+    if (b.disabled) { b.style.opacity = '0.45'; b.style.cursor = 'not-allowed'; }
+    b.onclick = async (e) => {
+      e.stopPropagation();
+      if (b.disabled) return;
+      // Without a confirmed guest count the dialog collects it first.
+      if (!Number.isInteger(count) || count < 1 || !arrival || !departure) {
+        await openEntryAccessStatus(code, arrival, departure, isTest, reservationId, count);
+        return;
+      }
+      await action(code, arrival, departure, isTest, reservationId, count);
+      await refreshEntryReleaseControls(code, isTest);
+    };
+    return b;
+  };
+  const release = mk('entry-release-btn', it ? '🔓 Rilascia accesso' : '🔓 Release access',
+    it ? 'Rilascia manualmente il codice per questa prenotazione: scavalca il check-in richiesto; l\'azione sarà registrata nell\'audit'
+       : 'Manually release the code for this booking: bypasses the check-in requirement; the action is recorded in the audit log',
+    !view.released, releaseEntryManually);
+  release.style.background = 'rgba(27,94,32,0.14)'; release.style.border = '1px solid rgba(27,94,32,0.4)'; release.style.color = '#1b5e20';
+  const restore = mk('entry-restore-btn', it ? '↩ Ripristina automatico' : '↩ Restore automatic',
+    it ? 'Ripristina il rilascio automatico: il codice torna nascosto finché il check-in non è completato'
+       : 'Restore automatic release: the code goes back to hidden until check-in is complete',
+    view.released, restoreAutomaticRelease);
+  restore.style.background = 'var(--white)'; restore.style.border = '1px solid var(--border)'; restore.style.color = 'var(--ink)';
+  node.append(release, restore);
+}
+async function hydrateEntryReleaseControls() {
+  if (propertyData?.entry_checkin_required !== true) return;
+  const nodes = [...document.querySelectorAll('.entry-release-controls:not([data-state])')];
+  const groups = new Map();
+  for (const n of nodes) {
+    n.dataset.state = 'loading';
+    const key = n.dataset.entryCode + '|' + n.dataset.entryTest;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(n);
+  }
+  const target = propertyId;
+  await Promise.all([...groups.values()].map(async (list) => {
+    const code = decodeURIComponent(list[0].dataset.entryCode), isTest = list[0].dataset.entryTest === 'true';
+    let state = null;
+    try { state = await readHostEntryState(code, isTest); } catch (_) { state = null; }
+    if (target !== propertyId) return;
+    for (const n of list) { _renderEntryReleaseControls(n, code, isTest, state); n.dataset.state = 'ready'; }
+  }));
+}
+async function refreshEntryReleaseControls(code, isTest) {
+  const enc = encodeURIComponent(code);
+  document.querySelectorAll('.entry-release-controls').forEach(n => {
+    if (n.dataset.entryCode === enc && n.dataset.entryTest === (isTest === true ? 'true' : 'false')) delete n.dataset.state;
+  });
+  await hydrateEntryReleaseControls();
+}
+// Any render path (lists, calendar detail, dashboard) gets filled in.
+new MutationObserver(() => {
+  if (document.querySelector('.entry-release-controls:not([data-state])')) queueMicrotask(hydrateEntryReleaseControls);
+}).observe(document.documentElement, { childList: true, subtree: true });
 function entryStatusButton(code,arrival,departure,isTest,reservationId,count) {
   const args=encodeURIComponent(JSON.stringify([code,arrival,departure,isTest,reservationId,count]));
   return `<button type="button" class="btn btn-secondary" style="padding:5px 10px;font-size:0.75rem" data-entry-scope="${args}" onclick="event.stopPropagation();openEntryAccessStatus(...JSON.parse(decodeURIComponent(this.dataset.entryScope)))">${hostLang==='it'?'Stato accesso':'Entry status'}</button>`;
@@ -15105,8 +15195,8 @@ async function openEntryAccessStatus(code,arrival,departure,isTest,reservationId
       if(r.error)throw r.error;await refresh();
     }catch(_){status.textContent=it?'Conferma non riuscita. Ricarica lo stato prima di riprovare.':'Confirmation failed. Reload status before retrying.';current=null;}
   };
-  d.querySelector('#entryStatusRelease').onclick=async()=>{if(!readonly()&&current&&target===propertyId){await releaseEntryManually(code,arrival,departure,isTest,reservationId,Number(input.value));await refresh();}};
-  d.querySelector('#entryStatusRestore').onclick=async()=>{if(!readonly()&&current&&target===propertyId){await restoreAutomaticRelease(code,arrival,departure,isTest,reservationId,Number(input.value));await refresh();}};
+  d.querySelector('#entryStatusRelease').onclick=async()=>{if(!readonly()&&current&&target===propertyId){await releaseEntryManually(code,arrival,departure,isTest,reservationId,Number(input.value));await refresh();await refreshEntryReleaseControls(code,isTest);}};
+  d.querySelector('#entryStatusRestore').onclick=async()=>{if(!readonly()&&current&&target===propertyId){await restoreAutomaticRelease(code,arrival,departure,isTest,reservationId,Number(input.value));await refresh();await refreshEntryReleaseControls(code,isTest);}};
   await refresh();
 }
 

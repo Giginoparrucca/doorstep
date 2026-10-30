@@ -7,6 +7,14 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Hotfix — Check-in form uses the booking's dates (Claude, 30 October 2026)
+
+Daniele's pilot check-in on TES-PYN48X (8 guests, 30 Oct → 4 Nov, "Require check-in before codes" on) failed with "The booking or guest list has changed". Postgres logged "Guest does not match roster" twice (13:50 and 13:51 UTC). The form's first step had pre-filled arrival = today and departure = tomorrow (31 Oct), and with the check-in gate on the atomic submission function correctly refuses dates that differ from the booking. Nothing was saved (0 check-ins on the booking).
+
+Fix: the guest gateway's property response now includes `stay` (`arrival_date`, `departure_date`, `guest_count`, `dates_locked`), read from the token's own active reservation only. The guest form pre-fills the dates and party size from it. When the property gates entry codes on check-in, the dates are locked, with the hint "Date della tua prenotazione. Se non sono corrette, contatta il tuo host." / "Dates from your booking. If they are wrong, contact your host.". Otherwise they stay editable, and walk-in links keep today/tomorrow. No database or policy change.
+
+Tests: new `scripts/guest-stay-dates-browser.test.mjs` (actual guest page, IT/EN: locked booking dates + party size, editable when not gated, walk-in defaults); `guest-property-instructions.test.mjs` now checks the actual `doProperty` stay (token booking only, lock follows the property setting, absent without a matching reservation or booking code). ROPA consent-card citations refreshed. Local `npm run test:all`: **PASS 118 / FAIL 0 / SKIP 3** (standing skips).
+
 ### Hotfix — Province of birth back under country of birth (Claude, 30 October 2026)
 
 Daniele's pilot feedback: in the guest check-in form, "Province of Birth" (shown only for guests born in Italy) appeared after the residence and invoice fields, which Round 68 had inserted above it. Moved the unchanged `#provinceGroup` block in `index.html` to directly follow the Country of Birth / Citizenship row; the field order is now birth details → province of birth → residence → invoice → document. Markup-only move (44 lines out, the same 44 in), no logic change. Visually checked at 390 px (Italian-born guest: province shown and pre-filled BA). Local `npm run test:all`: **PASS 117 / FAIL 0 / SKIP 3** (standing skips).

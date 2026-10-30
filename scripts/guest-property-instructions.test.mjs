@@ -22,7 +22,9 @@ const ctx = vm.createContext({
   encodeURIComponent,
   PROPERTY_PUBLIC_FIELDS: vm.runInNewContext(fields),
   PROPERTY_POST_CHECKIN_FIELDS: new Set(vm.runInNewContext(gated)),
-  pgrestGET: async () => ({ ok: true, json: async () => [row] }),
+  pgrestGET: async (path) => ({ ok: true, json: async () => path.startsWith('ota_reservations?')
+    ? (path.includes('booking_code=eq.BOOK&') ? [{ checkin_date: '2099-03-10', checkout_date: '2099-03-15', guest_count: 8 }] : [])
+    : [row] }),
   callRPC: async () => ({ ok: true, json: async () => null }),
   entryReleaseAllows: async () => allowed,
   loadGuestPropertyAccess: async () => ({
@@ -30,7 +32,7 @@ const ctx = vm.createContext({
     entryProperty: {}, room: null,
   }),
   resolveGuestRoom: async () => null,
-  Number: { isFinite: Number.isFinite }, Date,
+  Number, Date,
 });
 const start = api.indexOf('async function doProperty(');
 vm.runInContext(api.slice(start, api.indexOf('\n}\n', start) + 2), ctx);
@@ -59,4 +61,16 @@ for (const [, base] of guest.matchAll(/_propTextLang\(d, '([a-z_]+)'/g)) {
   for (const k of [base, `${base}_it`, `${base}_en`]) assert.ok(allow.has(k), `${k} read by guest app but missing from PROPERTY_PUBLIC_FIELDS`);
 }
 
-console.log('PASS guest gateway delivers check-out/transport text from the booking link, check-in instructions only after entry release, and allowlists every _propTextLang field the guest app reads');
+// Booking stay for the check-in form, scoped to the token's booking code.
+row.entry_checkin_required = true;
+await ctx.doProperty(res, 'fixture', 'BOOK', false);
+assert.deepEqual({ ...response.stay }, { arrival_date: '2099-03-10', departure_date: '2099-03-15', guest_count: 8, dates_locked: true });
+row.entry_checkin_required = false;
+await ctx.doProperty(res, 'fixture', 'BOOK', false);
+assert.equal(response.stay.dates_locked, false, 'dates editable when check-in does not gate entry');
+await ctx.doProperty(res, 'fixture', 'OTHER', false);
+assert.equal(response.stay, undefined, 'no stay without a matching reservation');
+await ctx.doProperty(res, 'fixture', null, false);
+assert.equal(response.stay, undefined, 'no stay without a booking code');
+
+console.log('PASS guest gateway: booking stay (dates, party size, lock) for the token booking only; delivers check-out/transport text from the booking link, check-in instructions only after entry release, and allowlists every _propTextLang field the guest app reads');

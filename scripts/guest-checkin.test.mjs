@@ -3,6 +3,7 @@ import {submitEntryCheckin} from '../api/_entry-submission-save.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { createRequire } from 'node:module';
 
 const source = fs.readFileSync(new URL('../api/guest.js', import.meta.url), 'utf8');
 // Exercise the actual gateway insert with a database stub enforcing NOT NULL.
@@ -16,6 +17,8 @@ const context = vm.createContext({supabaseAuthHeaders,
   callRPC: async () => ({ok:true,json:async()=>({enabled:false})}),
   submitEntryCheckin: async () => ({enabled:false}),
   CHECKIN_WRITE_FIELDS: vm.runInNewContext(fields),
+  CodiceFiscale: createRequire(import.meta.url)('../lib/codice-fiscale.js'),
+  pgrestGET: async () => ({ ok: true, json: async () => [{ region: 'Puglia' }] }),
   WALKIN_PREFIX: 'WB-', console, recordUsage: async () => {},
   fetch: async (url, opts) => {
     if (opts.method === 'POST' && url.endsWith('/checkins')) {
@@ -31,7 +34,7 @@ const context = vm.createContext({supabaseAuthHeaders,
 });
 vm.runInContext(helpers + '\n' + insert, context);
 const base = { surname: 'Test', name: 'Guest', sex: 'F',
-  date_of_birth: '1981-03-16', citizenship: 'United States',
+  date_of_birth: '1981-03-16', citizenship: 'United States', residence_country: 'United States',
   arrival_date: '2026-10-06', departure_date: '2026-10-10', nights: 4 };
 for (const guest_type of ['group', 'group_member', 'head', 'member']) {
   const member = ['group_member', 'member'].includes(guest_type);

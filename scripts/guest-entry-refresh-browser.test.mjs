@@ -35,7 +35,7 @@ try {
     if(b.action==='checkin_list')data={guests:[]};
     return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
    }
-   if(['/app-bootstrap.js','/lib/cover-layout.js','/lib/guest-entry-refresh.js','/vendor/supabase-2.118.0.js'].includes(u.pathname))return route.fulfill({contentType:'text/javascript',body:fs.readFileSync(new URL('.'+u.pathname,root),'utf8')});
+   if(['/app-bootstrap.js','/lib/cover-layout.js','/lib/guest-entry-refresh.js','/lib/codice-fiscale.js','/vendor/supabase-2.118.0.js'].includes(u.pathname))return route.fulfill({contentType:'text/javascript',body:fs.readFileSync(new URL('.'+u.pathname,root),'utf8')});
    return route.fulfill({body:''});
   });
   const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));

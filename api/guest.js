@@ -108,6 +108,7 @@ import { createRequire } from 'node:module';
 // autofile 'live' mode. Shared with api/alloggiati.js + host-console;
 // byte-identity enforced by scripts/golden-check.mjs.
 const AllogRecords = createRequire(import.meta.url)('../lib/alloggiati-records.js');
+const CodiceFiscale = createRequire(import.meta.url)('../lib/codice-fiscale.js');
 
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -398,6 +399,7 @@ const CHECKIN_WRITE_FIELDS = [
   'arrival_date', 'departure_date', 'nights',
   'id_photo_path', 'docs_status',
   'residence_country', 'residence_place',
+  'fiscal_code', 'residence_address', 'residence_postcode', 'residence_province',
 ];
 // Columns we return to the guest for the welcome-back + edit flows.
 // Deliberately omits id_photo_path — guest never needs the storage key.
@@ -408,6 +410,7 @@ const CHECKIN_READ_FIELDS = [
   'arrival_date', 'departure_date', 'nights',
   'docs_status', 'alloggiati_status', 'filed_at',
   'checkin_reopened_at', 'residence_country', 'residence_place',
+  'fiscal_code', 'residence_address', 'residence_postcode', 'residence_province',
   'booking_code', 'submitted_at', 'keybox_code',
 ];
 
@@ -636,8 +639,11 @@ async function doCheckinList(res, propertyId, bookingCode, isTest, sessionExpUni
 
 // ── action: checkin_insert ────────────────────────────────────────────
 async function doCheckinInsert(res, propertyId, incomingBookingCode, sessionId, body, isTest) {
-  const inRecord = body.record || {};
+  const inRecord = normalizeInvoiceFields(body.record || {});
   const errors = validateCheckinRecord(inRecord, { requireAll: true });
+  const region = await readPropertyRegion(propertyId);
+  if (region === undefined) return res.status(503).json({ error: 'property_unavailable' });
+  errors.push(...validateResidence(inRecord, region));
   if (errors.length) return res.status(400).json({ error: 'validation_failed', fields: errors });
 
   // Walk-in mint when the token has no booking code.
@@ -755,10 +761,25 @@ async function doCheckinInsert(res, propertyId, incomingBookingCode, sessionId, 
 // ── action: checkin_update ────────────────────────────────────────────
 async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, isTest, sessionExpUnixSec) {
   const id = String(body.id || '').trim();
-  const fields = body.fields || {};
+  const fields = normalizeInvoiceFields(body.fields || {});
   if (!id) return res.status(400).json({ error: 'id required' });
   const errors = validateCheckinRecord(fields, { requireAll: false });
   if (errors.length) return res.status(400).json({ error: 'validation_failed', fields: errors });
+
+  // Residence is required on every save, including edits of rows saved
+  // before it became mandatory: check the row as it will be after the patch.
+  const scopeFilter = `id=eq.${encodeURIComponent(id)}&property_id=eq.${encodeURIComponent(propertyId)}` +
+    `&is_test=eq.${isTest === true ? 'true' : 'false'}&deleted_at=is.null` +
+    (bookingCode ? `&booking_code=eq.${encodeURIComponent(bookingCode)}` : '');
+  const [currentRes, region] = await Promise.all([
+    pgrestGET(`checkins?${scopeFilter}&select=residence_country,residence_place,residence_postcode&limit=1`),
+    readPropertyRegion(propertyId),
+  ]);
+  if (!currentRes.ok || region === undefined) return res.status(503).json({ error: 'checkin_unavailable' });
+  const [current] = await currentRes.json();
+  if (!current) return res.status(409).json({ error: 'already_filed' });
+  const residenceErrors = validateResidence({ ...current, ...fields }, region);
+  if (residenceErrors.length) return res.status(400).json({ error: 'validation_failed', fields: residenceErrors });
 
   const patch = pickFields(fields, CHECKIN_WRITE_FIELDS);
   patch.guest_edited_at = new Date().toISOString();
@@ -1098,7 +1119,55 @@ function validateCheckinRecord(rec, { requireAll }) {
   if (rec.id_photo_path && !String(rec.id_photo_path).startsWith('id-photos/')) {
     errors.push('id_photo_path');
   }
+  // Optional invoice details: format only (already normalised).
+  if (rec.fiscal_code && !CodiceFiscale.isValid(rec.fiscal_code)) errors.push('fiscal_code');
+  if (rec.residence_province && !/^[A-Z]{2}$/.test(rec.residence_province)) errors.push('residence_province');
+  if (rec.residence_address && rec.residence_address.length > 120) errors.push('residence_address');
+  if (rec.residence_postcode && rec.residence_postcode.length > 12) errors.push('residence_postcode');
   return errors;
+}
+
+// Trim the optional invoice fields, uppercase codice fiscale and provincia,
+// and turn '' into null so a cleared field is stored as empty.
+function normalizeInvoiceFields(rec) {
+  const out = { ...rec };
+  const clean = (k, fn) => {
+    if (!(k in out)) return;
+    const v = typeof out[k] === 'string' ? fn(out[k]) : out[k];
+    out[k] = v === '' || v == null ? null : v;
+  };
+  clean('fiscal_code', v => CodiceFiscale.normalize(v));
+  clean('residence_province', v => v.trim().toUpperCase());
+  clean('residence_address', v => v.trim());
+  clean('residence_postcode', v => v.trim());
+  return out;
+}
+
+const ITALY_NAMES = new Set(['italian', 'italiana', 'italiano', 'italy', 'italia', 'it']);
+
+// Regional statistics (ISTAT IST-00139) need every guest's residence: the
+// country, plus the comune for Italian residents. Alto Adige's ASTAT also
+// asks for every guest's postcode. Region comes from the property row.
+function validateResidence(rec, region) {
+  const errors = [];
+  const str = (v) => (typeof v === 'string' ? v.trim() : '');
+  const country = str(rec.residence_country);
+  if (!country) errors.push('residence_country');
+  else if (ITALY_NAMES.has(country.toLowerCase()) && !str(rec.residence_place)) errors.push('residence_place');
+  if (region === 'Alto Adige' && !str(rec.residence_postcode)) errors.push('residence_postcode');
+  return errors;
+}
+
+// The property's region, or undefined when it cannot be read.
+async function readPropertyRegion(propertyId) {
+  try {
+    const r = await pgrestGET(`properties?id=eq.${encodeURIComponent(propertyId)}&deleted_at=is.null&select=region&limit=1`);
+    if (!r.ok) return undefined;
+    const [row] = await r.json();
+    return row ? (row.region || null) : undefined;
+  } catch (_) {
+    return undefined;
+  }
 }
 
 // Crockford base32 — unambiguous human-readable, 8 chars = 40 bits of

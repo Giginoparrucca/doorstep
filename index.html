@@ -1290,19 +1290,52 @@ function icon(name, cls) {
          rejects any value that doesn't resolve to a canonical country. -->
     <datalist id="wbnbCountryList"></datalist>
 
-    <!-- Round 47.2 — optional residence. Not required by Alloggiati Web
-         (168-char tracciato has no residence field), but used by ROSS1000
-         regional statistics and tourist-tax resident exemptions. If left
-         blank, the exports fall back to inferring residence from
-         citizenship/birth place. -->
+    <!-- Round 68 — residence is required for every guest: every region's
+         statistics feed the ISTAT survey IST-00139, which classifies Italians
+         by region and foreigners by country of residence. Italian residents
+         also pick their comune; Alto Adige (ASTAT) also needs the postcode.
+         Members start with the main guest's values, visible and editable.
+         Never inferred from citizenship or birthplace. -->
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label" data-i18n="residence_country_label">Country of Residence <span style="font-weight:400;color:var(--ink-soft);">(optional)</span></label>
-        <input class="form-input" type="text" id="residenceCountry" list="wbnbCountryList" autocomplete="off" data-i18n-placeholder="residence_country_hint" placeholder="e.g., Italy, Germany, France">
+        <label class="form-label" data-i18n="residence_country_label">Country of Residence <span class="req">*</span></label>
+        <input class="form-input" type="text" id="residenceCountry" list="wbnbCountryList" autocomplete="off" data-i18n-placeholder="residence_country_hint" placeholder="e.g., Italy, Germany, France" oninput="onResidenceCountryChange()">
       </div>
       <div class="form-group">
-        <label class="form-label" data-i18n="residence_place_label">Comune / City of Residence <span style="font-weight:400;color:var(--ink-soft);">(optional)</span></label>
+        <label class="form-label" data-i18n="residence_place_label">Comune / City of Residence</label>
         <input class="form-input" type="text" id="residencePlace" autocomplete="off" data-i18n-placeholder="residence_place_hint" placeholder="e.g., Milano, Berlin, Paris">
+      </div>
+    </div>
+    <div id="residencePrefillHint" data-i18n="residence_prefill_hint" style="display:none;margin:-6px 0 12px;font-size:0.72rem;color:var(--ink-soft);">Pre-filled from the main guest — change it if this guest lives elsewhere.</div>
+    <div id="residencePostcodeRequiredSlot">
+      <div class="form-group" id="residencePostcodeGroup">
+        <label class="form-label" id="residencePostcodeLabel">Postcode of Residence</label>
+        <input class="form-input" type="text" id="residencePostcode" autocomplete="postal-code" maxlength="12">
+      </div>
+    </div>
+
+    <!-- Round 68 — optional invoice details, main guest only. -->
+    <div id="invoiceSection" style="display:none;margin-bottom:16px;">
+      <button type="button" id="invoiceToggle" class="btn btn-secondary" aria-expanded="false" aria-controls="invoiceFields" onclick="toggleInvoiceSection()" style="width:100%;text-align:left;font-size:0.8rem;padding:10px 12px;">
+        <span data-i18n="invoice_toggle">Need an invoice? Add your details (optional)</span>
+      </button>
+      <div id="invoiceFields" style="display:none;margin-top:12px;">
+        <div class="form-group">
+          <label class="form-label" data-i18n="fiscal_code_label">Codice fiscale (if you have one)</label>
+          <input class="form-input" type="text" id="fiscalCode" autocomplete="off" maxlength="20" style="text-transform:uppercase;" oninput="onFiscalCodeInput()">
+          <div id="fiscalCodeError" role="alert" data-i18n="val_fiscal_code" style="display:none;margin-top:6px;font-size:0.72rem;color:var(--red);">The codice fiscale doesn't look right — check it or leave it empty.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" data-i18n="residence_address_label">Street and number</label>
+          <input class="form-input" type="text" id="residenceAddress" autocomplete="street-address" maxlength="120">
+        </div>
+        <div class="form-row">
+          <div id="invoicePostcodeSlot"></div>
+          <div class="form-group" id="residenceProvinceGroup" style="display:none;">
+            <label class="form-label" data-i18n="residence_province_label">Province (2 letters)</label>
+            <input class="form-input" type="text" id="residenceProvince" autocomplete="off" maxlength="2" style="text-transform:uppercase;">
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1581,6 +1614,7 @@ function icon(name, cls) {
 </script>
 <script src="/vendor/supabase-2.118.0.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="/lib/guest-entry-refresh.js?v=66g1"></script>
+<script src="/lib/codice-fiscale.js?v=68.1"></script>
 <script>
 /* ══════════════════════════════════════
    SUPABASE CONNECTION
@@ -1953,6 +1987,18 @@ const T = {
     residence_country_hint: 'e.g., Italy, Germany, France',
     residence_place_label: 'Comune / City of Residence',
     residence_place_hint: 'e.g., Milano, Berlin, Paris',
+    residence_prefill_hint: 'Pre-filled from the main guest — change it if this guest lives elsewhere.',
+    residence_postcode_label: 'Postcode of Residence',
+    val_residence_country: 'Please enter the country of residence.',
+    val_residence_country_unknown: 'Country of residence "{v}" isn\'t recognized — please pick one from the list.',
+    val_residence_place: 'Please pick the comune of residence from the list (required for residents of Italy).',
+    val_residence_postcode: 'Please enter the postcode of residence.',
+    invoice_toggle: 'Need an invoice? Add your details (optional)',
+    fiscal_code_label: 'Codice fiscale (if you have one)',
+    residence_address_label: 'Street and number',
+    residence_province_label: 'Province (2 letters)',
+    val_fiscal_code: 'The codice fiscale doesn\'t look right — check it or leave it empty.',
+    val_residence_province: 'The province must be 2 letters (e.g. BA).',
     doc_section: 'Identity Document',
     doctype_label: 'Document Type',
     passport: 'Passport', id_card: 'ID Card / Carta d\'Identità', driving: 'Driving License / Patente',
@@ -2112,6 +2158,18 @@ const T = {
     residence_country_hint: 'es. Italia, Germania, Francia',
     residence_place_label: 'Comune / Città di Residenza',
     residence_place_hint: 'es. Milano, Berlino, Parigi',
+    residence_prefill_hint: 'Copiato dall\'ospite principale: modificalo se questo ospite risiede altrove.',
+    residence_postcode_label: 'CAP di residenza',
+    val_residence_country: 'Inserisci lo stato di residenza.',
+    val_residence_country_unknown: 'Lo stato di residenza "{v}" non è riconosciuto: sceglilo dall\'elenco.',
+    val_residence_place: 'Seleziona il comune di residenza dall\'elenco (obbligatorio per chi risiede in Italia).',
+    val_residence_postcode: 'Inserisci il CAP di residenza.',
+    invoice_toggle: 'Ti serve la fattura? Aggiungi i tuoi dati (facoltativo)',
+    fiscal_code_label: 'Codice fiscale (se ne hai uno)',
+    residence_address_label: 'Via e numero civico',
+    residence_province_label: 'Provincia (sigla)',
+    val_fiscal_code: 'Il codice fiscale non sembra corretto: controllalo o lascialo vuoto.',
+    val_residence_province: 'La provincia deve essere di 2 lettere (es. BA).',
     doc_section: 'Documento d\'Identità',
     doctype_label: 'Tipo Documento',
     passport: 'Passaporto', id_card: 'Carta d\'Identità', driving: 'Patente',
@@ -3027,6 +3085,9 @@ function attachComuneAutocomplete(input, onSelect, opts) {
   //                are all legitimate issuers.
   const strict = !opts || opts.strict !== false;
   input._comuneStrict = strict;
+  // Round 68: residence decides by its own country field (opts.applies).
+  const applies = (opts && opts.applies) || _comuneValidationApplies;
+  input._comuneApplies = applies;
 
   // Build the dropdown panel. Positioned absolute relative to the input's
   // wrapping form-group (which is position:relative implicitly via flow,
@@ -3059,7 +3120,7 @@ function attachComuneAutocomplete(input, onSelect, opts) {
   const renderResults = (query) => {
     // Round 18.2.1: for foreign-born guests the comune dropdown should
     // never appear at all — place of birth / issue are free text.
-    if (!_comuneValidationApplies()) {
+    if (!applies()) {
       panel.style.display = 'none';
       panel.innerHTML = '';
       return;
@@ -3084,7 +3145,7 @@ function attachComuneAutocomplete(input, onSelect, opts) {
     // For a foreign-born guest, place-of-birth and place-of-issue are free
     // text — Paris, Zurich, "Préfecture de Lyon" are all valid and none
     // are in the Italian comune list. Suppress all validation UI for them.
-    if (!_comuneValidationApplies()) {
+    if (!applies()) {
       hint.textContent = '';
       _clearComuneValidated(input);
       return;
@@ -3185,7 +3246,7 @@ function refreshComuneValidation(input, onSelect) {
   _clearComuneValidated(input);
   // Round 18.2: skip comune resolution entirely for foreign-born guests.
   // Their place-of-birth / place-of-issue are free text.
-  if (!_comuneValidationApplies()) {
+  if (!(input._comuneApplies || _comuneValidationApplies)()) {
     // Round 18.2.1: also force-close any open comune dropdown panels —
     // a stale panel may have been rendered before the birth country was
     // known (e.g. during doc scan, fields fill in sequence).
@@ -3311,6 +3372,85 @@ function isMainGuest() {
   return currentGuestIdx === 0;
 }
 
+// Round 68 — residence (required) and invoice details (optional, main guest).
+function _isAltoAdigeProperty() {
+  return (propertyData?.region || '') === 'Alto Adige';
+}
+function _residencePlaceApplies() {
+  return isItalianCountry(document.getElementById('residenceCountry')?.value || '');
+}
+function updateResidenceUI() {
+  const main = isMainGuest();
+  const altoAdige = _isAltoAdigeProperty();
+  const group = document.getElementById('residencePostcodeGroup');
+  const slot = document.getElementById(altoAdige ? 'residencePostcodeRequiredSlot' : 'invoicePostcodeSlot');
+  if (group && slot && group.parentNode !== slot) slot.appendChild(group);
+  const label = document.getElementById('residencePostcodeLabel');
+  if (label) {
+    label.textContent = T[lang].residence_postcode_label + (altoAdige ? ' ' : '');
+    if (altoAdige) {
+      const star = document.createElement('span');
+      star.className = 'req'; star.textContent = '*';
+      label.appendChild(star);
+    }
+  }
+  const invoice = document.getElementById('invoiceSection');
+  if (invoice) invoice.style.display = main ? '' : 'none';
+  const prov = document.getElementById('residenceProvinceGroup');
+  if (prov) prov.style.display = _residencePlaceApplies() ? '' : 'none';
+  const hint = document.getElementById('residencePrefillHint');
+  const lead = savedGuests[0];
+  const country = document.getElementById('residenceCountry')?.value?.trim() || '';
+  if (hint) hint.style.display = (!main && lead && country && lead.residence_country === country) ? '' : 'none';
+}
+function onResidenceCountryChange() {
+  const place = document.getElementById('residencePlace');
+  if (place) refreshComuneValidation(place, _fillResidenceProvince);
+  updateResidenceUI();
+}
+function _fillResidenceProvince(entry) {
+  const prov = document.getElementById('residenceProvince');
+  if (prov && entry && /^[A-Z]{2}$/.test(entry.prov || '') && entry.prov !== 'EE') prov.value = entry.prov;
+}
+function toggleInvoiceSection(force) {
+  const fields = document.getElementById('invoiceFields');
+  const btn = document.getElementById('invoiceToggle');
+  if (!fields || !btn) return;
+  const open = typeof force === 'boolean' ? force : fields.style.display === 'none';
+  fields.style.display = open ? '' : 'none';
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+function onFiscalCodeInput() {
+  const el = document.getElementById('fiscalCode');
+  const err = document.getElementById('fiscalCodeError');
+  if (!el || !err) return;
+  // Hide the error while typing; it reappears on Next if still invalid.
+  err.style.display = 'none';
+  el.style.borderColor = '';
+}
+// Returns validation messages for the residence + invoice fields of the
+// guest currently on screen, and marks the invoice error inline.
+function _residenceInvoiceErrors() {
+  const errors = [];
+  const country = document.getElementById('residenceCountry').value.trim();
+  const placeEl = document.getElementById('residencePlace');
+  if (!country) errors.push(T[lang].val_residence_country);
+  else if (!wbnbAcceptsCountry(country)) errors.push(T[lang].val_residence_country_unknown.replace('{v}', country));
+  else if (isItalianCountry(country) && placeEl.dataset.comuneValidated !== 'true') errors.push(T[lang].val_residence_place);
+  if (_isAltoAdigeProperty() && !document.getElementById('residencePostcode').value.trim()) errors.push(T[lang].val_residence_postcode);
+  if (isMainGuest()) {
+    const cfEl = document.getElementById('fiscalCode');
+    const cf = cfEl.value.trim();
+    const bad = cf && !window.CodiceFiscale?.isValid(cf);
+    document.getElementById('fiscalCodeError').style.display = bad ? '' : 'none';
+    cfEl.style.borderColor = bad ? 'var(--red)' : '';
+    if (bad) { toggleInvoiceSection(true); errors.push(T[lang].val_fiscal_code); }
+    const prov = document.getElementById('residenceProvince').value.trim();
+    if (prov && _residencePlaceApplies() && !/^[A-Za-z]{2}$/.test(prov)) errors.push(T[lang].val_residence_province);
+  }
+  return errors;
+}
+
 function updateSteps() {
   for (let i = 1; i <= 2; i++) {
     const dot = document.getElementById('sd' + i);
@@ -3346,6 +3486,7 @@ function updateSteps() {
 
     // Scanner hint
     document.getElementById('scanHint').textContent = isMain ? T[lang].scan_hint : T[lang].scan_hint_companion;
+    updateResidenceUI();
 
     // Button label
     if (isLast) {
@@ -3398,6 +3539,14 @@ function clearForm() {
   document.getElementById('scanInputCamera').value = '';
   document.getElementById('scanInputGallery').value = '';
   uploadedIdFile = null;
+  // Round 68 — residence stays as a visible, editable pre-fill for the
+  // next guest; invoice details belong to the main guest only.
+  ['fiscalCode','residenceAddress','residenceProvince'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  toggleInvoiceSection(false);
+  onFiscalCodeInput();
 }
 
 function checkinNext() {
@@ -3474,15 +3623,22 @@ function checkinNext() {
       // route appropriately.
     }
 
+    errors.push(..._residenceInvoiceErrors());
+
     if (errors.length > 0) {
       alert(errors.join('\n'));
       // Highlight first empty required field
+      const _resPlaceEl = document.getElementById('residencePlace');
       const fieldMap = [
         ['surname', surname], ['gname', name], ['dob', dob],
         ['birthplace', birthplace], ['birthCountry', birthCountry], ['citizenship', citizenship],
         ['birthProvince', isItalianCountry(birthCountry) ? document.getElementById('birthProvince').value : 'ok'],
         ['docnum', isMainGuest() ? document.getElementById('docnum').value.trim() : 'ok'],
         ['docissue', isMainGuest() ? document.getElementById('docissue').value.trim() : 'ok'],
+        ['residenceCountry', wbnbAcceptsCountry(document.getElementById('residenceCountry').value.trim()) ? 'ok' : ''],
+        ['residencePlace', !_residencePlaceApplies() || _resPlaceEl.dataset.comuneValidated === 'true' ? 'ok' : ''],
+        ['residencePostcode', !_isAltoAdigeProperty() || document.getElementById('residencePostcode').value.trim() ? 'ok' : ''],
+        ['fiscalCode', document.getElementById('fiscalCodeError').style.display === 'none' ? 'ok' : ''],
       ];
       for (const [id, val] of fieldMap) {
         if (!val) {
@@ -3514,6 +3670,15 @@ function checkinPrev() {
       if (document.getElementById('docissue')) document.getElementById('docissue').value = prev.doc_issue_place || '';
       document.getElementById('birthProvince').value = prev.birth_province || '';
       onBirthCountryChange(); // Show/hide province field
+      // Round 68 — restore this guest's residence and invoice details.
+      document.getElementById('residenceCountry').value = prev.residence_country || '';
+      document.getElementById('residencePlace').value = prev.residence_place || '';
+      document.getElementById('residencePostcode').value = prev.residence_postcode || '';
+      document.getElementById('fiscalCode').value = prev.fiscal_code || '';
+      document.getElementById('residenceAddress').value = prev.residence_address || '';
+      document.getElementById('residenceProvince').value = prev.residence_province || '';
+      if (prev.fiscal_code || prev.residence_address || prev.residence_province) toggleInvoiceSection(true);
+      onResidenceCountryChange();
     }
     savedGuests.splice(currentGuestIdx, 1);
     updateSteps();
@@ -3819,10 +3984,15 @@ async function saveCurrentGuest() {
       birth_country: birthCountry || '',
       birth_province: bornInItaly ? province : 'EE',
       citizenship: citizenship || '',
-      // Round 47.2 — optional residence. Blank → ROSS1000 falls back
-      // to citizenship/birth-place inference. Alloggiati doesn't use it.
+      // Round 68 — residence is required (regional statistics); the
+      // postcode is collected in Alto Adige or with invoice details.
       residence_country: document.getElementById('residenceCountry')?.value?.trim() || '',
       residence_place:   document.getElementById('residencePlace')?.value?.trim() || '',
+      residence_postcode: (_isAltoAdigeProperty() || isMainGuest()) ? (document.getElementById('residencePostcode')?.value?.trim() || '') : '',
+      // Optional invoice details, main guest only.
+      fiscal_code:        isMainGuest() ? (window.CodiceFiscale?.normalize(document.getElementById('fiscalCode')?.value) || '') : '',
+      residence_address:  isMainGuest() ? (document.getElementById('residenceAddress')?.value?.trim() || '') : '',
+      residence_province: isMainGuest() && _residencePlaceApplies() ? (document.getElementById('residenceProvince')?.value?.trim().toUpperCase() || '') : '',
       document_type: isMainGuest() ? document.getElementById('doctype').value : '',
       document_number: isMainGuest() ? document.getElementById('docnum').value.trim() : '',
       doc_issue_place: isMainGuest() ? (docIssuePlaceEl?.value?.trim() || birthplace || '') : '',
@@ -3974,7 +4144,10 @@ async function saveCurrentGuest() {
     btn.innerHTML = originalText;
     btn.disabled = false;
     if (!err?.code) {
-      const fields = Array.isArray(err?.fields) ? err.fields : [];
+      const fieldMsg = { residence_country: T[lang].val_residence_country, residence_place: T[lang].val_residence_place,
+        residence_postcode: T[lang].val_residence_postcode, fiscal_code: T[lang].val_fiscal_code,
+        residence_province: T[lang].val_residence_province };
+      const fields = (Array.isArray(err?.fields) ? err.fields : []).map(f => fieldMsg[f] || f);
       alert(err.entryConflict
         ? (lang === 'it' ? 'La prenotazione o l’elenco ospiti è cambiato. Ricarica la pagina per controllare i dati salvati. Se il problema continua, contatta il tuo host.'
           : 'The booking or guest list has changed. Reload the page to check what was saved. If the problem continues, contact your host.')
@@ -3992,6 +4165,19 @@ async function saveCurrentGuest() {
 // screens). isMain here means "this record owns the document fields";
 // the review-step passes `i === 0`, welcome-back checks guest_type.
 function _editFormHTML(g, i, isMain) {
+  // Round 68 — residence (required) for every guest, invoice details for
+  // the main guest. Values are escaped: they come back from the server.
+  const ea = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const lab = t => `<label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${t}</label>`;
+  const inp = (id, v, extra = '') => `<input class="form-input" id="${id}${i}" value="${ea(v)}" style="font-size:0.78rem;padding:8px;" ${extra}>`;
+  const residenceHTML = `
+            <div>${lab(T[lang].residence_country_label + ' *')}${inp('ed_rcountry', g.residence_country, 'list="wbnbCountryList" autocomplete="off"')}</div>
+            <div>${lab(T[lang].residence_place_label)}${inp('ed_rplace', g.residence_place, 'autocomplete="off"')}</div>
+            ${(_isAltoAdigeProperty() || isMain) ? `<div>${lab(T[lang].residence_postcode_label + (_isAltoAdigeProperty() ? ' *' : ''))}${inp('ed_rpostcode', g.residence_postcode, 'maxlength="12"')}</div>` : ''}
+            ${isMain ? `
+            <div>${lab(T[lang].fiscal_code_label)}${inp('ed_fiscal', g.fiscal_code, 'maxlength="20" autocapitalize="characters"')}</div>
+            <div>${lab(T[lang].residence_address_label)}${inp('ed_raddress', g.residence_address, 'maxlength="120"')}</div>
+            <div>${lab(T[lang].residence_province_label)}${inp('ed_rprov', g.residence_province, 'maxlength="2" autocapitalize="characters"')}</div>` : ''}`;
   return `
         <div id="editForm${i}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
@@ -4007,6 +4193,7 @@ function _editFormHTML(g, i, isMain) {
             <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].docnum_label}</label><input class="form-input" id="ed_docnum${i}" value="${g.document_number||''}" style="font-size:0.78rem;padding:8px;"></div>
             <div><label style="font-size:0.55rem;color:var(--ink-soft);display:block;margin-bottom:2px;">${T[lang].docissue_label}</label><input class="form-input" id="ed_docissue${i}" value="${g.doc_issue_place||''}" style="font-size:0.78rem;padding:8px;"></div>
             ` : ''}
+            ${residenceHTML}
           </div>
           <div style="display:flex;gap:8px;margin-top:10px;">
             <button onclick="saveGuestEdit(${i})" class="btn btn-primary" style="flex:1;padding:8px;font-size:0.72rem;">${T[lang].review_save}</button>
@@ -4037,6 +4224,18 @@ function _wireEditFormAutocomplete() {
     if (_edi) {
       attachComuneAutocomplete(_edi, null, { strict: false });
       if (_edi.value && _edi.value.trim()) refreshComuneValidation(_edi, null);
+    }
+    // Round 68 — residence comune, checked only for residents of Italy.
+    const _erp = document.getElementById('ed_rplace' + i);
+    const _erc = document.getElementById('ed_rcountry' + i);
+    if (_erp && _erc) {
+      const fillProv = (entry) => {
+        const _epv = document.getElementById('ed_rprov' + i);
+        if (_epv && entry && /^[A-Z]{2}$/.test(entry.prov || '') && entry.prov !== 'EE') _epv.value = entry.prov;
+      };
+      attachComuneAutocomplete(_erp, fillProv, { applies: () => isItalianCountry(_erc.value) });
+      _erc.addEventListener('input', () => refreshComuneValidation(_erp, fillProv));
+      if (_erp.value && _erp.value.trim()) refreshComuneValidation(_erp, fillProv);
     }
   });
 }
@@ -4178,6 +4377,27 @@ async function saveGuestEdit(idx) {
     return;
   }
 
+  // Round 68 — residence is required on every save, including older
+  // check-ins that never had it; invoice details are optional.
+  const _rc = document.getElementById('ed_rcountry' + idx);
+  const _rp = document.getElementById('ed_rplace' + idx);
+  const _rpc = document.getElementById('ed_rpostcode' + idx);
+  const _cf = document.getElementById('ed_fiscal' + idx);
+  const _rpv = document.getElementById('ed_rprov' + idx);
+  const _rcVal = _rc ? _rc.value.trim() : '';
+  let _resErr = null, _resEl = null;
+  if (!_rcVal) { _resErr = T[lang].val_residence_country; _resEl = _rc; }
+  else if (!wbnbAcceptsCountry(_rcVal)) { _resErr = T[lang].val_residence_country_unknown.replace('{v}', _rcVal); _resEl = _rc; }
+  else if (isItalianCountry(_rcVal) && _rp && _rp.dataset.comuneValidated !== 'true') { _resErr = T[lang].val_residence_place; _resEl = _rp; }
+  else if (_isAltoAdigeProperty() && (!_rpc || !_rpc.value.trim())) { _resErr = T[lang].val_residence_postcode; _resEl = _rpc; }
+  else if (_cf && _cf.value.trim() && !window.CodiceFiscale?.isValid(_cf.value)) { _resErr = T[lang].val_fiscal_code; _resEl = _cf; }
+  else if (_rpv && _rpv.value.trim() && !/^[A-Za-z]{2}$/.test(_rpv.value.trim())) { _resErr = T[lang].val_residence_province; _resEl = _rpv; }
+  if (_resErr) {
+    alert(_resErr);
+    if (_resEl) { _resEl.focus(); _resEl.style.borderColor = 'var(--red)'; setTimeout(() => _resEl.style.borderColor = '', 3000); }
+    return;
+  }
+
   const updates = {
     surname: document.getElementById('ed_surname' + idx).value.trim(),
     name: document.getElementById('ed_name' + idx).value.trim(),
@@ -4192,6 +4412,15 @@ async function saveGuestEdit(idx) {
     updates.document_number = document.getElementById('ed_docnum' + idx).value.trim();
     updates.doc_issue_place = document.getElementById('ed_docissue' + idx).value.trim();
   }
+  if (_rc) {
+    updates.residence_country = _rcVal;
+    updates.residence_place = _rp ? _rp.value.trim() : '';
+  }
+  if (_rpc) updates.residence_postcode = _rpc.value.trim() || null;
+  if (_cf) updates.fiscal_code = window.CodiceFiscale?.normalize(_cf.value) || null;
+  const _raddr = document.getElementById('ed_raddress' + idx);
+  if (_raddr) updates.residence_address = _raddr.value.trim() || null;
+  if (_rpv) updates.residence_province = (isItalianCountry(_rcVal) && _rpv.value.trim().toUpperCase()) || null;
 
   // Round 48 Phase 2 — gateway-routed update. The review-step edit
   // (idx is in the pre-submit list, _dbId unset) stays local-only;
@@ -4213,6 +4442,13 @@ async function saveGuestEdit(idx) {
           showWelcomeBackState(listR.data.guests);
         }
       } catch (_) {}
+      return;
+    }
+    if (r && r.status === 400 && Array.isArray(r.data?.fields)) {
+      const msg = { residence_country: T[lang].val_residence_country, residence_place: T[lang].val_residence_place,
+        residence_postcode: T[lang].val_residence_postcode, fiscal_code: T[lang].val_fiscal_code,
+        residence_province: T[lang].val_residence_province };
+      alert(r.data.fields.map(f => msg[f] || f).join('\n'));
       return;
     }
     if (!r || !r.ok) { console.error('Update error:', r); alert('Save failed. Try again.'); return; }
@@ -5595,6 +5831,12 @@ async function init() {
     // we don't gate this field on validation (see checkinNext).
     attachComuneAutocomplete(docissueInput, null, { strict: false });
   }
+  // Round 68 — residence comune is checked against the list only when the
+  // country of residence is Italy; foreign cities stay free text.
+  const residencePlaceInput = document.getElementById('residencePlace');
+  if (residencePlaceInput) {
+    attachComuneAutocomplete(residencePlaceInput, _fillResidenceProvince, { applies: _residencePlaceApplies });
+  }
 
   // Round 18: if cache was cleared due to host-side delete, surface a
   // friendly message so the guest understands why the app reset itself.
@@ -5880,7 +6122,7 @@ const PRIVACY_TEMPLATE_IT = `
   <p style="margin:0 0 6px;">{{HOST_NAME}}, gestore della struttura ricettiva {{PROPERTY_NAME}}{{PROPERTY_ADDRESS}}{{CIN}}.</p>
   {{CONTACT_BLOCK}}
   <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">2. Quali dati raccogliamo</h4>
-  <p style="margin:0 0 10px;">Dati di identificazione: nome, cognome, sesso, data e luogo di nascita, cittadinanza, tipo, numero e luogo di rilascio del documento di identità. Dati relativi al soggiorno: date di arrivo e partenza, numero di notti, codice prenotazione, composizione del gruppo. Immagine del documento di identità, se caricata durante il check-in online. Comunicazioni: i messaggi scambiati tramite la chat dell'applicazione. Indirizzo e-mail, se prestato il consenso a comunicazioni promozionali.</p>
+  <p style="margin:0 0 10px;">Dati di identificazione: nome, cognome, sesso, data e luogo di nascita, cittadinanza, tipo, numero e luogo di rilascio del documento di identità. Dati relativi al soggiorno: date di arrivo e partenza, numero di notti, codice prenotazione, composizione del gruppo. Immagine del documento di identità, se caricata durante il check-in online. Comunicazioni: i messaggi scambiati tramite la chat dell'applicazione. Indirizzo e-mail, se prestato il consenso a comunicazioni promozionali. Residenza: stato e comune o città di residenza, richiesti per le comunicazioni statistiche. Se ha bisogno della fattura, può indicare anche il codice fiscale e l'indirizzo di residenza, così il gestore può emetterla.</p>
   <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">3. Perché trattiamo i dati e su quale base giuridica</h4>
   <p style="margin:0 0 10px;">Comunicazione dei dati degli alloggiati alla Questura tramite il Portale Alloggiati Web &mdash; obbligo legale, art. 6.1.c GDPR e art. 109 TULPS. Comunicazioni statistiche ai portali regionali &mdash; obbligo legale, art. 6.1.c GDPR. Determinazione e riscossione dell'imposta di soggiorno &mdash; obbligo legale, art. 6.1.c GDPR. Gestione del soggiorno, informazioni pratiche, assistenza e servizio di concierge &mdash; esecuzione del contratto, art. 6.1.b GDPR. Invio di comunicazioni promozionali &mdash; consenso, art. 6.1.a GDPR, revocabile in ogni momento.</p>
   <p style="margin:0 0 10px;">Il conferimento dei dati per le prime tre finalità è obbligatorio per legge: in loro assenza non è possibile ospitarLa. Il consenso promozionale è facoltativo e il rifiuto non ha alcuna conseguenza sul soggiorno.</p>
@@ -5911,7 +6153,7 @@ const PRIVACY_TEMPLATE_EN = `
   <p style="margin:0 0 6px;">{{HOST_NAME}}, operator of {{PROPERTY_NAME}}{{PROPERTY_ADDRESS}}{{CIN}}.</p>
   {{CONTACT_BLOCK}}
   <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">2. What we collect</h4>
-  <p style="margin:0 0 10px;">Identification data: first name, surname, sex, date and place of birth, citizenship, identity document type, number and place of issue. Stay data: arrival and departure dates, number of nights, booking reference, composition of the party. Image of your identity document, if uploaded during online check-in. Messages exchanged through the in-app chat. Email address, where you have consented to promotional communications.</p>
+  <p style="margin:0 0 10px;">Identification data: first name, surname, sex, date and place of birth, citizenship, identity document type, number and place of issue. Stay data: arrival and departure dates, number of nights, booking reference, composition of the party. Image of your identity document, if uploaded during online check-in. Messages exchanged through the in-app chat. Email address, where you have consented to promotional communications. Residence: country and comune or city of residence, required for statistical reporting. If you need an invoice, you can also give your codice fiscale and residence address so your host can issue it.</p>
   <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">3. Why we process it, and on what legal basis</h4>
   <p style="margin:0 0 10px;">Reporting guest data to the Italian State Police via the Alloggiati Web portal &mdash; legal obligation, Art. 6(1)(c) GDPR and Art. 109 TULPS. Statistical reporting to regional authorities &mdash; legal obligation, Art. 6(1)(c). Calculating and collecting the tourist tax &mdash; legal obligation, Art. 6(1)(c). Managing your stay, practical information, assistance and concierge service &mdash; performance of a contract, Art. 6(1)(b). Sending promotional communications &mdash; consent, Art. 6(1)(a), withdrawable at any time.</p>
   <p style="margin:0 0 10px;">Providing data for the first three purposes is required by law: without it we cannot accommodate you. Marketing consent is optional and refusing has no effect on your stay.</p>

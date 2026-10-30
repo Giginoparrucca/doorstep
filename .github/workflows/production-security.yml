@@ -1,7 +1,13 @@
-# Owner-provisioned and verified 2026-10-26; every run requires owner review.
+# Owner-provisioned and verified 2026-10-26. Since 2026-10-30 it also runs
+# automatically after every green regression run on main (owner request);
+# the Production environment restricts the credential to main.
 name: production security smoke
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: [regression]
+    types: [completed]
+    branches: [main]
 permissions:
   contents: read
 concurrency:
@@ -9,14 +15,21 @@ concurrency:
   cancel-in-progress: false
 jobs:
   production-live:
-    if: github.ref == 'refs/heads/main' && vars.ROUND65_PRODUCTION_ENV_READY == 'true'
+    # Manual runs from main, or automatic runs after a successful push-to-main
+    # regression run (never after pull-request runs).
+    if: >-
+      vars.ROUND65_PRODUCTION_ENV_READY == 'true' && (
+        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+         github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main'))
     environment: Production
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ github.sha }}
+          # The exact commit that passed regression (automatic) or the invoking main commit (manual).
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'

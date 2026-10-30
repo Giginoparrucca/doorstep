@@ -3,10 +3,17 @@ import fs from 'node:fs';
 const text=fs.readFileSync(new URL('../.github/workflows/production-security.yml',import.meta.url),'utf8');
 const trigger=text.slice(text.indexOf('on:'),text.indexOf('permissions:'));
 assert.match(trigger,/workflow_dispatch:/);
-assert.ok(!/pull_request|push:|schedule:|workflow_run:/.test(trigger),'production-secret workflow must be manually invoked');
-assert.match(text,/if: github.ref == 'refs\/heads\/main' && vars.ROUND65_PRODUCTION_ENV_READY == 'true'/);
+// Since 2026-10-30 (owner request) it may also start after a green push-to-main regression run.
+assert.ok(!/pull_request|push:|schedule:/.test(trigger),'never started directly by PRs, pushes or schedules');
+assert.match(trigger,/workflow_run:\s*\n\s*workflows: \[regression\]\s*\n\s*types: \[completed\]\s*\n\s*branches: \[main\]/,'automatic start only after regression on main');
+const gate=text.slice(text.indexOf('    if: >-'),text.indexOf('    environment: Production'));
+assert.match(gate,/vars\.ROUND65_PRODUCTION_ENV_READY == 'true'/);
+assert.match(gate,/github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main'/,'manual runs only from main');
+assert.match(gate,/github\.event\.workflow_run\.conclusion == 'success'/,'only after a green regression');
+assert.match(gate,/github\.event\.workflow_run\.event == 'push'/,'never after pull-request (incl. fork) regression runs');
+assert.match(gate,/github\.event\.workflow_run\.head_branch == 'main'/);
 assert.match(text,/environment: Production/);
-assert.match(text,/ref: \$\{\{ github.sha \}\}/,'only the trusted invoking main commit is checked out');
+assert.match(text,/ref: \$\{\{ github\.event\.workflow_run\.head_sha \|\| github\.sha \}\}/,'only the tested main commit (automatic) or invoking main commit (manual) is checked out');
 assert.match(text,/test -n "\$SUPABASE_SERVICE_ROLE_KEY"/,'missing credential fails rather than silently skipping');
 const credentialStep=text.indexOf('      - name: Require the protected server credential');
 assert.ok(credentialStep>text.indexOf('run: npm ci'));
@@ -17,7 +24,7 @@ for(const use of text.matchAll(/uses:\s+(\S+)/g))assert.match(use[1],/@[0-9a-f]{
 assert.ok(!/pull-requests: write|contents: write/.test(text));
 assert.ok(!text.includes('IRESERVATION_LIVE_PROBE'),'no provider calls implicitly enabled');
 assert.match(text,/npm run test:live/);
-console.log('PASS protected production workflow: manual/main/readiness gates, pinned checkout at invoking SHA, read-only token permissions and credential exposed only after install; missing credential fails closed');
+console.log('PASS protected production workflow: manual-from-main or after green push-to-main regression, readiness gate, pinned checkout at invoking SHA, read-only token permissions and credential exposed only after install; missing credential fails closed');
 
 const regression=fs.readFileSync(new URL('../.github/workflows/regression.yml',import.meta.url),'utf8');
 assert.ok(!/secrets\.SUPABASE|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_PRODUCTION_SERVICE_ROLE_KEY/.test(regression),'PR regression must never receive a production server credential');

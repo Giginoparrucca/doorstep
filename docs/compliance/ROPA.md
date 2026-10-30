@@ -36,10 +36,14 @@ role: processor for the host (host is controller)
 purpose:
   - Collect the identity data every guest must give the accommodation provider
   - File guest registrations with Polizia di Stato through Alloggiati Web (art. 109 TULPS), manually or by automatic filing when the host enables it
+  - Give the host the residence data every regional statistics system collects for ISTAT
+  - Let the host issue the guest's invoice when the guest provides optional invoice details
 data_subjects:
   - Guests, including minors and group or family members
 personal_data:
-  - Identity - surname, name, sex, date and place of birth, citizenship, residence
+  - Identity - surname, name, sex, date and place of birth, citizenship
+  - Residence - country, plus comune for Italian residents (required for regional statistics, ISTAT IST-00139); postcode required in Alto Adige
+  - Invoice details, optional, main guest only - codice fiscale, street address, postcode, province (Round 68)
   - Identity document - type, number, place of issue
   - Stay - arrival and departure dates, booking code
   - Document photo and optional selfie (storage bucket documents)
@@ -53,6 +57,7 @@ international_transfers:
 retention:
   - Document and selfie photos are deleted automatically 7 days after arrival (purge_old_id_photos, migration 20261019140000_round60c_photo_retention_7days.sql)
   - Soft-deleted check-ins are purged after 30 days; test rows after 30 days (daily job welcomebnb_daily_purge)
+  - Residence and invoice details - same as the check-in row (no separate rule)
   - OWNER DECISION - live check-in rows have no time limit today; police receipts and alloggiati_filing_log have no purge (comments mention 5 years, nothing enforces it)
 security_measures:
   - Row-level security on every table; guests reach data only through the signed guest gateway (api/guest.js)
@@ -61,6 +66,7 @@ security_measures:
   - Fields editable by guests restricted by allowlist; filed rows locked against edits
 legal_basis:
   - Art. 6(1)(c) legal obligation of the host (art. 109 TULPS)
+  - Art. 6(1)(c) for residence (art. 7 D.Lgs. 322/1989, ISTAT survey IST-00139) and for invoice details the host must put on the invoice
 evidence:
   - api/guest.js
   - api/_alloggiati-soap.js
@@ -166,8 +172,8 @@ evidence:
 
 The Round 67 plan proposed recording this finding as "structurally unreachable". Checking the current code does not support that wording:
 
-- `index.html:1398` says the card is "Only shown to the main guest (see showConsentCard())".
-- `showConsentCard()` is defined at `index.html:4089` and has exactly one call site, `index.html:3952`, on the success screen after the check-in party is saved on that device.
+- `index.html:1431` says the card is "Only shown to the main guest (see showConsentCard())".
+- `showConsentCard()` is defined at `index.html:4288` and has exactly one call site, `index.html:4122`, on the success screen after the check-in party is saved on that device.
 - `showConsentCard()` itself checks neither who is the lead guest nor anyone's age. "Main guest" is a consequence of the usual flow (one adult completes the group's check-in), not an enforced rule.
 
 What does hold: Art. 8 applies to information-society services offered **directly** to a child, and in Italy only below 14 (d.lgs. 196/2003 art. 2-quinquies). Check-in is normally completed by an adult who registers the whole party, and the form is per booking. So the risk is **low but not zero**: a teenager completing their own check-in on their own device would see the form.

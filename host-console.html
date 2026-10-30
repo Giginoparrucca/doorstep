@@ -2512,6 +2512,7 @@ observePageToolbarHeader();
      and autofileDueAt live in a shared lib so the auto-filer (Round 49
      tick) runs the same code as the host-console Export panel. -->
 <script src="/lib/alloggiati-records.js"></script>
+<script src="/lib/codice-fiscale.js?v=68.1"></script>
 <!-- Round 51 Phase 1-3 — pure readiness module + checklist/widget UI. -->
 <script src="/lib/onboarding-readiness.js"></script>
 <script src="/lib/calendar-roundtrip.js"></script>
@@ -4455,8 +4456,21 @@ const HT = {
     field_birth_province: 'Italian province (2 letters, if born in Italy)',
     field_birth_country: 'Country of birth',
     field_citizenship: 'Citizenship',
-    field_residence_country: 'Country of Residence (opt.)',
-    field_residence_place: 'Comune / City of Residence (opt.)',
+    field_residence_country: 'Country of Residence',
+    field_residence_place: 'Comune / City of Residence',
+    field_residence_postcode: 'Postcode of Residence',
+    field_fiscal_code: 'Codice fiscale (opt.)',
+    field_residence_address: 'Street and number (opt.)',
+    field_residence_province: 'Province (opt.)',
+    edit_invoice_section: 'Residence and invoice details',
+    edit_invoice_filed_note: 'Residence and invoice details can still be changed after the police filing.',
+    edit_residence_required: 'Country of residence is required (regional statistics).',
+    edit_residence_place_required: 'For residents of Italy, enter a valid comune of residence.',
+    edit_residence_postcode_required: 'Postcode of residence is required for properties in Alto Adige.',
+    edit_fiscal_code_invalid: 'The codice fiscale does not look right: check it or leave it empty.',
+    edit_residence_province_invalid: 'Province must be 2 letters (e.g. BA).',
+    edit_save_invoice: 'Save residence and invoice details',
+    chip_missing_residence: 'Residence missing',
     field_doc_type: 'Document type',
     field_doc_number: 'Document number',
     field_doc_issue_place: 'Place of issue',
@@ -5044,8 +5058,21 @@ const HT = {
     field_birth_province: 'Provincia italiana (2 lettere, se nato in Italia)',
     field_birth_country: 'Paese di nascita',
     field_citizenship: 'Cittadinanza',
-    field_residence_country: 'Stato di Residenza (opz.)',
-    field_residence_place: 'Comune / Città di Residenza (opz.)',
+    field_residence_country: 'Stato di Residenza',
+    field_residence_place: 'Comune / Città di Residenza',
+    field_residence_postcode: 'CAP di residenza',
+    field_fiscal_code: 'Codice fiscale (opz.)',
+    field_residence_address: 'Via e numero civico (opz.)',
+    field_residence_province: 'Provincia (opz.)',
+    edit_invoice_section: 'Residenza e dati per la fattura',
+    edit_invoice_filed_note: 'Residenza e dati per la fattura sono modificabili anche dopo l\'invio alla Questura.',
+    edit_residence_required: 'Lo stato di residenza è obbligatorio (statistiche regionali).',
+    edit_residence_place_required: 'Per chi risiede in Italia, inserisci un comune di residenza valido.',
+    edit_residence_postcode_required: 'Il CAP di residenza è obbligatorio per le strutture in Alto Adige.',
+    edit_fiscal_code_invalid: 'Il codice fiscale non sembra corretto: controllalo o lascialo vuoto.',
+    edit_residence_province_invalid: 'La provincia deve essere di 2 lettere (es. BA).',
+    edit_save_invoice: 'Salva residenza e dati fattura',
+    chip_missing_residence: 'Residenza mancante',
     field_doc_type: 'Tipo documento',
     field_doc_number: 'Numero documento',
     field_doc_issue_place: 'Luogo di rilascio',
@@ -8144,6 +8171,9 @@ function renderCheckins() {
       // rows; otherwise we show the next computed due time via
       // AllogRecords.autofileDueAt.
       const autofileChip = _renderAutofileRowChip(c, it);
+      // Round 68 — older check-ins saved before residence became required.
+      const residenceChip = (c.residence_country || '').trim() ? ''
+        : `<span class="residence-missing-chip" style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:10px;font-size:0.62rem;font-weight:600;background:rgba(200,150,50,0.15);color:#7a5200;">${h('chip_missing_residence')}</span>`;
       // Round 40 T1 — citizenship / document / submitted / docs
       // moved to the detail view (viewGuest opens the modal that already
       // shows them). Keeping them in the table caused the sticky-right
@@ -8157,7 +8187,7 @@ function renderCheckins() {
       html += `
         <tr data-checkin-group="${groupToken}"${hideAttr}
             onclick="viewGuest('${c.id}')" style="cursor:pointer;">
-          <td data-label=""><strong>${c.surname} ${c.name}</strong>${rowPill}${guestEditChip}${autofileChip}</td>
+          <td data-label=""><strong>${c.surname} ${c.name}</strong>${rowPill}${guestEditChip}${autofileChip}${residenceChip}</td>
           <td data-label="${h('th_type')}">${typeLabel}</td>
           <td data-label="${h('th_arrival')}">${fmtDate(c.arrival_date)}</td>
           <td data-label="${h('th_departure')}">${fmtDate(c.departure_date)}</td>
@@ -14688,10 +14718,26 @@ function editGuest(id) {
       `<input id="edit_birth_country" type="text" list="wbnbCountryList" autocomplete="off" value="${safeAttr(c.birth_country || '')}" style="${inputStyle}"${roAttr}>`)}
     ${field('field_citizenship',
       `<input id="edit_citizenship" type="text" list="wbnbCountryList" autocomplete="off" value="${safeAttr(c.citizenship || '')}" style="${inputStyle}"${roAttr}>`)}
+  `;
+
+  // Round 68 — residence (required) and optional invoice details. Not
+  // covered by the filed lock, so they stay editable after filing.
+  const altoAdige = (propertyData?.region || '') === 'Alto Adige';
+  const residenceSection = `
+    ${sectionTitle(h('edit_invoice_section'))}
+    ${isFiled ? `<div style="font-size:0.74rem;color:var(--ink-soft);margin:-2px 0 6px;">${safeAttr(h('edit_invoice_filed_note'))}</div>` : ''}
     ${field('field_residence_country',
-      `<input id="edit_residence_country" type="text" list="wbnbCountryList" autocomplete="off" value="${safeAttr(c.residence_country || '')}" style="${inputStyle}" placeholder="— optional —"${roAttr}>`)}
+      `<input id="edit_residence_country" type="text" list="wbnbCountryList" autocomplete="off" value="${safeAttr(c.residence_country || '')}" style="${inputStyle}" required>`)}
     ${field('field_residence_place',
-      `<input id="edit_residence_place" type="text" value="${safeAttr(c.residence_place || '')}" style="${inputStyle}" placeholder="— optional —"${roAttr}>`)}
+      `<input id="edit_residence_place" type="text" value="${safeAttr(c.residence_place || '')}" style="${inputStyle}">`)}
+    ${field('field_residence_postcode',
+      `<input id="edit_residence_postcode" type="text" maxlength="12" value="${safeAttr(c.residence_postcode || '')}" style="${inputStyle}max-width:160px;"${altoAdige ? ' required' : ''}>`)}
+    ${field('field_fiscal_code',
+      `<input id="edit_fiscal_code" type="text" maxlength="20" value="${safeAttr(c.fiscal_code || '')}" style="${inputStyle}font-family:monospace;text-transform:uppercase;">`)}
+    ${field('field_residence_address',
+      `<input id="edit_residence_address" type="text" maxlength="120" value="${safeAttr(c.residence_address || '')}" style="${inputStyle}">`)}
+    ${field('field_residence_province',
+      `<input id="edit_residence_province" type="text" maxlength="2" value="${safeAttr(c.residence_province || '')}" style="${inputStyle}text-transform:uppercase;max-width:120px;">`)}
   `;
 
   // Shared datalist so both birth_country and citizenship inputs get
@@ -14736,12 +14782,14 @@ function editGuest(id) {
         ${countryListHTML}
         ${stay}
         ${personal}
+        ${residenceSection}
         ${docSection}
         <div id="editGuestStatus" style="min-height:20px;margin-top:12px;font-size:0.82rem;"></div>
         <div style="margin-top:6px;display:flex;justify-content:flex-end;gap:10px;">
           <button type="button" onclick="closeGuestEditModal()" class="btn btn-secondary" data-h="edit_cancel">${safeAttr(h('edit_cancel'))}</button>
           ${isFiled
-            ? `<button type="button" onclick="unlockFiledForCorrection('${c.id}')" class="btn" style="background:#c89632;color:#fff;border:none;">${safeAttr(h('edit_unlock_btn'))}</button>`
+            ? `<button type="button" onclick="unlockFiledForCorrection('${c.id}')" class="btn" style="background:#c89632;color:#fff;border:none;">${safeAttr(h('edit_unlock_btn'))}</button>
+               <button type="button" onclick="saveGuestEdits('${c.id}')" class="btn btn-primary">${safeAttr(h('edit_save_invoice'))}</button>`
             : `<button type="button" onclick="saveGuestEdits('${c.id}')" class="btn btn-primary" data-h="edit_save">${safeAttr(h('edit_save'))}</button>`}
         </div>
       </div>
@@ -14830,6 +14878,54 @@ async function saveGuestEdits(id) {
 
     const v = (elId) => (document.getElementById(elId)?.value ?? '').trim();
 
+    // Round 68 — residence is required; invoice details are optional and
+    // checked only when filled. Both stay editable on filed rows.
+    const residence = {
+      residence_country: v('edit_residence_country') || null,
+      residence_place: v('edit_residence_place') || null,
+      residence_postcode: v('edit_residence_postcode') || null,
+      fiscal_code: window.CodiceFiscale?.normalize(v('edit_fiscal_code')) || null,
+      residence_address: v('edit_residence_address') || null,
+      residence_province: v('edit_residence_province').toUpperCase() || null,
+    };
+    const residenceItaly = residence.residence_country && /^(italian[oa]?|italy|italia|it)$/i.test(residence.residence_country);
+    if (!residence.residence_country) {
+      setStatus(h('edit_residence_required'), 'error'); return false;
+    }
+    if (!wbnbAcceptsCountry(residence.residence_country)) {
+      setStatus(h('edit_country_unresolved').replace('{name}', h('field_residence_country')), 'error'); return false;
+    }
+    if (residenceItaly && !(residence.residence_place && window.AllogRecords?.lookupPoliceCode(residence.residence_place))) {
+      setStatus(h('edit_residence_place_required'), 'error'); return false;
+    }
+    if ((propertyData?.region || '') === 'Alto Adige' && !residence.residence_postcode) {
+      setStatus(h('edit_residence_postcode_required'), 'error'); return false;
+    }
+    if (residence.fiscal_code && !window.CodiceFiscale?.isValid(residence.fiscal_code)) {
+      setStatus(h('edit_fiscal_code_invalid'), 'error'); return false;
+    }
+    if (residence.residence_province && !/^[A-Z]{2}$/.test(residence.residence_province)) {
+      setStatus(h('edit_residence_province_invalid'), 'error'); return false;
+    }
+    if (!residenceItaly) residence.residence_province = null;
+
+    // Filed rows: the identity/document/stay fields are locked by the DB
+    // trigger, so save only residence and invoice details.
+    const current = allCheckins.find(c => c.id === id);
+    if (current && current.alloggiati_status === 'filed') {
+      setStatus(it ? 'Salvataggio…' : 'Saving…');
+      const { data: updatedRes, error: errRes } = await sb.from('checkins').update(residence).eq('id', id).select();
+      if (errRes) { setStatus(h('edit_save_failed') + ': ' + errRes.message, 'error'); return false; }
+      if (!updatedRes || updatedRes.length === 0) { setStatus(h('edit_save_blocked'), 'error'); return false; }
+      const fIdx = allCheckins.findIndex(c => c.id === id);
+      if (fIdx > -1) allCheckins[fIdx] = { ...allCheckins[fIdx], ...updatedRes[0] };
+      renderCheckins();
+      setStatus(h('edit_saved'), 'ok');
+      track('edit_checkin', { id, fields_updated: Object.keys(residence).length, filed: true });
+      closeGuestEditModal(true);
+      return true;
+    }
+
     // Read all fields from the form
     const surname = v('edit_surname').toUpperCase();
     const name = v('edit_name').toUpperCase();
@@ -14896,10 +14992,7 @@ async function saveGuestEdits(id) {
       birth_province: birthProv || null,
       birth_country: birth_country || null,
       citizenship,
-      // Round 47.2 — optional residence. '' coerces to null so the DB
-      // row doesn't carry an empty string; blank → ROSS1000 fallback.
-      residence_country: v('edit_residence_country') || null,
-      residence_place:   v('edit_residence_place')   || null,
+      ...residence,
       document_type: document_type_raw || '',
       document_number: document_number || '',
       doc_issue_place: v('edit_doc_issue_place') || null,

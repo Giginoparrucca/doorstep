@@ -1204,6 +1204,7 @@ function icon(name, cls) {
         <input class="form-input" type="date" id="departureDate">
       </div>
     </div>
+    <div id="stayDatesHint" data-i18n="stay_dates_hint" style="display:none;margin:-6px 0 12px;font-size:0.72rem;color:var(--ink-soft);">Dates from your booking. If they are wrong, contact your host.</div>
   </div>
 
   <!-- Step 2: Scan & Personal Details -->
@@ -1988,6 +1989,7 @@ const T = {
     residence_place_label: 'Comune / City of Residence',
     residence_place_hint: 'e.g., Milano, Berlin, Paris',
     residence_prefill_hint: 'Pre-filled from the main guest — change it if this guest lives elsewhere.',
+    stay_dates_hint: 'Dates from your booking. If they are wrong, contact your host.',
     residence_postcode_label: 'Postcode of Residence',
     val_residence_country: 'Please enter the country of residence.',
     val_residence_country_unknown: 'Country of residence "{v}" isn\'t recognized — please pick one from the list.',
@@ -2159,6 +2161,7 @@ const T = {
     residence_place_label: 'Comune / Città di Residenza',
     residence_place_hint: 'es. Milano, Berlino, Parigi',
     residence_prefill_hint: 'Copiato dall\'ospite principale: modificalo se questo ospite risiede altrove.',
+    stay_dates_hint: 'Date della tua prenotazione. Se non sono corrette, contatta il tuo host.',
     residence_postcode_label: 'CAP di residenza',
     val_residence_country: 'Inserisci lo stato di residenza.',
     val_residence_country_unknown: 'Lo stato di residenza "{v}" non è riconosciuto: sceglilo dall\'elenco.',
@@ -3359,6 +3362,25 @@ function autoDetectProvince() {
       if (sel.options[i].value === province) { sel.selectedIndex = i; return; }
     }
   }
+}
+
+// The guest's booking (from the gateway): pre-fill the stay dates and party
+// size; lock the dates when check-in gates entry codes, because the server
+// then only accepts a check-in that matches the booking.
+let _bookingStay = null;
+function applyBookingStay() {
+  const st = _bookingStay;
+  const arr = document.getElementById('arrivalDate'), dep = document.getElementById('departureDate');
+  if (!st || !arr || !dep || !/^\d{4}-\d{2}-\d{2}$/.test(st.arrival_date || '') || !/^\d{4}-\d{2}-\d{2}$/.test(st.departure_date || '')) return;
+  arr.value = st.arrival_date;
+  dep.value = st.departure_date;
+  const locked = st.dates_locked === true;
+  arr.readOnly = dep.readOnly = locked;
+  arr.style.background = dep.style.background = locked ? 'var(--cream-2, #F4F7FC)' : '';
+  const hint = document.getElementById('stayDatesHint');
+  if (hint) hint.style.display = locked ? '' : 'none';
+  const n = document.getElementById('numGuests');
+  if (n && Number.isInteger(st.guest_count) && st.guest_count >= 2 && st.guest_count <= 20) n.value = String(st.guest_count);
 }
 
 function isMainGuest() {
@@ -5487,6 +5509,8 @@ async function init() {
     propertyId = storedPropId;
     const r = await _guestCall('property', {});
     let data = r?.data?.property || null;
+    _bookingStay = r?.data?.stay || null;
+    applyBookingStay();
     // Round 60 Phase 4 — the gateway now also returns `room` when the
     // stay is linked to a property_rooms row. Shape:
     //   { id, name, beds, door_code? }
@@ -5674,6 +5698,7 @@ async function init() {
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
   if (document.getElementById('arrivalDate')) document.getElementById('arrivalDate').value = today;
   if (document.getElementById('departureDate')) document.getElementById('departureDate').value = tomorrow;
+  applyBookingStay();
 
   // Round 48 Phase 2 — cache validation + existing-checkin load, now
   // routed through the guest gateway (anon SELECT on checkins is

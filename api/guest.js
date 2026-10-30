@@ -512,6 +512,28 @@ async function doProperty(res, propertyId, bookingCode, isTest, sessionExpUnixSe
   // can treat the former as "proceed as today" and the latter as "show
   // the locked card." Shipped as a non-breaking addition; existing
   // clients that read only `checked_in` continue to work.
+  // The guest's own booking dates and party size, so the check-in form
+  // starts from them. When check-in gates entry codes the save must match
+  // the booking exactly, so the form also locks the dates.
+  if (bookingCode) {
+    try {
+      const sr = await pgrestGET(
+        `ota_reservations?property_id=eq.${encodeURIComponent(propertyId)}` +
+        `&booking_code=eq.${encodeURIComponent(bookingCode)}&is_test=eq.${isTest === true ? 'true' : 'false'}` +
+        `&deleted_at=is.null&status=eq.active&entry_type=eq.reservation` +
+        `&select=checkin_date,checkout_date,guest_count&limit=2`);
+      const rows = sr.ok ? await sr.json() : [];
+      const day = v => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : null);
+      if (Array.isArray(rows) && rows.length === 1 && day(rows[0].checkin_date) && day(rows[0].checkout_date)) {
+        resp.stay = {
+          arrival_date: day(rows[0].checkin_date),
+          departure_date: day(rows[0].checkout_date),
+          guest_count: Number.isInteger(rows[0].guest_count) ? rows[0].guest_count : null,
+          dates_locked: row.entry_checkin_required === true,
+        };
+      }
+    } catch (_) { /* stay is a convenience; the form keeps its defaults */ }
+  }
   if (policy) {
     resp.entry_release = {
       state: policy.state,

@@ -17,6 +17,8 @@ Daniele's feedback on the 7contrade guest page (Italian selected, before check-i
 
 Tests: new `guest-language-wifi-browser.test.mjs` (390/1440: IT/EN switch re-renders transport, check-out and welcome; locked card with no Retry; Wi-Fi message before release, values after; no Wi-Fi password before release); `entry-release-policy.test.mjs` +3 cases (not started → locked; check-in without record → unavailable; override present → unavailable); `round66-fixed-code.test.mjs` no-record case now `locked`; `guest-property-instructions.test.mjs` and `guest-links-static.test.mjs` follow the new render function; `entry-submission-browser.test.mjs` harness includes `guestLinkedText`; ROPA consent-card citations refreshed (4335/4169). Local `npm run test:all`: **PASS 119 / FAIL 0 / SKIP 3** (standing skips: demo-e2e needs a demo origin, demo-schema needs a private catalog, demo-schema-parse needs pglast).
 
+Shipped — PR #259 merged (1cb039b); `regression` and the automatic `production security smoke` on main both green; production serves the new page. `npm run test:live` against app.welcomebnb.it: **PASS 4 / FAIL 0 / SKIP 5** (chat startup, security headers, SPOT, tax rates pass; skips: demo origin, iReservation probe opt-in, and three probes needing the service-role key, which this session does not hold; anonymous grant denials passed). No migration in this change.
+
 ### Hotfix — Edited bookings stay in sync; no release once the code is visible (Claude, 31 October 2026)
 
 Daniele's pilot feedback on TES-PYN48X:

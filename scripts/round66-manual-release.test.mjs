@@ -19,7 +19,9 @@ const src = fs.readFileSync(path.resolve(here, '..', 'host-console.html'), 'utf8
 // (needs attention / currently staying) all render it.
 assert.ok(/propertyData\?\.entry_checkin_required\s*===\s*true/.test(src),
   'release controls only render when propertyData.entry_checkin_required === true');
-assert.ok(/function entryReleaseControls\(code, isTest\)/.test(src), 'shared control exists');
+assert.ok(/function entryReleaseControls\(code, isTest, arrival, departure\)/.test(src), 'shared control exists');
+assert.ok(/entryReleaseControls\(bookingCode,rows\[0\]\.is_test===true,arrival,rows\[0\]\.departure_date\)/.test(src), 'check-in groups render it');
+assert.ok(!/openEntryAccessStatus|entryStatusButton/.test(src), 'no separate "Stato accesso" panel');
 assert.ok(/\$\{entryReleaseControls\(r\.booking_code, r\.is_test === true\)\}/.test(src), 'reservation rows render it');
 assert.ok(/propertyData\?\.entry_checkin_required === true \? entryReleaseControls\(r\.code, false\)/.test(src), 'dashboard rows render it');
 assert.ok(/readHostEntryState\(code, isTest\)/.test(src), 'state comes from the server, not the row');

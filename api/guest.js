@@ -804,6 +804,11 @@ async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, is
   if (residenceErrors.length) return res.status(400).json({ error: 'validation_failed', fields: residenceErrors });
 
   const patch = pickFields(fields, CHECKIN_WRITE_FIELDS);
+  // A guest's role (single / head / member…) is fixed when the check-in is
+  // saved: it ties the row to its entry slot and to the Alloggiati type.
+  // Edits correct personal details only; a changed role would silently stop
+  // that guest counting towards the entry release.
+  delete patch.guest_type;
   patch.guest_edited_at = new Date().toISOString();
   patch.checkin_reopened_at = null;
 

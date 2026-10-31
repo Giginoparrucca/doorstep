@@ -2980,11 +2980,12 @@ async function loadGuestAnalytics() {
 
     if (error) throw error;
 
-    // Round 50 — merge in guest chat_messages for the same window so
-    // engagement is correct for guests whose device blocks direct
-    // analytics_events writes. See _loadGuestChatAsEvents comment.
-    const chatEvents = await _loadGuestChatAsEvents(propertyId, cutoff);
-    const merged = (data || []).concat(chatEvents)
+    // Guest analytics now reach the database through the same-origin
+    // /api/guest gateway, so the Round 50 chat_messages fallback is no
+    // longer needed here. It also counted every chat message as its own
+    // session and could not tell a host's test chats from a guest's.
+    // (The dashboard engagement hint still uses it.)
+    const merged = (data || []).slice()
       .sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
 
     loadingEl.style.display = 'none';
@@ -3942,7 +3943,11 @@ async function handleHostAuthEvent(event, session) {
 }
 // Auth callbacks run under the SDK's session lock. Release the callback before
 // calling updateUser/RPC or any other authenticated API, including invite work.
+// Analytics: a browser where a host or admin has signed in is a host
+// device. The guest app does not record analytics on it, so a host
+// testing their own guest links never counts as a guest.
 sb.auth.onAuthStateChange((event, session) => {
+  if (session) { try { localStorage.setItem('wbnb_host_device', '1'); } catch (_) {} }
   setTimeout(() => {
     handleHostAuthEvent(event, session).catch(error => console.warn('Host auth event failed:', error));
   }, 0);

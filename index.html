@@ -1623,6 +1623,8 @@ function icon(name, cls) {
 const APP_CONFIG = window.getWelcomeBnbConfig();
 const SUPABASE_URL = APP_CONFIG.supabaseUrl;
 const SUPABASE_KEY = APP_CONFIG.publicKey;
+// Read before the client below can touch stored sessions.
+var _hostDeviceAtLoad = _isHostDevice(); // var: read inside _isHostDevice while initialising
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, APP_CONFIG.mode === 'demo' ? { auth: { storageKey: `wbnb-demo-auth-${APP_CONFIG.projectRef}` } } : {});
 
 let propertyId = null;
@@ -1830,11 +1832,27 @@ let _guestLastPage         = null;
 let _guestPageEnterTs      = Date.now();
 const _guestPageTimes      = {};
 
+// A host or admin who has signed in on this browser (now, or before) is
+// testing, not staying: record no guest analytics from this device.
+function _isHostDevice() {
+  if (typeof _hostDeviceAtLoad !== 'undefined' && _hostDeviceAtLoad) return true;
+  try {
+    if (localStorage.getItem('wbnb_host_device') === '1') return true;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i) || '';
+      if (/^sb-[a-z0-9]+-auth-token$/.test(k) || k.startsWith('wbnb-demo-auth-')) {
+        localStorage.setItem('wbnb_host_device', '1');
+        return true;
+      }
+    }
+  } catch (_) {}
+  return false;
+}
 async function trackGuest(eventType, eventData = {}) {
   // Noop until propertyId is resolved — guest events are always
   // scoped to a property. Buffer would complicate things; instead
   // we just drop events that fire pre-resolution (very few).
-  if (!propertyId) return;
+  if (!propertyId || _isHostDevice()) return;
   try {
     // Route via the same-origin /api/guest gateway so ad-blockers /
     // Brave Shields / Firefox ETP / DNS blocklists that match
@@ -1852,7 +1870,7 @@ async function trackGuest(eventType, eventData = {}) {
 
 // Fire a guest event even on page unload (keepalive).
 function trackGuestBeacon(eventType, eventData = {}) {
-  if (!propertyId) return;
+  if (!propertyId || _isHostDevice()) return;
   // Beacon writes have to use `keepalive: true` — the browser flushes
   // the request even after the page starts unloading. We can't await
   // mintGuestToken() here (it's an async promise and the page is

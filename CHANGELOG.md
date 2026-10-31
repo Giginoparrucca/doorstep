@@ -7,6 +7,17 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Guest analytics ignore host devices (Claude, 31 October 2026)
+
+Daniele saw analytics for 7contrade (28 sessions, 141 events, 11 bookings, 18–31 Oct) although the property has not started with real guests: it was the host testing.
+
+- `host-console.html` and `admin.html`: any sign-in marks the browser as a host device (`localStorage.wbnb_host_device`).
+- `index.html`: `trackGuest` and `trackGuestBeacon` record nothing on a host device. That means the marker, or a stored WelcomeBnB sign-in, read at page load before the guest page's client touches stored sessions (the marker is then set). The guest experience is unchanged; only analytics are skipped.
+- Guest Analytics no longer merges `chat_messages` as synthetic sessions (Round 50 fallback). Events now arrive through the same-origin gateway, and the fallback counted each chat message as its own session and could not tell host chats from guest chats. The dashboard engagement hint still uses it.
+- Limits: a host testing on a device where they never signed in (e.g. a phone opened from WhatsApp) is still counted; signing in once on that device stops it. Existing 7contrade events are untouched pending Daniele's decision.
+
+Tests: new `guest-host-device-analytics-browser.test.mjs` (guest browser records events and beacons; marked or signed-in browser records none; both consoles mark on sign-in; no chat fallback in Guest Analytics); ROPA citations refreshed. Local `npm run test:all`: **PASS 121 / FAIL 0 / SKIP 3** (standing skips).
+
 ### Host console — "Stato accesso" panel removed; required guests on the card (Claude, 31 October 2026)
 
 Daniele asked to move the panel's only unique control onto the booking card and remove the panel. The unstyled "Stato accesso" dialog repeated the card's release/restore buttons and still allowed "Rilascia accesso" when the code was already visible.

@@ -7,6 +7,10 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Hotfix — Success screen after adding a missing guest (Claude, 31 October 2026)
+
+Daniele added the second guest on TES-PYN48X. The data was correct (slot 1 `head`, slot 2 `member`, 2 of 2 submitted), but the success screen kept the "1 of 2" banner, labelled the added guest "Main guest" and said "1 guest(s) registered". `index.html`: the banner is removed on completion; the count includes guests saved earlier (`partyCount`, also in the host notification message); review cards take the role from the saved `guest_type`. Test: `guest-partial-party-browser.test.mjs` extended. Local `npm run test:all`: **PASS 120 / FAIL 0 / SKIP 3** (standing skips).
+
 ### Hotfix — Incomplete party is not "check-in complete"; edits keep the guest's role (Claude, 31 October 2026)
 
 Daniele tested TES-PYN48X ("Test" property): check-in done, but no code and no Wi-Fi, while the page said "1 guest · Check-in complete ✓". Findings: the booking's entry record expects **2** guests and only 1 checked in, so the code is correctly held. In addition, that guest's row had been saved as `head`, but a later edit from the welcome-back screen rewrote it to `single`. That no longer matches its entry slot, so the release check counted **0 of 2**.

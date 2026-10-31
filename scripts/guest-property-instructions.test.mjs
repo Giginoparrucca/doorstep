@@ -57,7 +57,9 @@ for (const k of [...PUBLIC, ...ENTRY]) assert.equal(response.property[k], row[k]
 // Every per-language text the guest app reads through _propTextLang is allowlisted.
 const guest = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const allow = new Set(vm.runInNewContext(fields));
-for (const [, base] of guest.matchAll(/_propTextLang\(d, '([a-z_]+)'/g)) {
+const read = [...guest.matchAll(/(?:_propTextLang\(d, |pick\()'([a-z_]+)'/g)].map(m => m[1]);
+for (const f of ['welcome_message', 'transport_info', 'checkout_instructions']) assert.ok(read.includes(f), `guest app reads ${f}`);
+for (const base of read) {
   for (const k of [base, `${base}_it`, `${base}_en`]) assert.ok(allow.has(k), `${k} read by guest app but missing from PROPERTY_PUBLIC_FIELDS`);
 }
 

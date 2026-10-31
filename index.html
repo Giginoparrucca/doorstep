@@ -3781,6 +3781,27 @@ function clearGuestEntryView() {
   }
   renderGuestEntryState({data:{property:{},entry_release:{state:'unavailable',allow_entry:false}}});
 }
+// Host free-text that is not gated by the entry release. Re-run on every
+// language switch so the cards follow the selected language.
+function renderPropertyTexts() {
+  const d = propertyData;
+  if (!d) return;
+  const pick = (field) => {
+    const own = d[field + '_' + lang], other = d[field + '_' + (lang === 'it' ? 'en' : 'it')];
+    if (own && own.trim()) return own.trim();
+    if (other && other.trim()) return other.trim();
+    return (d[field] || '').trim();
+  };
+  const linked = guestLinkedText;
+  const transport = pick('transport_info');
+  const tEl = document.getElementById('transportInfoText');
+  if (tEl) tEl.innerHTML = linked(transport);
+  const tCard = document.getElementById('transportCard');
+  if (tCard) tCard.style.display = transport ? 'block' : 'none';
+  const checkout = pick('checkout_instructions');
+  const coEl = document.getElementById('checkoutInstructionsText');
+  if (coEl) { coEl.innerHTML = linked(checkout); coEl.style.display = checkout ? 'block' : 'none'; }
+}
 function applyGuestEntryResponse(r) {
   if (document.visibilityState === 'hidden' || navigator.onLine === false) { clearGuestEntryView(); return; }
   if(r.data.entry_release?.protected_chat===true&&!_entryProtectedChat)resetEntryConversation();
@@ -3797,10 +3818,14 @@ function applyGuestEntryResponse(r) {
     el('roomDoorCode').textContent = allowed && room?.door_code ? (lang === 'it' ? 'Codice porta: ' : 'Door code: ') + room.door_code : '';
     el('roomDoorCode').style.display = allowed && room?.door_code ? '' : 'none';
   }
-  if (el('wifiName')) el('wifiName').textContent = allowed ? propertyData.wifi_name || '—' : '—';
-  const wifi = 'Password: ' + (allowed ? propertyData.wifi_password || '—' : '—');
+  // Wi-Fi details are released together with the entry instructions.
+  // Before that, say so plainly instead of showing an empty dash.
+  if (el('wifiName')) el('wifiName').textContent = allowed ? propertyData.wifi_name || '—'
+    : (lang === 'it' ? 'Disponibile dopo il check-in online' : 'Available after online check-in');
+  const wifi = allowed ? 'Password: ' + (propertyData.wifi_password || '—') : '';
   if (el('wifiPass')) el('wifiPass').textContent = wifi;
   T.en.wifi_pass = wifi; T.it.wifi_pass = wifi;
+  renderPropertyTexts();
   const instructions = allowed ? (propertyData['checkin_instructions_' + lang]
     || propertyData['checkin_instructions_' + (lang === 'it' ? 'en' : 'it')] || propertyData.checkin_instructions || '') : '';
   if (el('checkinInstructionsText')) {
@@ -5556,8 +5581,6 @@ async function init() {
       if (el('heroBadge')) el('heroBadge').textContent = `${d.city || 'City'}, ${d.region || 'Region'}`;
       if (el('heroImg') && d.hero_image_url) el('heroImg').src = d.hero_image_url;
       CoverLayout.apply(el('heroImg'), d.hero_image_layout);
-      if (el('wifiName')) el('wifiName').textContent = d.wifi_name || '—';
-      if (el('wifiPass')) el('wifiPass').textContent = `Password: ${d.wifi_password || '—'}`;
       if (el('propAddress')) el('propAddress').textContent = d.address || '—';
       if (el('propCityZip')) el('propCityZip').textContent = `${d.zip || ''} ${d.city || ''} (${d.region || ''})`;
       if (d.maps_link && el('mapsBtn')) {
@@ -5610,28 +5633,9 @@ async function init() {
         return String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
       }
 
-      // Round 21: transport / getting-around info (Staying section).
-      // Hidden if the host hasn't filled it in.
-      const transportInfo = (_propTextLang(d, 'transport_info', lang) || '').trim();
-      if (el('transportInfoText')) el('transportInfoText').innerHTML = guestLinkedText(transportInfo);
-      if (el('transportCard')) el('transportCard').style.display = transportInfo ? 'block' : 'none';
-
-      // ── Round 19: Check-in/out instructions + lockbox code ──────────
-      // Round 19.1 restructure: instructions are now rendered INSIDE
-      // the check-in / check-out cards (not as separate cards). The
-      // cards themselves are always shown (they always have a time);
-      // we just toggle the visibility of the instructions text and the
-      // lockbox row based on whether the host has filled them in.
-      const ciInst = (_propTextLang(d, 'checkin_instructions',  lang) || '').trim();
-      const coInst = (_propTextLang(d, 'checkout_instructions', lang) || '').trim();
-      if (el('checkinInstructionsText')) {
-        el('checkinInstructionsText').innerHTML = guestLinkedText(ciInst);
-        el('checkinInstructionsText').style.display = ciInst ? 'block' : 'none';
-      }
-      if (el('checkoutInstructionsText')) {
-        el('checkoutInstructionsText').innerHTML = guestLinkedText(coInst);
-        el('checkoutInstructionsText').style.display = coInst ? 'block' : 'none';
-      }
+      // Transport info and check-out instructions are rendered by
+      // renderPropertyTexts() (from applyGuestEntryResponse, so they follow
+      // every language switch); check-in instructions are gated there too.
       // Round 36.2: dual lockbox codes are rendered by refreshLockboxDisplay().
       refreshLockboxDisplay();
       // Round 36.2.1: pull the rotating code assigned to this booking on
@@ -5642,8 +5646,6 @@ async function init() {
       // Update i18n translations with DB data
       T.en.welcome_title = `Welcome to<br><em>${d.name}</em>`;
       T.it.welcome_title = `Benvenuti a<br><em>${d.name}</em>`;
-      T.en.wifi_pass = `Password: ${d.wifi_password || '—'}`;
-      T.it.wifi_pass = `Password: ${d.wifi_password || '—'}`;
       T.en.host_msg = _propTextLang(d, 'welcome_message', 'en') || T.en.host_msg;
       T.it.host_msg = _propTextLang(d, 'welcome_message', 'it') || T.it.host_msg;
       // A property can finish loading after the language toggle was painted.

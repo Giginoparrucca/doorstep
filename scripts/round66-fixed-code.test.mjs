@@ -85,7 +85,8 @@ assert.equal(manual.room.door_code, 'ROOM-FICTIONAL');
 assert.equal((await request({ property: { show_fixed_lockbox_to_guest: false } })).property.keybox_code, undefined);
 assert.equal((await request({ property: { show_fixed_lockbox_to_guest: undefined } })).property.keybox_code, 'FIXED-FICTIONAL');
 denied(await request({ state: { released_manually: false } }), 'locked');
-denied(await request({ noRoster: true }), 'unavailable');
+// No stored record and no check-in yet: still denied, but tells the guest to check in.
+denied(await request({ noRoster: true }), 'locked');
 denied(await request({ expired: true }), 'invalid');
 denied(await request({ noBooking: true }));
 denied(await request({ readFailure: true }), 'unavailable');

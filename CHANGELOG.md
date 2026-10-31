@@ -7,6 +7,16 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Hotfix — Guest page: "check in first" instead of Retry, Wi-Fi message, Italian texts (Claude, 31 October 2026)
+
+Daniele's feedback on the 7contrade guest page (Italian selected, before check-in):
+
+1. **"Riprova" (Retry) still shown before check-in.** A booking that has not started online check-in has no stored entry record yet, so the policy returned `unavailable` (`unknown_roster`) → "Istruzioni di accesso non disponibili" + Retry. Fix in `api/_entry-release-policy.js`: when no record, no manual release and no check-in exist, the result is `locked` (`checkin_not_started`) → "Completa il check-in online per visualizzare le istruzioni di accesso.", no Retry. Still denied, nothing disclosed. A check-in without a record, or any record/read problem, stays `unavailable` as before.
+2. **Wi-Fi showed only "—".** Wi-Fi is set for 7contrade but, by design, is released together with the entry code. Before release the card now says "Disponibile dopo il check-in online" / "Available after online check-in" with no empty password line; after release the name and password appear as before.
+3. **Some texts in English with Italian selected.** The stored Italian texts are correct; the page opens in English and switching language did not re-render transport info and check-out instructions. New `renderPropertyTexts()` in `index.html` renders them from `applyGuestEntryResponse()`, which `setLang()` already re-runs, so they follow every switch. Removed duplicate load-time rendering of these texts and of the ungated Wi-Fi line.
+
+Tests: new `guest-language-wifi-browser.test.mjs` (390/1440: IT/EN switch re-renders transport, check-out and welcome; locked card with no Retry; Wi-Fi message before release, values after; no Wi-Fi password before release); `entry-release-policy.test.mjs` +3 cases (not started → locked; check-in without record → unavailable; override present → unavailable); `round66-fixed-code.test.mjs` no-record case now `locked`; `guest-property-instructions.test.mjs` and `guest-links-static.test.mjs` follow the new render function; `entry-submission-browser.test.mjs` harness includes `guestLinkedText`; ROPA consent-card citations refreshed (4335/4169). Local `npm run test:all`: **PASS 119 / FAIL 0 / SKIP 3** (standing skips: demo-e2e needs a demo origin, demo-schema needs a private catalog, demo-schema-parse needs pglast).
+
 ### Hotfix — Edited bookings stay in sync; no release once the code is visible (Claude, 31 October 2026)
 
 Daniele's pilot feedback on TES-PYN48X:

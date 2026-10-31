@@ -61,6 +61,10 @@ for (const [label, mutate, state, reason] of [
   ['deleted property', s => { s.property.deleted_at = '2026-10-26T11:00:00Z'; }, 'invalid'],
   ['malformed policy', s => { s.property.entry_checkin_required = 'false'; }, 'unavailable'],
   ['unknown roster', s => { s.roster = null; }, 'unavailable', 'unknown_roster'],
+  ['no record and no check-in yet', s => { s.roster = null; s.submissions = []; s.legacy_has_checkin = false; }, 'locked', 'checkin_not_started'],
+  ['check-in without a roster stays unavailable', s => { s.roster = null; s.legacy_has_checkin = true; }, 'unavailable', 'unknown_roster'],
+  ['override blocks the not-started shortcut', s => { s.roster = null; s.legacy_has_checkin = false;
+    s.override = { ...binding, identity_version: 'identity-v1', active: false }; }, 'unavailable', 'unknown_roster'],
   ['guest count is not authority', s => { s.roster.source = 'guest'; }, 'unavailable'],
   ['unconfirmed roster', s => { s.roster.confirmed = false; }, 'unavailable'],
   ['foreign roster', s => { s.roster.property_id = 'property-b'; }, 'unavailable'],

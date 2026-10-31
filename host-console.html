@@ -6618,7 +6618,6 @@ function _renderReservationCard(r, todayISO) {
       <button type="button" class="btn btn-secondary btn-sm" data-share-code="${encodeURIComponent(r.booking_code)}" onclick="openBookingShare(decodeURIComponent(this.dataset.shareCode))">${safe(hostLang === 'it' ? 'Condividi' : 'Share')}</button>
       ${reopenBtn}${reopenedNote}
       ${propertyData?.entry_checkin_required === true && r.booking_code && r.checkin_date && r.checkout_date ? `
-      ${entryStatusButton(r.booking_code,r.checkin_date,r.checkout_date,r.is_test===true,r.id,r.guest_count)}
       ${entryReleaseControls(r.booking_code, r.is_test === true)}` : ''}
     </div>` : '';
   const html = `
@@ -8114,7 +8113,7 @@ function renderCheckins() {
                     style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;font-size:0.85rem;color:var(--ink-soft);user-select:none;">${chevron}</span>
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                 ${groupPill}${uploadBtn}${markBtn}${reopenBtn}${groupStatusMsg}
-                ${propertyData?.entry_checkin_required===true&&!isSolo?entryStatusButton(bookingCode,arrival,rows[0].departure_date,rows[0].is_test===true,null,null):''}
+                ${propertyData?.entry_checkin_required===true&&!isSolo?entryReleaseControls(bookingCode,rows[0].is_test===true,arrival,rows[0].departure_date):''}
               </div>
               <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                 <span style="font-size:0.68rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-2);font-weight:600;">${it ? 'Gruppo' : 'Group'}</span>
@@ -15054,9 +15053,11 @@ async function readHostEntryState(code,isTest) {
 // enables only the action that applies (release when not released, restore
 // when released). Filled in by hydrateEntryReleaseControls() wherever it is
 // rendered (reservation rows, calendar detail, dashboard).
-function entryReleaseControls(code, isTest) {
+function entryReleaseControls(code, isTest, arrival, departure) {
   if (!code) return '';
-  return `<span class="entry-release-controls" data-entry-code="${encodeURIComponent(code)}" data-entry-test="${isTest === true ? 'true' : 'false'}" style="display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;"></span>`;
+  // Dates are a fallback for bookings without a reservation or stored record.
+  const day = v => /^\d{4}-\d{2}-\d{2}/.test(String(v || '')) ? String(v).slice(0, 10) : '';
+  return `<span class="entry-release-controls" data-entry-code="${encodeURIComponent(code)}" data-entry-test="${isTest === true ? 'true' : 'false'}" data-entry-arrival="${day(arrival)}" data-entry-departure="${day(departure)}" style="display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;"></span>`;
 }
 function _entryReleaseView(state, it) {
   const er = state?.entry_release || {}, s = state?.summary || {};
@@ -15072,7 +15073,7 @@ function _entryReleaseView(state, it) {
   // Code already visible (check-in complete): nothing to release or restore.
   return { released: false, visible: er.state === 'available', tone, text };
 }
-function _renderEntryReleaseControls(node, code, isTest, state) {
+function _renderEntryReleaseControls(node, code, isTest, state, fallback = {}) {
   const it = hostLang === 'it';
   node.textContent = '';
   if (state && state.entry_release?.state === 'disabled') return;
@@ -15083,17 +15084,23 @@ function _renderEntryReleaseControls(node, code, isTest, state) {
   if (!state) {
     badge.textContent = it ? '⚠️ Stato codice non disponibile' : '⚠️ Code status unavailable';
     badge.style.background = 'rgba(224,90,90,0.10)'; badge.style.color = '#b03939';
-    node.appendChild(badge);
+    const retry = document.createElement('button');
+    retry.type = 'button'; retry.className = 'entry-retry-btn';
+    retry.textContent = it ? 'Riprova' : 'Retry';
+    retry.style.cssText = 'padding:4px 10px;border-radius:6px;font-size:0.72rem;font-family:inherit;background:var(--white);border:1px solid var(--border);color:var(--ink);cursor:pointer;';
+    retry.onclick = (e) => { e.stopPropagation(); refreshEntryReleaseControls(code, isTest); };
+    node.append(badge, retry);
     return;
   }
   const view = _entryReleaseView(state, it);
   const colors = { ok: ['rgba(27,94,32,0.12)', '#1b5e20'], wait: ['rgba(232,184,75,0.18)', '#7d5e10'], warn: ['rgba(224,90,90,0.10)', '#b03939'] };
   [badge.style.background, badge.style.color] = colors[view.tone];
-  badge.textContent = view.text;
+  const er = state.entry_release || {};
+  badge.textContent = view.text + (Number.isInteger(er.expected) && !view.released ? ` · ${er.submitted ?? 0}/${er.expected}` : '');
   node.appendChild(badge);
   const readonly = !entryUiEnabled() || (IS_ADMIN_VIEW && !_adminEditEnabled);
   const s = state.summary || {}, r = state.reservation || {};
-  const arrival = s.arrival_date || r.checkin_date, departure = s.departure_date || r.checkout_date;
+  const arrival = s.arrival_date || r.checkin_date || fallback.arrival, departure = s.departure_date || r.checkout_date || fallback.departure;
   const count = Number(s.expected_count || r.guest_count), reservationId = s.reservation_id || r.id || null;
   const mk = (cls, label, title, enabled, action) => {
     const b = document.createElement('button');
@@ -15104,9 +15111,10 @@ function _renderEntryReleaseControls(node, code, isTest, state) {
     b.onclick = async (e) => {
       e.stopPropagation();
       if (b.disabled) return;
-      // Without a confirmed guest count the dialog collects it first.
+      // Without a confirmed guest count, ask for it in the field below.
       if (!Number.isInteger(count) || count < 1 || !arrival || !departure) {
-        await openEntryAccessStatus(code, arrival, departure, isTest, reservationId, count);
+        toast(it ? 'Indica prima gli ospiti richiesti e salva.' : 'Set the required guests and save first.');
+        guests.querySelector('input')?.focus();
         return;
       }
       await action(code, arrival, departure, isTest, reservationId, count);
@@ -15114,6 +15122,7 @@ function _renderEntryReleaseControls(node, code, isTest, state) {
     };
     return b;
   };
+  const guests = _entryGuestsField(code, isTest, state, readonly, it, fallback);
   const release = mk('entry-release-btn', it ? '🔓 Rilascia accesso' : '🔓 Release access',
     it ? 'Rilascia manualmente il codice per questa prenotazione: scavalca il check-in richiesto; l\'azione sarà registrata nell\'audit'
        : 'Manually release the code for this booking: bypasses the check-in requirement; the action is recorded in the audit log',
@@ -15124,7 +15133,63 @@ function _renderEntryReleaseControls(node, code, isTest, state) {
        : 'Restore automatic release: the code goes back to hidden until check-in is complete',
     view.released, restoreAutomaticRelease);
   restore.style.background = 'var(--white)'; restore.style.border = '1px solid var(--border)'; restore.style.color = 'var(--ink)';
-  node.append(release, restore);
+  node.append(release, restore, guests);
+}
+// "Required guests": how many guests must check in before the code is
+// released (include minors). Saving it confirms the booking's entry record.
+function _entryGuestsField(code, isTest, state, readonly, it, fallback = {}) {
+  const s = state.summary || {}, r = state.reservation || {};
+  const arrival = s.arrival_date || r.checkin_date || fallback.arrival, departure = s.departure_date || r.checkout_date || fallback.departure;
+  const reservationId = s.reservation_id || r.id || null;
+  const current = Number(s.expected_count || r.guest_count);
+  // The booking's own guest count is the floor; to lower it, edit the booking.
+  const floor = Number.isInteger(r.guest_count) && r.guest_count > 0 ? r.guest_count : 1;
+  const wrap = document.createElement('span');
+  wrap.className = 'entry-guests-field';
+  wrap.style.cssText = 'display:inline-flex;align-items:center;gap:5px;font-size:0.72rem;color:var(--ink-soft);';
+  wrap.title = it ? `Quanti ospiti devono fare il check-in prima che il codice sia visibile (inclusi i minori). Minimo ${floor}: per ridurlo modifica la prenotazione.`
+    : `How many guests must check in before the code is shown (include minors). Minimum ${floor}: edit the booking to lower it.`;
+  const label = document.createElement('span');
+  label.textContent = it ? 'Ospiti richiesti' : 'Required guests';
+  const input = document.createElement('input');
+  input.type = 'number'; input.min = String(floor); input.max = '50'; input.step = '1';
+  input.value = Number.isInteger(current) && current > 0 ? String(current) : '';
+  input.disabled = readonly;
+  input.setAttribute('aria-label', label.textContent);
+  input.style.cssText = 'width:52px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;font-size:0.75rem;font-family:inherit;';
+  input.onclick = e => e.stopPropagation();
+  const save = document.createElement('button');
+  save.type = 'button'; save.className = 'entry-guests-save';
+  save.textContent = it ? 'Salva' : 'Save';
+  save.style.cssText = 'padding:4px 10px;border-radius:6px;font-size:0.72rem;font-family:inherit;font-weight:500;background:var(--white);border:1px solid var(--border);color:var(--ink);cursor:pointer;';
+  const sync = () => {
+    const n = Number(input.value);
+    save.disabled = readonly || !Number.isInteger(n) || n < floor || n > 50 || n === current || !arrival || !departure;
+    save.style.opacity = save.disabled ? '0.45' : '1';
+    save.style.cursor = save.disabled ? 'not-allowed' : 'pointer';
+  };
+  input.oninput = sync; sync();
+  save.onclick = async (e) => {
+    e.stopPropagation();
+    if (save.disabled) return;
+    const n = Number(input.value), target = propertyId;
+    save.disabled = true;
+    try {
+      const res = await sb.rpc('entry_access_confirm_roster', {
+        p_property_id: target, p_booking_code: code, p_count: n,
+        p_arrival: String(arrival).slice(0, 10), p_departure: String(departure).slice(0, 10),
+        p_request_id: crypto.randomUUID(), p_reservation_id: reservationId,
+        p_expected_version: s.state_version || null, p_is_test: isTest === true,
+      });
+      if (res.error) throw res.error;
+      toast(it ? 'Ospiti richiesti aggiornati.' : 'Required guests updated.');
+    } catch (_) {
+      toast(it ? 'Salvataggio non riuscito. Ricarica la pagina e riprova.' : 'Save failed. Reload the page and retry.');
+    }
+    if (target === propertyId) await refreshEntryReleaseControls(code, isTest);
+  };
+  wrap.append(label, input, save);
+  return wrap;
 }
 async function hydrateEntryReleaseControls() {
   if (propertyData?.entry_checkin_required !== true) return;
@@ -15142,7 +15207,11 @@ async function hydrateEntryReleaseControls() {
     let state = null;
     try { state = await readHostEntryState(code, isTest); } catch (_) { state = null; }
     if (target !== propertyId) return;
-    for (const n of list) { _renderEntryReleaseControls(n, code, isTest, state); n.dataset.state = 'ready'; }
+    for (const n of list) {
+      const fallback = { arrival: n.dataset.entryArrival || null, departure: n.dataset.entryDeparture || null };
+      _renderEntryReleaseControls(n, code, isTest, state, fallback);
+      n.dataset.state = 'ready';
+    }
   }));
 }
 async function refreshEntryReleaseControls(code, isTest) {
@@ -15180,7 +15249,7 @@ async function syncEntryRosterAfterEdit(reservationId) {
     p_reservation_id: r.id, p_expected_version: s.state_version, p_is_test: r.is_test === true,
   });
   if (res.error) {
-    toast(it ? 'Prenotazione salvata. Apri "Stato accesso" per confermare ospiti e date.' : 'Booking saved. Open "Entry status" to confirm guests and dates.');
+    toast(it ? 'Prenotazione salvata. Controlla "Ospiti richiesti" sulla prenotazione e salva.' : 'Booking saved. Check "Required guests" on the booking and save.');
     return;
   }
   if (datesChanged && s.released_manually === true) {
@@ -15188,52 +15257,6 @@ async function syncEntryRosterAfterEdit(reservationId) {
   }
   await refreshEntryReleaseControls(r.booking_code, r.is_test === true);
 }
-function entryStatusButton(code,arrival,departure,isTest,reservationId,count) {
-  const args=encodeURIComponent(JSON.stringify([code,arrival,departure,isTest,reservationId,count]));
-  return `<button type="button" class="btn btn-secondary" style="padding:5px 10px;font-size:0.75rem" data-entry-scope="${args}" onclick="event.stopPropagation();openEntryAccessStatus(...JSON.parse(decodeURIComponent(this.dataset.entryScope)))">${hostLang==='it'?'Stato accesso':'Entry status'}</button>`;
-}
-async function openEntryAccessStatus(code,arrival,departure,isTest,reservationId,count) {
-  document.getElementById('entryStatusDialog')?.close();document.getElementById('entryStatusDialog')?.remove();
-  const d=document.createElement('dialog');d.id='entryStatusDialog';d.style.cssText='width:min(440px,calc(100vw - 32px));border:1px solid var(--border);border-radius:12px;padding:20px;color:var(--ink);';
-  const it=hostLang==='it';
-  d.innerHTML=`<h3>${it?'Istruzioni di accesso':'Entry instructions'}</h3><p id="entryStatusSummary" role="status"></p>
-    <label>${it?'Ospiti richiesti':'Required guests'} <input id="entryRosterCount" type="number" required min="1" max="50" step="1" style="width:70px"></label>
-    <p style="font-size:0.8rem">${it?'Conferma tutti gli ospiti richiesti, inclusi minori. Il rilascio manuale scavalca check-in e orario; non risolve assegnazioni camera ambigue.':'Confirm all required guests, including minors. Manual release bypasses check-in and release time; it cannot resolve ambiguous room assignments.'}</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button id="entryRosterConfirm" type="button">${it?'Conferma ospiti':'Confirm roster'}</button><button id="entryStatusRelease" type="button">${it?'Rilascia accesso':'Release access'}</button><button id="entryStatusRestore" type="button">${it?'Ripristina automatico':'Restore automatic'}</button><button id="entryStatusRetry" type="button">${it?'Riprova':'Retry'}</button><button id="entryStatusClose" type="button">${it?'Chiudi':'Close'}</button></div>`;
-  document.body.appendChild(d);d.showModal();const target=propertyId;let current=null;
-  const status=d.querySelector('#entryStatusSummary'),input=d.querySelector('#entryRosterCount');
-  input.value=Number.isInteger(count)&&count>0?count:'';
-  const buttons=[...d.querySelectorAll('button')].filter(b=>!['entryStatusClose','entryStatusRetry'].includes(b.id));
-  const readonly=()=>!entryUiEnabled()||(IS_ADMIN_VIEW&&!_adminEditEnabled);
-  async function refresh() {
-    buttons.forEach(b=>b.disabled=true);status.textContent=it?'Verifica in corso…':'Checking…';
-    try {
-      current=await readHostEntryState(code,isTest);if(!d.isConnected||target!==propertyId)return;
-      const s=current.summary,r=current.reservation;
-      reservationId=s?.reservation_id??r?.id??reservationId;arrival=s?.arrival_date||r?.checkin_date||arrival;departure=s?.departure_date||r?.checkout_date||departure;
-      if(s?.expected_count||r?.guest_count)input.value=s?.expected_count||r.guest_count;
-      const p=current.entry_release;
-      const labels=it?{locked:'Bloccato — check-in incompleto',scheduled:'Programmato',available:'Disponibile — check-in completo',manual:'Rilasciato manualmente',unavailable:'Da verificare — ospiti, prenotazione o camera',invalid:'Prenotazione non valida',disabled:'Restrizione disattivata'}:{locked:'Locked — check-in incomplete',scheduled:'Scheduled',available:'Available — check-in complete',manual:'Released manually',unavailable:'Needs review — roster, booking or room',invalid:'Invalid booking',disabled:'Restriction off'};
-      status.textContent=(labels[p.state]||labels.unavailable)+(Number.isInteger(p.expected)?` · ${p.submitted??0}/${p.expected}`:'');
-      if(p.state==='scheduled'&&p.release_at&&p.release_timezone)status.textContent+=' · '+new Date(p.release_at).toLocaleString(it?'it-IT':'en-GB',{timeZone:p.release_timezone})+' ('+p.release_timezone+')';
-      buttons.forEach(b=>b.disabled=readonly());
-    }catch(_){current=null;status.textContent=it?'Stato non disponibile. Riprova o contatta il proprietario.':'Status unavailable. Retry or contact the owner.';}
-  }
-  d.querySelector('#entryStatusClose').onclick=()=>{d.close();d.remove();};d.querySelector('#entryStatusRetry').onclick=refresh;
-  d.querySelector('#entryRosterConfirm').onclick=async()=>{
-    if(readonly()||!current||target!==propertyId)return;
-    const n=Number(input.value);if(!Number.isInteger(n)||n<1||n>50){input.reportValidity();return;}
-    buttons.forEach(b=>b.disabled=true);
-    try {
-      const r=await sb.rpc('entry_access_confirm_roster',{p_property_id:target,p_booking_code:code,p_count:n,p_arrival:arrival,p_departure:departure,p_request_id:crypto.randomUUID(),p_reservation_id:reservationId||null,p_expected_version:current.summary?.state_version||null,p_is_test:isTest===true});
-      if(r.error)throw r.error;await refresh();
-    }catch(_){status.textContent=it?'Conferma non riuscita. Ricarica lo stato prima di riprovare.':'Confirmation failed. Reload status before retrying.';current=null;}
-  };
-  d.querySelector('#entryStatusRelease').onclick=async()=>{if(!readonly()&&current&&target===propertyId){await releaseEntryManually(code,arrival,departure,isTest,reservationId,Number(input.value));await refresh();await refreshEntryReleaseControls(code,isTest);}};
-  d.querySelector('#entryStatusRestore').onclick=async()=>{if(!readonly()&&current&&target===propertyId){await restoreAutomaticRelease(code,arrival,departure,isTest,reservationId,Number(input.value));await refresh();await refreshEntryReleaseControls(code,isTest);}};
-  await refresh();
-}
-
 // Round 66 Phase 2d — manual override for the entry-release gate.
 // Calls the authenticated-only RPC pair exposed by the Phase 1a
 // migration:

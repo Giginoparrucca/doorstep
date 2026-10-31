@@ -18,6 +18,8 @@ Daniele tested TES-PYN48X ("Test" property): check-in done, but no code and no W
 
 Tests: new `guest-partial-party-browser.test.mjs` (1-of-2 opens the add-guest form, no "complete" state, count shown EN/IT; a complete party keeps the welcome-back panel); `round68-residence-api.test.mjs` asserts an edit never sends `guest_type`; ROPA citations refreshed. Local `npm run test:all`: **PASS 120 / FAIL 0 / SKIP 3** (standing skips).
 
+Shipped — PR #260 merged (40d0a03); `regression` and the automatic `production security smoke` on main green; production serves the new page. `npm run test:live`: **PASS 4 / FAIL 0 / SKIP 5** (same skips as PR #259: demo origin, iReservation opt-in, three service-role probes). No migration.
+
 ### Hotfix — Guest page: "check in first" instead of Retry, Wi-Fi message, Italian texts (Claude, 31 October 2026)
 
 Daniele's feedback on the 7contrade guest page (Italian selected, before check-in):

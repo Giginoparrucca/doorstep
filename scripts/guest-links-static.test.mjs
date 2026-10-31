@@ -6,9 +6,10 @@ assert.match(html, /target="_blank" rel="noopener noreferrer"/);
 assert.match(html, /parsed\.protocol === 'https:' \|\| parsed\.protocol === 'http:'\)/);
 for (const text of [
   'guestLinkedText(r.desc)',
-  'guestLinkedText(transportInfo)',
-  'guestLinkedText(ciInst)',
-  'guestLinkedText(coInst)',
+  'linked(transport)',
+  'linked(checkout)',
+  "guestLinkedText(instructions)",
+  'const linked = guestLinkedText;',
 ]) assert.ok(html.includes(text), 'guest-facing URL support missing: ' + text);
 assert.match(html, /el\.innerHTML = guestLinkedText\(T\[lang\]\[key\]\)/,
   'language switching retains clickable Home welcome links');

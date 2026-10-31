@@ -104,6 +104,12 @@ export function evaluateEntryRelease(snapshot, now = Date.now()) {
     }
     if (override.active !== false) return result('unavailable', 'invalid_override');
   }
+  // Nothing persisted yet and no guest has checked in: the booking simply
+  // has not started online check-in. Tell the guest to check in rather
+  // than reporting a fault. Any check-in without a roster stays unavailable.
+  if (roster == null && override == null && snapshot.legacy_has_checkin === false) {
+    return result('locked', 'checkin_not_started');
+  }
   if (!scoped(roster, scope) || roster.confirmed !== true
       || roster.identity_version !== booking.identity_version
       || !text(roster.version) || !['host', 'reservation', 'server_contract'].includes(roster.source)

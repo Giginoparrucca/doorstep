@@ -32,6 +32,7 @@ try {
       ${fn('_isLockboxPlaceholder')}
       ${fn('_resolveLockboxCodes')}
       ${fn('refreshLockboxDisplay')}
+      ${fn('guestLinkedText')}
       ${helpers}
       _entryRefreshReady=true;`});
     const record={surname:'Fictional',name:'Guest'};

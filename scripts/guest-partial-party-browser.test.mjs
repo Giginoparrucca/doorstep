@@ -55,6 +55,13 @@ try {
       assert.match(await page.locator('#accessMethod').textContent(), /1 of 2 guests have checked in/);
       await page.evaluate(() => setLang('it'));
       assert.match(await page.locator('#accessMethod').textContent(), /Check-in completato da 1 ospiti su 2/);
+      // Success screen: the added guest is labelled a companion, the
+      // count includes guests saved earlier, and the banner goes away.
+      await page.evaluate(() => { setLang('en'); savedGuests = [{ guest_type: 'member', surname: 'FICTIONAL', name: 'ADDED', sex: 'M' }]; renderReviewCards(); });
+      const card = await page.locator('#reviewCard0').textContent();
+      assert.ok(!/Main guest/i.test(card), 'added guest is not the main guest');
+      assert.ok(/partyCount = \(isReopenedCheckin \? \(existingCheckins\?\.length \|\| 0\) : 0\) \+ savedGuests\.length/.test(html), 'count includes earlier guests');
+      assert.ok(html.includes("document.getElementById('checkinReopenBanner')?.remove();"), 'banner removed on completion');
       // The added guest is a family member of the existing head.
       assert.ok(/head\?\.guest_type === 'group' \? 'group_member' : 'member'/.test(html));
     } else {

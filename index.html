@@ -4179,9 +4179,12 @@ async function saveCurrentGuest() {
       // All done — Round 48: routed via /api/guest (service-role
       // backed), not the anon sb client. property_id + booking_code
       // come from the token payload on the server side.
+      // Guests added to an existing booking count with those already saved.
+      const partyCount = (isReopenedCheckin ? (existingCheckins?.length || 0) : 0) + savedGuests.length;
+      document.getElementById('checkinReopenBanner')?.remove();
       await _guestCall('send', {
         sender: 'system',
-        message: `Check-in complete: ${savedGuests.length} guest(s) registered. Arrival: ${arrivalDate}, Departure: ${departureDate}.`
+        message: `Check-in complete: ${partyCount} guest(s) registered. Arrival: ${arrivalDate}, Departure: ${departureDate}.`
       });
       document.getElementById('checkinBtns').classList.add('hidden');
       document.querySelectorAll('.form-section').forEach(s => s.classList.remove('active'));
@@ -4190,8 +4193,8 @@ async function saveCurrentGuest() {
       document.getElementById('guestCounter').style.display = 'none';
       document.getElementById('checkinSuccess').classList.add('show');
       document.getElementById('successText').textContent = lang === 'it'
-        ? `${savedGuests.length} ospite/i registrato/i. Arrivo: ${arrivalDate}, Partenza: ${departureDate}.`
-        : `${savedGuests.length} guest(s) registered. Arrival: ${arrivalDate}, Departure: ${departureDate}.`;
+        ? `${partyCount} ospite/i registrato/i. Arrivo: ${arrivalDate}, Partenza: ${departureDate}.`
+        : `${partyCount} guest(s) registered. Arrival: ${arrivalDate}, Departure: ${departureDate}.`;
       document.getElementById('reviewHintText').innerHTML = T[lang].review_hint;
       document.getElementById('checkinBadge').style.display = 'none';
       renderReviewCards();
@@ -4319,7 +4322,9 @@ function _wireEditFormAutocomplete() {
 function renderReviewCards() {
   const container = document.getElementById('reviewCards');
   container.innerHTML = savedGuests.map((g, i) => {
-    const isMain = i === 0;
+    // The saved role decides the label: a guest added to an existing
+    // booking is a companion even though it is first in this session.
+    const isMain = g.guest_type ? ['single','head','group'].includes(g.guest_type) : i === 0;
     const role = isMain ? T[lang].review_main : T[lang].review_companion;
     const docInfo = g.document_number
       ? `${g.document_type === 'passport' ? '' : ''} ${g.document_number}`

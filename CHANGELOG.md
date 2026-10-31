@@ -7,6 +7,17 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Hotfix — Incomplete party is not "check-in complete"; edits keep the guest's role (Claude, 31 October 2026)
+
+Daniele tested TES-PYN48X ("Test" property): check-in done, but no code and no Wi-Fi, while the page said "1 guest · Check-in complete ✓". Findings: the booking's entry record expects **2** guests and only 1 checked in, so the code is correctly held. In addition, that guest's row had been saved as `head`, but a later edit from the welcome-back screen rewrote it to `single`. That no longer matches its entry slot, so the release check counted **0 of 2**.
+
+1. `api/guest.js` `doCheckinUpdate`: `guest_type` is no longer editable. The role is fixed at check-in (it binds the row to its entry slot and the Alloggiati type); edits correct personal details only.
+2. `index.html`: when a gated booking (`stay.dates_locked`) has fewer check-ins than its guest count (the larger of the reservation count and the server's expected count), the page no longer shows "Check-in complete". It opens the existing add-guests form with "Check-in incompleto: 1 di 2 ospiti registrati…" and preselects the right number of guests to add. Added guests are `member` (or `group_member` under a group leader) instead of always `group_member`.
+3. The locked entry card shows the count: "Check-in completato da 1 ospiti su 2. Tutti gli ospiti devono completare il check-in online…".
+4. Data repair (test property only): TES-PYN48X's guest row restored from `single` to `head`, the value the check-in RPC wrote.  Query of every live slot/row pair in production: no other mismatch.
+
+Tests: new `guest-partial-party-browser.test.mjs` (1-of-2 opens the add-guest form, no "complete" state, count shown EN/IT; a complete party keeps the welcome-back panel); `round68-residence-api.test.mjs` asserts an edit never sends `guest_type`; ROPA citations refreshed. Local `npm run test:all`: **PASS 120 / FAIL 0 / SKIP 3** (standing skips).
+
 ### Hotfix — Guest page: "check in first" instead of Retry, Wi-Fi message, Italian texts (Claude, 31 October 2026)
 
 Daniele's feedback on the 7contrade guest page (Italian selected, before check-in):

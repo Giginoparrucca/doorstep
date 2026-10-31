@@ -140,6 +140,9 @@ assert.equal(patched.length, 0, 'nothing written');
 out = await update({ surname: 'Corretto', residence_country: 'Italia', residence_place: 'Lecce' });
 assert.equal(out.status, 200, 'old row saved once residence is added');
 assert.equal(patched.at(-1).residence_place, 'Lecce');
+// An edit never changes the guest's role (it binds the row to its entry slot).
+out = await update({ guest_type: 'single', surname: 'Corretto', residence_country: 'Italia', residence_place: 'Lecce' });
+assert.equal(out.status, 200); assert.ok(!('guest_type' in patched.at(-1)), 'guest_type is not editable');
 
 currentRow = { id: 'row-1', residence_country: 'France', residence_place: null, residence_postcode: null };
 out = await update({ surname: 'Corretto' });

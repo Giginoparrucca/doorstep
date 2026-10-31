@@ -2372,13 +2372,36 @@ function goTo(page) {
 // booking's check-in has been reopened by the host. Doesn't hide the
 // check-in form; the form picks up from guest N+1 with the numbering
 // offset applied in updateSteps.
-function showReopenedBanner(alreadyCount) {
+// Guests the booking still needs: only for bookings whose entry code waits
+// for every guest's check-in (dates_locked), using the larger of the
+// reservation count and the server's expected count.
+function _partyMissing(guests) {
+  const st = _bookingStay;
+  if (!st || st.dates_locked !== true) return 0;
+  const er = _entryLastResponse?.data?.entry_release;
+  const total = Math.max(Number.isInteger(st.guest_count) ? st.guest_count : 0,
+    Number.isInteger(er?.expected) ? er.expected : 0);
+  return Math.max(0, total - (Array.isArray(guests) ? guests.length : 0));
+}
+function showReopenedBanner(alreadyCount, missing = 0) {
   const it = lang === 'it';
   const wrap = document.getElementById('checkinIntro');
   if (!wrap) return;
-  const msg = it
-    ? `L'host ha riaperto il check-in. Ci sono già <strong>${alreadyCount}</strong> ospite/i registrato/i — aggiungi qui i restanti.`
-    : `The host has reopened check-in. <strong>${alreadyCount}</strong> guest${alreadyCount === 1 ? '' : 's'} already registered — please add the remaining ones here.`;
+  const total = alreadyCount + missing;
+  const msg = missing > 0
+    ? (it
+      ? `Check-in incompleto: <strong>${alreadyCount} di ${total}</strong> ospiti registrati. Aggiungi qui ${missing === 1 ? "l'ospite mancante" : 'gli ospiti mancanti'}: il codice di accesso e il Wi-Fi saranno visibili quando tutti avranno completato il check-in.`
+      : `Check-in incomplete: <strong>${alreadyCount} of ${total}</strong> guests registered. Please add the ${missing === 1 ? 'missing guest' : 'missing guests'} here: the entry code and Wi-Fi appear once everyone has checked in.`)
+    : (it
+      ? `L'host ha riaperto il check-in. Ci sono già <strong>${alreadyCount}</strong> ospite/i registrato/i — aggiungi qui i restanti.`
+      : `The host has reopened check-in. <strong>${alreadyCount}</strong> guest${alreadyCount === 1 ? '' : 's'} already registered — please add the remaining ones here.`);
+  if (missing > 0) {
+    const opts = [...document.querySelectorAll('.guest-type-opt')];
+    const single = opts.find(o => /'single'/.test(o.getAttribute('onclick') || ''));
+    const party = opts.find(o => /'head'/.test(o.getAttribute('onclick') || ''));
+    if (missing === 1 && single) selectGuestType(single, 'single');
+    else if (missing > 1 && party) { selectGuestType(party, 'head'); document.getElementById('numGuests').value = String(missing); }
+  }
 
   const existing = document.getElementById('checkinReopenBanner');
   if (existing) existing.remove();
@@ -3918,7 +3941,12 @@ function renderGuestEntryState(r) {
             }
           }
           if (!msg) {
-            if (er.state === 'locked') {
+            if (er.state === 'locked' && Number.isInteger(er.expected) && er.expected > 1
+                && Number.isInteger(er.submitted) && er.submitted < er.expected) {
+              msg = isIt
+                ? `Check-in completato da ${er.submitted} ospiti su ${er.expected}. Tutti gli ospiti devono completare il check-in online per visualizzare le istruzioni di accesso.`
+                : `${er.submitted} of ${er.expected} guests have checked in. Every guest must complete online check-in to view the entry instructions.`;
+            } else if (er.state === 'locked') {
               msg = isIt
                 ? 'Completa il check-in online per visualizzare le istruzioni di accesso.'
                 : 'Complete online check-in to view your entry instructions.';
@@ -4000,7 +4028,8 @@ async function saveCurrentGuest() {
     if (isReopenedCheckin) {
       // Round 36.2.3 — reopened flow: head already exists in the DB,
       // every guest added here is a family/group member.
-      guestType = 'group_member';
+      const head = (existingCheckins || []).find(g => ['single','head','group'].includes(g.guest_type));
+      guestType = head?.guest_type === 'group' ? 'group_member' : 'member';
     } else if (currentGuestIdx === 0) {
       guestType = selectedGuestType === 'single' ? 'single' : selectedGuestType === 'group' ? 'group' : 'head';
     } else {
@@ -5730,10 +5759,11 @@ async function init() {
         console.log(`✅ Found ${guests.length} existing check-ins for booking ${bookingCode}`);
         // Reopen signal: any row's checkin_reopened_at, or ota_reservations.
         const reopened = guests.some(c => c.checkin_reopened_at) || !!listR?.data?.reopened_at;
-        if (reopened) {
-          console.log('🔓 Booking check-in has been reopened by the host — allowing more guests');
+        const missing = _partyMissing(guests);
+        if (reopened || missing > 0) {
+          console.log('🔓 More guests can be added to this booking');
           isReopenedCheckin = true;
-          showReopenedBanner(guests.length);
+          showReopenedBanner(guests.length, missing);
           refreshLockboxDisplay();
         } else {
           showWelcomeBackState(guests);
@@ -5772,9 +5802,10 @@ async function init() {
               existingCheckins = guests;
               foundExisting = true;
               const reopened = guests.some(c => c.checkin_reopened_at) || !!listR?.data?.reopened_at;
-              if (reopened) {
+              const missing = _partyMissing(guests);
+              if (reopened || missing > 0) {
                 isReopenedCheckin = true;
-                showReopenedBanner(guests.length);
+                showReopenedBanner(guests.length, missing);
                 refreshLockboxDisplay();
               } else {
                 showWelcomeBackState(guests);

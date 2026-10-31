@@ -7,6 +7,10 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### CI — flaky residence browser test (Claude, 31 October 2026)
+
+The main `regression` run for PR #262 (275b2b4, run 41195263115) failed: **PASS 119 / FAIL 1 / SKIP 3**. The failure was `round68-residence-browser.test.mjs:220` timing out at en/1440, the last variant. Cause: a race in the test, not the app. The helper switches to the check-in page after the property loads, while startup independently loads saved guests and switches to the welcome page; when the guest list arrived first, the helper's switch landed last and the wait for the welcome page never succeeded. The same code passed on the PR run, on the next main run (ff50e9a) and 6/6 local runs. Fix: wait for the welcome-back panel that startup always shows, not for the active page. PR #262 was already deployed and verified via ff50e9a (green regression + production check). Local `npm run test:all` after the fix: **PASS 121 / FAIL 0 / SKIP 3** (standing skips).
+
 ### Guest analytics ignore host devices (Claude, 31 October 2026)
 
 Daniele saw analytics for 7contrade (28 sessions, 141 events, 11 bookings, 18–31 Oct) although the property has not started with real guests: it was the host testing.

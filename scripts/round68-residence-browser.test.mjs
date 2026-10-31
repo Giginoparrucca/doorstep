@@ -216,8 +216,10 @@ try {
       { id: 'old-member', guest_type: 'member', surname: 'Ritorno', name: 'Member', sex: 'M', date_of_birth: '2015-01-01', place_of_birth: 'Berlin', birth_country: 'Germany', citizenship: 'Germany', arrival_date: '2026-11-02', departure_date: '2026-11-05', residence_country: null, residence_place: null, editable: true },
     ];
     ({ context, page, state } = await openGuestPage({ language, width, region: 'Puglia', guests }));
-    // Startup loads the saved guests and opens the welcome page; act after it settles.
-    await page.waitForFunction(() => existingCheckins.length === 2 && document.getElementById('page-welcome').classList.contains('active'));
+    // Startup loads the saved guests and shows the welcome-back panel; act
+    // after it settles. Wait for the panel, not the active page: the helper's
+    // goTo('checkin') can land before or after startup's goTo('welcome').
+    await page.waitForFunction(() => existingCheckins.length === 2 && document.getElementById('welcomeBackPanel').style.display === 'block');
     await page.evaluate(g => { existingCheckins = g; goTo('checkin'); showWelcomeBackState(g); editGuest(0); }, guests);
     assert.equal(await page.inputValue('#ed_fiscal0'), VALID_CF, 'codice fiscale pre-filled on edit');
     assert.equal(await page.inputValue('#ed_raddress0'), 'Via Prova 1');

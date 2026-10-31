@@ -7,6 +7,15 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Hotfix — Edited bookings stay in sync; no release once the code is visible (Claude, 31 October 2026)
+
+Daniele's pilot feedback on TES-PYN48X:
+
+1. **Before check-in the guest card showed "Riprova" (Retry).** On 30 Oct the booking's stored check-in record (`entry_access.bookings`) was confirmed for 8 guests from 30 Oct. The host then edited the reservation to 2 guests from 31 Oct, but the record was not updated. The protected snapshot correctly refuses a reservation that no longer matches its record, so the guest saw "unavailable" with Retry until the first check-in re-synced it (the atomic submission detects the change). Fix: after the host saves an edited direct reservation, `syncEntryRosterAfterEdit()` in `host-console.html` calls the existing `entry_access_confirm_roster` RPC with the new guest count and dates, using the stored version. It only runs when an entry record already exists and differs; the first check-in still creates a missing one. When the dates change the RPC already resets any manual release, and the host is told so. If the sync fails, the host is told to confirm via "Stato accesso". Bookings changed by calendar sync (iCal) still re-sync at the next check-in, as before.
+2. **After check-in, "Rilascia accesso" was still clickable** although the code was already visible. Now, once check-in is complete and the code is visible, both actions are disabled; release is offered only while the code is hidden.
+
+No server, policy or database change. Tests: `entry-host-status-browser.test.mjs` adds the visible-code state (both actions disabled), the edit re-sync (count/dates/reservation sent with the stored version) and no write when already in sync; `round66-manual-release.test.mjs` updated. Local `npm run test:all`: **PASS 118 / FAIL 0 / SKIP 3** (standing skips).
+
 ### Hotfix — Check-in form uses the booking's dates (Claude, 30 October 2026)
 
 Daniele's pilot check-in on TES-PYN48X (8 guests, 30 Oct → 4 Nov, "Require check-in before codes" on) failed with "The booking or guest list has changed". Postgres logged "Guest does not match roster" twice (13:50 and 13:51 UTC). The form's first step had pre-filled arrival = today and departure = tomorrow (31 Oct), and with the check-in gate on the atomic submission function correctly refuses dates that differ from the booking. Nothing was saved (0 check-ins on the booking).

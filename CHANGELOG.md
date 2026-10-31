@@ -9,7 +9,7 @@ Newest entries at the top of each section.
 
 ### Hotfix — Success screen after adding a missing guest (Claude, 31 October 2026)
 
-Daniele added the second guest on TES-PYN48X. The data was correct (slot 1 `head`, slot 2 `member`, 2 of 2 submitted), but the success screen kept the "1 of 2" banner, labelled the added guest "Main guest" and said "1 guest(s) registered". `index.html`: the banner is removed on completion; the count includes guests saved earlier (`partyCount`, also in the host notification message); review cards take the role from the saved `guest_type`. Test: `guest-partial-party-browser.test.mjs` extended. Local `npm run test:all`: **PASS 120 / FAIL 0 / SKIP 3** (standing skips).
+Daniele added the second guest on TES-PYN48X. The data was correct (slot 1 `head`, slot 2 `member`, 2 of 2 submitted), but the success screen kept the "1 of 2" banner, labelled the added guest "Main guest" and said "1 guest(s) registered". `index.html`: the banner is removed on completion; the count includes guests saved earlier (`partyCount`, also in the host notification message); review cards take the role from the saved `guest_type`. Test: `guest-partial-party-browser.test.mjs` extended. Local `npm run test:all`: **PASS 120 / FAIL 0 / SKIP 3** (standing skips). Shipped — PR #261 merged (75ee140); `regression` and automatic `production security smoke` on main green; production serves the new page. `npm run test:live`: **PASS 4 / FAIL 0 / SKIP 5** (standing skips).
 
 ### Hotfix — Incomplete party is not "check-in complete"; edits keep the guest's role (Claude, 31 October 2026)
 

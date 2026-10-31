@@ -364,6 +364,10 @@ const APP_CONFIG = window.getWelcomeBnbConfig();
 const SUPABASE_URL = APP_CONFIG.supabaseUrl;
 const SUPABASE_KEY = APP_CONFIG.publicKey;
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, APP_CONFIG.mode === 'demo' ? { auth: { storageKey: `wbnb-demo-auth-${APP_CONFIG.projectRef}` } } : {});
+// Analytics: a browser where a host or admin has signed in is a host
+// device. The guest app does not record analytics on it, so a host
+// testing their own guest links never counts as a guest.
+sb.auth.onAuthStateChange((event, session) => { if (session) { try { localStorage.setItem('wbnb_host_device', '1'); } catch (_) {} } });
 
 let allEvents = [];
 let allProperties = [];

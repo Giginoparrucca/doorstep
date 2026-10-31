@@ -16,7 +16,7 @@ Daniele saw analytics for 7contrade (28 sessions, 141 events, 11 bookings, 18–
 - Guest Analytics no longer merges `chat_messages` as synthetic sessions (Round 50 fallback). Events now arrive through the same-origin gateway, and the fallback counted each chat message as its own session and could not tell host chats from guest chats. The dashboard engagement hint still uses it.
 - Limits: a host testing on a device where they never signed in (e.g. a phone opened from WhatsApp) is still counted; signing in once on that device stops it. Data: at Daniele's request, 7contrade's 141 guest analytics events (18–31 Oct) were soft-deleted (`deleted_at` set, restorable), so Guest Analytics starts from zero. The first update also caught the property's 1,541 non-guest (host console) events; those were restored immediately. Verified: guest events 0 visible / 141 hidden, other events 1,541 visible.
 
-Tests: new `guest-host-device-analytics-browser.test.mjs` (guest browser records events and beacons; marked or signed-in browser records none; both consoles mark on sign-in; no chat fallback in Guest Analytics); ROPA citations refreshed. Local `npm run test:all`: **PASS 121 / FAIL 0 / SKIP 3** (standing skips).
+Tests: new `guest-host-device-analytics-browser.test.mjs` (guest browser records events and beacons; marked or signed-in browser records none; both consoles mark on sign-in; no chat fallback in Guest Analytics); ROPA citations refreshed. Local `npm run test:all`: **PASS 121 / FAIL 0 / SKIP 3** (standing skips). Shipped — PR #263 merged (ff50e9a); main `regression` and automatic `production security smoke` green on ff50e9a (which contains both); production serves the new pages. `npm run test:live`: **PASS 4 / FAIL 0 / SKIP 5** (standing skips).
 
 ### Host console — "Stato accesso" panel removed; required guests on the card (Claude, 31 October 2026)
 
@@ -27,7 +27,7 @@ Daniele asked to move the panel's only unique control onto the booking card and 
 - The badge shows progress (e.g. "Codice nascosto: check-in incompleto · 1/2"). A **Riprova** button appears when the status cannot be read. Release with no known count asks for the count instead of opening the dialog.
 - The read-only admin view and the rollback switch disable the field as well as the buttons. The toast after a failed booking-edit re-sync points to "Ospiti richiesti".
 
-Tests: `entry-host-status-browser.test.mjs` rewritten for the card (no panel; progress badge; required guests saved with optimistic version, floor, standalone dates; retry; read-only admin; rollback pause); `round66-manual-release.test.mjs` updated. Local `npm run test:all`: **PASS 120 / FAIL 0 / SKIP 3** (standing skips).
+Tests: `entry-host-status-browser.test.mjs` rewritten for the card (no panel; progress badge; required guests saved with optimistic version, floor, standalone dates; retry; read-only admin; rollback pause); `round66-manual-release.test.mjs` updated. Local `npm run test:all`: **PASS 120 / FAIL 0 / SKIP 3** (standing skips). Shipped — PR #262 merged (275b2b4); main `regression` and automatic `production security smoke` green on ff50e9a (which contains both); production serves the new pages. `npm run test:live`: **PASS 4 / FAIL 0 / SKIP 5** (standing skips).
 
 ### Hotfix — Success screen after adding a missing guest (Claude, 31 October 2026)
 

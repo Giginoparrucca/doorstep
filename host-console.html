@@ -7290,6 +7290,7 @@ async function saveDirectReservation(ev) {
       _closeReservationForm(true);
       try { toast(h('rf_saved_ok')); } catch(_) {}
       try { track('direct_reservation_saved', { mode, edit: !!reservationId, channel }); } catch(_) {}
+      if (reservationId && !isBlock) { try { await syncEntryRosterAfterEdit(reservationId); } catch (e) { console.warn('[entry] roster sync failed:', e); } }
       // Refresh the surfaces that show reservations.
       try { if (typeof renderCalendarPanel === 'function') await renderCalendarPanel(); } catch(_) {}
       try { if (typeof renderDashboard === 'function') await renderDashboard(); } catch(_) {}
@@ -15060,7 +15061,7 @@ function entryReleaseControls(code, isTest) {
 function _entryReleaseView(state, it) {
   const er = state?.entry_release || {}, s = state?.summary || {};
   if (s.released_manually === true || er.state === 'manual') {
-    return { released: true, tone: 'ok', text: it ? '🔓 Codice rilasciato manualmente' : '🔓 Code released manually' };
+    return { released: true, visible: true, tone: 'ok', text: it ? '🔓 Codice rilasciato manualmente' : '🔓 Code released manually' };
   }
   const map = {
     available: ['ok', it ? '✅ Codice visibile: check-in completo' : '✅ Code visible: check-in complete'],
@@ -15068,7 +15069,8 @@ function _entryReleaseView(state, it) {
     locked: ['wait', it ? '🔒 Codice nascosto: check-in incompleto' : '🔒 Code hidden: check-in incomplete'],
   };
   const [tone, text] = map[er.state] || ['warn', it ? '⚠️ Codice nascosto: da verificare' : '⚠️ Code hidden: needs review'];
-  return { released: false, tone, text };
+  // Code already visible (check-in complete): nothing to release or restore.
+  return { released: false, visible: er.state === 'available', tone, text };
 }
 function _renderEntryReleaseControls(node, code, isTest, state) {
   const it = hostLang === 'it';
@@ -15115,7 +15117,7 @@ function _renderEntryReleaseControls(node, code, isTest, state) {
   const release = mk('entry-release-btn', it ? '🔓 Rilascia accesso' : '🔓 Release access',
     it ? 'Rilascia manualmente il codice per questa prenotazione: scavalca il check-in richiesto; l\'azione sarà registrata nell\'audit'
        : 'Manually release the code for this booking: bypasses the check-in requirement; the action is recorded in the audit log',
-    !view.released, releaseEntryManually);
+    !view.released && !view.visible, releaseEntryManually);
   release.style.background = 'rgba(27,94,32,0.14)'; release.style.border = '1px solid rgba(27,94,32,0.4)'; release.style.color = '#1b5e20';
   const restore = mk('entry-restore-btn', it ? '↩ Ripristina automatico' : '↩ Restore automatic',
     it ? 'Ripristina il rilascio automatico: il codice torna nascosto finché il check-in non è completato'
@@ -15154,6 +15156,38 @@ async function refreshEntryReleaseControls(code, isTest) {
 new MutationObserver(() => {
   if (document.querySelector('.entry-release-controls:not([data-state])')) queueMicrotask(hydrateEntryReleaseControls);
 }).observe(document.documentElement, { childList: true, subtree: true });
+// When check-in gates entry codes, the booking's stored check-in record
+// (guest count and dates) must match the reservation; otherwise the guest
+// sees "unavailable" until the next check-in re-syncs it. After the host
+// edits a reservation, update an existing record right away. A record
+// that does not exist yet is created by the first check-in.
+async function syncEntryRosterAfterEdit(reservationId) {
+  if (propertyData?.entry_checkin_required !== true || !entryUiEnabled()) return;
+  const it = hostLang === 'it';
+  const { data: r } = await sb.from('ota_reservations')
+    .select('id,booking_code,is_test,checkin_date,checkout_date,guest_count,status,deleted_at')
+    .eq('id', reservationId).maybeSingle();
+  if (!r || !r.booking_code || r.status !== 'active' || r.deleted_at || !Number.isInteger(r.guest_count)) return;
+  const day = v => String(v || '').slice(0, 10);
+  const state = await readHostEntryState(r.booking_code, r.is_test === true);
+  const s = state?.summary;
+  if (!s?.state_version) return;
+  const datesChanged = day(s.arrival_date) !== day(r.checkin_date) || day(s.departure_date) !== day(r.checkout_date);
+  if (!datesChanged && s.expected_count === r.guest_count) return;
+  const res = await sb.rpc('entry_access_confirm_roster', {
+    p_property_id: propertyId, p_booking_code: r.booking_code, p_count: r.guest_count,
+    p_arrival: day(r.checkin_date), p_departure: day(r.checkout_date), p_request_id: crypto.randomUUID(),
+    p_reservation_id: r.id, p_expected_version: s.state_version, p_is_test: r.is_test === true,
+  });
+  if (res.error) {
+    toast(it ? 'Prenotazione salvata. Apri "Stato accesso" per confermare ospiti e date.' : 'Booking saved. Open "Entry status" to confirm guests and dates.');
+    return;
+  }
+  if (datesChanged && s.released_manually === true) {
+    toast(it ? 'Le date sono cambiate: il rilascio manuale del codice è stato annullato.' : 'The dates changed: the manual code release was reset.');
+  }
+  await refreshEntryReleaseControls(r.booking_code, r.is_test === true);
+}
 function entryStatusButton(code,arrival,departure,isTest,reservationId,count) {
   const args=encodeURIComponent(JSON.stringify([code,arrival,departure,isTest,reservationId,count]));
   return `<button type="button" class="btn btn-secondary" style="padding:5px 10px;font-size:0.75rem" data-entry-scope="${args}" onclick="event.stopPropagation();openEntryAccessStatus(...JSON.parse(decodeURIComponent(this.dataset.entryScope)))">${hostLang==='it'?'Stato accesso':'Entry status'}</button>`;

@@ -25,7 +25,8 @@ assert.ok(/propertyData\?\.entry_checkin_required === true \? entryReleaseContro
 assert.ok(/readHostEntryState\(code, isTest\)/.test(src), 'state comes from the server, not the row');
 assert.ok(/s\.released_manually === true \|\| er\.state === 'manual'/.test(src), 'released state recognised');
 assert.ok(/Codice rilasciato manualmente/.test(src) && /Code released manually/.test(src), 'released badge IT/EN');
-assert.ok(/!view\.released, releaseEntryManually\)/.test(src), 'release enabled only when not released');
+assert.ok(/!view\.released && !view\.visible, releaseEntryManually\)/.test(src), 'release enabled only while the code is hidden');
+assert.ok(/async function syncEntryRosterAfterEdit\(reservationId\)/.test(src) && /await syncEntryRosterAfterEdit\(reservationId\)/.test(src), 'reservation edits re-sync the stored check-in record');
 assert.ok(/view\.released, restoreAutomaticRelease\)/.test(src), 'restore enabled only when released');
 assert.ok(/b\.disabled = readonly \|\| !enabled/.test(src), 'read-only views cannot act');
 

@@ -7,11 +7,12 @@ try{for(const lang of ['it','en'])for(const width of [390,1440]){
  const page=await browser.newPage({viewport:{width,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
  await page.route('https://host-entry.example.invalid/',r=>r.fulfill({contentType:'text/html',body:'<button id="open">Entry status</button>'}));await page.goto('https://host-entry.example.invalid/');
  await page.addScriptTag({content:`let APP_CONFIG={entryReleaseUiEnabled:true};let propertyData={entry_checkin_required:true};let hostLang=${JSON.stringify(lang)},propertyId='fictional-property',IS_ADMIN_VIEW=false,_adminEditEnabled=false;
- let version='version-1',released=false,failed=false,unknown=false,mutations=[];
- const state=()=>({entry_release:{state:released?'manual':'locked',allow_entry:released,submitted:1,expected:3},summary:unknown?null:{booking_id:'fictional-booking',state_version:version,expected_count:3,released_manually:released,reservation_id:null,arrival_date:'2099-01-01',departure_date:'2099-01-02'},reservation:null});
- const sb={auth:{getSession:async()=>({data:{session:{access_token:'fictional-host'}}})},rpc:async(name,args)=>{mutations.push({name,args});if(args.p_expected_version!==(unknown?null:version))throw Error('wrong optimistic version');version=crypto.randomUUID();unknown=false;if(name==='entry_access_set_release')released=args.p_release;return {data:{booking_id:'fictional-booking',state_version:version}};}};
+ let version='version-1',released=false,failed=false,unknown=false,visible=false,mutations=[],toasts=[];const toast=m=>toasts.push(m);
+ const state=()=>({entry_release:{state:released?'manual':visible?'available':'locked',allow_entry:released,submitted:1,expected:3},summary:unknown?null:{booking_id:'fictional-booking',state_version:version,expected_count:3,released_manually:released,reservation_id:null,arrival_date:'2099-01-01',departure_date:'2099-01-02'},reservation:null});
+ const reservationRow={id:'fictional-res',booking_code:'FICTIONAL-BOOK',is_test:false,checkin_date:'2099-01-02',checkout_date:'2099-01-05',guest_count:2,status:'active',deleted_at:null};
+ const sb={from:()=>({select(){return this;},eq(){return this;},maybeSingle:async()=>({data:reservationRow,error:null})}),auth:{getSession:async()=>({data:{session:{access_token:'fictional-host'}}})},rpc:async(name,args)=>{mutations.push({name,args});if(args.p_expected_version!==(unknown?null:version))throw Error('wrong optimistic version');version=crypto.randomUUID();unknown=false;if(name==='entry_access_set_release')released=args.p_release;return {data:{booking_id:'fictional-booking',state_version:version}};}};
  window.fetch=async(url,options)=>{if(url!=='/api/guest'||options.cache!=='no-store'||options.headers.Authorization!=='Bearer fictional-host')throw Error('unexpected transport');const b=JSON.parse(options.body);if(b.property_id!==propertyId||b.action!=='host_entry_state')throw Error('wrong scope');return {ok:!failed,json:async()=>state()};};
- ${['entryUiEnabled','readHostEntryState','entryStatusButton','openEntryAccessStatus','releaseEntryManually','restoreAutomaticRelease','entryReleaseControls','_entryReleaseView','_renderEntryReleaseControls','hydrateEntryReleaseControls','refreshEntryReleaseControls'].map(fn).join('\n')}`});
+ ${['entryUiEnabled','readHostEntryState','entryStatusButton','openEntryAccessStatus','releaseEntryManually','restoreAutomaticRelease','entryReleaseControls','_entryReleaseView','_renderEntryReleaseControls','hydrateEntryReleaseControls','refreshEntryReleaseControls','syncEntryRosterAfterEdit'].map(fn).join('\n')}`});
  await page.evaluate(()=>openEntryAccessStatus('FICTIONAL-BOOK','2099-01-01','2099-01-02',false,null,3));
  assert.match(await page.locator('#entryStatusSummary').textContent(),/1\/3/);
  await page.locator('#entryStatusRelease').click();await page.waitForFunction(()=>released&&document.getElementById('entryStatusSummary').textContent.includes(hostLang==='it'?'Rilasciato':'Released'));
@@ -43,6 +44,21 @@ try{for(const lang of ['it','en'])for(const width of [390,1440]){
  await page.evaluate(()=>{IS_ADMIN_VIEW=true;_adminEditEnabled=false;});await page.evaluate(()=>refreshEntryReleaseControls('FICTIONAL-BOOK',false));assert.equal(await page.locator('#inline .entry-release-btn').first().isDisabled(),true,'read-only admin sees status but cannot act');
  await page.evaluate(()=>{IS_ADMIN_VIEW=false;failed=true;});await page.evaluate(()=>refreshEntryReleaseControls('FICTIONAL-BOOK',false));assert.match(await badge(),lang==='it'?/non disponibile/:/unavailable/);assert.equal(await page.locator('#inline .entry-release-btn').count(),0,'no actions without a known state');
  await page.evaluate(()=>{failed=false;});
+ // Code already visible after a complete check-in: nothing to release or restore.
+ await page.evaluate(async()=>{released=false;visible=true;await refreshEntryReleaseControls('FICTIONAL-BOOK',false);});
+ assert.match(await badge(),lang==='it'?/Codice visibile: check-in completo/:/Code visible: check-in complete/);
+ assert.equal(await page.locator('#inline .entry-release-btn').first().isDisabled(),true,'no release once the code is visible');
+ assert.equal(await page.locator('#inline .entry-restore-btn').first().isDisabled(),true);
+ await page.evaluate(()=>{visible=false;});
+ // Editing the reservation (2 guests, new dates) re-syncs the stored record.
+ const mBefore=await page.evaluate(()=>mutations.length);
+ await page.evaluate(()=>syncEntryRosterAfterEdit('fictional-res'));
+ const sync=await page.evaluate(()=>mutations.at(-1));
+ assert.equal(await page.evaluate(()=>mutations.length),mBefore+1);
+ assert.equal(sync.name,'entry_access_confirm_roster');assert.equal(sync.args.p_count,2);assert.equal(sync.args.p_arrival,'2099-01-02');assert.equal(sync.args.p_departure,'2099-01-05');assert.equal(sync.args.p_reservation_id,'fictional-res');
+ // Already in sync: no write.
+ await page.evaluate(()=>{reservationRow.checkin_date='2099-01-01';reservationRow.checkout_date='2099-01-02';reservationRow.guest_count=3;});
+ await page.evaluate(()=>syncEntryRosterAfterEdit('fictional-res'));assert.equal(await page.evaluate(()=>mutations.length),mBefore+1,'unchanged booking is not rewritten');
  if(process.env.ENTRY_QA_DIR&&width===390){await page.evaluate(async()=>{released=true;await refreshEntryReleaseControls('FICTIONAL-BOOK',false);});await page.locator('#inline').screenshot({path:`${process.env.ENTRY_QA_DIR}/release-controls-${lang}.png`});}
  assert.deepEqual(errors,[]);await page.close();
-}console.log('PASS actual host status/roster/release/restore UI IT/EN 390/1440: authoritative counts, optimistic versions, no unknown-count fallback, errors/read-only admin, standalone confirmation; inline control shows released state and enables only the applicable action.');}finally{await browser.close();}
+}console.log('PASS actual host status/roster/release/restore UI IT/EN 390/1440: authoritative counts, optimistic versions, no unknown-count fallback, errors/read-only admin, standalone confirmation; inline control shows released/visible state and enables only the applicable action; reservation edits re-sync the stored check-in record.');}finally{await browser.close();}

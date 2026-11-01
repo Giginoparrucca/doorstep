@@ -125,7 +125,7 @@ create policy host_terms_acceptances_read on public.host_terms_acceptances for s
   using (host_id = auth.uid() or public.is_admin());
 
 insert into public.legal_documents (kind, version, file_path, text_sha256, annex_file_path, annex_sha256, specific_clauses, requires_reacceptance)
-values ('host_terms', 1, 'legal/CONDIZIONI_GENERALI_v1.md', '7ebd39e081bd3468bf378e8cb20dacd14d4941bbb6df13196b704be54fd92de4',
+values ('host_terms', 1, 'legal/CONDIZIONI_GENERALI_v1.md', '65465c4297c35948065cc6417ae1f5d8345de046303ce2570876930245078457',
   'legal/ALLEGATO_A_DPA_v1.md', '0bef0a5d37c9f6c60e3f9e8232035ee62fd645338b12418252bde4d44a1e9bea',
   '[{"ref": "3.3", "label": "modifica o rimozione di funzioni del Servizio"}, {"ref": "5.2 e 5.3", "label": "adempimenti di legge che restano a carico dell''Host anche con l''Invio automatico"}, {"ref": "6.4", "label": "nessuna garanzia sull''accettazione degli invii da parte dei Portali pubblici"}, {"ref": "9.1 e 9.2", "label": "nessuna garanzia di continuità del Servizio e dei servizi di terzi"}, {"ref": "10.2 e 10.3", "label": "limitazioni ed esclusioni di responsabilità e massimale"}, {"ref": "11", "label": "manleva a carico dell''Host"}, {"ref": "13.3", "label": "recesso del Fornitore, anche immediato"}, {"ref": "14", "label": "modifiche delle Condizioni da parte del Fornitore"}, {"ref": "15.2", "label": "foro competente"}]'::jsonb, true)
 on conflict (kind, version) do update set

@@ -105,7 +105,7 @@ L'Host tiene indenne il Fornitore da richieste di terzi, compresi Ospiti e autor
 
 13.1 Il contratto è a tempo indeterminato.
 
-13.2 L'Host può recedere in qualsiasi momento, senza costi, con una richiesta a info@welcomebnb.it o dalla funzione dedicata nel Servizio.
+13.2 L'Host può recedere in qualsiasi momento, senza costi, con una richiesta a info@welcomebnb.it.
 
 13.3 Il Fornitore può recedere con 30 giorni di preavviso via email, o subito in caso di violazione grave di queste Condizioni, uso illecito del Servizio o ordine dell'autorità.
 

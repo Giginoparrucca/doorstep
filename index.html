@@ -1945,7 +1945,7 @@ const T = {
   en: {
     // Welcome
     welcome_title: 'Welcome to<br><em>Your Stay</em>',
-    welcome_sub: 'Your home in the heart of the old city',
+    welcome_sub: '', // set from the booking's dates (applyBookingStay) or after check-in
     wifi_pass: 'Password: sole2025!',
     address_label: 'Address', maps_btn: 'Get Directions', maps_btn_short: 'Directions',
     checkin_sub: 'Self check-in · Keybox',
@@ -2120,7 +2120,7 @@ const T = {
   },
   it: {
     welcome_title: 'Benvenuti a<br><em>Il Vostro Soggiorno</em>',
-    welcome_sub: 'La vostra casa nel cuore della città vecchia',
+    welcome_sub: '',
     wifi_pass: 'Password: sole2025!',
     address_label: 'Indirizzo', maps_btn: 'Indicazioni Stradali', maps_btn_short: 'Indicazioni',
     checkin_sub: 'Self check-in · Keybox',
@@ -3409,8 +3409,23 @@ function autoDetectProvince() {
 // size; lock the dates when check-in gates entry codes, because the server
 // then only accepts a check-in that matches the booking.
 let _bookingStay = null;
+// Hero subtitle before check-in: the booking's own dates and party size.
+// No booking on the link → no subtitle. After check-in showWelcomeBackState
+// replaces it with the checked-in summary.
+function applyStaySubtitle() {
+  const st = _bookingStay, sub = document.getElementById('heroSub');
+  const iso = /^\d{4}-\d{2}-\d{2}$/;
+  if (!st || !iso.test(st.arrival_date || '') || !iso.test(st.departure_date || '')) return;
+  const d = v => v.slice(8, 10) + '/' + v.slice(5, 7);
+  const dates = `${d(st.arrival_date)} — ${d(st.departure_date)}`;
+  const n = Number.isInteger(st.guest_count) && st.guest_count > 0 ? st.guest_count : null;
+  T.en.welcome_sub = dates + (n ? ` · ${n} guest${n > 1 ? 's' : ''}` : '');
+  T.it.welcome_sub = dates + (n ? ` · ${n} ${n > 1 ? 'ospiti' : 'ospite'}` : '');
+  if (sub) sub.textContent = T[lang].welcome_sub;
+}
 function applyBookingStay() {
   const st = _bookingStay;
+  applyStaySubtitle();
   const arr = document.getElementById('arrivalDate'), dep = document.getElementById('departureDate');
   if (!st || !arr || !dep || !/^\d{4}-\d{2}-\d{2}$/.test(st.arrival_date || '') || !/^\d{4}-\d{2}-\d{2}$/.test(st.departure_date || '')) return;
   arr.value = st.arrival_date;

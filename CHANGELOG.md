@@ -11,7 +11,7 @@ Newest entries at the top of each section.
 
 Daniele saw "Your home in the heart of the old city" under 7contrade's name although it is not in the property details. It was a hardcoded default (`T.en/it.welcome_sub` in `index.html`) left from the original demo, shown for every property before check-in. Now the default is empty; `applyStaySubtitle()` (run from `applyBookingStay`) shows the booking's dates and party size, e.g. "31/10 — 04/11 · 2 ospiti", in the selected language. Without a booking on the link there is no subtitle. After check-in the welcome-back summary still replaces it.
 
-Tests: `guest-stay-dates-browser.test.mjs` checks the subtitle (dates + party, IT/EN switch, dates only when the count is unknown, empty and no demo text without a booking); ROPA citations refreshed. Local `npm run test:all`: **PASS 121 / FAIL 0 / SKIP 3** (standing skips).
+Tests: `guest-stay-dates-browser.test.mjs` checks the subtitle (dates + party, IT/EN switch, dates only when the count is unknown, empty and no demo text without a booking); ROPA citations refreshed. Local `npm run test:all`: **PASS 121 / FAIL 0 / SKIP 3** (standing skips). Shipped — PR #265 merged (2b01070); main `regression` and automatic `production security smoke` green; production serves the new page. `npm run test:live`: **PASS 4 / FAIL 0 / SKIP 5** (standing skips).
 
 ### CI — flaky residence browser test (Claude, 31 October 2026)
 

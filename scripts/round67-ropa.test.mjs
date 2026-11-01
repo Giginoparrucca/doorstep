@@ -32,9 +32,9 @@ const REQUIRED = ['purpose', 'data_subjects', 'personal_data', 'recipients',
   'international_transfers', 'retention', 'security_measures', 'legal_basis'];
 const EXPECTED_IDS = ['guest-checkin-alloggiati', 'tourist-tax-regional', 'entry-codes',
   'marketing-consent', 'guest-chat-ai', 'ical-sync', 'ireservation', 'admin-access',
-  'host-accounts', 'analytics', 'document-scan'];
+  'host-accounts', 'analytics', 'document-scan', 'host-terms-acceptance'];
 
-assert.deepEqual(blocks.map(b => b.id), EXPECTED_IDS, 'one block per planned activity, in order');
+assert.deepEqual(blocks.map(b => b.id), EXPECTED_IDS, 'one block per planned activity, in order (Round 69 adds host-terms-acceptance)');
 for (const b of blocks) {
   assert.ok(typeof b.role === 'string' && /controller|processor/.test(b.role), `${b.id}: role names controller/processor`);
   for (const f of REQUIRED) {

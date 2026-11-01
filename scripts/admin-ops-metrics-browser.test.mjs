@@ -34,6 +34,10 @@ let opsMetricsData=null;
 const allProperties=[{id:'p',owner_id:'owner',name:'Fixture property',city:'Ostuni',host_names:'Fixture host',_checkin_count:2},{id:'empty',name:'Empty property',_checkin_count:0},{id:'full',owner_id:'fullOwner',name:'Villa 12',city:'Roma',_checkin_count:12,wifi_name:'fixture',host_names:'Full host',host_phone:'fixture',address:'fixture',cir_code:'fixture'},{id:'zero',owner_id:'zeroOwner',name:'Zero usage',city:'Ostuni',_checkin_count:0}];
 function adminRowClass(){return '';}function copyableId(id){return id;}function adminRowActions(){return '';}function viewAsHost(id){window.clickedProperty=id;}
 ${fn('escapeHtml')}
+let hostTermsByHost={owner:[{id:'acc-1',host_id:'owner',version:1,document_id:'doc-1',text_sha256:'a'.repeat(64),host_kind:'private',method:'password_login+email_otp',account_email:'host@example.invalid',created_at:'2026-11-01T10:00:00Z'}]};
+let legalDocsById={'doc-1':{id:'doc-1',kind:'host_terms',version:1,text_sha256:'a'.repeat(64),specific_clauses:[{ref:'15.2',label:'foro competente'}]}};
+${fn('hostTermsCell')}
+${fn('downloadHostTermsEvidence')}
 ${fn('renderHostsPropertiesTable')}
 const userStats={'host@example.invalid':{sessions:new Set(['a','b']),events:2,lastSeen:'2026-10-25T10:00:00Z'},'full@example.invalid':{sessions:new Set(['a']),lastSeen:'2026-10-24T10:00:00Z'},'zero@example.invalid':{sessions:new Set(),lastSeen:'2026-10-22T10:00:00Z'},'orphan@example.invalid':{sessions:new Set(['a']),lastSeen:'2026-10-20T10:00:00Z'}};
 const userIdToEmail={owner:'host@example.invalid',fullOwner:'full@example.invalid',zeroOwner:'zero@example.invalid'};
@@ -42,7 +46,10 @@ AdminOpsMetrics.load(sb,{since:'${since}',until:'${until}'}).then(data=>{opsMetr
 </script></body></html>`}));
   await page.goto('https://ops.invalid/');await page.waitForFunction(()=>window.fixtureReady);
   const row=page.locator('tbody tr').first();const cells=await row.locator('td').allTextContents();
-  assert.equal(cells.length,12);assert.equal(cells[4],'2');assert.equal(cells[5],'1');assert.equal(cells[6],'1');assert.match(cells[7],/50%.*1 \/ 2 bookings/s);
+  assert.equal(cells.length,13);assert.match(cells[11],/v1 · 01\/11\/2026/);assert.match(cells[11],/Scarica prova/);
+  {const fullCells=await page.locator('tbody tr').filter({hasText:'Villa 12'}).locator('td').allTextContents();assert.equal(fullCells[11].trim(),'Non accettate');}
+  {const [dl]=await Promise.all([page.waitForEvent('download'),row.getByRole('button',{name:'Scarica prova'}).click()]);assert.equal(dl.suggestedFilename(),'welcomebnb-terms-evidence-owner.json');
+   const ev=JSON.parse(fs.readFileSync(await dl.path(),'utf8'));assert.equal(ev.host_id,'owner');assert.equal(ev.acceptances[0].id,'acc-1');assert.equal(ev.documents[0].specific_clauses[0].ref,'15.2');}assert.equal(cells[4],'2');assert.equal(cells[5],'1');assert.equal(cells[6],'1');assert.match(cells[7],/50%.*1 \/ 2 bookings/s);
   assert.equal(requests.length,3);await row.getByRole('button',{name:'Console'}).click();assert.equal(await page.evaluate(()=>window.clickedProperty),'p');
   await page.locator('[aria-label="Hosts and properties metrics"]').evaluate(el=>el.scrollLeft=0);
   await page.screenshot({path:path.join(out,`ops-${width}.png`),fullPage:true});
@@ -74,5 +81,5 @@ AdminOpsMetrics.load(sb,{since:'${since}',until:'${until}'}).then(data=>{opsMetr
   await page.evaluate(()=>{opsMetricsData.reservations=null;fixtureRender();});assert.equal(await page.locator('tbody tr').first().locator('td').nth(7).textContent(),'—');assert.match(await page.getByRole('status').textContent(),/unavailable/);await page.getByLabel('Show',{exact:true}).selectOption('unavailable');assert.deepEqual(await visible(),['p','full','zero','empty']);await page.getByRole('button',{name:'Reset',exact:true}).click();
   await page.evaluate(()=>{opsMetricsData.checkins=null;fixtureRender();});assert.equal(await page.locator('tbody tr').first().locator('td').nth(4).textContent(),'—');assert.deepEqual(errors,[]);await page.close();
  }
- console.log('PASS actual SDK paginated reads and Ops table: 390/1440px, 12 columns, keyboard/numeric sorting, compound filters, null/zero, empty/reset/state persistence, viewport fit, no extra reads, failed reads and Console action');
+ console.log('PASS actual SDK paginated reads and Ops table: 390/1440px, 13 columns incl. Terms (version · date, Non accettate, evidence JSON download), keyboard/numeric sorting, compound filters, null/zero, empty/reset/state persistence, viewport fit, no extra reads, failed reads and Console action');
 }finally{await browser.close();}

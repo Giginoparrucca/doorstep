@@ -7,6 +7,17 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Round 69 — Host terms of service: acceptance at login (confirmed 2026-11-01)
+
+Daniele confirmed the plain-language recap on 1 November 2026 by sending the terms text in reply to "Do you confirm Round 69? If so, please send the terms text". Specification: `PLAN_round69_host_terms.md`. Legal text: `docs/legal/CONDIZIONI_GENERALI_v1.md`, transcribed verbatim from Daniele's PDF (draft, "BOZZA" banner, bracketed company fields still empty). Everything ships behind `HOST_TERMS_ENFORCE` (default off): no host sees the window until Daniele turns it on after the SRLS exists and a lawyer approves the final text. Background work (autofile, reminders, calendar sync, check-ins) never depends on acceptance. Runs alongside open Round 67 phases (Claude), Round 65 Phase 7–8 and Round 63 Phase 3–6 (GPT); their ownership is unchanged.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 1 — Data model + text | in-progress — Claude Opus 5.5 | Migration (legal_documents, append-only host_terms_acceptances, host_terms_codes), seed v1, purge of old codes. PGlite: constraints, append-only trigger, grant probes per role; seed hash = file hash; clauses = Art. 16 bullets. |
+| 2 — Server actions | pending | `api/_host-terms.js` mounted on an existing function (12/12 budget), code + receipt emails via Resend, rate limits, flag. Actual handler tests. |
+| 3 — Console gate | pending | Non-dismissable acceptance window in `init()`, Settings row, IT/EN; Chromium IT/EN × 390/1440. |
+| 4 — Admin + paper trail | pending | Admin column + evidence download, ROPA activity, `docs/legal/README.md`; live schema-drift finds the migration. |
+
 ### Hotfix — Guest hero subtitle from the booking, not a fixed demo line (Claude, 1 November 2026)
 
 Daniele saw "Your home in the heart of the old city" under 7contrade's name although it is not in the property details. It was a hardcoded default (`T.en/it.welcome_sub` in `index.html`) left from the original demo, shown for every property before check-in. Now the default is empty; `applyStaySubtitle()` (run from `applyBookingStay`) shows the booking's dates and party size, e.g. "31/10 — 04/11 · 2 ospiti", in the selected language. Without a booking on the link there is no subtitle. After check-in the welcome-back summary still replaces it.

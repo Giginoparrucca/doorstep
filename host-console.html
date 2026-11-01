@@ -1781,6 +1781,12 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <button type="button" id="settingsCancelBtn" class="btn btn-secondary btn-sm" onclick="cancelSettingsEdit()" style="display:none;"><span data-h="btn_cancel_edit">Cancel</span></button>
       </div>
 
+      <!-- Round 69 — accepted Terms version (filled by renderHostTermsSettings). -->
+      <div class="form-card" id="hostTermsSettingsCard" style="display:none;">
+        <div class="form-card-title" data-terms-title>Terms of Service</div>
+        <div class="form-card-desc"><span data-terms-state></span> <a data-terms-link href="#" target="_blank" rel="noopener" style="color:var(--warm);">Read the text</a></div>
+      </div>
+
       <fieldset class="settings-edit-fieldset" disabled style="border:0;padding:0;margin:0;min-width:0;">
       <div class="form-card">
         <div class="form-card-title" data-h="prop_tax_title">Tourist Tax Configuration</div>
@@ -5389,6 +5395,7 @@ function h(key) { return HT[hostLang][key] || HT['en'][key] || key; }
 
 function setHostLang(l) {
   hostLang = l;
+  if (typeof renderHostTermsSettings === 'function') renderHostTermsSettings();
   // Round 37.6 — persist the host's language on the current property so
   // the daily reminder cron sends emails in this language. Best-effort;
   // failures don't block the UI switch. Uses the Round 20.2
@@ -5717,6 +5724,7 @@ async function showPanel(id, btn) {
   if (id === 'guestanalytics') loadGuestAnalytics();
   if (id === 'contacts') loadMarketingContacts();
   if (id === 'settings' && typeof renderIreservationPanel === 'function') void renderIreservationPanel(true);
+  if (id === 'settings' && typeof renderHostTermsSettings === 'function') renderHostTermsSettings();
   if (id === 'calendar') renderCalendarPanel(); // Round 40 T5
   // Round 43 — "Come funziona" pill next to the panel title. Uses a
   // lightweight loader pill until host-guides.js is lazy-loaded on
@@ -15681,6 +15689,316 @@ function showImpersonationError(propertyId, sessionEmail) {
   document.body.appendChild(overlay);
 }
 
+// ── Round 69 — host terms of service: acceptance gate ─────────────────────
+// init() calls ensureHostTerms() for the host's own console (never in the
+// admin ?p= view). The server decides (HOST_TERMS_ENFORCE): when acceptance
+// is required, a full-screen window that cannot be dismissed blocks the
+// console until the host accepts the current version or signs out. The
+// legal text is fetched from the committed static file, checked against the
+// recorded SHA-256 and rendered with textContent only.
+Object.assign(HT.en, {
+  terms_title: 'Terms of Service (Condizioni Generali di Servizio)',
+  terms_version: 'Version {v} · {date}',
+  terms_open: 'Open / print',
+  terms_binding: 'The Italian text is the binding version.',
+  terms_intro: 'To keep using WelcomeBnB, please read and accept the Terms. Background tasks (police filing, reminders, calendar sync) keep running in the meantime.',
+  terms_kind_label: 'How do you use WelcomeBnB?',
+  terms_kind_business: 'For a business with a partita IVA (VAT number)',
+  terms_kind_private: 'As a private person, without a partita IVA',
+  terms_check_general: 'I have read and accept the Terms of Service and the Data Processing Agreement (Annex A).',
+  terms_clauses_title: 'Clauses requiring specific approval (art. 16)',
+  terms_check_specific: 'Under arts. 1341 and 1342 of the Italian Civil Code I specifically approve the clauses listed above.',
+  terms_send_code: 'Send code',
+  terms_code_sent: 'We sent a 6-digit code to {email}. It is valid for 10 minutes.',
+  terms_code_label: 'Code from the email',
+  terms_confirm: 'Confirm and continue',
+  terms_resend: 'Send a new code',
+  terms_resend_wait: 'You can request a new code in {s} s',
+  terms_logout: 'Sign out',
+  terms_done: 'Done. We have emailed you a copy.',
+  terms_loading: 'Loading the Terms…',
+  terms_text_error: 'The Terms text could not be loaded or does not match the published version. Reload the page.',
+  terms_status_error: 'We could not check your Terms status. Check your connection and retry.',
+  terms_retry: 'Retry',
+  terms_annex_heading: 'Annex A — Data Processing Agreement',
+  terms_settings_title: 'Terms of Service',
+  terms_settings_accepted: 'Version {v} accepted on {date}.',
+  terms_settings_none: 'Not accepted yet.',
+  terms_settings_read: 'Read the text',
+});
+Object.assign(HT.it, {
+  terms_title: 'Condizioni Generali di Servizio',
+  terms_version: 'Versione {v} · {date}',
+  terms_open: 'Apri / stampa',
+  terms_binding: 'Il testo italiano è quello vincolante.',
+  terms_intro: 'Per continuare a usare WelcomeBnB leggi e accetta le Condizioni. Nel frattempo le attività automatiche (invio Alloggiati, promemoria, calendari) continuano a funzionare.',
+  terms_kind_label: 'Come usi WelcomeBnB?',
+  terms_kind_business: "Uso WelcomeBnB per un'attività con partita IVA",
+  terms_kind_private: 'Uso WelcomeBnB come privato, senza partita IVA',
+  terms_check_general: "Ho letto e accetto le Condizioni Generali di Servizio e l'Accordo sul trattamento dei dati (Allegato A).",
+  terms_clauses_title: 'Clausole da approvare specificamente (art. 16)',
+  terms_check_specific: 'Ai sensi degli artt. 1341 e 1342 c.c. approvo specificamente le clausole elencate qui sopra.',
+  terms_send_code: 'Invia codice',
+  terms_code_sent: 'Abbiamo inviato un codice di 6 cifre a {email}. Vale 10 minuti.',
+  terms_code_label: "Codice ricevuto via email",
+  terms_confirm: 'Conferma e continua',
+  terms_resend: 'Invia un nuovo codice',
+  terms_resend_wait: 'Puoi chiedere un nuovo codice tra {s} s',
+  terms_logout: 'Esci',
+  terms_done: 'Fatto. Ti abbiamo inviato una copia via email.',
+  terms_loading: 'Caricamento delle Condizioni…',
+  terms_text_error: 'Non è stato possibile caricare il testo delle Condizioni, oppure non corrisponde alla versione pubblicata. Ricarica la pagina.',
+  terms_status_error: 'Non riusciamo a verificare lo stato delle Condizioni. Controlla la connessione e riprova.',
+  terms_retry: 'Riprova',
+  terms_annex_heading: 'Allegato A — Accordo sul trattamento dei dati',
+  terms_settings_title: 'Condizioni di servizio',
+  terms_settings_accepted: 'Versione {v} accettata il {date}.',
+  terms_settings_none: 'Non ancora accettate.',
+  terms_settings_read: 'Leggi il testo',
+});
+var _hostTermsStatus = null; // var: renderHostTermsSettings may run (via setHostLang) before this line
+const _termsFmtDate = iso => { const d = new Date(iso); return Number.isFinite(d.getTime()) ? d.toLocaleDateString('it-IT', { timeZone: 'Europe/Rome', day: '2-digit', month: '2-digit', year: 'numeric' }) : ''; };
+async function hostTermsCall(action, extra = {}) {
+  const { data } = await sb.auth.getSession();
+  const token = data?.session?.access_token;
+  if (!token) return { ok: false, status: 401, data: {} };
+  const r = await fetch('/api/host-terms', { method: 'POST', cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ action, lang: hostLang === 'en' ? 'en' : 'it', ...extra }) });
+  let body = {}; try { body = await r.json(); } catch (_) {}
+  return { ok: r.ok, status: r.status, data: body };
+}
+// Minimal Markdown → DOM (headings, quotes, lists, paragraphs; **bold** and
+// `code`), every piece of text set with textContent.
+function _termsRenderMarkdown(target, md) {
+  const inline = (parent, text) => {
+    const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/);
+    for (const p of parts) {
+      if (!p) continue;
+      if (p.startsWith('**') && p.endsWith('**')) { const b = document.createElement('strong'); b.textContent = p.slice(2, -2); parent.appendChild(b); }
+      else if (p.startsWith('`') && p.endsWith('`')) { const c = document.createElement('code'); c.textContent = p.slice(1, -1); parent.appendChild(c); }
+      else parent.appendChild(document.createTextNode(p));
+    }
+  };
+  let list = null;
+  for (const raw of String(md).split('\n')) {
+    const line = raw.trimEnd();
+    if (!line.trim()) { list = null; continue; }
+    const head = /^(#{1,3}) (.*)$/.exec(line);
+    if (head) { list = null; const el = document.createElement(head[1].length === 1 ? 'h3' : 'h4'); inline(el, head[2]); target.appendChild(el); continue; }
+    if (line.startsWith('- ')) {
+      if (!list) { list = document.createElement('ul'); target.appendChild(list); }
+      const li = document.createElement('li'); inline(li, line.slice(2)); list.appendChild(li); continue;
+    }
+    list = null;
+    const el = document.createElement(line.startsWith('> ') ? 'blockquote' : 'p');
+    inline(el, line.startsWith('> ') ? line.slice(2) : line);
+    target.appendChild(el);
+  }
+}
+async function _termsFetchVerified(path, sha) {
+  const r = await fetch('/' + path, { cache: 'no-store' });
+  if (!r.ok) throw Error('text unavailable');
+  const bytes = await r.arrayBuffer();
+  const digest = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(b => b.toString(16).padStart(2, '0')).join('');
+  if (digest !== sha) throw Error('text hash mismatch');
+  return new TextDecoder('utf-8').decode(bytes);
+}
+function renderHostTermsSettings() {
+  const card = document.getElementById('hostTermsSettingsCard');
+  const s = _hostTermsStatus;
+  if (!card) return;
+  if (!s || !s.current) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  card.querySelector('[data-terms-title]').textContent = h('terms_settings_title');
+  card.querySelector('[data-terms-state]').textContent = s.accepted_version
+    ? h('terms_settings_accepted').replace('{v}', s.accepted_version).replace('{date}', _termsFmtDate(s.accepted_at))
+    : h('terms_settings_none');
+  const link = card.querySelector('[data-terms-link]');
+  link.textContent = h('terms_settings_read');
+  link.href = '/' + s.current.file_path;
+}
+// Resolves only when the console may load. Returns false if the window
+// cannot even be shown (no session), so init() stops.
+async function ensureHostTerms() {
+  for (;;) {
+    let res;
+    try { res = await hostTermsCall('status'); } catch (_) { res = null; }
+    if (res && res.ok) {
+      _hostTermsStatus = res.data;
+      try { localStorage.setItem('wbnb_host_terms_enforce', res.data.enforce ? '1' : '0'); } catch (_) {}
+      if (res.data.enforce !== true || res.data.accepted === true) return true;
+      const accepted = await _showHostTermsWindow(res.data);
+      if (accepted) {
+        try { const again = await hostTermsCall('status'); if (again.ok) _hostTermsStatus = again.data; } catch (_) {}
+        return true;
+      }
+      continue;
+    }
+    if (res && res.status === 401) return false;
+    // Status unknown. While the requirement is known to be off, do not lock
+    // hosts out over a network blip; otherwise never fail open.
+    let lastOff = false; try { lastOff = localStorage.getItem('wbnb_host_terms_enforce') === '0'; } catch (_) {}
+    if (lastOff) return true;
+    await _showHostTermsRetry();
+  }
+}
+function _termsOverlay() {
+  document.getElementById('hostTermsOverlay')?.remove();
+  const o = document.createElement('div');
+  o.id = 'hostTermsOverlay';
+  o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true'); o.setAttribute('aria-labelledby', 'hostTermsTitle');
+  o.style.cssText = 'position:fixed;inset:0;z-index:100000;background:var(--cream,#F7F9FC);overflow-y:auto;font-family:inherit;';
+  // Not dismissable: Escape and backdrop clicks do nothing.
+  o.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); } }, true);
+  document.body.appendChild(o);
+  return o;
+}
+function _termsEl(tag, css, text) { const el = document.createElement(tag); if (css) el.style.cssText = css; if (text != null) el.textContent = text; return el; }
+async function _termsSignOut() { try { await sb.auth.signOut(); } catch (_) {} location.reload(); }
+function _showHostTermsRetry() {
+  return new Promise(resolve => {
+    const o = _termsOverlay();
+    const box = _termsEl('div', 'max-width:520px;margin:15vh auto;padding:24px 18px;text-align:center;');
+    box.appendChild(_termsEl('p', 'font-size:0.95rem;color:var(--ink,#061A3D);margin-bottom:16px;', h('terms_status_error')));
+    const retry = _termsEl('button', '', h('terms_retry')); retry.className = 'btn btn-primary'; retry.id = 'hostTermsRetry';
+    retry.onclick = () => { o.remove(); resolve(); };
+    const out = _termsEl('button', 'margin-left:8px;', h('terms_logout')); out.className = 'btn btn-secondary'; out.onclick = _termsSignOut;
+    box.append(retry, out); o.appendChild(box);
+  });
+}
+function _showHostTermsWindow(status) {
+  return new Promise(resolve => {
+    const it = hostLang !== 'en', cur = status.current;
+    const o = _termsOverlay();
+    const wrap = _termsEl('div', 'max-width:760px;margin:0 auto;padding:20px 16px 40px;box-sizing:border-box;');
+    o.appendChild(wrap);
+    const title = _termsEl('h2', "font-family:'Playfair Display',serif;font-size:1.35rem;margin:4px 0 4px;color:var(--ink,#061A3D);", h('terms_title'));
+    title.id = 'hostTermsTitle';
+    const meta = _termsEl('div', 'font-size:0.8rem;color:var(--ink-soft,#6B7A90);display:flex;flex-wrap:wrap;gap:10px;align-items:center;');
+    meta.appendChild(_termsEl('span', '', h('terms_version').replace('{v}', cur.version).replace('{date}', _termsFmtDate(cur.published_at))));
+    const open = _termsEl('a', 'color:var(--warm,#005BFF);', h('terms_open')); open.href = '/' + cur.file_path; open.target = '_blank'; open.rel = 'noopener';
+    meta.appendChild(open);
+    wrap.append(title, meta);
+    if (!it) wrap.appendChild(_termsEl('div', 'font-size:0.8rem;font-weight:600;margin-top:6px;', h('terms_binding')));
+    wrap.appendChild(_termsEl('p', 'font-size:0.85rem;color:var(--ink-soft,#6B7A90);margin:10px 0;', h('terms_intro')));
+    const panel = _termsEl('div', 'border:1px solid var(--border,#d9e1ee);border-radius:10px;background:#fff;padding:12px 16px;max-height:45vh;overflow-y:auto;font-size:0.82rem;line-height:1.55;color:var(--ink,#061A3D);');
+    panel.id = 'hostTermsText'; panel.tabIndex = 0;
+    panel.appendChild(_termsEl('p', '', h('terms_loading')));
+    wrap.appendChild(panel);
+
+    const form = _termsEl('div', 'margin-top:16px;display:flex;flex-direction:column;gap:12px;font-size:0.86rem;color:var(--ink,#061A3D);');
+    const kind = _termsEl('fieldset', 'border:1px solid var(--border,#d9e1ee);border-radius:10px;padding:10px 14px;margin:0;');
+    kind.appendChild(_termsEl('legend', 'font-weight:600;padding:0 4px;', h('terms_kind_label')));
+    for (const [value, key] of [['business', 'terms_kind_business'], ['private', 'terms_kind_private']]) {
+      const lab = _termsEl('label', 'display:flex;gap:8px;align-items:flex-start;margin:6px 0;cursor:pointer;');
+      const r = document.createElement('input'); r.type = 'radio'; r.name = 'hostTermsKind'; r.value = value; r.id = 'hostTermsKind_' + value;
+      lab.append(r, _termsEl('span', '', h(key))); kind.appendChild(lab);
+    }
+    const mkCheck = (id, key) => {
+      const lab = _termsEl('label', 'display:flex;gap:8px;align-items:flex-start;cursor:pointer;');
+      const c = document.createElement('input'); c.type = 'checkbox'; c.id = id; c.style.marginTop = '3px';
+      lab.append(c, _termsEl('span', '', h(key))); return [lab, c];
+    };
+    const [labA, checkA] = mkCheck('hostTermsGeneral', 'terms_check_general');
+    const clauses = _termsEl('div', 'border:2px solid #E8B84B;background:rgba(232,184,75,0.10);border-radius:10px;padding:12px 14px;');
+    clauses.id = 'hostTermsClauses';
+    clauses.appendChild(_termsEl('div', 'font-weight:600;margin-bottom:6px;', h('terms_clauses_title')));
+    const ul = _termsEl('ul', 'margin:0 0 10px 18px;padding:0;');
+    for (const c of Array.isArray(cur.clauses) ? cur.clauses : []) {
+      const li = document.createElement('li');
+      li.appendChild(_termsEl('strong', '', 'art. ' + c.ref)); li.appendChild(document.createTextNode(' — ' + c.label));
+      ul.appendChild(li);
+    }
+    const [labB, checkB] = mkCheck('hostTermsSpecific', 'terms_check_specific');
+    clauses.append(ul, labB);
+    const msg = _termsEl('div', 'min-height:1.2em;font-size:0.82rem;'); msg.id = 'hostTermsMessage'; msg.setAttribute('role', 'alert');
+    const send = _termsEl('button', '', h('terms_send_code')); send.className = 'btn btn-primary'; send.id = 'hostTermsSend'; send.type = 'button';
+    const codeRow = _termsEl('div', 'display:none;flex-direction:column;gap:8px;'); codeRow.id = 'hostTermsCodeRow';
+    const sentInfo = _termsEl('div', 'font-size:0.82rem;');
+    const codeLab = _termsEl('label', 'font-weight:600;', h('terms_code_label')); codeLab.htmlFor = 'hostTermsCode';
+    const code = document.createElement('input'); code.id = 'hostTermsCode'; code.inputMode = 'numeric'; code.autocomplete = 'one-time-code';
+    code.maxLength = 6; code.className = 'form-input'; code.style.cssText = 'max-width:160px;letter-spacing:0.2em;font-size:1.1rem;';
+    const confirm = _termsEl('button', '', h('terms_confirm')); confirm.className = 'btn btn-primary'; confirm.id = 'hostTermsConfirm'; confirm.type = 'button';
+    const resend = _termsEl('button', 'background:none;border:none;color:var(--warm,#005BFF);text-decoration:underline;cursor:pointer;padding:0;font:inherit;align-self:flex-start;');
+    resend.id = 'hostTermsResend'; resend.type = 'button';
+    codeRow.append(sentInfo, codeLab, code, confirm, resend);
+    const out = _termsEl('button', 'align-self:flex-start;', h('terms_logout')); out.className = 'btn btn-secondary'; out.id = 'hostTermsLogout'; out.type = 'button';
+    out.onclick = _termsSignOut;
+    form.append(kind, labA, clauses, send, codeRow, msg, out);
+    wrap.appendChild(form);
+
+    const ticks = {};
+    let textReady = false, busy = false, waitTimer = null;
+    const kindValue = () => o.querySelector('input[name="hostTermsKind"]:checked')?.value || null;
+    const sync = () => {
+      send.disabled = busy || !textReady || !checkA.checked || !checkB.checked || !kindValue();
+      confirm.disabled = busy || !/^\d{6}$/.test(code.value) || !checkA.checked || !checkB.checked || !kindValue();
+    };
+    const say = (text, bad) => { msg.textContent = text || ''; msg.style.color = bad ? '#b03939' : 'var(--ink,#061A3D)'; };
+    checkA.onchange = () => { if (checkA.checked) ticks.general = new Date().toISOString(); sync(); };
+    checkB.onchange = () => { if (checkB.checked) ticks.specific = new Date().toISOString(); sync(); };
+    kind.onchange = sync; code.oninput = () => { code.value = code.value.replace(/\D/g, '').slice(0, 6); sync(); };
+    const startWait = () => {
+      let s = 60; resend.disabled = true; clearInterval(waitTimer);
+      const tick = () => { resend.textContent = s > 0 ? h('terms_resend_wait').replace('{s}', s) : h('terms_resend'); resend.disabled = s > 0; s--; if (s < -1) clearInterval(waitTimer); };
+      tick(); waitTimer = setInterval(tick, 1000);
+    };
+    const requestCode = async () => {
+      busy = true; sync(); say('');
+      try {
+        const r = await hostTermsCall('request_code');
+        if (r.ok) {
+          codeRow.style.display = 'flex';
+          sentInfo.textContent = h('terms_code_sent').replace('{email}', _trackEmail || '');
+          startWait(); code.focus();
+        } else say(r.data?.message || h('terms_status_error'), true);
+      } catch (_) { say(h('terms_status_error'), true); }
+      busy = false; sync();
+    };
+    send.onclick = () => { if (!send.disabled) requestCode(); };
+    resend.onclick = () => { if (!resend.disabled) requestCode(); };
+    confirm.onclick = async () => {
+      if (confirm.disabled) return;
+      busy = true; sync(); say('');
+      try {
+        const r = await hostTermsCall('accept', { version: cur.version, sha256: cur.sha256, host_kind: kindValue(),
+          general: checkA.checked === true, specific: checkB.checked === true, code: code.value,
+          general_at: ticks.general, specific_at: ticks.specific });
+        if (r.ok && r.data?.accepted) {
+          clearInterval(waitTimer);
+          say(h('terms_done'));
+          setTimeout(() => { o.remove(); resolve(true); }, 1200);
+          return;
+        }
+        say(r.data?.message || h('terms_status_error'), true);
+        if (r.data?.error === 'stale') setTimeout(() => { o.remove(); resolve(false); }, 1500);
+      } catch (_) { say(h('terms_status_error'), true); }
+      busy = false; sync();
+    };
+    sync();
+    (async () => {
+      try {
+        const [termsText, annexText] = await Promise.all([
+          _termsFetchVerified(cur.file_path, cur.sha256),
+          cur.annex_file_path && cur.annex_sha256 ? _termsFetchVerified(cur.annex_file_path, cur.annex_sha256) : Promise.resolve(null),
+        ]);
+        panel.textContent = '';
+        _termsRenderMarkdown(panel, termsText);
+        if (annexText) {
+          panel.appendChild(_termsEl('hr', 'margin:18px 0;border:none;border-top:1px solid var(--border,#d9e1ee);'));
+          panel.appendChild(_termsEl('h3', '', h('terms_annex_heading')));
+          _termsRenderMarkdown(panel, annexText);
+        }
+        textReady = true; sync();
+      } catch (_) {
+        panel.textContent = ''; panel.appendChild(_termsEl('p', 'color:#b03939;', h('terms_text_error')));
+      }
+    })();
+    send.focus();
+  });
+}
+
 async function init() {
   // Round 21.1: the chat cursor became per-property; clean up the old
   // global key if it's still lingering from a previous version.
@@ -15719,6 +16037,11 @@ async function init() {
     activateAdminView();
   }
 
+  // Round 69 — the host's own console waits for the current Terms to be
+  // accepted (only when the server requires it). Never in the admin view.
+  if (!adminPropId) {
+    if (!await ensureHostTerms()) { document.getElementById('loginOverlay')?.classList.remove('hidden'); return; }
+  }
 
   // 1. Load the FULL list of properties this user owns (Round 21 multi-property)
   try {

@@ -15,7 +15,7 @@ async function boot({search='',blank=false,active='dashboard',authenticated=true
  const ctx=vm.createContext({document,window:{location,history:{replaceState:(a,b,url)=>cleaned.push(String(url))}},history:{replaceState:(a,b,url)=>cleaned.push(String(url))},URL,URLSearchParams,console,setTimeout:f=>f(),
   localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},propertyId:null,propertyData:null,allProperties:[],hostLang:'en',
   checkAuth:async()=>authenticated,sb:{auth:{getSession:async()=>({data:{session:{user:{id:'fictional-owner',email:'owner@example.invalid'}}}})},from(){reads++;const q={select:()=>q,eq:()=>q,is:()=>q,order:()=>q,then:resolve=>Promise.resolve({data:rows}).then(resolve)};return q;}},
-  track(){},setHostLang(){},fillPropertyForm(){},renderPropertySwitcher(){},loadPropertyData:async()=>{},activateAdminView(){},_hostIsAdmin:async()=>true,
+  track(){},setHostLang(){},fillPropertyForm(){},renderPropertySwitcher(){},loadPropertyData:async()=>{},activateAdminView(){},_hostIsAdmin:async()=>true,ensureHostTerms:async()=>true,
   showPanel:async panel=>{panels.push(panel);document.querySelectorAll('.panel').forEach(e=>e.classList.toggle('active',e.id==='panel-'+panel));},
   showSection:(section,tab)=>{sections.push([section,tab]);},switchProperty:async id=>{switches.push(id);ctx.propertyId=id;},openBookingShare:code=>shares.push(code),loadHostChat(){},
   // Existing stored state must never be consulted to choose the landing page.

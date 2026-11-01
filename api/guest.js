@@ -101,6 +101,7 @@ import { verifyFromAuthHeader } from './_guest-token.js';
 import { applyCors } from './_cors.js';
 import { mintWalkinCode } from './_booking-code.js';
 import { notifyHostForChatInsert } from './_notify-host.js';
+import { handleHostTerms } from './_host-terms.js';
 import { createRequire } from 'node:module';
 
 // Round 49 Phase 4 — pulls autofileDueAt + the record builder lib so
@@ -127,6 +128,9 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
   if (req.body?.action === 'host_entry_state') return hostEntryState(req,res);
+  // Round 69 — host terms (status / request_code / accept), via the
+  // /api/host-terms rewrite; host JWT, not a guest token.
+  if (req.query?.host_terms === '1') return handleHostTerms(req, res);
 
   // Token auth. Everything below trusts only the token payload.
   const auth = req.headers['authorization'] || req.headers['Authorization'];

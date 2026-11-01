@@ -383,6 +383,10 @@ let apiUsageByProp = {};
 // Presentation-only; loadData() and every Supabase query below stay put.
 let activeTab   = 'pilot';                 // 'pilot' | 'deepdive' | 'ops'
 let showTestData = false;                  // top-bar toggle; default off
+// Round 69 — host terms acceptances (admins read all via RLS is_admin()).
+// null = not loaded/unavailable; otherwise host_id → rows (newest first).
+let hostTermsByHost = null;
+let legalDocsById = {};
 let pilotHosts   = [];                     // fetched in loadData
 let pilotInvites = [];                     // Round 38 — fetched in loadData
 let hostAudit    = [];                     // Round 38 — filled by loadHostAudit RPC
@@ -1020,9 +1024,9 @@ async function loadData() {
     return q.is('deleted_at', null);
   };
 
-  let eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes, invitesRes, opsRes;
+  let eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes, invitesRes, opsRes, termsRes, legalRes;
   try {
-    [eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes, invitesRes, opsRes] = await Promise.all([
+    [eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes, invitesRes, opsRes, termsRes, legalRes] = await Promise.all([
       applyHiddenFilter(sb.from('analytics_events').select('*').gte('created_at', since)).order('created_at', { ascending: false }).limit(10000),
       applyHiddenFilter(sb.from('properties').select('*')).order('name'),
       applyHiddenFilter(sb.from('checkins').select('id, property_id, booking_code, surname, name, guest_type, submitted_at, arrival_date, departure_date, nights, is_test, deleted_at')),
@@ -1035,6 +1039,9 @@ async function loadData() {
       // Round 38 — pilot_invites for the invite-only Ops panel.
       sb.from('pilot_invites').select('*').order('invited_at', { ascending: false }).then(r => r, err => ({ data: [], error: err })),
       AdminOpsMetrics.load(sb, { since, until, showHidden, showTestData }),
+      // Round 69 — acceptance evidence and the versions it refers to.
+      sb.from('host_terms_acceptances').select('*').order('created_at', { ascending: false }).then(r => r, err => ({ data: null, error: err })),
+      sb.from('legal_documents').select('*').order('version').then(r => r, err => ({ data: null, error: err })),
     ]);
   } catch (e) {
     console.error('loadData fatal:', e);
@@ -1058,6 +1065,14 @@ async function loadData() {
   allCheckins = checkinsRes.data || [];
   allChatMessages = (chatRes && chatRes.data) || [];
   pilotHosts = (pilotRes && pilotRes.data) || [];
+  if (termsRes && !termsRes.error && Array.isArray(termsRes.data)) {
+    hostTermsByHost = {};
+    for (const row of termsRes.data) (hostTermsByHost[row.host_id] ||= []).push(row);
+  } else {
+    hostTermsByHost = null;
+    if (termsRes && termsRes.error) console.warn('host_terms_acceptances query failed (Terms column shows a dash):', termsRes.error.message || termsRes.error);
+  }
+  legalDocsById = Object.fromEntries(((legalRes && legalRes.data) || []).map(d => [d.id, d]));
   pilotInvites = (invitesRes && invitesRes.data) || [];
   if (invitesRes && invitesRes.error) {
     console.warn('pilot_invites query failed (non-fatal — Invites panel will render empty):', invitesRes.error.message || invitesRes.error);
@@ -3422,6 +3437,32 @@ async function showAlloggiatiSupport(propertyId) {
   await AdminAlloggiatiSupport.open({ propertyId, name: property.name, client: sb, onConsole: viewAsHost });
 }
 
+// Round 69 — "Terms" column: latest accepted version and date, or
+// "Non accettate"; a dash when the evidence could not be read.
+function hostTermsCell(hostId) {
+  const map = typeof hostTermsByHost === 'undefined' ? null : hostTermsByHost;
+  if (!map || !hostId) return '<span title="Terms evidence unavailable">—</span>';
+  const rows = map[hostId] || [];
+  if (!rows.length) return '<span style="color:var(--amber);">Non accettate</span>';
+  const last = rows[0];
+  const date = new Date(last.created_at).toLocaleDateString('it-IT', { timeZone: 'Europe/Rome', day: '2-digit', month: '2-digit', year: 'numeric' });
+  return `v${Number(last.version)} · ${date}<br><button type="button" data-terms-evidence="${escapeHtml(hostId)}" onclick="downloadHostTermsEvidence(this.dataset.termsEvidence)" style="margin-top:3px;padding:3px 7px;background:#fff;color:#005BFF;border:1px solid #005BFF;border-radius:4px;font-size:0.62rem;cursor:pointer;">Scarica prova</button>`;
+}
+// Dispute file: every acceptance row of the host plus the versions they refer
+// to (hashes and the clause list shown in the approval box).
+function downloadHostTermsEvidence(hostId) {
+  const rows = (hostTermsByHost && hostTermsByHost[hostId]) || [];
+  if (!rows.length) return;
+  const documents = [...new Set(rows.map(r => r.document_id))].map(id => legalDocsById[id]).filter(Boolean);
+  const evidence = { generated_at: new Date().toISOString(), host_id: hostId, acceptances: rows, documents };
+  const blob = new Blob([JSON.stringify(evidence, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `welcomebnb-terms-evidence-${hostId}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
 function renderHostsPropertiesTable(userStats, userIdToEmail) {
   const metrics = opsMetricsData ? AdminOpsMetrics.aggregate(opsMetricsData) : new Map();
   const checkinsAvailable = Array.isArray(opsMetricsData?.checkins);
@@ -3456,7 +3497,7 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
     ${!checkinsAvailable || !usageAvailable ? '<p role="status" style="color:var(--amber);font-size:0.75rem;">Some metric data is unavailable. A dash is shown instead of a zero; refresh to retry.</p>' : ''}
     <div style="overflow-x:auto;margin-bottom:24px;" tabindex="0" role="region" aria-label="Hosts and properties metrics">
     <table class="data-table" style="width:100%;">
-      <thead><tr>${[['property','Property'],['host','Host'],['city','City'],['guests','Guests'],['completed','Check-ins completed'],['sent','Alloggiati sent'],['failed','Alloggiati failed'],['usage','Guest app usage'],['setup','Setup'],['activity','Activity (sessions)'],['lastActive','Last Active']].map(([key, label]) => heading(key, label)).join('')}<th scope="col">Actions</th></tr></thead>
+      <thead><tr>${[['property','Property'],['host','Host'],['city','City'],['guests','Guests'],['completed','Check-ins completed'],['sent','Alloggiati sent'],['failed','Alloggiati failed'],['usage','Guest app usage'],['setup','Setup'],['activity','Activity (sessions)'],['lastActive','Last Active']].map(([key, label]) => heading(key, label)).join('')}<th scope="col">Terms</th><th scope="col">Actions</th></tr></thead>
       <tbody>
         ${hostRowsExisting.sort((a, b) => (b._stats.lastSeen || '').localeCompare(a._stats.lastSeen || '')).map(p => {
           const s = p._stats;
@@ -3476,6 +3517,7 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
             <td style="text-align:center;"><span style="color:${setupColor};font-weight:600;">${setupPct}%</span></td>
             <td style="font-size:0.72rem;">${s.sessions.size || 0} sess · ${s.saves || 0} saves · ${s.exports || 0} exp</td>
             <td style="font-size:0.72rem;color:var(--ink-soft);">${s.lastSeen ? new Date(s.lastSeen).toLocaleDateString() : '—'}</td>
+            <td style="font-size:0.72rem;white-space:nowrap;">${hostTermsCell(p.owner_id)}</td>
             <td><div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
               <button type="button" onclick="showAlloggiatiSupport('${p.id}')" style="padding:4px 8px;background:#fff;color:#005BFF;border:1px solid #005BFF;border-radius:4px;font-size:0.65rem;cursor:pointer;">Alloggiati support</button>
               <button onclick="viewAsHost('${p.id}')" style="padding:4px 8px;background:#005BFF;color:#fff;border:none;border-radius:4px;font-size:0.65rem;cursor:pointer;white-space:nowrap;">👁 Console</button>
@@ -3491,9 +3533,10 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
           <td>—</td><td style="text-align:center;">0</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
           <td style="font-size:0.72rem;">${s.sessions.size} sess · ${s.saves} saves</td>
           <td style="font-size:0.72rem;color:var(--ink-soft);">${new Date(s.lastSeen).toLocaleDateString()}</td>
+          <td>—</td>
           <td><button onclick="document.getElementById('userFilter').value='${email}';setActiveTab('deepdive');" style="padding:4px 8px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.65rem;cursor:pointer;color:var(--warm);">📊</button></td>
         </tr>`).join('')}
-        <tr data-ops-empty hidden><td colspan="12" style="text-align:center;padding:20px;color:var(--ink-soft);">No hosts or properties match these filters.</td></tr>
+        <tr data-ops-empty hidden><td colspan="13" style="text-align:center;padding:20px;color:var(--ink-soft);">No hosts or properties match these filters.</td></tr>
       </tbody>
     </table></div></section>`;
 }

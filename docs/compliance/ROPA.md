@@ -395,6 +395,43 @@ evidence:
   - api/scan-document.js
 ```
 
+### 12. Host terms acceptance (Accettazione condizioni host)
+
+Round 69. Proof that each host accepted the Terms of Service (Condizioni Generali) and the DPA (Annex A), with the separate approval of the art. 16 clauses required by arts. 1341-1342 c.c., confirmed with a one-time code sent to the account email. Active only when `HOST_TERMS_ENFORCE` is on.
+
+```yaml
+id: host-terms-acceptance
+role: controller (WelcomeBnB)
+purpose:
+  - Prove the contract with the host, its version and the specific approval of the onerous clauses
+  - Send the one-time confirmation code and a copy of the accepted texts
+data_subjects:
+  - Hosts
+personal_data:
+  - Account id and email, business or private declaration, accepted version and SHA-256 of the texts
+  - Times of acceptance, specific approval and code verification
+  - IP address and browser user agent at acceptance, receipt email id
+  - One-time codes, stored only as a keyed hash
+recipients:
+  - Resend (code and receipt emails)
+  - Sub-processors - Supabase, Vercel
+international_transfers:
+  - USA - Resend (OWNER - confirm DPA)
+retention:
+  - Acceptance evidence - life of the account plus 10 years (ordinary limitation period); append-only, kept after account deletion
+  - One-time codes - deleted after 1 day by the daily job welcomebnb_host_terms_codes_purge
+security_measures:
+  - Evidence rows cannot be changed or deleted by any role (database trigger); hosts read only their own, admins all
+  - Codes valid 10 minutes, 5 attempts, rate-limited, never shown or stored in clear
+legal_basis:
+  - Art. 6(1)(b) conclusion and performance of the contract with the host
+  - Art. 6(1)(c) evidence required by arts. 1341-1342 c.c. and limitation-period obligations
+evidence:
+  - supabase/migrations/20261101090000_round69_host_terms.sql
+  - api/_host-terms.js
+  - legal/CONDIZIONI_GENERALI_v1.md
+```
+
 ## Owner decisions collected from this register
 
 1. **Retention periods** where none is enforced today: live check-ins, police receipts and filing log, marketing consents, past calendar reservations, chat Q&A archive, entry-release audit, admin log, notification log and closed host accounts.

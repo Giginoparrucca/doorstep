@@ -43,7 +43,7 @@ data_subjects:
 personal_data:
   - Identity - surname, name, sex, date and place of birth, citizenship
   - Residence - country, plus comune for Italian residents (required for regional statistics, ISTAT IST-00139); postcode required in Alto Adige
-  - Invoice details, optional, main guest only - codice fiscale, street address, postcode, province (Round 68)
+  - Invoice details, optional, main guest only - codice fiscale, street address, postcode, province (Round 68), email address to send the invoice to (2 Nov 2026)
   - Identity document - type, number, place of issue
   - Stay - arrival and departure dates, booking code
   - Document photo and optional selfie (storage bucket documents)
@@ -172,8 +172,8 @@ evidence:
 
 The Round 67 plan proposed recording this finding as "structurally unreachable". Checking the current code does not support that wording:
 
-- `index.html:1432` says the card is "Only shown to the main guest (see showConsentCard())".
-- `showConsentCard()` is defined at `index.html:4403` and has exactly one call site, `index.html:4235`, on the success screen after the check-in party is saved on that device.
+- `index.html:1436` says the card is "Only shown to the main guest (see showConsentCard())".
+- `showConsentCard()` is defined at `index.html:4417` and has exactly one call site, `index.html:4248`, on the success screen after the check-in party is saved on that device.
 - `showConsentCard()` itself checks neither who is the lead guest nor anyone's age. "Main guest" is a consequence of the usual flow (one adult completes the group's check-in), not an enforced rule.
 
 What does hold: Art. 8 applies to information-society services offered **directly** to a child, and in Italy only below 14 (d.lgs. 196/2003 art. 2-quinquies). Check-in is normally completed by an adult who registers the whole party, and the form is per booking. So the risk is **low but not zero**: a teenager completing their own check-in on their own device would see the form.

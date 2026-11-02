@@ -15,7 +15,7 @@ const pid = id(10), other = id(20), off = id(30), reservation = id(40), owner = 
 const code = 'FICTIONAL-ATOMIC';
 const migrations = ['20261027041500_round66_entry_roster_audit.sql',
   '20261028033000_round66_entry_access_state_rpc.sql', '20261028082453_round66_atomic_submissions.sql','20261029105517_round66_host_entry_audit.sql',
-  '20261030090000_round68_invoice_fields.sql'];
+  '20261030090000_round68_invoice_fields.sql', '20261102090000_invoice_email.sql'];
 const scope = { propertyId: pid, bookingCode: code, isTest: false,
   sessionValidUntil: new Date(Date.now() + 86400000).toISOString() };
 let checks = 0;

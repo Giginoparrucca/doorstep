@@ -124,6 +124,12 @@ try {
     assert.equal(await visible(page, '#fiscalCodeError'), false, 'error clears while typing');
     await page.fill('#residenceAddress', 'Via Prova 1');
     await page.fill('#residencePostcode', '70121');
+    // Invoice email: a malformed one is blocked, then corrected.
+    await page.fill('#invoiceEmail', 'not-an-email');
+    msg = await next(page, state);
+    assert.match(msg, language === 'it' ? /email per la fattura/i : /invoice email/i, 'malformed invoice email blocked');
+    assert.equal(state.inserts.length, 0);
+    await page.fill('#invoiceEmail', ' Guest@Example.Invalid ');
     if (process.env.ENTRY_QA_DIR) { await page.locator('#invoiceSection').scrollIntoViewIfNeeded(); await page.screenshot({ path: `${process.env.ENTRY_QA_DIR}/r68-invoice-${language}-${width}.png` }); }
     msg = await next(page, state);
     assert.equal(msg, '', 'valid main guest saves without alerts');
@@ -135,6 +141,7 @@ try {
     assert.equal(lead.residence_address, 'Via Prova 1');
     assert.equal(lead.residence_postcode, '70121');
     assert.equal(lead.residence_province, 'BA');
+    assert.equal(lead.invoice_email, 'guest@example.invalid', 'invoice email trimmed and lowercased');
 
     // Member: residence pre-filled and visible, invoice section hidden.
     await page.waitForFunction(() => currentGuestIdx === 1);
@@ -212,7 +219,7 @@ try {
     // ── Welcome back: values pre-filled on edit; an older row without
     //    residence is asked for it before saving.
     const guests = [
-      { id: 'old-main', guest_type: 'head', surname: 'Ritorno', name: 'Main', sex: 'F', date_of_birth: '1990-03-01', place_of_birth: 'Berlin', birth_country: 'Germany', citizenship: 'Germany', document_number: 'FICT0002', doc_issue_place: 'Berlin', arrival_date: '2026-11-02', departure_date: '2026-11-05', residence_country: 'Italia', residence_place: 'Bari', fiscal_code: VALID_CF, residence_address: 'Via Prova 1', residence_postcode: '70121', residence_province: 'BA', editable: true },
+      { id: 'old-main', guest_type: 'head', surname: 'Ritorno', name: 'Main', sex: 'F', date_of_birth: '1990-03-01', place_of_birth: 'Berlin', birth_country: 'Germany', citizenship: 'Germany', document_number: 'FICT0002', doc_issue_place: 'Berlin', arrival_date: '2026-11-02', departure_date: '2026-11-05', residence_country: 'Italia', residence_place: 'Bari', fiscal_code: VALID_CF, residence_address: 'Via Prova 1', residence_postcode: '70121', residence_province: 'BA', invoice_email: 'guest@example.invalid', editable: true },
       { id: 'old-member', guest_type: 'member', surname: 'Ritorno', name: 'Member', sex: 'M', date_of_birth: '2015-01-01', place_of_birth: 'Berlin', birth_country: 'Germany', citizenship: 'Germany', arrival_date: '2026-11-02', departure_date: '2026-11-05', residence_country: null, residence_place: null, editable: true },
     ];
     ({ context, page, state } = await openGuestPage({ language, width, region: 'Puglia', guests }));
@@ -226,8 +233,10 @@ try {
     assert.equal(await page.inputValue('#ed_rpostcode0'), '70121');
     assert.equal(await page.inputValue('#ed_rprov0'), 'BA');
     assert.equal(await page.inputValue('#ed_rcountry0'), 'Italia');
+    assert.equal(await page.inputValue('#ed_imail0'), 'guest@example.invalid', 'invoice email pre-filled on edit');
     await page.evaluate(() => editGuest(1));
     assert.equal(await page.locator('#ed_fiscal1').count(), 0, 'members have no invoice fields');
+    assert.equal(await page.locator('#ed_imail1').count(), 0, 'members have no invoice email');
     let before = state.alerts.length;
     await page.evaluate(() => saveGuestEdit(1));
     assert.match(state.alerts.slice(before).join('\n'), L.country, 'older row asks for residence before saving');
@@ -241,7 +250,7 @@ try {
     assert.deepEqual(state.errors, []);
     await context.close();
 
-    console.log(`PASS ${language} ${width}px: residence required (incl. no-region property), Italian comune via list with provincia, invalid codice fiscale blocked inline then fixed, member pre-fill visible/editable, empty invoice section unchanged, Alto Adige postcode for every guest, edit pre-fill and older-row residence prompt`);
+    console.log(`PASS ${language} ${width}px: residence required (incl. no-region property), Italian comune via list with provincia, invalid codice fiscale blocked inline then fixed, invoice email checked and normalised, member pre-fill visible/editable, empty invoice section unchanged, Alto Adige postcode for every guest, edit pre-fill and older-row residence prompt`);
   }
 } finally {
   await browser.close();

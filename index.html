@@ -1381,6 +1381,10 @@ function icon(name, cls) {
             <input class="form-input" type="text" id="residenceProvince" autocomplete="off" maxlength="2" style="text-transform:uppercase;">
           </div>
         </div>
+        <div class="form-group">
+          <label class="form-label" for="invoiceEmail" data-i18n="invoice_email_label">Email for the invoice</label>
+          <input class="form-input" type="email" id="invoiceEmail" autocomplete="email" inputmode="email" maxlength="254">
+        </div>
       </div>
     </div>
 
@@ -2017,6 +2021,8 @@ const T = {
     fiscal_code_label: 'Codice fiscale (if you have one)',
     residence_address_label: 'Street and number',
     residence_province_label: 'Province (2 letters)',
+    invoice_email_label: 'Email for the invoice',
+    val_invoice_email: 'The invoice email does not look right — check it or leave it empty.',
     val_fiscal_code: 'The codice fiscale doesn\'t look right — check it or leave it empty.',
     val_residence_province: 'The province must be 2 letters (e.g. BA).',
     doc_section: 'Identity Document',
@@ -2189,6 +2195,8 @@ const T = {
     fiscal_code_label: 'Codice fiscale (se ne hai uno)',
     residence_address_label: 'Via e numero civico',
     residence_province_label: 'Provincia (sigla)',
+    invoice_email_label: 'Email per la fattura',
+    val_invoice_email: "L'email per la fattura non sembra corretta: controllala o lasciala vuota.",
     val_fiscal_code: 'Il codice fiscale non sembra corretto: controllalo o lascialo vuoto.',
     val_residence_province: 'La provincia deve essere di 2 lettere (es. BA).',
     doc_section: 'Documento d\'Identità',
@@ -3509,6 +3517,7 @@ function onFiscalCodeInput() {
 }
 // Returns validation messages for the residence + invoice fields of the
 // guest currently on screen, and marks the invoice error inline.
+const _isInvoiceEmail = v => v.length <= 254 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
 function _residenceInvoiceErrors() {
   const errors = [];
   const country = document.getElementById('residenceCountry').value.trim();
@@ -3526,6 +3535,8 @@ function _residenceInvoiceErrors() {
     if (bad) { toggleInvoiceSection(true); errors.push(T[lang].val_fiscal_code); }
     const prov = document.getElementById('residenceProvince').value.trim();
     if (prov && _residencePlaceApplies() && !/^[A-Za-z]{2}$/.test(prov)) errors.push(T[lang].val_residence_province);
+    const mail = document.getElementById('invoiceEmail').value.trim();
+    if (mail && !_isInvoiceEmail(mail)) { toggleInvoiceSection(true); errors.push(T[lang].val_invoice_email); }
   }
   return errors;
 }
@@ -3620,7 +3631,7 @@ function clearForm() {
   uploadedIdFile = null;
   // Round 68 — residence stays as a visible, editable pre-fill for the
   // next guest; invoice details belong to the main guest only.
-  ['fiscalCode','residenceAddress','residenceProvince'].forEach(id => {
+  ['fiscalCode','residenceAddress','residenceProvince','invoiceEmail'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -3755,8 +3766,9 @@ function checkinPrev() {
       document.getElementById('residencePostcode').value = prev.residence_postcode || '';
       document.getElementById('fiscalCode').value = prev.fiscal_code || '';
       document.getElementById('residenceAddress').value = prev.residence_address || '';
+      document.getElementById('invoiceEmail').value = prev.invoice_email || '';
       document.getElementById('residenceProvince').value = prev.residence_province || '';
-      if (prev.fiscal_code || prev.residence_address || prev.residence_province) toggleInvoiceSection(true);
+      if (prev.fiscal_code || prev.residence_address || prev.residence_province || prev.invoice_email) toggleInvoiceSection(true);
       onResidenceCountryChange();
     }
     savedGuests.splice(currentGuestIdx, 1);
@@ -4103,6 +4115,7 @@ async function saveCurrentGuest() {
       fiscal_code:        isMainGuest() ? (window.CodiceFiscale?.normalize(document.getElementById('fiscalCode')?.value) || '') : '',
       residence_address:  isMainGuest() ? (document.getElementById('residenceAddress')?.value?.trim() || '') : '',
       residence_province: isMainGuest() && _residencePlaceApplies() ? (document.getElementById('residenceProvince')?.value?.trim().toUpperCase() || '') : '',
+      invoice_email:      isMainGuest() ? (document.getElementById('invoiceEmail')?.value?.trim().toLowerCase() || '') : '',
       document_type: isMainGuest() ? document.getElementById('doctype').value : '',
       document_number: isMainGuest() ? document.getElementById('docnum').value.trim() : '',
       doc_issue_place: isMainGuest() ? (docIssuePlaceEl?.value?.trim() || birthplace || '') : '',
@@ -4290,7 +4303,8 @@ function _editFormHTML(g, i, isMain) {
             ${isMain ? `
             <div>${lab(T[lang].fiscal_code_label)}${inp('ed_fiscal', g.fiscal_code, 'maxlength="20" autocapitalize="characters"')}</div>
             <div>${lab(T[lang].residence_address_label)}${inp('ed_raddress', g.residence_address, 'maxlength="120"')}</div>
-            <div>${lab(T[lang].residence_province_label)}${inp('ed_rprov', g.residence_province, 'maxlength="2" autocapitalize="characters"')}</div>` : ''}`;
+            <div>${lab(T[lang].residence_province_label)}${inp('ed_rprov', g.residence_province, 'maxlength="2" autocapitalize="characters"')}</div>
+            <div>${lab(T[lang].invoice_email_label)}${inp('ed_imail', g.invoice_email, 'type="email" maxlength="254" autocomplete="email"')}</div>` : ''}`;
   return `
         <div id="editForm${i}" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
@@ -4499,6 +4513,7 @@ async function saveGuestEdit(idx) {
   const _rpc = document.getElementById('ed_rpostcode' + idx);
   const _cf = document.getElementById('ed_fiscal' + idx);
   const _rpv = document.getElementById('ed_rprov' + idx);
+  const _im = document.getElementById('ed_imail' + idx);
   const _rcVal = _rc ? _rc.value.trim() : '';
   let _resErr = null, _resEl = null;
   if (!_rcVal) { _resErr = T[lang].val_residence_country; _resEl = _rc; }
@@ -4507,6 +4522,7 @@ async function saveGuestEdit(idx) {
   else if (_isAltoAdigeProperty() && (!_rpc || !_rpc.value.trim())) { _resErr = T[lang].val_residence_postcode; _resEl = _rpc; }
   else if (_cf && _cf.value.trim() && !window.CodiceFiscale?.isValid(_cf.value)) { _resErr = T[lang].val_fiscal_code; _resEl = _cf; }
   else if (_rpv && _rpv.value.trim() && !/^[A-Za-z]{2}$/.test(_rpv.value.trim())) { _resErr = T[lang].val_residence_province; _resEl = _rpv; }
+  else if (_im && _im.value.trim() && !_isInvoiceEmail(_im.value.trim())) { _resErr = T[lang].val_invoice_email; _resEl = _im; }
   if (_resErr) {
     alert(_resErr);
     if (_resEl) { _resEl.focus(); _resEl.style.borderColor = 'var(--red)'; setTimeout(() => _resEl.style.borderColor = '', 3000); }
@@ -4536,6 +4552,7 @@ async function saveGuestEdit(idx) {
   const _raddr = document.getElementById('ed_raddress' + idx);
   if (_raddr) updates.residence_address = _raddr.value.trim() || null;
   if (_rpv) updates.residence_province = (isItalianCountry(_rcVal) && _rpv.value.trim().toUpperCase()) || null;
+  if (_im) updates.invoice_email = _im.value.trim().toLowerCase() || null;
 
   // Round 48 Phase 2 — gateway-routed update. The review-step edit
   // (idx is in the pre-submit list, _dbId unset) stays local-only;
@@ -6222,7 +6239,7 @@ const PRIVACY_TEMPLATE_IT = `
   <p style="margin:0 0 6px;">{{HOST_NAME}}, gestore della struttura ricettiva {{PROPERTY_NAME}}{{PROPERTY_ADDRESS}}{{CIN}}.</p>
   {{CONTACT_BLOCK}}
   <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">2. Quali dati raccogliamo</h4>
-  <p style="margin:0 0 10px;">Dati di identificazione: nome, cognome, sesso, data e luogo di nascita, cittadinanza, tipo, numero e luogo di rilascio del documento di identità. Dati relativi al soggiorno: date di arrivo e partenza, numero di notti, codice prenotazione, composizione del gruppo. Immagine del documento di identità, se caricata durante il check-in online. Comunicazioni: i messaggi scambiati tramite la chat dell'applicazione. Indirizzo e-mail, se prestato il consenso a comunicazioni promozionali. Residenza: stato e comune o città di residenza, richiesti per le comunicazioni statistiche. Se ha bisogno della fattura, può indicare anche il codice fiscale e l'indirizzo di residenza, così il gestore può emetterla.</p>
+  <p style="margin:0 0 10px;">Dati di identificazione: nome, cognome, sesso, data e luogo di nascita, cittadinanza, tipo, numero e luogo di rilascio del documento di identità. Dati relativi al soggiorno: date di arrivo e partenza, numero di notti, codice prenotazione, composizione del gruppo. Immagine del documento di identità, se caricata durante il check-in online. Comunicazioni: i messaggi scambiati tramite la chat dell'applicazione. Indirizzo e-mail, se prestato il consenso a comunicazioni promozionali. Residenza: stato e comune o città di residenza, richiesti per le comunicazioni statistiche. Se ha bisogno della fattura, può indicare anche il codice fiscale, l'indirizzo di residenza e un indirizzo e-mail a cui inviarla, così il gestore può emetterla.</p>
   <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">3. Perché trattiamo i dati e su quale base giuridica</h4>
   <p style="margin:0 0 10px;">Comunicazione dei dati degli alloggiati alla Questura tramite il Portale Alloggiati Web &mdash; obbligo legale, art. 6.1.c GDPR e art. 109 TULPS. Comunicazioni statistiche ai portali regionali &mdash; obbligo legale, art. 6.1.c GDPR. Determinazione e riscossione dell'imposta di soggiorno &mdash; obbligo legale, art. 6.1.c GDPR. Gestione del soggiorno, informazioni pratiche, assistenza e servizio di concierge &mdash; esecuzione del contratto, art. 6.1.b GDPR. Invio di comunicazioni promozionali &mdash; consenso, art. 6.1.a GDPR, revocabile in ogni momento.</p>
   <p style="margin:0 0 10px;">Il conferimento dei dati per le prime tre finalità è obbligatorio per legge: in loro assenza non è possibile ospitarLa. Il consenso promozionale è facoltativo e il rifiuto non ha alcuna conseguenza sul soggiorno.</p>
@@ -6253,7 +6270,7 @@ const PRIVACY_TEMPLATE_EN = `
   <p style="margin:0 0 6px;">{{HOST_NAME}}, operator of {{PROPERTY_NAME}}{{PROPERTY_ADDRESS}}{{CIN}}.</p>
   {{CONTACT_BLOCK}}
   <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">2. What we collect</h4>
-  <p style="margin:0 0 10px;">Identification data: first name, surname, sex, date and place of birth, citizenship, identity document type, number and place of issue. Stay data: arrival and departure dates, number of nights, booking reference, composition of the party. Image of your identity document, if uploaded during online check-in. Messages exchanged through the in-app chat. Email address, where you have consented to promotional communications. Residence: country and comune or city of residence, required for statistical reporting. If you need an invoice, you can also give your codice fiscale and residence address so your host can issue it.</p>
+  <p style="margin:0 0 10px;">Identification data: first name, surname, sex, date and place of birth, citizenship, identity document type, number and place of issue. Stay data: arrival and departure dates, number of nights, booking reference, composition of the party. Image of your identity document, if uploaded during online check-in. Messages exchanged through the in-app chat. Email address, where you have consented to promotional communications. Residence: country and comune or city of residence, required for statistical reporting. If you need an invoice, you can also give your codice fiscale, residence address and an email address to send it to, so your host can issue it.</p>
   <h4 style="font-size:0.9rem;margin:16px 0 4px;font-weight:600;">3. Why we process it, and on what legal basis</h4>
   <p style="margin:0 0 10px;">Reporting guest data to the Italian State Police via the Alloggiati Web portal &mdash; legal obligation, Art. 6(1)(c) GDPR and Art. 109 TULPS. Statistical reporting to regional authorities &mdash; legal obligation, Art. 6(1)(c). Calculating and collecting the tourist tax &mdash; legal obligation, Art. 6(1)(c). Managing your stay, practical information, assistance and concierge service &mdash; performance of a contract, Art. 6(1)(b). Sending promotional communications &mdash; consent, Art. 6(1)(a), withdrawable at any time.</p>
   <p style="margin:0 0 10px;">Providing data for the first three purposes is required by law: without it we cannot accommodate you. Marketing consent is optional and refusing has no effect on your stay.</p>

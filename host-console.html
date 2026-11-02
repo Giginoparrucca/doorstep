@@ -4473,6 +4473,8 @@ const HT = {
     field_fiscal_code: 'Codice fiscale (opt.)',
     field_residence_address: 'Street and number (opt.)',
     field_residence_province: 'Province (opt.)',
+    field_invoice_email: 'Email for the invoice (opt.)',
+    edit_invoice_email_invalid: 'The invoice email does not look right: check it or leave it empty.',
     edit_invoice_section: 'Residence and invoice details',
     edit_invoice_filed_note: 'Residence and invoice details can still be changed after the police filing.',
     edit_residence_required: 'Country of residence is required (regional statistics).',
@@ -5075,6 +5077,8 @@ const HT = {
     field_fiscal_code: 'Codice fiscale (opz.)',
     field_residence_address: 'Via e numero civico (opz.)',
     field_residence_province: 'Provincia (opz.)',
+    field_invoice_email: 'Email per la fattura (opz.)',
+    edit_invoice_email_invalid: "L'email per la fattura non sembra corretta: controllala o lasciala vuota.",
     edit_invoice_section: 'Residenza e dati per la fattura',
     edit_invoice_filed_note: 'Residenza e dati per la fattura sono modificabili anche dopo l\'invio alla Questura.',
     edit_residence_required: 'Lo stato di residenza è obbligatorio (statistiche regionali).',
@@ -14326,7 +14330,7 @@ function viewGuest(id) {
   // Round 68 — residence (every guest) and the optional invoice details
   // (main guest only) in the read-only view, not just in the edit form.
   const isMainGuestRow = ['single','head','group'].includes(c.guest_type);
-  const hasInvoice = !!(c.fiscal_code || c.residence_address || c.residence_province);
+  const hasInvoice = !!(c.fiscal_code || c.residence_address || c.residence_province || c.invoice_email);
   const residenceSection = `
     ${sectionTitle(it ? 'Residenza e fatturazione' : 'Residence and invoice details')}
     ${field(it ? 'Paese di residenza' : 'Country of residence', safe(c.residence_country))}
@@ -14336,6 +14340,7 @@ function viewGuest(id) {
       ${field(it ? 'Codice fiscale' : 'Codice fiscale', safe(c.fiscal_code), { mono: true })}
       ${field(it ? 'Indirizzo' : 'Street address', safe(c.residence_address))}
       ${field(it ? 'Provincia' : 'Province', safe(c.residence_province))}
+      ${field(it ? 'Email per la fattura' : 'Email for the invoice', safe(c.invoice_email))}
       ${hasInvoice ? '' : `<div style="font-size:0.74rem;color:var(--ink-soft);font-style:italic;padding:6px 0;">${it ? 'Nessun dato per la fattura inserito dall\'ospite.' : 'The guest entered no invoice details.'}</div>`}
     ` : ''}
   `;
@@ -14753,6 +14758,8 @@ function editGuest(id) {
       `<input id="edit_residence_address" type="text" maxlength="120" value="${safeAttr(c.residence_address || '')}" style="${inputStyle}">`)}
     ${field('field_residence_province',
       `<input id="edit_residence_province" type="text" maxlength="2" value="${safeAttr(c.residence_province || '')}" style="${inputStyle}text-transform:uppercase;max-width:120px;">`)}
+    ${field('field_invoice_email',
+      `<input id="edit_invoice_email" type="email" maxlength="254" value="${safeAttr(c.invoice_email || '')}" style="${inputStyle}">`)}
   `;
 
   // Shared datalist so both birth_country and citizenship inputs get
@@ -14902,7 +14909,9 @@ async function saveGuestEdits(id) {
       fiscal_code: window.CodiceFiscale?.normalize(v('edit_fiscal_code')) || null,
       residence_address: v('edit_residence_address') || null,
       residence_province: v('edit_residence_province').toUpperCase() || null,
+      invoice_email: document.getElementById('edit_invoice_email') ? (v('edit_invoice_email').toLowerCase() || null) : undefined,
     };
+    if (residence.invoice_email === undefined) delete residence.invoice_email;
     const residenceItaly = residence.residence_country && /^(italian[oa]?|italy|italia|it)$/i.test(residence.residence_country);
     if (!residence.residence_country) {
       setStatus(h('edit_residence_required'), 'error'); return false;
@@ -14921,6 +14930,9 @@ async function saveGuestEdits(id) {
     }
     if (residence.residence_province && !/^[A-Z]{2}$/.test(residence.residence_province)) {
       setStatus(h('edit_residence_province_invalid'), 'error'); return false;
+    }
+    if (residence.invoice_email && (residence.invoice_email.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(residence.invoice_email))) {
+      setStatus(h('edit_invoice_email_invalid'), 'error'); return false;
     }
     if (!residenceItaly) residence.residence_province = null;
 

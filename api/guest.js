@@ -403,7 +403,7 @@ const CHECKIN_WRITE_FIELDS = [
   'arrival_date', 'departure_date', 'nights',
   'id_photo_path', 'docs_status',
   'residence_country', 'residence_place',
-  'fiscal_code', 'residence_address', 'residence_postcode', 'residence_province',
+  'fiscal_code', 'residence_address', 'residence_postcode', 'residence_province', 'invoice_email',
 ];
 // Columns we return to the guest for the welcome-back + edit flows.
 // Deliberately omits id_photo_path — guest never needs the storage key.
@@ -414,7 +414,7 @@ const CHECKIN_READ_FIELDS = [
   'arrival_date', 'departure_date', 'nights',
   'docs_status', 'alloggiati_status', 'filed_at',
   'checkin_reopened_at', 'residence_country', 'residence_place',
-  'fiscal_code', 'residence_address', 'residence_postcode', 'residence_province',
+  'fiscal_code', 'residence_address', 'residence_postcode', 'residence_province', 'invoice_email',
   'booking_code', 'submitted_at', 'keybox_code',
 ];
 
@@ -1155,6 +1155,7 @@ function validateCheckinRecord(rec, { requireAll }) {
   if (rec.residence_province && !/^[A-Z]{2}$/.test(rec.residence_province)) errors.push('residence_province');
   if (rec.residence_address && rec.residence_address.length > 120) errors.push('residence_address');
   if (rec.residence_postcode && rec.residence_postcode.length > 12) errors.push('residence_postcode');
+  if (rec.invoice_email && (rec.invoice_email.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(rec.invoice_email))) errors.push('invoice_email');
   return errors;
 }
 
@@ -1171,6 +1172,7 @@ function normalizeInvoiceFields(rec) {
   clean('residence_province', v => v.trim().toUpperCase());
   clean('residence_address', v => v.trim());
   clean('residence_postcode', v => v.trim());
+  clean('invoice_email', v => v.trim().toLowerCase());
   return out;
 }
 

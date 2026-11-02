@@ -122,6 +122,15 @@ assert.equal(saved.fiscal_code, VALID_CF, 'codice fiscale normalised');
 assert.equal(saved.residence_address, 'Via Prova 1');
 assert.equal(saved.residence_postcode, '70121');
 assert.equal(saved.residence_province, 'BA', 'provincia uppercased');
+// Invoice email: trimmed and lowercased; empty → null; malformed refused on insert and update.
+out = await insert({ ...it, invoice_email: '  Guest@Example.Invalid ' });
+assert.equal(out.status, 200); assert.equal(inserted.at(-1).invoice_email, 'guest@example.invalid', 'invoice email normalised');
+out = await insert({ ...it, invoice_email: '' });
+assert.equal(out.status, 200); assert.equal(inserted.at(-1).invoice_email, null, 'empty invoice email stored as null');
+for (const bad of ['no-at-sign', 'a@b', 'x@y.z w', 'a'.repeat(250) + '@b.it']) {
+  out = await insert({ ...it, invoice_email: bad });
+  assert.deepEqual([...out.body.fields], ['invoice_email'], `invoice email ${bad.slice(0, 12)} refused`);
+}
 out = await insert({ ...it, fiscal_code: '', residence_province: '' });
 assert.equal(out.status, 200, 'empty invoice section submits as today');
 assert.equal(inserted.at(-1).fiscal_code, null); assert.equal(inserted.at(-1).residence_province, null);
@@ -147,6 +156,10 @@ assert.equal(out.status, 200); assert.ok(!('guest_type' in patched.at(-1)), 'gue
 currentRow = { id: 'row-1', residence_country: 'France', residence_place: null, residence_postcode: null };
 out = await update({ surname: 'Corretto' });
 assert.equal(out.status, 200, 'row that already has residence edits freely');
+out = await update({ invoice_email: 'bad', residence_country: 'Italia', residence_place: 'Lecce' });
+assert.deepEqual([...out.body.fields], ['invoice_email'], 'malformed invoice email refused on update');
+out = await update({ invoice_email: 'ok@example.invalid', residence_country: 'Italia', residence_place: 'Lecce' });
+assert.equal(out.status, 200); assert.equal(patched.at(-1).invoice_email, 'ok@example.invalid', 'invoice email saved on update');
 out = await update({ fiscal_code: 'BADCODE' });
 assert.deepEqual([...out.body.fields], ['fiscal_code']);
 out = await update({ fiscal_code: '' });

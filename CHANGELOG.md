@@ -7,6 +7,18 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Invoice email in the guest app's invoice section (Claude, 2 November 2026)
+
+Daniele asked for an email field in the optional invoice section (main guest only).
+
+- **Migration** `20261102090000_invoice_email.sql`: nullable `checkins.invoice_email` with a format CHECK (≤254 chars, `local@domain.tld`); `entry_access_submit_checkin` re-created from the Round 68 source (production `prosrc` md5 `9c429848…` verified identical to the committed file before the change) with only `invoice_email` added to the inserted column list. ACL (service_role only), SECURITY DEFINER and search_path unchanged; `authenticated` keeps UPDATE on the column. The filed lock (`checkins_prevent_filed_edit`) lists identity/document/stay columns only, so the email stays editable after filing, like the other invoice fields. **Applied to production before merging** (the code sends the field) via `execute_sql`, as for `round69_host_terms`; recorded in `supabase_migrations.schema_migrations` as `20261102090000` / `invoice_email`. Verified in prod: column + CHECK present, function body md5 `25ba44fc…` equals the file, EXECUTE service_role only, migration row present.
+- **Server** (`api/guest.js`): `invoice_email` in the write/read allowlists; trimmed, lowercased, '' → NULL; malformed → field error `invoice_email` on insert and update.
+- **Guest app**: "Email per la fattura / Email for the invoice" field (`type=email`) in the invoice section; checked on Next and in the edit form; restored on back; pre-filled on edit; members have none. Privacy notice §2 (IT/EN) now mentions the email to send the invoice to.
+- **Host console**: shown in the guest view and editable in the guest modal (also on filed rows, with the other invoice fields), same format check.
+- **ROPA**: check-in activity's invoice details include the email.
+
+Tests: `round68-invoice-db` (real function stores it; members NULL; CHECK rejects malformed), `round68-residence-api` (normalised, empty → NULL, malformed refused on insert and update), `round68-residence-browser` (IT/EN × 390/1440: malformed blocked then saved normalised, edit pre-fill, none for members), `guest-detail-invoice-browser`, `unsaved-forms-browser` (filed-row save now writes 7 fields). PGlite fixture loads the new migration. Local `npm run test:all`: **PASS 125 / FAIL 0 / SKIP 3** (standing skips).
+
 ### Hotfix — Invoice data in the guest view; guest app opens in Italian (Claude, 2 November 2026)
 
 1. **Invoice data not visible.** The host console's read-only guest view (`viewGuest`) showed personal and document data but not the Round 68 fields, which were only in the edit form (the data was loaded: `checkins` is read with `select('*')`). New "Residenza e fatturazione / Residence and invoice details" section: country, comune and CAP of residence for every guest; codice fiscale, street address and provincia for the main guest, or a note when the guest gave none; nothing invoice-related for members. Values escaped as before.

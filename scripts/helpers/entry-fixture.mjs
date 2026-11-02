@@ -62,7 +62,7 @@ const row = (ordinal=1) => ({ guest_type: ordinal===1 ? 'head' : 'member', surna
   place_of_birth: 'London', birth_country: 'United Kingdom', birth_province: 'EE', citizenship: 'United Kingdom',
   residence_country: 'United Kingdom',
   document_type: ordinal===1 ? 'passport' : '', document_number: ordinal===1 ? 'FICTIONAL123' : '',
-  doc_issue_place: ordinal===1 ? 'London' : '', arrival_date: '2026-11-01', departure_date: '2026-11-05',
+  doc_issue_place: ordinal===1 ? 'London' : '', arrival_date: '2099-11-01', departure_date: '2099-11-05',
   nights: 4, id_photo_path: null, docs_status: 'pending' });
 const save = (ordinal, submissionId=randomUUID(), extra={}) => submitEntryCheckin({ callRPC,
   propertyId: pid, bookingCode: code, isTest: false, ordinal, submissionId, record: row(ordinal), ...extra });
@@ -98,7 +98,7 @@ async function state(expected, submitted) {
   await db.query(`insert into properties(id,owner_id,entry_checkin_required,keybox_code,access_method)
     values($1,$4,true,'FIXED-FICTIONAL','Fictional entry'),($2,$4,true,'OTHER-FICTIONAL','Other'),($3,$4,false,'OFF-FICTIONAL','Off')`, [pid,other,off,owner]);
   await db.query(`insert into ota_reservations(id,property_id,booking_code,is_test,status,entry_type,guest_count,checkin_date,checkout_date)
-    values($1,$2,$3,false,'active','reservation',3,'2026-11-01','2026-11-05')`, [reservation,pid,code]);
+    values($1,$2,$3,false,'active','reservation',3,'2099-11-01','2099-11-05')`, [reservation,pid,code]);
   for (const file of migrations) await db.exec(fs.readFileSync(new URL('../../supabase/migrations/'+file, import.meta.url), 'utf8'));
   for (const file of migrations.slice(-2)) await db.exec(fs.readFileSync(new URL('../../supabase/migrations/'+file, import.meta.url), 'utf8'));
 

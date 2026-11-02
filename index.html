@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="it">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -934,8 +934,8 @@ function icon(name, cls) {
   <div class="top-bar">
     <div class="top-bar-title" id="topBarTitle">&nbsp;</div>
     <div class="lang-toggle">
-      <button class="lang-opt active" onclick="setLang('en')">EN</button>
-      <button class="lang-opt" onclick="setLang('it')">IT</button>
+      <button class="lang-opt" onclick="setLang('en')">EN</button>
+      <button class="lang-opt active" onclick="setLang('it')">IT</button>
     </div>
   </div>
 
@@ -1101,8 +1101,8 @@ function icon(name, cls) {
   <div class="top-bar">
     <div class="top-bar-title" data-i18n="checkin_title">Online Check-in</div>
     <div class="lang-toggle">
-      <button class="lang-opt active" onclick="setLang('en')">EN</button>
-      <button class="lang-opt" onclick="setLang('it')">IT</button>
+      <button class="lang-opt" onclick="setLang('en')">EN</button>
+      <button class="lang-opt active" onclick="setLang('it')">IT</button>
     </div>
   </div>
 
@@ -1461,8 +1461,8 @@ function icon(name, cls) {
   <div class="top-bar">
     <div class="top-bar-title" data-i18n="rules_topbar">House Rules</div>
     <div class="lang-toggle">
-      <button class="lang-opt active" onclick="setLang('en')">EN</button>
-      <button class="lang-opt" onclick="setLang('it')">IT</button>
+      <button class="lang-opt" onclick="setLang('en')">EN</button>
+      <button class="lang-opt active" onclick="setLang('it')">IT</button>
     </div>
   </div>
 
@@ -1479,8 +1479,8 @@ function icon(name, cls) {
   <div class="top-bar">
     <div class="top-bar-title" data-i18n="explore_topbar">Explore</div>
     <div class="lang-toggle">
-      <button class="lang-opt active" onclick="setLang('en')">EN</button>
-      <button class="lang-opt" onclick="setLang('it')">IT</button>
+      <button class="lang-opt" onclick="setLang('en')">EN</button>
+      <button class="lang-opt active" onclick="setLang('it')">IT</button>
     </div>
   </div>
 
@@ -1500,8 +1500,8 @@ function icon(name, cls) {
     <div class="top-bar">
       <div class="top-bar-title" data-i18n="chat_topbar">Concierge</div>
       <div class="lang-toggle">
-        <button class="lang-opt active" onclick="setLang('en')">EN</button>
-        <button class="lang-opt" onclick="setLang('it')">IT</button>
+        <button class="lang-opt" onclick="setLang('en')">EN</button>
+        <button class="lang-opt active" onclick="setLang('it')">IT</button>
       </div>
     </div>
 
@@ -1939,7 +1939,7 @@ let uploadedIdFile = null;
 /* ══════════════════════════════════════
    i18n
 ══════════════════════════════════════ */
-let lang = 'en';
+let lang = 'it'; // default language: Italian (guests can switch to EN)
 
 const T = {
   en: {
@@ -2291,6 +2291,7 @@ const T = {
 function setLang(l) {
   const prev = lang;
   lang = l;
+  document.documentElement.lang = l === 'en' ? 'en' : 'it';
   if (prev !== l) trackGuest('guest_language_switch', { from: prev, to: l });
   document.querySelectorAll('.lang-opt').forEach(btn => {
     btn.classList.toggle('active', btn.textContent.trim() === l.toUpperCase());
@@ -5575,6 +5576,9 @@ async function handleUnsubscribeIfPresent() {
 ══════════════════════════════════════ */
 async function init() {
   console.log('🏠 WelcomeBnB Guest App v2.1');
+  // The page markup is written in English; apply the default language
+  // (Italian) to every translated element and the EN/IT toggles first.
+  try { setLang(lang); } catch (e) { console.warn('initial language apply failed:', e); }
   if (await handleUnsubscribeIfPresent()) return;
   // Extract URL params first (?b=CODE&p=PROPERTY_UUID) — MUST run before property load
   bookingCode = getBookingCode();

@@ -11,7 +11,7 @@ try {
     return asRole(role,async tx=>{await tx.query("select set_config('request.jwt.claim.sub',$1,true)",[uid||'']);return fn(tx);});
   }
   const hostState=(uid,property=pid,booking=code,test=false)=>actor(uid,tx=>tx.query('select public.entry_access_host_state($1,$2,$3) data',[property,booking,test]).then(r=>r.rows[0].data));
-  const confirmAs=(uid,version)=>actor(uid,tx=>tx.query("select public.entry_access_confirm_roster($1,$2,3,'2026-11-01','2026-11-05',$3,$4,$5,false) data",[pid,code,randomUUID(),reservation,version]).then(r=>r.rows[0].data));
+  const confirmAs=(uid,version)=>actor(uid,tx=>tx.query("select public.entry_access_confirm_roster($1,$2,3,'2099-11-01','2099-11-05',$3,$4,$5,false) data",[pid,code,randomUUID(),reservation,version]).then(r=>r.rows[0].data));
   const releaseAs=(uid,b,yes,request=randomUUID())=>actor(uid,tx=>tx.query('select public.entry_access_set_release($1,$2,$3,$4) data',[b.booking_id,yes,b.state_version,request]).then(r=>r.rows[0].data));
   for(const role of ['anon','service_role'])await assert.rejects(actor(owner,tx=>tx.query('select public.entry_access_host_state($1,$2,false)',[pid,code]),role),e=>e.code==='42501');
   await assert.rejects(hostState(id(91)),e=>e.code==='42501');checks+=3;

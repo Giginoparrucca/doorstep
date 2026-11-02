@@ -14323,6 +14323,23 @@ function viewGuest(id) {
     ${field(it ? 'Cittadinanza' : 'Citizenship', safe(c.citizenship))}
   `;
 
+  // Round 68 — residence (every guest) and the optional invoice details
+  // (main guest only) in the read-only view, not just in the edit form.
+  const isMainGuestRow = ['single','head','group'].includes(c.guest_type);
+  const hasInvoice = !!(c.fiscal_code || c.residence_address || c.residence_province);
+  const residenceSection = `
+    ${sectionTitle(it ? 'Residenza e fatturazione' : 'Residence and invoice details')}
+    ${field(it ? 'Paese di residenza' : 'Country of residence', safe(c.residence_country))}
+    ${field(it ? 'Comune / città di residenza' : 'Comune / city of residence', safe(c.residence_place))}
+    ${field(it ? 'CAP' : 'Postcode', safe(c.residence_postcode), { skip: !c.residence_postcode })}
+    ${isMainGuestRow ? `
+      ${field(it ? 'Codice fiscale' : 'Codice fiscale', safe(c.fiscal_code), { mono: true })}
+      ${field(it ? 'Indirizzo' : 'Street address', safe(c.residence_address))}
+      ${field(it ? 'Provincia' : 'Province', safe(c.residence_province))}
+      ${hasInvoice ? '' : `<div style="font-size:0.74rem;color:var(--ink-soft);font-style:italic;padding:6px 0;">${it ? 'Nessun dato per la fattura inserito dall\'ospite.' : 'The guest entered no invoice details.'}</div>`}
+    ` : ''}
+  `;
+
   const isGroupMember = c.guest_type === 'group_member' || c.guest_type === 'member';
   const docSection = (c.document_type || c.document_number || c.doc_issue_place) ? `
     ${sectionTitle(it ? 'Documento' : 'Document')}
@@ -14429,6 +14446,7 @@ function viewGuest(id) {
         </div>
         ${bookingSection}
         ${personalSection}
+        ${residenceSection}
         ${docSection}
         ${photoSection}
         ${filingSection}

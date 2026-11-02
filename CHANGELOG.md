@@ -14,7 +14,7 @@ Newest entries at the top of each section.
 
 **Found while testing:** three suites (`entry-atomic-submissions`, `entry-host-audit`, `entry-round66-release`) failed on unchanged main from today: their fixture bookings arrived on 1 Nov 2026, so a release expected to be "scheduled" became "available". Fixture dates moved to 2099-11-01/05 (also in `helpers/entry-fixture.mjs`); the logic under test is unchanged.
 
-Tests: new `guest-detail-invoice-browser.test.mjs` (actual `viewGuest`, IT/EN: residence for every guest, invoice fields for the main guest, note when empty, none for members, escaped values); `guest-partial-party-browser.test.mjs` now asserts the app opens in Italian. ROPA citations refreshed. Local `npm run test:all`: **PASS 125 / FAIL 0 / SKIP 3** (standing skips).
+Tests: new `guest-detail-invoice-browser.test.mjs` (actual `viewGuest`, IT/EN: residence for every guest, invoice fields for the main guest, note when empty, none for members, escaped values); `guest-partial-party-browser.test.mjs` now asserts the app opens in Italian. ROPA citations refreshed. Local `npm run test:all`: **PASS 125 / FAIL 0 / SKIP 3** (standing skips). Shipped — PR #271 merged (`1a28ef6`); main `regression` and automatic `production security smoke` green; production serves both pages. `npm run test:live`: **PASS 4 / FAIL 0 / SKIP 5** (standing skips).
 
 ### Round 69 — terms text: withdrawal by email only (Claude, 1 November 2026)
 

@@ -17,7 +17,7 @@ Daniele asked for an email field in the optional invoice section (main guest onl
 - **Host console**: shown in the guest view and editable in the guest modal (also on filed rows, with the other invoice fields), same format check.
 - **ROPA**: check-in activity's invoice details include the email.
 
-Tests: `round68-invoice-db` (real function stores it; members NULL; CHECK rejects malformed), `round68-residence-api` (normalised, empty → NULL, malformed refused on insert and update), `round68-residence-browser` (IT/EN × 390/1440: malformed blocked then saved normalised, edit pre-fill, none for members), `guest-detail-invoice-browser`, `unsaved-forms-browser` (filed-row save now writes 7 fields). PGlite fixture loads the new migration. Local `npm run test:all`: **PASS 125 / FAIL 0 / SKIP 3** (standing skips).
+Tests: `round68-invoice-db` (real function stores it; members NULL; CHECK rejects malformed), `round68-residence-api` (normalised, empty → NULL, malformed refused on insert and update), `round68-residence-browser` (IT/EN × 390/1440: malformed blocked then saved normalised, edit pre-fill, none for members), `guest-detail-invoice-browser`, `unsaved-forms-browser` (filed-row save now writes 7 fields). PGlite fixture loads the new migration. Local `npm run test:all`: **PASS 125 / FAIL 0 / SKIP 3** (standing skips). Shipped — PR #272 merged (`434e06a`); main `regression` 41446085899 and automatic `production security smoke` 41446590520 green, incl. `schema-drift.test.live.mjs` (finds `invoice_email` in production); production serves the new field. `npm run test:live`: **PASS 4 / FAIL 0 / SKIP 5** (standing skips).
 
 ### Hotfix — Invoice data in the guest view; guest app opens in Italian (Claude, 2 November 2026)
 

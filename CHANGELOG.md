@@ -7,6 +7,15 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Hotfix — Invoice data in the guest view; guest app opens in Italian (Claude, 2 November 2026)
+
+1. **Invoice data not visible.** The host console's read-only guest view (`viewGuest`) showed personal and document data but not the Round 68 fields, which were only in the edit form (the data was loaded: `checkins` is read with `select('*')`). New "Residenza e fatturazione / Residence and invoice details" section: country, comune and CAP of residence for every guest; codice fiscale, street address and provincia for the main guest, or a note when the guest gave none; nothing invoice-related for members. Values escaped as before.
+2. **Guest app default language Italian.** `index.html`: `lang` now defaults to `it`; `init()` applies it first (`setLang(lang)`), because the page markup is written in English; the IT toggles start active; `<html lang="it">`, and `setLang` keeps `document.documentElement.lang` in sync. Guests can still switch to EN.
+
+**Found while testing:** three suites (`entry-atomic-submissions`, `entry-host-audit`, `entry-round66-release`) failed on unchanged main from today: their fixture bookings arrived on 1 Nov 2026, so a release expected to be "scheduled" became "available". Fixture dates moved to 2099-11-01/05 (also in `helpers/entry-fixture.mjs`); the logic under test is unchanged.
+
+Tests: new `guest-detail-invoice-browser.test.mjs` (actual `viewGuest`, IT/EN: residence for every guest, invoice fields for the main guest, note when empty, none for members, escaped values); `guest-partial-party-browser.test.mjs` now asserts the app opens in Italian. ROPA citations refreshed. Local `npm run test:all`: **PASS 125 / FAIL 0 / SKIP 3** (standing skips).
+
 ### Round 69 — terms text: withdrawal by email only (Claude, 1 November 2026)
 
 Daniele chose to drop the promise of an in-app withdrawal function, which does not exist. `legal/CONDIZIONI_GENERALI_v1.md` art. 13.2 now reads: "L'Host può recedere in qualsiasi momento, senza costi, con una richiesta a info@welcomebnb.it." (removed: "o dalla funzione dedicata nel Servizio"). The v1 SHA-256 changed to `65465c42…078457`: the migration seed was updated (re-runnable, as `docs/legal/README.md` describes) and the production v1 row updated via `execute_sql` while it had **0 acceptances** (the freeze trigger permits it only then); verified. An in-app "Recedi" button can come later with paid plans. Local `npm run test:all`: **PASS 124 / FAIL 0 / SKIP 3** (standing skips).

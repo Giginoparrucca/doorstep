@@ -58,7 +58,7 @@ const row = (ordinal=1) => ({ guest_type: ordinal===1 ? 'head' : 'member', surna
   name: 'Guest'+ordinal, sex: 'F', date_of_birth: ordinal===1 ? '1980-01-01' : '2020-01-01',
   place_of_birth: 'London', birth_country: 'United Kingdom', birth_province: 'EE', citizenship: 'United Kingdom',
   document_type: ordinal===1 ? 'passport' : '', document_number: ordinal===1 ? 'FICTIONAL123' : '',
-  doc_issue_place: ordinal===1 ? 'London' : '', arrival_date: '2026-11-01', departure_date: '2026-11-05',
+  doc_issue_place: ordinal===1 ? 'London' : '', arrival_date: '2099-11-01', departure_date: '2099-11-05',
   nights: 4, id_photo_path: null, docs_status: 'pending' });
 const save = (ordinal, submissionId=randomUUID(), extra={}) => submitEntryCheckin({ callRPC,
   propertyId: pid, bookingCode: code, isTest: false, ordinal, submissionId, record: row(ordinal), ...extra });
@@ -92,7 +92,7 @@ try {
   await db.query(`insert into properties(id,owner_id,entry_checkin_required,keybox_code,access_method)
     values($1,$4,true,'FIXED-FICTIONAL','Fictional entry'),($2,$4,true,'OTHER-FICTIONAL','Other'),($3,$4,false,'OFF-FICTIONAL','Off')`, [pid,other,off,owner]);
   await db.query(`insert into ota_reservations(id,property_id,booking_code,is_test,status,entry_type,guest_count,checkin_date,checkout_date)
-    values($1,$2,$3,false,'active','reservation',3,'2026-11-01','2026-11-05')`, [reservation,pid,code]);
+    values($1,$2,$3,false,'active','reservation',3,'2099-11-01','2099-11-05')`, [reservation,pid,code]);
   for (const file of migrations) await db.exec(fs.readFileSync(new URL('../supabase/migrations/'+file, import.meta.url), 'utf8'));
   await db.exec(fs.readFileSync(new URL('../supabase/migrations/'+migrations.at(-1), import.meta.url), 'utf8'));
   for (const role of ['anon','authenticated']) {
@@ -118,7 +118,7 @@ try {
   assert.equal((await save(3,third)).status,503);
   assert.equal((await db.query('select count(*)::int n from checkins where id=$1',[third])).rows[0].n,0); checks++;
   await db.query(`insert into ota_reservations(id,property_id,booking_code,is_test,status,entry_type,guest_count,checkin_date,checkout_date)
-    values($1,$2,'FICTIONAL-ROLLBACK',false,'active','reservation',1,'2026-11-01','2026-11-05')`,[id(60),pid]);
+    values($1,$2,'FICTIONAL-ROLLBACK',false,'active','reservation',1,'2099-11-01','2099-11-05')`,[id(60),pid]);
   const failedFirst=randomUUID();
   assert.equal((await save(1,failedFirst,{bookingCode:'FICTIONAL-ROLLBACK'})).status,503);
   assert.equal((await db.query("select count(*)::int n from entry_access.bookings where booking_code='FICTIONAL-ROLLBACK'")).rows[0].n,0);
@@ -180,7 +180,7 @@ try {
   // never the browser's claimed party size or the number of saved rows.
   await asRole('authenticated',async tx=>{
     await tx.query("select set_config('request.jwt.claim.sub',$1,true)",[owner]);
-    await tx.query("select public.entry_access_confirm_roster($1,'STANDALONE',2,'2026-11-01','2026-11-05',$2,null,null,false)",[other,randomUUID()]);
+    await tx.query("select public.entry_access_confirm_roster($1,'STANDALONE',2,'2099-11-01','2099-11-05',$2,null,null,false)",[other,randomUUID()]);
   });
   assert.equal((await save(1,first,{propertyId:other,bookingCode:'STANDALONE'})).status,409); checks++;
   assert.equal((await save(1,randomUUID(),{propertyId:other,bookingCode:'STANDALONE'})).enabled,true); checks++;

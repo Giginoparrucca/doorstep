@@ -15,6 +15,7 @@ function fixture(rows, logs) {
   const response=(data,status=200,total)=>new Response(Buffer.isBuffer(data)?data:JSON.stringify(data),{status,headers:{'content-range':`0-99/${total??(Array.isArray(data)?data.length:0)}`}});
   const match=(r,p)=> [...p].every(([key,val])=>{
     if(['select','order','limit','offset'].includes(key)) return true;
+    if(key==='or'&&val==='(filing_method.is.null,filing_method.neq.late_questura_pec)') return r.filing_method==null||r.filing_method!=='late_questura_pec';
     if(key==='checkin_ids'&&val.startsWith('ov.')) return r.checkin_ids.some(id=>val.slice(3).includes(id));
     if(val.startsWith('eq.')) return String(r[key])===val.slice(3);
     if(val==='is.null') return r[key]==null;
@@ -65,6 +66,8 @@ f=fixture([row('x')],[log([row('x')])]);f.hooks.concurrent=true;assert.equal((aw
 for(const flag of ['hiddenProperty','noCreds']){f=fixture([row('x')],[log([row('x')])]);f.hooks[flag]=true;assert.equal((await f.run()).rows_attached,0);assert.equal(f.downloads.length,0);}
 console.log('PASS portal/PDF/storage/attachment failures retry, race guards, concurrent object conflict and removed access');
 f=fixture([row('x')],[log([row('x')])]);assert.equal((await collectReceipts({now,budgetMs:0},f.deps)).errors,1);assert.equal(f.calls.length,0);
+// Round 70: a late filing via the Questura has no portal receipt; never fetched, even with a matching log entry.
+f=fixture([row('late',{filing_method:'late_questura_pec',late_pec_sent_on:'2026-10-12'})],[log([row('late')])]);await f.run();assert.equal(f.downloads.length,0,'late filing skipped');
 const many=Array.from({length:150},(_,i)=>row('id'+i));f=fixture(many,[log(many)]);await f.run(new Date(now.getTime()+600000));assert.ok(f.calls.some(c=>c.query.includes('offset=100')));assert.equal(f.rows.filter(r=>r.receipt_path).length,50);await f.run(new Date(now.getTime()+1200000));assert.equal(f.rows.filter(r=>r.receipt_path).length,150);assert.equal(f.downloads.length,1);
 let elapsed=0;f=fixture([row('x')],[log([row('x')])]);f.deps.clock=()=>elapsed+=15000;assert.equal((await f.run()).errors,1);assert.equal(f.downloads.length,0);
 console.log('PASS bounded runtime and rotating pagination beyond the first missing-row page');

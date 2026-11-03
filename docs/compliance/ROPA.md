@@ -48,9 +48,11 @@ personal_data:
   - Stay - arrival and departure dates, booking code
   - Document photo and optional selfie (storage bucket documents)
   - Filing state and police receipts (alloggiati_filing_log, bucket receipts)
+  - Late filing via the Questura (Round 70) - filing method, the date the host declares the PEC was sent, and the optional PEC delivery receipt (bucket receipts); the file for the Questura is generated on the host's device only and never sent by WelcomeBnB
 recipients:
   - The host
   - Polizia di Stato, Alloggiati Web (alloggiatiweb.poliziadistato.it)
+  - The competent Questura, only when the host sends a late filing by PEC themselves
   - Sub-processors - Supabase, Vercel
 international_transfers:
   - None for storage (Supabase EU). Vercel function region to be confirmed (see sub-processor table)
@@ -58,6 +60,7 @@ retention:
   - Document and selfie photos are deleted automatically 7 days after arrival (purge_old_id_photos, migration 20261019140000_round60c_photo_retention_7days.sql)
   - Soft-deleted check-ins are purged after 30 days; test rows after 30 days (daily job welcomebnb_daily_purge)
   - Residence and invoice details - same as the check-in row (no separate rule)
+  - Late filing method, PEC date and PEC delivery receipt - same as the check-in row and its police receipt
   - OWNER DECISION - live check-in rows have no time limit today; police receipts and alloggiati_filing_log have no purge (comments mention 5 years, nothing enforces it)
 security_measures:
   - Row-level security on every table; guests reach data only through the signed guest gateway (api/guest.js)

@@ -48,8 +48,9 @@ export async function collectReceipts({ budgetMs = 12000, now = new Date() } = {
   const { today, oldest } = receiptWindow(now);
   // Broad UTC floor includes Rome's first local day across offset/DST changes.
   const floor = new Date(now.getTime() - 31 * 86400000).toISOString();
-  const query = 'checkins?is_test=eq.false&deleted_at=is.null&alloggiati_status=eq.filed&receipt_path=is.null' +
-    `&filed_at=gte.${encodeURIComponent(floor)}&select=id,property_id,filed_at,is_test,deleted_at,alloggiati_status,receipt_path&order=filed_at.asc,id.asc&limit=100`;
+  // Round 70: late filings via the Questura have no portal receipt to fetch.
+  const query = 'checkins?is_test=eq.false&deleted_at=is.null&alloggiati_status=eq.filed&receipt_path=is.null&or=(filing_method.is.null,filing_method.neq.late_questura_pec)' +
+    `&filed_at=gte.${encodeURIComponent(floor)}&select=id,property_id,filed_at,is_test,deleted_at,alloggiati_status,receipt_path,filing_method&order=filed_at.asc,id.asc&limit=100`;
   let page;
   try {
     page = await get(query);
@@ -60,6 +61,7 @@ export async function collectReceipts({ budgetMs = 12000, now = new Date() } = {
   } catch (_) { summary.errors++; return summary; }
   const candidates = page.rows.filter(r => {
     if (r.is_test !== false || r.deleted_at || r.alloggiati_status !== 'filed' || r.receipt_path || !r.filed_at) return false;
+    if (r.filing_method === 'late_questura_pec') return false; // Round 70: no portal receipt exists
     const date = romeDate(new Date(r.filed_at));
     return date >= oldest && date < today;
   });

@@ -7971,6 +7971,105 @@ function _lateFilingButton(c, it, style) {
   return `<button type="button" class="late-filing-btn" data-late-key="${(_lateGroupKey(c)).replace(/"/g, '&quot;')}" onclick="event.stopPropagation();openLateFilingPanel(this.dataset.lateKey)" style="${style || 'display:inline-block;font-size:0.6rem;padding:2px 8px;background:rgba(176,57,57,0.12);color:#b03939;border:1px solid rgba(176,57,57,0.35);border-radius:8px;font-weight:600;margin-left:6px;vertical-align:middle;cursor:pointer;font-family:inherit;'}">${h('late_btn')}</button>`;
 }
 
+// Round 70 Phase 3 — record the late filing: whole group → filed with
+// filing_method 'late_questura_pec' and the declared PEC date; the PEC
+// delivery receipt (PDF or .eml) is strongly encouraged, not forced, and
+// goes to the private receipts bucket (<property_id>/... path convention).
+// Never written as a portal filing; the filing log is not touched.
+Object.assign(HT.en, {
+  late_record_title: 'Record the late filing',
+  late_record_date: 'Date the PEC was sent',
+  late_record_receipt: 'PEC delivery receipt (PDF or .eml) — strongly recommended',
+  late_record_btn: 'Mark as sent late',
+  late_record_date_missing: 'Enter the date the PEC was sent (not in the future, not before arrival).',
+  late_record_no_receipt: 'Record the late filing WITHOUT the PEC delivery receipt?\n\nKeep the receipt: it is your proof that the data was sent. You can still attach it later with «Receipt» on the booking.',
+  late_record_done: '✓ {n} guest(s) recorded as sent late via PEC.',
+  late_record_failed: 'Saving failed: ',
+  late_record_blocked: 'Update blocked (permissions). Nothing was recorded.',
+  late_filed_label: 'Sent late via PEC · {date}',
+  late_receipt_link: 'PEC receipt',
+});
+Object.assign(HT.it, {
+  late_record_title: 'Registra l\'invio tardivo',
+  late_record_date: 'Data di invio della PEC',
+  late_record_receipt: 'Ricevuta di consegna della PEC (PDF o .eml) — fortemente consigliata',
+  late_record_btn: 'Segna come inviato in ritardo',
+  late_record_date_missing: 'Inserisci la data di invio della PEC (non futura e non precedente all\'arrivo).',
+  late_record_no_receipt: 'Registrare l\'invio tardivo SENZA la ricevuta di consegna della PEC?\n\nConserva la ricevuta: è la prova che i dati sono stati inviati. Potrai allegarla anche dopo con «Ricevuta» sulla prenotazione.',
+  late_record_done: '✓ {n} ospite/i registrati come inviati in ritardo via PEC.',
+  late_record_failed: 'Salvataggio non riuscito: ',
+  late_record_blocked: 'Aggiornamento bloccato (permessi). Nulla è stato registrato.',
+  late_filed_label: 'Inviato in ritardo via PEC · {date}',
+  late_receipt_link: 'Ricevuta PEC',
+});
+function renderLateFilingRecord(container, key, rows) {
+  if (!container) return;
+  const el = (tag, css, text) => { const e = document.createElement(tag); if (css) e.style.cssText = css; if (text != null) e.textContent = text; return e; };
+  const readonly = typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !(typeof _adminEditEnabled !== 'undefined' && _adminEditEnabled);
+  const box = el('div', 'border-top:1px solid var(--border,#d9e1ee);padding-top:12px;margin:4px 0 14px;');
+  box.append(el('div', 'font-weight:600;margin-bottom:8px;', h('late_record_title')));
+  const today = new Date().toISOString().slice(0, 10);
+  const dLab = el('label', 'display:block;font-size:0.8rem;margin-bottom:4px;', h('late_record_date')); dLab.htmlFor = 'lateFilingDate';
+  const date = document.createElement('input'); date.type = 'date'; date.id = 'lateFilingDate'; date.max = today;
+  date.min = String(rows[0].arrival_date || '').slice(0, 10); date.value = today; date.className = 'form-input';
+  date.style.cssText = 'max-width:200px;margin-bottom:10px;';
+  const fLab = el('label', 'display:block;font-size:0.8rem;margin-bottom:4px;', h('late_record_receipt')); fLab.htmlFor = 'lateFilingReceipt';
+  const file = document.createElement('input'); file.type = 'file'; file.id = 'lateFilingReceipt';
+  file.accept = '.pdf,.eml,application/pdf,message/rfc822'; file.style.cssText = 'display:block;margin-bottom:10px;font-size:0.8rem;';
+  const btn = el('button', 'padding:8px 14px;border:1px solid #2f7a44;border-radius:8px;background:rgba(47,122,68,0.1);color:#2f7a44;cursor:pointer;font-family:inherit;font-weight:600;', '✓ ' + h('late_record_btn'));
+  btn.type = 'button'; btn.id = 'lateFilingRecordBtn'; btn.disabled = readonly;
+  const msg = el('div', 'font-size:0.8rem;margin-top:8px;min-height:1em;'); msg.id = 'lateFilingRecordMsg'; msg.setAttribute('role', 'status');
+  btn.onclick = async () => {
+    btn.disabled = true;
+    const r = await recordLateFiling(rows, date.value, file.files && file.files[0]);
+    msg.textContent = r.message; msg.style.color = r.ok ? '#2f7a44' : '#b03939';
+    if (r.ok) setTimeout(() => document.getElementById('lateFilingModal')?.remove(), 1200);
+    else btn.disabled = false;
+  };
+  box.append(dLab, date, fLab, file, btn, msg);
+  container.append(box);
+}
+async function recordLateFiling(rows, sentOn, receiptFile) {
+  const ids = rows.map(r => r.id);
+  const arrival = String(rows[0].arrival_date || '').slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(sentOn || '') || sentOn > today || (arrival && sentOn < arrival)) {
+    return { ok: false, message: h('late_record_date_missing') };
+  }
+  if (!receiptFile && !confirm(h('late_record_no_receipt'))) return { ok: false, message: '' };
+  let receiptPath = null;
+  if (receiptFile) {
+    if (receiptFile.size > 10 * 1024 * 1024) return { ok: false, message: h('late_record_failed') + (hostLang === 'it' ? 'file troppo grande (>10 MB)' : 'file too large (>10 MB)') };
+    const ext = ((receiptFile.name.match(/\.([a-z0-9]{1,8})$/i) || [])[1] || 'pdf').toLowerCase();
+    const stamp = sentOn.replace(/-/g, '');
+    const owner = rows[0].property_id || propertyId;
+    // <property_id>/... — the receipts bucket policy checks the first segment.
+    receiptPath = `${owner}/${(rows[0].booking_code || rows[0].id).replace(/[^A-Za-z0-9_-]/g, '')}-tardivo-${stamp}.${ext}`;
+    const { error: upErr } = await sb.storage.from('receipts').upload(receiptPath, receiptFile,
+      { upsert: true, contentType: receiptFile.type || (ext === 'eml' ? 'message/rfc822' : 'application/pdf') });
+    if (upErr) return { ok: false, message: h('late_record_failed') + (upErr.message || upErr) };
+  }
+  const patch = {
+    alloggiati_status: 'filed', filed_at: new Date().toISOString(),
+    filing_method: 'late_questura_pec', late_pec_sent_on: sentOn,
+    autofile_last_error: null,
+    ...(receiptPath ? { receipt_path: receiptPath } : {}),
+  };
+  const { data, error } = await sb.from('checkins').update(patch).in('id', ids).select('id');
+  if (error) return { ok: false, message: h('late_record_failed') + error.message };
+  if (!data || data.length !== ids.length) return { ok: false, message: h('late_record_blocked') };
+  const done = new Set(data.map(r => r.id));
+  allCheckins = allCheckins.map(c => done.has(c.id) ? { ...c, ...patch } : c);
+  try { track('alloggiati_late_recorded', { guests: ids.length, receipt: !!receiptPath }); } catch (_) {}
+  try { renderCheckins(); } catch (_) {}
+  try { renderDashboard?.(); } catch (_) {}
+  try { paintNavBadges(); } catch (_) {}
+  return { ok: true, message: h('late_record_done').replace('{n}', ids.length) };
+}
+function _lateFiledLabel(c) {
+  return h('late_filed_label').replace('{date}', _fmtDateItShort(c.late_pec_sent_on));
+}
+
 // Round 49 Phase 4 — the per-row autofile chip. Returns HTML.
 // • filed/correction: hidden (the main rowPill already covers it).
 // • autofile_excluded: amber "⏸ Escluso" pill.
@@ -8194,7 +8293,10 @@ function renderCheckins() {
     // Status pill for the group header. Round 48 Phase 4 — a group that
     // contains at least one 'correction' row shows an amber "Correction"
     // pill: filed once, needs re-filing after a host or guest edit.
-    const groupPill = anyCorrection
+    const allLate = allFiled && rows.every(r => r.filing_method === 'late_questura_pec');
+    const groupPill = allLate
+      ? `<span data-guide="checkin-row-status" class="late-filed-pill" style="display:inline-block;font-size:0.66rem;padding:3px 10px;background:rgba(47,122,68,0.10);color:#2f7a44;border:1px dashed rgba(47,122,68,0.5);border-radius:12px;font-weight:600;letter-spacing:0.04em;">✓ ${_lateFiledLabel(rows[0])}</span>`
+      : anyCorrection
       ? `<span data-guide="checkin-row-status" style="display:inline-block;font-size:0.66rem;padding:3px 10px;background:rgba(232,184,75,0.18);color:#9a6b00;border-radius:12px;font-weight:600;letter-spacing:0.04em;">${it ? '✎ Correzione — da reinviare' : '✎ Correction — needs re-filing'}</span>`
       : allFiled
       ? `<span data-guide="checkin-row-status" style="display:inline-block;font-size:0.66rem;padding:3px 10px;background:rgba(47,122,68,0.14);color:#2f7a44;border-radius:12px;font-weight:600;letter-spacing:0.04em;">${it ? '✓ Inviato Alloggiati' : '✓ Filed on Alloggiati'}</span>`
@@ -14576,7 +14678,9 @@ function viewGuest(id) {
   const isCorrection = c.alloggiati_status === 'correction';
   // Round 48 Phase 4 — 'correction' is "filed once, needs re-filing after a
   // host or guest edit". Not green ✓, not red ⚠ — amber ✎.
-  const filedBadge = isCorrection
+  const filedBadge = (isFiled && c.filing_method === 'late_questura_pec')
+    ? `<span class="late-filed-pill" style="display:inline-block;font-size:0.66rem;padding:2px 8px;background:rgba(47,122,68,0.10);color:#2f7a44;border:1px dashed rgba(47,122,68,0.5);border-radius:10px;font-weight:600;letter-spacing:0.04em;">✓ ${safe(_lateFiledLabel(c))}</span>`
+    : isCorrection
     ? `<span style="display:inline-block;font-size:0.66rem;padding:2px 8px;background:rgba(232,184,75,0.18);color:#9a6b00;border-radius:10px;font-weight:600;letter-spacing:0.04em;">${it ? '✎ Correzione — da reinviare' : '✎ Correction — needs re-filing'}</span>`
     : isFiled
       ? `<span style="display:inline-block;font-size:0.66rem;padding:2px 8px;background:rgba(47,122,68,0.14);color:#2f7a44;border-radius:10px;font-weight:600;letter-spacing:0.04em;">${it ? '✓ Inviato Alloggiati' : '✓ Filed on Alloggiati'}</span>`

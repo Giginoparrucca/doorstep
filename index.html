@@ -1620,6 +1620,7 @@ function icon(name, cls) {
 <script src="/vendor/supabase-2.118.0.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="/lib/guest-entry-refresh.js?v=66g1"></script>
 <script src="/lib/codice-fiscale.js?v=68.1"></script>
+<script src="/lib/country-iso3.js?v=1"></script>
 <script>
 /* ══════════════════════════════════════
    SUPABASE CONNECTION
@@ -2989,6 +2990,14 @@ const _wbnbCountryAcceptSet = (() => {
   for (const v of Object.values(COUNTRY_ALIASES)) s.add(_normKey(v));
   return s;
 })();
+// A scanned country value the guest form can accept, or '' (guest picks).
+function _scanCountry(v) {
+  const raw = String(v == null ? '' : v).trim();
+  if (!raw) return '';
+  if (wbnbAcceptsCountry(raw)) return raw;
+  const iso = window.CountryISO3 && window.CountryISO3.toAllogName(raw);
+  return iso && wbnbAcceptsCountry(iso) ? iso : '';
+}
 function wbnbAcceptsCountry(input) {
   if (!input) return false;
   return _wbnbCountryAcceptSet.has(_normKey(input));
@@ -4051,6 +4060,23 @@ async function saveCurrentGuest() {
     });
   }
 
+  // Countries are checked again here: a document scan can fill them after
+  // the step's validation ran. An unrecognised value would hold back the
+  // whole group's police filing.
+  {
+    const bad = [];
+    const cit = document.getElementById('citizenship')?.value?.trim() || '';
+    const bc = document.getElementById('birthCountry')?.value?.trim() || '';
+    if (!cit || !wbnbAcceptsCountry(cit)) bad.push((T[lang].val_citizenship_unknown || 'Citizenship "{v}" isn\'t recognized — please pick one from the list.').replace('{v}', cit));
+    if (!bc || !wbnbAcceptsCountry(bc)) bad.push((T[lang].val_birth_country_unknown || 'Country of birth "{v}" isn\'t recognized — please pick one from the list.').replace('{v}', bc));
+    if (bad.length) {
+      alert(bad.join('\n'));
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+      return;
+    }
+  }
+
   if (!propertyId) {
     console.error('❌ No propertyId — cannot save check-in');
     alert(lang === 'it' ? 'Errore: proprietà non trovata. Ricarica la pagina.' : 'Error: property not found. Please reload the page.');
@@ -4677,12 +4703,17 @@ async function scanDocument(input) {
         if (dobWarnEl) dobWarnEl.style.display = 'none';
       }
       if (d.place_of_birth) document.getElementById('birthplace').value = d.place_of_birth;
-      if (d.citizenship) document.getElementById('citizenship').value = d.citizenship;
+      // Scanned countries can be document codes ("ITA", "D"): turn them into
+      // a country name the police export understands, or leave the field
+      // for the guest to pick, never an unrecognised value.
+      const scanCitizenship = _scanCountry(d.citizenship);
+      const scanBirthCountry = _scanCountry(d.birth_country);
+      if (scanCitizenship) document.getElementById('citizenship').value = scanCitizenship;
       // Birth country: use scan result if available, otherwise default to citizenship
-      if (d.birth_country) {
-        document.getElementById('birthCountry').value = d.birth_country;
-      } else if (d.citizenship && !document.getElementById('birthCountry').value) {
-        document.getElementById('birthCountry').value = d.citizenship;
+      if (scanBirthCountry) {
+        document.getElementById('birthCountry').value = scanBirthCountry;
+      } else if (scanCitizenship && !document.getElementById('birthCountry').value) {
+        document.getElementById('birthCountry').value = scanCitizenship;
       }
       if (d.document_number) document.getElementById('docnum').value = d.document_number;
       if (d.issuing_country && document.getElementById('docissue')) document.getElementById('docissue').value = d.issuing_country;

@@ -18,6 +18,7 @@ const context = vm.createContext({supabaseAuthHeaders,
   submitEntryCheckin: async () => ({enabled:false}),
   CHECKIN_WRITE_FIELDS: vm.runInNewContext(fields),
   CodiceFiscale: createRequire(import.meta.url)('../lib/codice-fiscale.js'),
+  AllogRecords: createRequire(import.meta.url)('../lib/alloggiati-records.js'),
   pgrestGET: async () => ({ ok: true, json: async () => [{ region: 'Puglia' }] }),
   WALKIN_PREFIX: 'WB-', console, recordUsage: async () => {},
   fetch: async (url, opts) => {

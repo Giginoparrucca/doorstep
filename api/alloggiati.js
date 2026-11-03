@@ -397,11 +397,40 @@ async function processPropertyAutofile(prop) {
     const m = w.match(/Row\s+(\d+):/);
     if (m) warningRowIdxs.add(Number(m[1]));
   }
+  // A booking is filed as a group: its members need their leader in the
+  // same batch. When one row fails our check, hold back its whole group
+  // (stamped group_member_invalid) and keep the other groups going, instead
+  // of sending a leaderless member the portal rejects with the whole batch.
+  const groupKeyOf = id => {
+    const row = toFile.find(r => r.id === id);
+    return row && row.booking_code ? 'b:' + row.booking_code : 'i:' + id;
+  };
+  const warnGroups = new Set();
+  for (let i = 0; i < lines.length; i++) {
+    if (warningRowIdxs.has(i + 1)) warnGroups.add(groupKeyOf(rowMeta[i].checkin_id));
+  }
   const okIndices = [];
   const warnIndices = [];
+  const heldIndices = [];
   for (let i = 0; i < lines.length; i++) {
     if (warningRowIdxs.has(i + 1)) warnIndices.push(i);
+    else if (warnGroups.has(groupKeyOf(rowMeta[i].checkin_id))) heldIndices.push(i);
     else okIndices.push(i);
+  }
+  if (heldIndices.length > 0) {
+    const heldIds = heldIndices.map(i => rowMeta[i].checkin_id).filter(Boolean).map(x => `"${x}"`).join(',');
+    if (heldIds) {
+      try {
+        await sbPatch(
+          `checkins?id=in.(${encodeURIComponent(heldIds)})`,
+          {
+            autofile_last_attempt_at: new Date().toISOString(),
+            autofile_last_error: 'group_member_invalid',
+          },
+        );
+      } catch (e) { console.warn('[autofile_tick] group-member stamp failed:', e.message); }
+    }
+    summary.group_blocked += heldIndices.length;
   }
   if (warnIndices.length > 0) {
     const warnIds = warnIndices.map(i => rowMeta[i].checkin_id).filter(Boolean).map(x => `"${x}"`).join(',');
@@ -554,8 +583,35 @@ async function processPropertyAutofile(prop) {
   // SOAP Test → Send → deferred receipt. Same Round 44 safety order the host
   // manual send uses: refuse to Send if Test rejects any row.
   try {
-    const testOutcome = await evidence.run('test', options=>soapTest({ utente: creds.utente, token, rows: batchLines }, options));
-    const anyRejected = !testOutcome.overall?.ok || (testOutcome.perRow || []).some(r => !r.ok);
+    let testOutcome = await evidence.run('test', options=>soapTest({ utente: creds.utente, token, rows: batchLines }, options));
+    let anyRejected = !testOutcome.overall?.ok || (testOutcome.perRow || []).some(r => !r.ok);
+    // Per-row rejections: release only the rejected rows' groups and Test the
+    // remaining groups again. Send still happens only for a batch whose own
+    // Test passed in full (the Round 44 safety order is unchanged).
+    const perRow = Array.isArray(testOutcome.perRow) ? testOutcome.perRow : [];
+    if (anyRejected && perRow.length === batchCheckinIds.length && perRow.some(r => r.ok)) {
+      const badGroups = new Set(batchCheckinIds.filter((id, i) => !perRow[i].ok).map(groupKeyOf));
+      const keep = batchCheckinIds.map((id, i) => i).filter(i => !badGroups.has(groupKeyOf(batchCheckinIds[i])));
+      if (keep.length > 0) {
+        const dropIds = batchCheckinIds.filter((id, i) => !keep.includes(i));
+        await _releaseClaimAndStamp(dropIds, 'test_rejected');
+        await maybeFireRejectionAlert(prop, dropIds);
+        await logFiling({
+          propertyId: prop.id, trigger: 'autofile',
+          checkinIds: dropIds, outcome: 'test_rejected',
+          errorCode: 'validation_failed',
+          errorDetail: redactSupport(perRow.map((r, i) => ({ ...r, checkinId: batchCheckinIds[i] })).filter(r => !r.ok).slice(0, 5).map(r => [r.checkinId, r.erroreDes || r.code, r.erroreDet].filter(Boolean).join(': ')).join(' | '), toFile.map(row => row.document_number)),
+        });
+        summary.errors += dropIds.length;
+        const keptLines = keep.map(i => batchLines[i]);
+        const keptIds = keep.map(i => batchCheckinIds[i]);
+        batchLines.length = 0; batchLines.push(...keptLines);
+        batchCheckinIds.length = 0; batchCheckinIds.push(...keptIds);
+        evidence.setRows(batchLines, batchCheckinIds.map(id=>[id]));
+        testOutcome = await evidence.run('test', options=>soapTest({ utente: creds.utente, token, rows: batchLines }, options));
+        anyRejected = !testOutcome.overall?.ok || (testOutcome.perRow || []).some(r => !r.ok);
+      }
+    }
     if (anyRejected) {
       await _releaseClaimAndStamp(batchCheckinIds, 'test_rejected');
       await maybeFireRejectionAlert(prop, batchCheckinIds);

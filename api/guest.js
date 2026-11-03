@@ -1136,6 +1136,12 @@ function validateCheckinRecord(rec, { requireAll }) {
   if (rec.surname && str(rec.surname).length > 50) errors.push('surname');
   if (rec.name    && str(rec.name).length    > 30) errors.push('name');
   if (rec.sex     && !['M', 'F'].includes(str(rec.sex).toUpperCase())) errors.push('sex');
+  // Countries must translate to an Alloggiati state code; an unrecognised
+  // value (e.g. a raw document code) would hold back the whole group's
+  // police filing. Names and 3-letter document codes are both accepted.
+  for (const f of ['citizenship', 'birth_country']) {
+    if (str(rec[f]) && !AllogRecords.lookupStateCode(str(rec[f])).trim()) errors.push(f);
+  }
   for (const d of ['date_of_birth', 'arrival_date', 'departure_date']) {
     if (rec[d] && !/^\d{4}-\d{2}-\d{2}$/.test(String(rec[d]))) errors.push(d);
   }

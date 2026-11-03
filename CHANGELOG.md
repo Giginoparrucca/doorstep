@@ -7,6 +7,17 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Round 70 — Late Alloggiati filing: warn before the window closes, guide the host after (confirmed 2026-11-03)
+
+Daniele confirmed the plain-language recap on 3 November 2026. Specification: `PLAN_round70_late_filing.md` (with the inspection findings). Trigger: the Caralis Holiday incident (four guests, arrivals 31 Oct, never filed; see the hotfix below). Not legal advice: the product tells the host to contact the Questura and ask how to send the data. Never Test/Send late rows. Runs alongside Round 63 (GPT, in-flight) and open Round 67 phases (Claude); their ownership is unchanged.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 1 — Last-evening and window-closed alerts (server) | in-progress — Claude Opus 5.5 | Shared date helper; closing (18:00) / window-closed / split 09:00 alerts incl. autofile-off properties; `late_alert_at`; tick tests with a time stub. |
+| 2 — «Invio tardivo» in the console | pending | Late panel, `.txt` for the Questura, PEC text, `questura_pec`, export exclusion; Chromium IT/EN × 390/1440. |
+| 3 — Recording the late filing | pending | `filing_method` + `late_pec_sent_on`, receipt upload, labels, receipt fetch skip, admin hint; PGlite + browser tests; schema-drift. |
+| 4 — Guide and close-out | pending | Host guide, docs, live smoke with `SPOT_SMOKE_REQUIRE_MATCH=1`, Caralis follow-up. |
+
 ### Hotfix — Alloggiati: document country codes, scan check, one group no longer blocks others (Claude, 3 November 2026)
 
 **Incident (Caralis Holiday, arrivals 31 Oct 2026).** Four guests in two bookings (CAR-77HJEN, CAR-JVD4A9) were never filed. The lead guest of CAR-77HJEN had citizenship stored as `ITA` (the document's 3-letter code; the row was never edited, so it came from the document scan, which fills the form after the step's country check). The builder could not translate `ITA` (`builder_warning`), dropped that row, and sent the rest as one batch: the member of CAR-77HJEN was left without her leader, the portal rejected the whole batch ("Ospite con Capo Gruppo o Capo Famiglia Mancante"), and the valid German group was blocked with it. Retries repeated the same pattern until the online window closed (arrival + 1 day, 23:59 Rome); the rows are now `past_portal_window` and need manual late filing by the host. Daniele was told on 3 Nov with the manual steps.

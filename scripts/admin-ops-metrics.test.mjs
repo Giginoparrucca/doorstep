@@ -22,7 +22,33 @@ await assert.rejects(()=>readPages(()=>({order(){return this;},range(){return {e
 // Actual loader: minimal fields, filters, pagination and per-source error isolation.
 const reads=[];const sb={from(table){const q={select(fields){reads.push([table,fields]);return q;},eq(){return q;},is(){return q;},gte(){return q;},lte(){return q;},like(){return q;},order(){return q;},range(){return table==='ota_reservations'?Promise.reject(new Error('denied')):Promise.resolve({data:[]});}};return q;}};
 const data=await load(sb,{since,until});assert.equal(data.reservations,null);assert.ok(Array.isArray(data.checkins));assert.ok(Array.isArray(data.events));assert.equal(reads.length,3);assert.ok(!reads.some(([,fields])=>/surname|name|phone|email|document|\*/.test(fields)));
-const html=fs.readFileSync(new URL('../admin.html',import.meta.url),'utf8');for(const script of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);assert.match(html,/AdminOpsMetrics.load\(sb/);assert.match(html,/opsMetricsData = opsRes/);assert.match(html,/admin-ops-metrics.js\?v=64.6/);
+const html=fs.readFileSync(new URL('../admin.html',import.meta.url),'utf8');for(const script of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);assert.match(html,/AdminOpsMetrics.load\(sb/);assert.match(html,/opsMetricsData = opsRes/);assert.match(html,/admin-ops-metrics.js\?v=70.1/);assert.ok(html.indexOf('/lib/alloggiati-records.js')>0&&html.indexOf('/lib/alloggiati-records.js')<html.indexOf('/admin-ops-metrics.js'),'shared late rule loads before the metrics');
 console.log('PASS admin Ops aggregation, period boundaries, isolation, pagination, source failures and inline syntax');
 
 for(const reason of ['send_result_uncertain','send_result_requires_review','prior_send_requires_review'])assert.equal(aggregate({...input,checkins:[c('review',{alloggiati_status:'correction',autofile_last_error:reason,autofile_last_attempt_at:since})]}).get('p').failed,1);
+
+// Round 70: missed filings (portal deadline passed, still unfiled) count as failed, by arrival date,
+// with the real shared rule; once each, never alongside an attempt error.
+{
+  const ctx2 = vm.createContext({});
+  vm.runInContext(fs.readFileSync(new URL('../lib/alloggiati-records.js', import.meta.url), 'utf8'), ctx2);
+  vm.runInContext(fs.readFileSync(new URL('../admin-ops-metrics.js', import.meta.url), 'utf8'), ctx2);
+  const now = '2026-11-03T09:00:00Z', s2 = '2026-10-01T00:00:00.000Z', u2 = '2026-11-03T23:59:59.000Z';
+  const rows = [
+    c('late-never', { arrival_date: '2026-10-31', alloggiati_status: 'pending' }),                                   // never attempted (autofile off)
+    c('late-stamped', { arrival_date: '2026-10-31', alloggiati_status: 'pending', autofile_last_error: 'past_portal_window', autofile_last_attempt_at: '2026-11-02T00:00:00Z' }),
+    c('late-and-rejected', { arrival_date: '2026-10-30', alloggiati_status: 'pending', autofile_last_error: 'test_rejected', autofile_last_attempt_at: '2026-10-30T12:00:00Z' }),
+    c('still-open', { arrival_date: '2026-11-02', alloggiati_status: 'pending' }),                                    // portal still accepts it
+    c('late-filed-pec', { arrival_date: '2026-10-31', alloggiati_status: 'filed', filed_at: now, filing_method: 'late_questura_pec' }),
+    c('late-excluded', { arrival_date: '2026-10-31', alloggiati_status: 'pending', autofile_excluded: true }),
+    c('late-before-period', { arrival_date: '2026-09-20', alloggiati_status: 'pending' }),
+  ];
+  const agg = ctx2.AdminOpsMetrics.aggregate({ since: s2, until: u2, now, checkins: rows, reservations: [], events: [] }).get('p');
+  assert.equal(agg.missed, 3); assert.equal(agg.failed, 3, 'each late row counted once');
+  // Without the shared library: the server stamp still counts.
+  const fallback = aggregate({ since: s2, until: u2, now, checkins: rows, reservations: [], events: [] }).get('p');
+  assert.equal(fallback.missed, 1); assert.equal(fallback.failed, 2);
+  // A filing made in time is never missed.
+  assert.equal(ctx2.AdminOpsMetrics.aggregate({ since: s2, until: u2, now, checkins: [c('ok', { arrival_date: '2026-10-31', alloggiati_status: 'filed', filed_at: '2026-10-31T15:00:00Z' })], reservations: [], events: [] }).get('p').failed, 0);
+  console.log('PASS Round 70 missed filings count as failed (shared rule, by arrival, once each; filed/excluded/open/out-of-period not counted; stamp fallback)');
+}

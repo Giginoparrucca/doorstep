@@ -19,7 +19,7 @@
       return q.is('deleted_at', null);
     };
     const queries = {
-      checkins: () => visible(sb.from('checkins').select('id,property_id,booking_code,arrival_date,submitted_at,alloggiati_status,filed_at,autofile_last_error,autofile_last_attempt_at,is_test,deleted_at')),
+      checkins: () => visible(sb.from('checkins').select('id,property_id,booking_code,arrival_date,submitted_at,alloggiati_status,filed_at,autofile_last_error,autofile_last_attempt_at,autofile_excluded,is_test,deleted_at')),
       reservations: () => visible(sb.from('ota_reservations').select('id,property_id,booking_code,checkin_date,status,entry_type,covered_by_reservation_id,is_test,deleted_at')),
       events: () => visible(sb.from('analytics_events').select('id,property_id,booking_code,event_type,created_at,is_test,deleted_at').gte('created_at', since).lte('created_at', until).like('event_type', 'guest_%')),
     };
@@ -31,9 +31,19 @@
   }
   function aggregate(input) {
     const { checkins, reservations, events, since, until, showHidden = false, showTestData = false } = input;
+    // Round 70: a guest the portal no longer accepts (arrival + 1, 23:59 Rome)
+    // is a missed filing and counts as failed, by arrival date. Same rule as
+    // the host console and the server (lib/alloggiati-records.js); without
+    // the library, fall back to the server's past_portal_window stamp.
+    const now = input.now ? new Date(input.now) : new Date();
+    const allog = root.AllogRecords;
+    const missedFiling = c => allog && allog.isPastPortalWindow
+      ? allog.isPastPortalWindow(c, now)
+      : !['filed', 'filing', 'correction'].includes(c.alloggiati_status) && !c.autofile_excluded &&
+        String(c.autofile_last_error || '').split(':')[0] === 'past_portal_window';
     const result = new Map();
     const get = pid => {
-      if (!result.has(pid)) result.set(pid, { completed: 0, sent: 0, failed: 0, used: 0, bookings: 0 });
+      if (!result.has(pid)) result.set(pid, { completed: 0, sent: 0, failed: 0, missed: 0, used: 0, bookings: 0 });
       return result.get(pid);
     };
     const visible = r => showHidden || (!r.deleted_at && (showTestData || !r.is_test));
@@ -65,7 +75,8 @@
       if (inPeriod(c.submitted_at)) m.completed++;
       if (c.alloggiati_status === 'filed' && inPeriod(c.filed_at)) m.sent++;
       const err = String(c.autofile_last_error || '').split(':')[0];
-      if (!['filed', 'filing'].includes(c.alloggiati_status) && inPeriod(c.autofile_last_attempt_at) &&
+      if (missedFiling(c)) { if (arrived(c.arrival_date)) { m.failed++; m.missed++; } }
+      else if (!['filed', 'filing'].includes(c.alloggiati_status) && inPeriod(c.autofile_last_attempt_at) &&
           ['generate_token_failed', 'test_failed', 'test_rejected', 'test_transport_error', 'send_failed', 'send_rejected', 'send_transport_error', 'send_result_uncertain', 'send_result_requires_review', 'prior_send_requires_review'].includes(err)) m.failed++;
       const k = key(c);
       if (c.booking_code && !seenReservations.has(k) && !excluded.has(k) && arrived(c.arrival_date)) cohort.set(k, c.property_id);

@@ -101,6 +101,8 @@ try {
  failRPC=true;response=await request();assert.equal(response.statusCode,503);assert.ok(!JSON.stringify(response).includes('PRIVATE-HOST-CODE'));failRPC=false;checks++;
  assert.equal((await request('history',{expired:true})).statusCode,401);checks++;
  await insert(off,'guest','SAFE QUESTION');await insert(off,'bot','SAFE ANSWER');
+ // Back-to-back inserts can share created_at on a fast runner; make the order explicit.
+ await db.query("update chat_messages set created_at=created_at-interval '1 second' where property_id=$1 and message='SAFE QUESTION'",[off]);
  response=await request('history',{property:off});assert.equal(response.body.messages.length,2);assert.equal(response.body.messages.at(-1).message,'SAFE ANSWER');checks++;
  await db.query('select public.capture_chat_qa_pairs()');
  assert.equal((await db.query('select count(*) n from chat_qa_pairs')).rows[0].n,1);checks++;

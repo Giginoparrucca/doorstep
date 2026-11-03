@@ -1006,6 +1006,18 @@ function adminRowClass(row) {
   return cls.join(' ');
 }
 
+// Reads every row of a query in pages (PostgREST caps each response at 1000
+// rows). Same {data, error} shape as a single Supabase call.
+async function readAllRows(makeQuery) {
+  try { return { data: await AdminOpsMetrics.readPages(makeQuery), error: null }; }
+  catch (error) { return { data: null, error }; }
+}
+
+// Owner id → email straight from the admin-gated list_hosts_for_admin RPC,
+// so hosts are attributed even when they had no console activity in the
+// selected period (event co-occurrence stays as a fallback).
+let hostEmailById = {};
+
 async function loadData() {
   const generation = ++dataLoadGeneration;
   const until = new Date().toISOString();
@@ -1025,10 +1037,15 @@ async function loadData() {
     return q.is('deleted_at', null);
   };
 
+  const hostsPromise = sb.rpc('list_hosts_for_admin').then(r => r, err => ({ data: null, error: err }));
   let eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes, invitesRes, opsRes, termsRes, legalRes;
   try {
     [eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes, invitesRes, opsRes, termsRes, legalRes] = await Promise.all([
-      applyHiddenFilter(sb.from('analytics_events').select('*').gte('created_at', since)).order('created_at', { ascending: false }).limit(10000),
+      // Paged: PostgREST returns at most 1000 rows per request, so a single
+      // .limit(10000) silently kept only the newest ~3 days of events (reco
+      // clicks and host attribution vanished from the admin views).
+      readAllRows(() => applyHiddenFilter(sb.from('analytics_events').select('*').gte('created_at', since)))
+        .then(r => (r.data && r.data.sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0)), r)),
       applyHiddenFilter(sb.from('properties').select('*')).order('name'),
       applyHiddenFilter(sb.from('checkins').select('id, property_id, booking_code, surname, name, guest_type, submitted_at, arrival_date, departure_date, nights, is_test, deleted_at')),
       applyHiddenFilter(sb.from('recommendations').select('*')).order('sort_order'),
@@ -1061,6 +1078,10 @@ async function loadData() {
   }
 
   allEvents = eventsRes.data || [];
+  const hostsRes = await hostsPromise;
+  if (hostsRes.error) console.warn('list_hosts_for_admin failed (host attribution falls back to events):', hostsRes.error.message || hostsRes.error);
+  hostEmailById = {};
+  (hostsRes.data || []).forEach(h => { if (h && h.user_id && h.email) hostEmailById[h.user_id] = h.email; });
   allProperties = propsRes.data || [];
   allRecommendations = recosRes.data || [];
   allCheckins = checkinsRes.data || [];
@@ -1212,7 +1233,7 @@ async function exportAllData() {
       sb.from('properties').select('*').limit(10000),
       sb.from('rules').select('*').limit(50000),
       sb.from('recommendations').select('*').limit(50000),
-      sb.from('analytics_events').select('*').limit(100000).order('created_at', { ascending: false }),
+      readAllRows(() => sb.from('analytics_events').select('*')),
       sb.from('analytics_monthly').select('*').limit(100000),
       sb.from('chat_qa_pairs').select('*').limit(100000).order('created_at', { ascending: false }),
       sb.from('data_purge_log').select('*').limit(10000).order('run_at', { ascending: false }),
@@ -2120,7 +2141,7 @@ function renderDeepDive() {
 
   // ── Hosts & Properties (merged table) ──
   if (!isUserView) {
-    const userIdToEmail = {};
+    const userIdToEmail = { ...hostEmailById };
     events.forEach(e => { if (e.user_id && e.user_email) userIdToEmail[e.user_id] = e.user_email; });
 
     // ══════════════════════════════════════════════════════════════════════
@@ -2791,7 +2812,7 @@ function renderDeepDive() {
 function renderPilotTab() {
   // ── Property → host-email map. Same shape as renderDeepDive uses so
   // hostShort labels stay consistent between tabs.
-  const userIdToEmail = {};
+  const userIdToEmail = { ...hostEmailById };
   allEvents.forEach(e => { if (e.user_id && e.user_email) userIdToEmail[e.user_id] = e.user_email; });
   const propToEmail = {};
   allProperties.forEach(p => {
@@ -3057,7 +3078,7 @@ function renderOpsTab() {
   // table wants. Same shape as renderDeepDive's version but sourced from
   // allEvents (unfiltered) so the Ops table reflects every host, not just
   // the current userFilter selection.
-  const userIdToEmail = {};
+  const userIdToEmail = { ...hostEmailById };
   allEvents.forEach(e => { if (e.user_id && e.user_email) userIdToEmail[e.user_id] = e.user_email; });
   const userStats = {};
   allEvents.forEach(e => {

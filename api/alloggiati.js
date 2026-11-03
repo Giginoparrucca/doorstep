@@ -109,6 +109,15 @@ async function sbGet(pathAndQuery) {
   if (!res.ok) throw new Error(`sbGet ${res.status}: ${await res.text().catch(() => '')}`);
   return res.json();
 }
+// Response-style read used by the alert helpers (maybeFireDailyAlerts,
+// _fireRowAlert). Round 70 found it was never defined in this file: every
+// daily and row alert threw a ReferenceError that the callers' try/catch
+// swallowed, so no Alloggiati alert was ever sent.
+async function pgrestGET(pathAndQuery) {
+  return fetch(`${SUPABASE_URL}/rest/v1/${pathAndQuery}`, {
+    headers: { ...supabaseAuthHeaders(SERVICE_KEY), Accept: 'application/json' },
+  });
+}
 async function sbUpsert(table, body, onConflict) {
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/${table}?on_conflict=${encodeURIComponent(onConflict)}`,
@@ -214,14 +223,13 @@ async function runAutofileTick(res, testCleanup) {
     console.error('[autofile_tick] property load failed:', e.message);
     return res.status(500).json({ error: 'property_load_failed', detail: e.message });
   }
-  if (!Array.isArray(props) || props.length === 0) {
-    return res.status(200).json({ ok: true, note: 'no autofile properties', ...summary, elapsed_ms: Date.now() - started });
-  }
+  if (!Array.isArray(props)) props = [];
+  // (Round 70: no early return — the alerts-only pass below still runs.)
 
   // Join: only properties with a verified credential row are eligible.
   const idsList = props.map(p => `"${p.id}"`).join(',');
   let verifiedIds = new Set();
-  try {
+  if (props.length > 0) try {
     const credRows = await sbGet(
       `host_alloggiati_credentials?property_id=in.(${encodeURIComponent(idsList)})` +
       '&verified_at=not.is.null&select=property_id'
@@ -258,6 +266,32 @@ async function runAutofileTick(res, testCleanup) {
     try { await maybeFireDailyAlerts(prop, null); }
     catch (e) { console.warn('[autofile_tick]', prop.id, 'alerts failed:', e.message); }
   }
+
+  // Round 70 — alerts-only pass for every other property with unfiled
+  // guests in the last 30 days (autofile off, dry-run/live without verified
+  // credentials): last-evening, window-closed and 09:00 alerts plus the
+  // past_portal_window stamp. Never Test/Send. Same tick, no new cron.
+  try {
+    const handled = new Set(eligible.map(p => p.id));
+    const since = _romeYmd(new Date(Date.now() - 30 * 86400000));
+    const pending = await sbGet(
+      'checkins?is_test=eq.false&deleted_at=is.null&autofile_excluded=eq.false' +
+      '&alloggiati_status=not.in.(filed,filing,correction)' +
+      `&arrival_date=gte.${since}&select=property_id&limit=2000`
+    );
+    const otherIds = [...new Set((pending || []).map(r => r.property_id))].filter(id => id && !handled.has(id));
+    if (otherIds.length > 0) {
+      const others = await sbGet(
+        `properties?id=in.(${encodeURIComponent(otherIds.map(id => `"${id}"`).join(','))})&deleted_at=is.null` +
+        '&select=id,name,owner_id,alloggiati_autofile_mode,checkin_time,timezone,host_language,alloggiati_autofile_alerts'
+      );
+      for (const prop of others || []) {
+        if (Date.now() - started > AUTOFILE_TICK_BUDGET_MS) break;
+        try { await maybeFireDailyAlerts(prop, null, { alertsOnly: true }); summary.properties_alerts_only = (summary.properties_alerts_only || 0) + 1; }
+        catch (e) { console.warn('[autofile_tick]', prop.id, 'alerts-only failed:', e.message); }
+      }
+    }
+  } catch (e) { console.warn('[autofile_tick] alerts-only pass failed:', e.message); }
 
   return res.status(200).json({ ok: true, ...summary, elapsed_ms: Date.now() - started });
 }
@@ -804,42 +838,117 @@ function _romeHour(d) {
   } catch (_e) { return d.getUTCHours(); }
 }
 
-async function maybeFireDailyAlerts(prop, perTickCounts) {
+// Round 70 — error codes that mean the portal (or the way to it) failed,
+// not the data. With one of these as a row's last error on the last
+// evening, the closing alert adds the PEC emergency route (D.M. 7/1/2013).
+const PORTAL_OUTAGE_ERRORS = new Set(['generate_token_failed', 'test_transport_error', 'send_transport_error',
+  'send_not_started', 'send_result_uncertain', 'test_error', 'send_error', 'timeout']);
+// Window-closed alerts only for groups that became late recently; older
+// late rows are marked silently so the first run after deploy (or a long
+// pause) does not send one message per historical booking.
+const LATE_ALERT_LOOKBACK_MS = 48 * 3600 * 1000;
+
+async function maybeFireDailyAlerts(prop, perTickCounts, opts = {}) {
   const now = new Date();
   const todayRome = _romeYmd(now);
+  const yesterdayRome = _romeYmd(new Date(now.getTime() - 86400000));
   const hourRome = _romeHour(now);
   const alertsState = (prop.alloggiati_autofile_alerts && typeof prop.alloggiati_autofile_alerts === 'object')
     ? prop.alloggiati_autofile_alerts : {};
   const toStamp = {}; // what we'll write back if we fire anything
+  const label = { en: prop.name || 'your property', it: prop.name || 'la tua struttura' };
 
-  // 09:00 overdue sweep — anything with arrival <= today Rome,
-  // status not filed, not excluded, not deleted. Count only; the
-  // host sees per-row chips in the console.
+  // Unfiled rows of the last 30 days up to today (not test, not deleted,
+  // not excluded; older rows are stale and would only repeat daily), read
+  // once and split with the shared date rule: still fileable vs late.
+  let unfiled = [];
+  try {
+    const r = await pgrestGET(
+      `checkins?property_id=eq.${encodeURIComponent(prop.id)}` +
+      '&is_test=eq.false&deleted_at=is.null&autofile_excluded=eq.false' +
+      '&alloggiati_status=not.in.(filed,filing,correction)' +
+      `&arrival_date=lte.${todayRome}&arrival_date=gte.${_romeYmd(new Date(now.getTime() - 30 * 86400000))}` +
+      '&select=id,booking_code,arrival_date,alloggiati_status,autofile_excluded,is_test,deleted_at,autofile_last_error,late_alert_at&limit=500'
+    );
+    unfiled = r.ok ? await r.json() : [];
+  } catch (e) { console.warn('[autofile_tick] unfiled load failed:', e.message); }
+  const late = unfiled.filter(row => AllogRecords.isPastPortalWindow(row, now));
+  const fileable = unfiled.filter(row => !AllogRecords.isPastPortalWindow(row, now));
+
+  // 09:00 overdue sweep — counts only, split into "still fileable today"
+  // and "late, needs the Questura". The host sees per-row chips in the console.
   if (hourRome >= 9 && alertsState.overdue !== todayRome) {
-    try {
-      const r = await pgrestGET(
-        `checkins?property_id=eq.${encodeURIComponent(prop.id)}` +
-        '&is_test=eq.false&deleted_at=is.null&autofile_excluded=eq.false' +
-        '&alloggiati_status=not.in.(filed,filing)' +
-        `&arrival_date=lte.${todayRome}` +
-        '&select=id&limit=200'
-      );
-      const rows = r.ok ? await r.json() : [];
-      if (rows.length > 0) {
-        await _sendAutofileAlert(prop, 'overdue', {
-          en: `⚠ ${rows.length} Alloggiati row${rows.length === 1 ? '' : 's'} overdue for ${prop.name || 'your property'}. Open the host console → Check-in Data → Alloggiati panel to review.`,
-          it: `⚠ ${rows.length} riga/e Alloggiati scaduta/e per ${prop.name || 'la tua struttura'}. Apri il pannello Alloggiati nella console host per rivedere.`,
+    if (unfiled.length > 0) {
+      const f = fileable.length, l = late.length;
+      await _sendAutofileAlert(prop, 'overdue', {
+        en: `⚠ Alloggiati for ${label.en}: ${f} guest${f === 1 ? '' : 's'} still to send today` +
+          (l ? `, ${l} late (the portal no longer accepts ${l === 1 ? 'it' : 'them'}: contact your Questura — console → Check-in → «Invio tardivo»)` : '') + '.',
+        it: `⚠ Alloggiati per ${label.it}: ${f} ospit${f === 1 ? 'e' : 'i'} da inviare oggi` +
+          (l ? `, ${l} in ritardo (il portale non ${l === 1 ? 'lo' : 'li'} accetta più: contatta la Questura — console → Check-in → «Invio tardivo»)` : '') + '.',
+      });
+    }
+    toStamp.overdue = todayRome;
+  }
+
+  // Closing — first tick at/after 18:00 Rome: rows whose window closes
+  // tonight (arrival = yesterday Rome), still unfiled. One per property per day.
+  if (hourRome >= 18 && alertsState.closing !== todayRome) {
+    const closing = fileable.filter(row => String(row.arrival_date).slice(0, 10) === yesterdayRome);
+    if (closing.length > 0) {
+      const n = closing.length;
+      const outage = closing.some(row => PORTAL_OUTAGE_ERRORS.has(row.autofile_last_error));
+      await _sendAutofileAlert(prop, 'closing', {
+        en: `⏰ ${n} guest${n === 1 ? '' : 's'} at ${label.en} must be sent to Alloggiati by 23:59 tonight. After that the portal no longer accepts ${n === 1 ? 'it' : 'them'} and you will have to contact the Questura.` +
+          (outage ? ' If the portal is not working, send the data by PEC to the Questura by tonight and keep the delivery receipt.' : ''),
+        it: `⏰ ${n} ospit${n === 1 ? 'e' : 'i'} di ${label.it} vanno inviati ad Alloggiati entro le 23:59 di stasera. Dopo, il portale non ${n === 1 ? 'lo' : 'li'} accetta più e dovrai contattare la Questura.` +
+          (outage ? ' Se il portale non funziona, invia i dati via PEC alla Questura entro stasera e conserva la ricevuta di consegna.' : ''),
+      });
+    }
+    toStamp.closing = todayRome;
+  }
+
+  // Late rows: stamp past_portal_window from the shared rule (also for
+  // autofile-off properties and arrivals older than yesterday), and send
+  // one window-closed alert per booking group as it becomes late.
+  if (late.length > 0) {
+    const restamp = late.filter(row => row.autofile_last_error !== 'past_portal_window').map(row => `"${row.id}"`);
+    if (restamp.length > 0) {
+      try {
+        await sbPatch(`checkins?id=in.(${encodeURIComponent(restamp.join(','))})`, {
+          autofile_last_error: 'past_portal_window', autofile_last_attempt_at: now.toISOString(),
         });
+      } catch (e) { console.warn('[autofile_tick] late stamp failed:', e.message); }
+    }
+    const pending = late.filter(row => !row.late_alert_at);
+    if (pending.length > 0) {
+      const groups = new Map();
+      for (const row of pending) {
+        const key = row.booking_code || ('row:' + row.id);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(row);
       }
-      toStamp.overdue = todayRome;
-    } catch (e) { console.warn('[autofile_tick] overdue sweep failed:', e.message); }
+      for (const [key, rows] of groups) {
+        const closedAt = AllogRecords.portalWindowCloseAt(rows[0].arrival_date);
+        const recent = closedAt && (now.getTime() - closedAt.getTime()) <= LATE_ALERT_LOOKBACK_MS;
+        if (recent) {
+          const n = rows.length, codeEn = rows[0].booking_code || 'no code', codeIt = rows[0].booking_code || 'senza codice';
+          await _sendAutofileAlert(prop, 'window_closed', {
+            en: `The deadline to send ${n} guest${n === 1 ? '' : 's'} (booking ${codeEn}) has passed. The portal no longer accepts ${n === 1 ? 'it' : 'them'}: open the console → Check-in → «Invio tardivo» for the steps.`,
+            it: `Il termine per inviare ${n} ospit${n === 1 ? 'e' : 'i'} (prenotazione ${codeIt}) è scaduto. Il portale non ${n === 1 ? 'lo' : 'li'} accetta più: apri la console → Check-in → «Invio tardivo» per i passaggi.`,
+          });
+        }
+        try {
+          await sbPatch(`checkins?id=in.(${encodeURIComponent(rows.map(row => `"${row.id}"`).join(','))})`, { late_alert_at: now.toISOString() });
+        } catch (e) { console.warn('[autofile_tick] late alert stamp failed:', e.message); }
+      }
+    }
   }
 
   // 18:00 heads-up — today's arrivals in ota_reservations without a
   // matching check-in row. Count only (no booking codes, Round 36
   // PASS B rule — the email body is "N bookings arriving today
   // haven't checked in", nothing identifying).
-  if (hourRome >= 18 && alertsState.heads_up !== todayRome) {
+  if (!opts.alertsOnly && hourRome >= 18 && alertsState.heads_up !== todayRome) {
     try {
       const resv = await pgrestGET(
         `ota_reservations?property_id=eq.${encodeURIComponent(prop.id)}` +
@@ -874,7 +983,7 @@ async function maybeFireDailyAlerts(prop, perTickCounts) {
   // Dry-run digest — once per day for properties in dry_run mode.
   // Pulls today's alloggiati_filing_log entries for this property to
   // summarise. Fires on the first tick after 09:00 Rome.
-  if (prop.alloggiati_autofile_mode === 'dry_run' && hourRome >= 9 && alertsState.digest !== todayRome) {
+  if (!opts.alertsOnly && prop.alloggiati_autofile_mode === 'dry_run' && hourRome >= 9 && alertsState.digest !== todayRome) {
     try {
       const todayStart = `${todayRome}T00:00:00Z`;
       const r = await pgrestGET(

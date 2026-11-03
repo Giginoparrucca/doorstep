@@ -31,4 +31,5 @@ assert.ok(!/secrets\.SUPABASE|SUPABASE_SERVICE_ROLE_KEY|SUPABASE_PRODUCTION_SERV
 assert.match(regression,/npm run test:all/,'keep whole offline and browser suite on PRs');
 assert.match(regression,/npm run test:live/,'keep public hosted and anonymous-denial probes');
 for(const origin of ['SPOT_SMOKE_ORIGIN','TAX_SMOKE_ORIGIN','SECURITY_SMOKE_ORIGIN'])assert.ok(regression.includes(origin));
+assert.match(text,/SPOT_SMOKE_REQUIRE_MATCH: '1'/,'post-deploy byte match of served libs');assert.ok(!regression.includes('SPOT_SMOKE_REQUIRE_MATCH'),'no byte match against old production before a merge');
 console.log('PASS PR regression has no production credential; full regression and public smoke retained, privileged gates remain owner-reviewed on main');

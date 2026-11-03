@@ -9,7 +9,7 @@ export function redactSupport(value, secrets = []) {
     .replace(/\b(password|wskey|token|authorization|credentials_enc|credentials_nonce)\s*[:=]\s*[^\s,;|]+/gi, '$1=[redacted]')
     .slice(0, 1600);
 }
-const RECORD_FIELDS = 'id,property_id,booking_code,guest_type,arrival_date,departure_date,submitted_at,alloggiati_status,filed_at,autofile_last_error,autofile_last_attempt_at,autofile_attempts,autofile_excluded,docs_status';
+const RECORD_FIELDS = 'id,property_id,booking_code,guest_type,arrival_date,departure_date,submitted_at,alloggiati_status,filed_at,autofile_last_error,autofile_last_attempt_at,autofile_attempts,autofile_excluded,docs_status,filing_method,late_pec_sent_on';
 const BUILD_FIELDS = RECORD_FIELDS + ',surname,name,sex,date_of_birth,citizenship,birth_country,birth_province,place_of_birth,document_type,document_number,doc_issue_place,nights';
 // Current-state leads only: never label them as the cause of an old portal rejection.
 export function currentBookingFindings(records) {

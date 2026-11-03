@@ -27,6 +27,7 @@ const ctx = vm.createContext({
   CHECKIN_WRITE_FIELDS: list('CHECKIN_WRITE_FIELDS'),
   CHECKIN_READ_FIELDS: list('CHECKIN_READ_FIELDS'),
   CodiceFiscale: createRequire(import.meta.url)('../lib/codice-fiscale.js'),
+  AllogRecords: createRequire(import.meta.url)('../lib/alloggiati-records.js'),
   mintWalkinCode: () => 'WB-TEST',
   recordUsage: async () => {},
   submitEntryCheckin: async () => ({ enabled: false }),
@@ -109,6 +110,15 @@ const before = inserted.length;
 out = await insert({ ...base, residence_country: 'Germany' });
 assert.equal(out.status, 503); assert.equal(inserted.length, before);
 regionReadOk = true;
+
+// ── Countries must translate to an Alloggiati code ─────────────────────
+region = 'Puglia';
+out = await insert({ ...base, residence_country: 'Germany', citizenship: 'ITA', birth_country: 'D' });
+assert.equal(out.status, 200, 'document codes (ITA, D) are accepted: they translate');
+out = await insert({ ...base, residence_country: 'Germany', citizenship: 'Wakanda' });
+assert.deepEqual([...out.body.fields], ['citizenship'], 'unrecognised citizenship refused');
+out = await insert({ ...base, residence_country: 'Germany', birth_country: 'XYZ' });
+assert.deepEqual([...out.body.fields], ['birth_country'], 'unrecognised birth country refused');
 
 // ── Invoice details ───────────────────────────────────────────────────
 const it = { ...base, residence_country: 'Italia', residence_place: 'Bari' };

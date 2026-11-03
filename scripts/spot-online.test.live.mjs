@@ -16,12 +16,17 @@ const files=['host-console.html','host-regional-exports.js','lib/regional-export
 // so the byte-match is narrowed to the files that are supposed to be
 // stable (JS libs + guides).
 const byteMatch=new Set(['host-regional-exports.js','lib/regional-exports.js','lib/alloggiati-records.js','host-guides.js']);
+const strict=process.env.SPOT_SMOKE_REQUIRE_MATCH==='1';
 const remote={};
 for(const file of files){
  const url=new URL('/'+file,base);url.searchParams.set('release','round61');
  const response=await fetch(url,{signal:AbortSignal.timeout(20000)});assert.equal(response.status,200,file);
  remote[file]=await response.text();
- if(byteMatch.has(file))assert.equal(remote[file],fs.readFileSync(new URL('../'+file,import.meta.url),'utf8'),file+' must match tested source');
+ // Byte-matching is a post-deploy check (production-security.yml sets
+ // SPOT_SMOKE_REQUIRE_MATCH=1 after main's regression). Before a merge,
+ // production still serves the previous release, so a PR that changes one of
+ // these files would always fail here; the engine/golden check below still runs.
+ if(strict&&byteMatch.has(file))assert.equal(remote[file],fs.readFileSync(new URL('../'+file,import.meta.url),'utf8'),file+' must match tested source');
 }
 const sandbox=vm.createContext({TextEncoder,Intl,Date});
 for(const file of ['lib/alloggiati-records.js','lib/regional-exports.js'])vm.runInContext(remote[file],sandbox,{filename:file});
@@ -31,4 +36,4 @@ for(const startup of [false,true]){
  assert.equal(result.errors.length,0,JSON.stringify(result.errors));
  assert.equal(result.files[0].content,fs.readFileSync(new URL('./golden/synthetic/spot-online'+(startup?'-startup':'')+'-expected.xml',import.meta.url),'utf8'));
 }
-console.log('PASS SPOT production smoke: five public assets match tested source; hosted serializer produces normal/startup goldens. No real guest data read or writes.');
+console.log('PASS SPOT production smoke: '+(strict?'five public assets match tested source; ':'public assets fetched (byte match runs post-deploy); ')+'hosted serializer produces normal/startup goldens. No real guest data read or writes.');

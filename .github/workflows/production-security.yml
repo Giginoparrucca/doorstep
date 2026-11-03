@@ -42,6 +42,8 @@ jobs:
           # This adds a required name; main-only checkout/review/credentials stay intact.
           SCHEMA_DRIFT_REQUIRED_MIGRATIONS: '["round66_atomic_submissions","round66_chat_history_guard","round66_host_entry_audit"]'
           SPOT_SMOKE_ORIGIN: https://app.welcomebnb.it
+          # Post-deploy: the served JS libs must equal the tested commit.
+          SPOT_SMOKE_REQUIRE_MATCH: '1'
           TAX_SMOKE_ORIGIN: https://app.welcomebnb.it
           SECURITY_SMOKE_ORIGIN: https://app.welcomebnb.it
           CHAT_SMOKE_ORIGIN: https://app.welcomebnb.it

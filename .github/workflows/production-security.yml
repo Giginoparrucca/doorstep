@@ -45,6 +45,7 @@ jobs:
           # Post-deploy: the served JS libs must equal the tested commit.
           SPOT_SMOKE_REQUIRE_MATCH: '1'
           TAX_SMOKE_ORIGIN: https://app.welcomebnb.it
+          TAX_SMOKE_REQUIRE_MATCH: '1'
           SECURITY_SMOKE_ORIGIN: https://app.welcomebnb.it
           CHAT_SMOKE_ORIGIN: https://app.welcomebnb.it
         run: |

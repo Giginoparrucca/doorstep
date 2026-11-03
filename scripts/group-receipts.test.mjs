@@ -12,7 +12,7 @@ const fn = name => {
 const { document, window } = parseHTML('<html><body><table><tbody id="checkinTable"></tbody></table><span id="checkinCount"></span></body></html>');
 const signed = [], opened = [], alerts = [];
 const ctx = vm.createContext({ document, window, console, hostLang:'en', propertyData:{}, allCheckins:[],
-  h:k=>k, isCheckinGroupCollapsed:()=>false, _renderAutofileRowChip:()=>'',
+  h:k=>k, isCheckinGroupCollapsed:()=>false, _renderAutofileRowChip:()=>'', _isLateRow:()=>false, _lateFilingButton:()=>'',
   sb:{storage:{from:bucket=>({createSignedUrl:async(path,ttl)=>{signed.push({bucket,path,ttl});return {data:{signedUrl:'https://fixture.invalid/'+encodeURIComponent(path)}};}})}},
   alert:message=>alerts.push(message), toast:()=>{} });
 window.open = (url,target,features) => opened.push({url,target,features});

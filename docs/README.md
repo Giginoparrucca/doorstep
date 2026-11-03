@@ -26,6 +26,7 @@ raw credential-bearing source examples must never enter this public repository.
 - [Demo environment](ROUND50_ENVIRONMENT.md), [provisioning](ROUND50_PROVISIONING.md),
   [hosted gate](ROUND50_HOSTED_GATE.md)
 - [Regional export formats](REGIONAL_EXPORT_FORMATS.md), [SPOT reference](spot/README.md)
+- [Alloggiati deadlines, alerts and late filing (Round 70)](ALLOGGIATI_LATE_FILING.md)
 
 The actual in-app IT/EN host guides live in `host-guides.js`; update them when
 shipped host behavior changes, following RELEASE's guide-version/target checks.

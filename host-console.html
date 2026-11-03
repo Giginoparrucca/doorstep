@@ -2002,6 +2002,19 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
       </div>
 
+      <!-- Round 70 — optional PEC of the competent Questura, shown in the
+           «Invio tardivo» panel. Format check only; no shipped list. -->
+      <fieldset class="settings-edit-fieldset" disabled style="border:0;padding:0;margin:0;min-width:0;">
+      <div class="form-card" id="questuraPecCard">
+        <div class="form-card-title" data-h="questura_pec_title">Questura PEC (optional)</div>
+        <div class="form-card-desc"><span data-h="questura_pec_desc">Used only for late Alloggiati filings: the address appears in the «Late filing» panel so you can send the data to your Questura.</span> <a href="https://questure.poliziadistato.it/" target="_blank" rel="noopener noreferrer" style="color:var(--warm);" data-h="questura_pec_find">Find your Questura</a></div>
+        <div class="form-group" style="max-width:420px;">
+          <label class="form-label" for="propQuesturaPec" data-h="questura_pec_label">Questura PEC address</label>
+          <input class="form-input" type="email" id="propQuesturaPec" maxlength="254" autocomplete="off" placeholder="nome@pec.poliziadistato.it">
+        </div>
+      </div>
+      </fieldset>
+
       <!-- Round 40 Task 6 · Removed 2026-09-30 — the "Privacy & data /
            Delete all check-in records" card was pulled out of the host
            console. Retention purges are automatic (Round 36 auto-purges
@@ -7798,12 +7811,175 @@ function _closeRowMenus() {
     }
   });
 }
+// ── Round 70 — «Invio tardivo»: late Alloggiati filing ────────────────────
+// Late = the shared rule in lib/alloggiati-records.js (arrival + 1, 23:59
+// Rome has passed and the row is still unfiled). The portal no longer
+// accepts these guests: the host contacts the Questura and asks how to
+// send the data. Nothing here calls Test/Send. Not legal advice.
+Object.assign(HT.en, {
+  late_btn: '⚠ Late filing',
+  late_title: 'Late filing to the Questura',
+  late_why: 'The Alloggiati portal only accepts guests whose arrival date is today or yesterday. These guests can no longer be sent through the portal.',
+  late_what: 'Contact the competent Questura (or your local Commissariato) and ask how they want to receive the data. Usually it is by PEC; some offices first ask you to request authorisation.',
+  late_pec_saved: 'Your Questura PEC',
+  late_pec_missing: 'No Questura PEC saved. You can add it in Settings → Questura PEC.',
+  late_find_questura: 'Find your Questura',
+  late_download: 'Download the file for the Questura',
+  late_pec_text: 'PEC text',
+  late_copy: 'Copy',
+  late_copied: 'Copied',
+  late_note: 'The data then reaches the police through the Questura. Keep the PEC delivery receipt.',
+  late_guests: '{n} guest(s) · booking {code} · arrival {date}',
+  late_export_excluded: '{n} guest(s) excluded: the portal no longer accepts their arrival date → use «Late filing».',
+  late_export_none: 'Every selected guest is late: the portal no longer accepts their arrival date. Use «Late filing» on each booking.',
+  late_close: 'Close',
+  questura_pec_title: 'Questura PEC (optional)',
+  questura_pec_desc: 'Used only for late Alloggiati filings: the address appears in the «Late filing» panel so you can send the data to your Questura.',
+  questura_pec_find: 'Find your Questura',
+  questura_pec_label: 'Questura PEC address',
+  questura_pec_invalid: 'The Questura PEC address does not look right: check it or leave it empty.',
+});
+Object.assign(HT.it, {
+  late_btn: '⚠ Invio tardivo',
+  late_title: 'Invio tardivo alla Questura',
+  late_why: 'Il portale Alloggiati accetta solo ospiti con data di arrivo di oggi o di ieri. Questi ospiti non possono più essere inviati dal portale.',
+  late_what: 'Contatta la Questura competente (o il Commissariato di zona) e chiedi come vogliono ricevere i dati. Di solito via PEC; alcuni uffici chiedono prima un\'autorizzazione.',
+  late_pec_saved: 'PEC della tua Questura',
+  late_pec_missing: 'Nessuna PEC della Questura salvata. Puoi aggiungerla in Impostazioni → PEC Questura.',
+  late_find_questura: 'Trova la tua Questura',
+  late_download: 'Scarica il file per la Questura',
+  late_pec_text: 'Testo PEC',
+  late_copy: 'Copia',
+  late_copied: 'Copiato',
+  late_note: 'I dati arrivano così alla Polizia tramite la Questura. Conserva la ricevuta di consegna della PEC.',
+  late_guests: '{n} ospite/i · prenotazione {code} · arrivo {date}',
+  late_export_excluded: '{n} ospite/i esclusi: il portale non accetta più la loro data di arrivo → usa «Invio tardivo».',
+  late_export_none: 'Tutti gli ospiti selezionati sono in ritardo: il portale non accetta più la loro data di arrivo. Usa «Invio tardivo» su ogni prenotazione.',
+  late_close: 'Chiudi',
+  questura_pec_title: 'PEC Questura (facoltativa)',
+  questura_pec_desc: 'Serve solo per gli invii Alloggiati in ritardo: l\'indirizzo compare nel pannello «Invio tardivo» per inviare i dati alla tua Questura.',
+  questura_pec_find: 'Trova la tua Questura',
+  questura_pec_label: 'Indirizzo PEC della Questura',
+  questura_pec_invalid: 'L\'indirizzo PEC della Questura non sembra corretto: controllalo o lascialo vuoto.',
+});
+const QUESTURE_URL = 'https://questure.poliziadistato.it/';
+function _isLateRow(c, now) { return !!(window.AllogRecords && window.AllogRecords.isPastPortalWindow(c, now || new Date())); }
+function _lateGroupKey(c) { return c.booking_code ? 'b:' + c.booking_code : 'r:' + c.id; }
+// Every still-unfiled guest of the booking (a group is always filed together).
+function _lateGroupRows(key) {
+  const live = allCheckins.filter(c => c.is_test === false && !c.deleted_at && !['filed', 'filing'].includes(c.alloggiati_status));
+  return key.startsWith('b:') ? live.filter(c => c.booking_code === key.slice(2)) : live.filter(c => c.id === key.slice(2));
+}
+const _fmtDateItShort = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || '')); return m ? `${m[3]}/${m[2]}/${m[1]}` : ''; };
+function lateFilingFile(rows) {
+  const { lines } = window.AllogRecords.buildBatch(rows);
+  return lines.join('\r\n');
+}
+function lateFilingFilename(rows) {
+  const code = (rows[0] && rows[0].booking_code) || 'senza-codice';
+  const arr = (rows[0] && rows[0].arrival_date || '').slice(0, 10);
+  return `alloggiati_INVIO-TARDIVO_${code.replace(/[^A-Za-z0-9_-]/g, '')}_arrivo-${arr}.txt`;
+}
+// Italian PEC text. Guest names go only in the attached file, never here.
+function latePecText(rows, prop) {
+  const p = prop || {};
+  const struttura = (p.name || '').trim() || 'struttura';
+  const arrival = _fmtDateItShort(rows[0] && rows[0].arrival_date);
+  const code = (rows[0] && rows[0].booking_code) || 'senza codice';
+  const n = rows.length;
+  const subject = `Comunicazione tardiva alloggiati – ${struttura} – arrivo ${arrival}`;
+  const address = [p.address, p.zip, p.city].map(x => (x || '').toString().trim()).filter(Boolean).join(', ');
+  const contacts = [(p.host_names || '').trim(), (p.host_phone || '').trim(), (p.host_email || '').trim()].filter(Boolean).join(' · ');
+  const body = [
+    'Spett.le Questura,',
+    '',
+    `con la presente si trasmette in ritardo la comunicazione delle persone alloggiate presso la struttura "${struttura}"` +
+      (address ? ` (${address})` : '') + ((p.cir_code || '').trim() ? `, CIN ${p.cir_code.trim()}` : '') + '.',
+    '',
+    `Data di arrivo: ${arrival}`,
+    `Numero di ospiti: ${n}`,
+    `Riferimento prenotazione: ${code}`,
+    '',
+    'I dati degli ospiti sono contenuti nel file allegato, nel formato previsto da Alloggiati Web.',
+    'Ci scusiamo per il ritardo e restiamo a disposizione per qualsiasi indicazione su come completare la comunicazione.',
+    '',
+    'Distinti saluti,',
+    contacts || struttura,
+  ].join('\n');
+  return { subject, body };
+}
+function openLateFilingPanel(key) {
+  const rows = _lateGroupRows(key);
+  if (!rows.length) return;
+  const it = hostLang === 'it';
+  document.getElementById('lateFilingModal')?.remove();
+  const el = (tag, css, text) => { const e = document.createElement(tag); if (css) e.style.cssText = css; if (text != null) e.textContent = text; return e; };
+  const overlay = el('div', 'position:fixed;inset:0;background:rgba(6,26,61,0.45);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:24px 12px;overflow-y:auto;');
+  overlay.id = 'lateFilingModal';
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  const box = el('div', 'background:#fff;border-radius:12px;max-width:640px;width:100%;padding:20px 18px;box-sizing:border-box;font-size:0.86rem;color:var(--ink);line-height:1.5;');
+  box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-labelledby', 'lateFilingTitle');
+  const title = el('h3', "font-family:'Playfair Display',serif;font-size:1.15rem;margin:0 0 4px;", h('late_title')); title.id = 'lateFilingTitle';
+  const meta = el('div', 'font-size:0.78rem;color:#b03939;font-weight:600;margin-bottom:10px;',
+    h('late_guests').replace('{n}', rows.length).replace('{code}', rows[0].booking_code || '—').replace('{date}', _fmtDateItShort(rows[0].arrival_date)));
+  meta.id = 'lateFilingMeta';
+  box.append(title, meta, el('p', 'margin:0 0 8px;', h('late_why')), el('p', 'margin:0 0 12px;', h('late_what')));
+  const copyBtn = (getText) => {
+    const b = el('button', 'padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-family:inherit;font-size:0.75rem;', h('late_copy'));
+    b.type = 'button';
+    b.onclick = async () => { try { await navigator.clipboard.writeText(getText()); b.textContent = h('late_copied'); } catch (_) {} };
+    return b;
+  };
+  // Questura PEC (saved in Settings) + link to find the Questura.
+  const pecRow = el('div', 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;padding:8px 10px;background:rgba(107,122,144,0.06);border-radius:8px;');
+  const pec = (propertyData?.questura_pec || '').trim();
+  if (pec) {
+    pecRow.append(el('span', 'font-weight:600;', h('late_pec_saved') + ':'));
+    const v = el('span', 'font-family:monospace;', pec); v.id = 'lateFilingPec';
+    pecRow.append(v, copyBtn(() => pec));
+  } else {
+    pecRow.append(el('span', '', h('late_pec_missing')));
+  }
+  const find = el('a', 'color:var(--warm);', h('late_find_questura')); find.href = QUESTURE_URL; find.target = '_blank'; find.rel = 'noopener noreferrer';
+  pecRow.append(find);
+  box.append(pecRow);
+  // File for the Questura: same builder, this group only.
+  const dl = el('button', 'padding:8px 14px;border:none;border-radius:8px;background:var(--warm,#005BFF);color:#fff;cursor:pointer;font-family:inherit;font-weight:600;margin-bottom:14px;', '⬇ ' + h('late_download'));
+  dl.type = 'button'; dl.id = 'lateFilingDownload';
+  dl.onclick = () => { downloadFile(lateFilingFilename(rows), lateFilingFile(rows)); try { track('alloggiati_late_file_download', { guests: rows.length }); } catch (_) {} };
+  box.append(dl);
+  // PEC text (Italian), built in JS; names only in the attachment.
+  const pecText = latePecText(rows, propertyData);
+  box.append(el('div', 'font-weight:600;margin-bottom:4px;', h('late_pec_text')));
+  const subj = el('div', 'font-family:monospace;font-size:0.76rem;padding:6px 8px;background:#f6f8fb;border-radius:6px;margin-bottom:6px;', pecText.subject); subj.id = 'lateFilingSubject';
+  const body = el('pre', 'white-space:pre-wrap;font-family:inherit;font-size:0.78rem;padding:8px 10px;background:#f6f8fb;border-radius:6px;margin:0 0 6px;max-height:260px;overflow:auto;', pecText.body); body.id = 'lateFilingBody';
+  const copies = el('div', 'display:flex;gap:8px;margin-bottom:12px;');
+  copies.append(copyBtn(() => pecText.subject), copyBtn(() => pecText.subject + '\n\n' + pecText.body));
+  copies.firstChild.textContent = h('late_copy') + (it ? ' oggetto' : ' subject');
+  copies.lastChild.textContent = h('late_copy') + (it ? ' testo' : ' text');
+  box.append(subj, body, copies);
+  box.append(el('p', 'font-size:0.78rem;color:var(--ink-soft);margin:0 0 14px;', h('late_note')));
+  const extra = el('div', ''); extra.id = 'lateFilingRecord'; box.append(extra);
+  const close = el('button', 'padding:6px 14px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-family:inherit;', h('late_close'));
+  close.type = 'button'; close.onclick = () => overlay.remove();
+  box.append(close);
+  overlay.append(box);
+  document.body.append(overlay);
+  if (typeof renderLateFilingRecord === 'function') renderLateFilingRecord(extra, key, rows);
+}
+function _lateFilingButton(c, it, style) {
+  return `<button type="button" class="late-filing-btn" data-late-key="${(_lateGroupKey(c)).replace(/"/g, '&quot;')}" onclick="event.stopPropagation();openLateFilingPanel(this.dataset.lateKey)" style="${style || 'display:inline-block;font-size:0.6rem;padding:2px 8px;background:rgba(176,57,57,0.12);color:#b03939;border:1px solid rgba(176,57,57,0.35);border-radius:8px;font-weight:600;margin-left:6px;vertical-align:middle;cursor:pointer;font-family:inherit;'}">${h('late_btn')}</button>`;
+}
+
 // Round 49 Phase 4 — the per-row autofile chip. Returns HTML.
 // • filed/correction: hidden (the main rowPill already covers it).
 // • autofile_excluded: amber "⏸ Escluso" pill.
 // • past_portal_window / group_already_filed / builder_warning / group_member_invalid: red "⚠ Non inviabile".
 // • dry_run / live with a computable due time: muted "⏱ <ora>".
 function _renderAutofileRowChip(c, it) {
+  // Round 70 — late rows (from the dates, any autofile mode) get the
+  // «Invio tardivo» button instead of a dead-end chip.
+  if (_isLateRow(c)) return ' ' + _lateFilingButton(c, it);
   const mode = propertyData?.alloggiati_autofile_mode;
   if (!mode || mode === 'off') return '';
   if (['filed','correction'].includes(c.alloggiati_status)) return '';
@@ -8130,7 +8306,7 @@ function renderCheckins() {
                     aria-label="${it ? 'Espandi/collassa gruppo' : 'Toggle group'}"
                     style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;font-size:0.85rem;color:var(--ink-soft);user-select:none;">${chevron}</span>
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                ${groupPill}${uploadBtn}${markBtn}${reopenBtn}${groupStatusMsg}
+                ${groupPill}${rows.some(r => _isLateRow(r)) ? _lateFilingButton(rows.find(r => _isLateRow(r)), it, 'padding:6px 12px;background:rgba(176,57,57,0.1);color:#b03939;border:1px solid rgba(176,57,57,0.4);border-radius:6px;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:inherit;') : ''}${uploadBtn}${markBtn}${reopenBtn}${groupStatusMsg}
                 ${propertyData?.entry_checkin_required===true&&!isSolo?entryReleaseControls(bookingCode,rows[0].is_test===true,arrival,rows[0].departure_date):''}
               </div>
               <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
@@ -8594,12 +8770,16 @@ async function saveProperty(scope = 'property') {
     host_email: (document.getElementById('propHostEmail')?.value || '').trim() || null,
     ical_feeds: collectIcalFeeds(),
     reminder_email: (document.getElementById('propReminderEmail')?.value || '').trim() || null,
+    questura_pec: (document.getElementById('propQuesturaPec')?.value || '').trim().toLowerCase() || null,
     timezone: document.getElementById('propTimezone')?.value || 'Europe/Rome',
   };
   if (typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled) return false;
-  const settingsKeys = new Set(['tax_rate_eur','tax_max_nights','tax_max_nights_basis','tax_max_total_eur','tax_exempt_under_age','tax_rules','tax_declared_exemptions','tax_source_note','tax_verified_at','ical_feeds','reminder_email','timezone']);
+  const settingsKeys = new Set(['tax_rate_eur','tax_max_nights','tax_max_nights_basis','tax_max_total_eur','tax_exempt_under_age','tax_rules','tax_declared_exemptions','tax_source_note','tax_verified_at','ical_feeds','reminder_email','timezone','questura_pec']);
   for (const key of Object.keys(update)) if (settingsKeys.has(key) !== (scope === 'settings')) delete update[key];
   if (scope === 'settings' && !_taxCfgValidatePeriods()) return false;
+  if (scope === 'settings' && update.questura_pec && (update.questura_pec.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(update.questura_pec))) {
+    toast(h('questura_pec_invalid')); document.getElementById('propQuesturaPec')?.focus(); return false;
+  }
   if (scope === 'property' && !validateEntrySetup(update)) return false;
   if (scope === 'property') Object.assign(update, await propertyEditor.prepareCover(sb, propertyId));
   const { data: saved, error } = await sb.from('properties').update(update).eq('id', propertyId).select('id').maybeSingle();
@@ -10886,6 +11066,21 @@ function _prepareAlloggiatiExport(opts = {}) {
     toExport = arrivedAll;
   }
 
+  // Round 70 — the portal refuses guests whose window has closed (arrival
+  // older than yesterday): leave them out of every portal export, say so,
+  // and point to «Invio tardivo». No file when every selected row is late.
+  const lateNow = new Date();
+  const Allog = typeof AllogRecords !== 'undefined' ? AllogRecords : null; // global from lib/alloggiati-records.js
+  const isLate = c => !!(Allog && Allog.isPastPortalWindow && Allog.isPastPortalWindow(c, lateNow));
+  // Count every arrived, unfiled late guest (the 48 h default window may
+  // already have dropped some silently), and remove them from this file.
+  const lateExcluded = baseSet.filter(c => hasArrived(c) && isLate(c));
+  if (lateExcluded.length > 0) {
+    toExport = toExport.filter(c => !isLate(c));
+    if (toExport.length === 0) { alert(h('late_export_none')); return null; }
+    toast(h('late_export_excluded').replace('{n}', lateExcluded.length));
+  }
+
   // Round 40 T2 — block generation if any guest in the selected set has
   // an invalid / missing DOB. Alloggiati would reject the whole batch
   // with an opaque error and the host wouldn't know which row to fix.
@@ -10908,7 +11103,7 @@ function _prepareAlloggiatiExport(opts = {}) {
   // lib/alloggiati-records.js. Byte-identity enforced by
   // scripts/golden-cross-check.mjs.
   const { lines, warnings, rowMeta, groupCount } = buildBatch(toExport);
-  return { lines, warnings, groupCount, rowMeta, skippedFiledCount };
+  return { lines, warnings, groupCount, rowMeta, skippedFiledCount, lateExcludedCount: lateExcluded.length };
 }
 
 function exportAlloggiati() {
@@ -16678,6 +16873,7 @@ function fillPropertyForm(data) {
   if (typeof renderIcalExportCard === 'function') renderIcalExportCard();
   if (typeof loadAlloggiatiCard === 'function') loadAlloggiatiCard();
   if (el('propReminderEmail')) el('propReminderEmail').value = data.reminder_email || '';
+  if (el('propQuesturaPec')) el('propQuesturaPec').value = data.questura_pec || '';
   if (el('propTimezone')) el('propTimezone').value = data.timezone || 'Europe/Rome';
   propertyEditor.reset(data);
   if (data.host_names) {

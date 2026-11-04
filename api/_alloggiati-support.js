@@ -33,8 +33,8 @@ export async function handleAlloggiatiSupport(req, res, deps) {
   const fetcher = deps.fetch || globalThis.fetch;
   const respond = (code, body) => { res.setHeader?.('Cache-Control', 'no-store'); return res.status(code).json(body); };
   const action = req.query?.action;
-  if (!['support_status', 'support_verify', 'support_validate', 'support_investigate', 'support_overview'].includes(action)) return respond(400, { error: 'Unknown support action' });
-  const overview = action === 'support_overview';
+  if (!['support_status', 'support_verify', 'support_validate', 'support_investigate', 'support_overview', 'support_readiness'].includes(action)) return respond(400, { error: 'Unknown support action' });
+  const overview = action === 'support_overview' || action === 'support_readiness';
   const propertyId = req.body?.property_id;
   if (!overview && (typeof propertyId !== 'string' || !/^[0-9a-f-]{36}$/i.test(propertyId))) return respond(400, { error: 'Valid property_id required' });
   const jwt = /^Bearer (.+)$/.exec(req.headers.authorization || req.headers.Authorization || '')?.[1];
@@ -49,6 +49,12 @@ export async function handleAlloggiatiSupport(req, res, deps) {
     // Ops table: connection state of every property in one read. Metadata
     // only (never utente/password/wskey or the encrypted blob), no guest data,
     // so no per-property view audit; the property dialog keeps its audit.
+    // Round 51 Phase 6: onboarding readiness of every property (computed by
+    // the caller's readiness function; no guest data, no credentials).
+    if (action === 'support_readiness') {
+      if (typeof deps.readiness !== 'function') return respond(503, { error: 'Readiness unavailable' });
+      return respond(200, { properties: await deps.readiness() });
+    }
     if (overview) {
       const rows = await get('host_alloggiati_credentials?select=property_id,verified_at,wskey_expires_at,last_error,updated_at&order=property_id.asc&limit=1000');
       return respond(200, { connections: rows.map(row => ({ property_id: row.property_id, verified_at: row.verified_at || null, wskey_expires_at: row.wskey_expires_at || null, updated_at: row.updated_at || null, last_error: row.last_error ? redactSupport(row.last_error).slice(0, 200) : null })) });

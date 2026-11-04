@@ -18,7 +18,7 @@
         case 'no_usage': return row.usage === 0;
         case 'low_usage': return row.usage != null && row.usage < 0.5;
         case 'no_bookings': return row.hasBookings === false;
-        case 'setup': return row.setup != null && row.setup < 80;
+        case 'setup': return row.ready === false || (row.ready == null && row.setup != null && row.setup < 80);
         case 'unavailable': return row.missingMetrics === true;
         case 'no_property': return !row.propertyId;
         default: return true;

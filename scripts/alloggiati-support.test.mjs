@@ -67,7 +67,11 @@ try{
  };
  async function dispatch(action){const response={setHeader(){},status(code){this.code=code;return this;},json(data){this.data=data;return this;}};await handler({method:'POST',query:{action},headers:{origin:'https://app.welcomebnb.it',authorization:'Bearer fixture-admin'},body:{property_id:property}},response);return response;}
  assert.equal((await dispatch('support_status')).code,200);
- for(const action of ['status','save','verify','validate','send','delete'])assert.equal((await dispatch(action)).code,403,action+' remains owner-only');
- adminAllowed=false;assert.equal((await dispatch('support_status')).code,403);
+ // Admins may read the connection status of any property (read-only metadata); every other action stays owner-only.
+ const adminStatus=await dispatch('status');assert.equal(adminStatus.code,200);assert.equal(adminStatus.data.admin_view,true);
+ assert.deepEqual(Object.keys(adminStatus.data).sort(),['admin_view','configured','last_error','updated_at','verified_at','wskey_expires_at']);
+ for(const action of ['save','verify','validate','send','delete'])assert.equal((await dispatch(action)).code,403,action+' remains owner-only');
+ const ov=await dispatch('support_overview');assert.equal(ov.code,200);assert.deepEqual(ov.data,{connections:[]});
+ adminAllowed=false;assert.equal((await dispatch('support_status')).code,403);assert.equal((await dispatch('status')).code,403,'non-admin non-owner refused');assert.equal((await dispatch('support_overview')).code,403,'overview is admin-only');
 }finally{globalThis.fetch=originalFetch;}
-console.log('PASS real dispatcher support access and unchanged owner-only status/save/verify/validate/send/delete boundaries');
+console.log('PASS real dispatcher support access and admin read-only status and overview, owner-only save/verify/validate/send/delete');

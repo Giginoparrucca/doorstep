@@ -31,11 +31,16 @@ try {
 const sb=supabase.createClient('https://fixture.supabase.co','fixture-key',{auth:{persistSession:false}});
 const APP_CONFIG={appOrigin:'https://app.welcomebnb.it'};
 let opsMetricsData=null;
-const allProperties=[{id:'p',owner_id:'owner',name:'Fixture property',city:'Ostuni',host_names:'Fixture host',_checkin_count:2},{id:'empty',name:'Empty property',_checkin_count:0},{id:'full',owner_id:'fullOwner',name:'Villa 12',city:'Roma',_checkin_count:12,wifi_name:'fixture',host_names:'Full host',host_phone:'fixture',address:'fixture',cir_code:'fixture'},{id:'zero',owner_id:'zeroOwner',name:'Zero usage',city:'Ostuni',_checkin_count:0}];
+const allProperties=[{id:'p',owner_id:'owner',name:'Fixture property',city:'Ostuni',host_names:'Fixture host',_checkin_count:2},{id:'empty',name:'Empty property',_checkin_count:0,alloggiati_autofile_mode:'live'},{id:'full',owner_id:'fullOwner',name:'Villa 12',city:'Roma',_checkin_count:12,wifi_name:'fixture',host_names:'Full host',host_phone:'fixture',address:'fixture',cir_code:'fixture'},{id:'zero',owner_id:'zeroOwner',name:'Zero usage',city:'Ostuni',_checkin_count:0}];
 function adminRowClass(){return '';}function copyableId(id){return id;}function adminRowActions(){return '';}function viewAsHost(id){window.clickedProperty=id;}
 ${fn('escapeHtml')}
 let hostTermsByHost={owner:[{id:'acc-1',host_id:'owner',version:1,document_id:'doc-1',text_sha256:'a'.repeat(64),host_kind:'private',method:'password_login+email_otp',account_email:'host@example.invalid',created_at:'2026-11-01T10:00:00Z'}]};
 let legalDocsById={'doc-1':{id:'doc-1',kind:'host_terms',version:1,text_sha256:'a'.repeat(64),specific_clauses:[{ref:'15.2',label:'foro competente'}]}};
+let allogConnections=new Map([['p',{property_id:'p',verified_at:'2026-11-01T09:00:00Z',wskey_expires_at:'2099-01-01T00:00:00Z',last_error:null,updated_at:'2026-11-01T08:00:00Z'}],['full',{property_id:'full',verified_at:null,wskey_expires_at:null,last_error:'authentication_failed',updated_at:'2026-10-30T08:00:00Z'}],['zero',{property_id:'zero',verified_at:null,wskey_expires_at:null,last_error:null,updated_at:'2026-10-30T08:00:00Z'}]]);
+allProperties[0].alloggiati_autofile_mode='live';
+function showAlloggiatiSupport(id){window.supportOpened=id;}
+${fn('allogConnectionState')}
+${fn('allogConnectionCell')}
 ${fn('hostTermsCell')}
 ${fn('downloadHostTermsEvidence')}
 ${fn('renderHostsPropertiesTable')}
@@ -46,10 +51,13 @@ AdminOpsMetrics.load(sb,{since:'${since}',until:'${until}'}).then(data=>{opsMetr
 </script></body></html>`}));
   await page.goto('https://ops.invalid/');await page.waitForFunction(()=>window.fixtureReady);
   const row=page.locator('tbody tr').first();const cells=await row.locator('td').allTextContents();
-  assert.equal(cells.length,13);assert.match(cells[11],/v1 · 01\/11\/2026/);assert.match(cells[11],/Scarica prova/);
-  {const fullCells=await page.locator('tbody tr').filter({hasText:'Villa 12'}).locator('td').allTextContents();assert.equal(fullCells[11].trim(),'Non accettate');}
+  assert.equal(cells.length,14);assert.match(cells[12],/v1 · 01\/11\/2026/);assert.match(cells[12],/Scarica prova/);assert.match(cells[6],/✓ Connected/);assert.match(cells[6],/Auto: live · 01\/11\/2026/);
+  {const fullCells=await page.locator('tbody tr').filter({hasText:'Villa 12'}).locator('td').allTextContents();assert.equal(fullCells[12].trim(),'Non accettate');assert.match(fullCells[6],/⚠ Error/);assert.match(fullCells[6],/Auto: off/);}
+  {const zeroCells=await page.locator('tbody tr').filter({hasText:'Zero usage'}).locator('td').allTextContents();assert.match(zeroCells[6],/Saved · not verified/);
+   const emptyCells=await page.locator('tbody tr').filter({hasText:'Empty property'}).locator('td').allTextContents();assert.match(emptyCells[6],/Not connected/);assert.match(emptyCells[6],/Manual filing only/);assert.ok(!/Auto:/.test(emptyCells[6]),'no automatic mode shown without credentials');
+   await page.locator('tbody tr').filter({hasText:'Villa 12'}).getByRole('button',{name:/Error/}).click();assert.equal(await page.evaluate(()=>window.supportOpened),'full');}
   {const [dl]=await Promise.all([page.waitForEvent('download'),row.getByRole('button',{name:'Scarica prova'}).click()]);assert.equal(dl.suggestedFilename(),'welcomebnb-terms-evidence-owner.json');
-   const ev=JSON.parse(fs.readFileSync(await dl.path(),'utf8'));assert.equal(ev.host_id,'owner');assert.equal(ev.acceptances[0].id,'acc-1');assert.equal(ev.documents[0].specific_clauses[0].ref,'15.2');}assert.equal(cells[4],'2');assert.equal(cells[5],'1');assert.equal(cells[6],'1');assert.match(cells[7],/50%.*1 \/ 2 bookings/s);
+   const ev=JSON.parse(fs.readFileSync(await dl.path(),'utf8'));assert.equal(ev.host_id,'owner');assert.equal(ev.acceptances[0].id,'acc-1');assert.equal(ev.documents[0].specific_clauses[0].ref,'15.2');}assert.equal(cells[4],'2');assert.equal(cells[5],'1');assert.equal(cells[7],'1');assert.match(cells[8],/50%.*1 \/ 2 bookings/s);
   assert.equal(requests.length,3);await row.getByRole('button',{name:'Console'}).click();assert.equal(await page.evaluate(()=>window.clickedProperty),'p');
   await page.locator('[aria-label="Hosts and properties metrics"]').evaluate(el=>el.scrollLeft=0);
   await page.screenshot({path:path.join(out,`ops-${width}.png`),fullPage:true});
@@ -64,6 +72,7 @@ AdminOpsMetrics.load(sb,{since:'${since}',until:'${until}'}).then(data=>{opsMetr
   await page.getByLabel('City',{exact:true}).selectOption(JSON.stringify('Roma'));assert.deepEqual(await visible(),[]);assert.match(await page.locator('[data-ops-empty]').textContent(),/No hosts or properties match/);
   await page.getByRole('button',{name:'Reset',exact:true}).click();
   await page.getByLabel('Show',{exact:true}).selectOption('failures');assert.deepEqual(await visible(),['p']);
+  await page.getByLabel('Show',{exact:true}).selectOption('allog_connection');assert.deepEqual(await visible(),['full','zero','empty'],'error, not verified, not connected');
   await page.getByLabel('Show',{exact:true}).selectOption('no_usage');assert.deepEqual(await visible(),['zero']);
   await page.getByLabel('Show',{exact:true}).selectOption('low_usage');assert.deepEqual(await visible(),['zero']);
   await page.getByLabel('Show',{exact:true}).selectOption('no_bookings');assert.deepEqual(await visible(),['empty']);
@@ -78,8 +87,9 @@ AdminOpsMetrics.load(sb,{since:'${since}',until:'${until}'}).then(data=>{opsMetr
   await page.locator('[aria-label="Hosts and properties metrics"]').evaluate(el=>el.scrollLeft=0);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'controls fit viewport');
   await page.screenshot({path:path.join(out,`ops-sort-filter-${width}.png`),fullPage:true});
-  await page.evaluate(()=>{opsMetricsData.reservations=null;fixtureRender();});assert.equal(await page.locator('tbody tr').first().locator('td').nth(7).textContent(),'—');assert.match(await page.getByRole('status').textContent(),/unavailable/);await page.getByLabel('Show',{exact:true}).selectOption('unavailable');assert.deepEqual(await visible(),['p','full','zero','empty']);await page.getByRole('button',{name:'Reset',exact:true}).click();
+  await page.evaluate(()=>{opsMetricsData.reservations=null;fixtureRender();});assert.equal(await page.locator('tbody tr').first().locator('td').nth(8).textContent(),'—');assert.match(await page.getByRole('status').textContent(),/unavailable/);await page.getByLabel('Show',{exact:true}).selectOption('unavailable');assert.deepEqual(await visible(),['p','full','zero','empty']);await page.getByRole('button',{name:'Reset',exact:true}).click();
+  await page.evaluate(()=>{allogConnections=null;fixtureRender();});assert.equal((await page.locator('tbody tr').first().locator('td').nth(6).textContent()).trim(),'—','unreadable status is a dash, never "not connected"');
   await page.evaluate(()=>{opsMetricsData.checkins=null;fixtureRender();});assert.equal(await page.locator('tbody tr').first().locator('td').nth(4).textContent(),'—');assert.deepEqual(errors,[]);await page.close();
  }
- console.log('PASS actual SDK paginated reads and Ops table: 390/1440px, 13 columns incl. Terms (version · date, Non accettate, evidence JSON download), keyboard/numeric sorting, compound filters, null/zero, empty/reset/state persistence, viewport fit, no extra reads, failed reads and Console action');
+ console.log('PASS actual SDK paginated reads and Ops table: 390/1440px, 14 columns incl. Alloggiati connection (connected/error/not verified/not connected, mode, opens diagnostics, problems filter) and Terms (version · date, Non accettate, evidence JSON download), keyboard/numeric sorting, compound filters, null/zero, empty/reset/state persistence, viewport fit, no extra reads, failed reads and Console action');
 }finally{await browser.close();}

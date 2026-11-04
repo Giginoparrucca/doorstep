@@ -33,9 +33,10 @@ export async function handleAlloggiatiSupport(req, res, deps) {
   const fetcher = deps.fetch || globalThis.fetch;
   const respond = (code, body) => { res.setHeader?.('Cache-Control', 'no-store'); return res.status(code).json(body); };
   const action = req.query?.action;
-  if (!['support_status', 'support_verify', 'support_validate', 'support_investigate'].includes(action)) return respond(400, { error: 'Unknown support action' });
+  if (!['support_status', 'support_verify', 'support_validate', 'support_investigate', 'support_overview'].includes(action)) return respond(400, { error: 'Unknown support action' });
+  const overview = action === 'support_overview';
   const propertyId = req.body?.property_id;
-  if (typeof propertyId !== 'string' || !/^[0-9a-f-]{36}$/i.test(propertyId)) return respond(400, { error: 'Valid property_id required' });
+  if (!overview && (typeof propertyId !== 'string' || !/^[0-9a-f-]{36}$/i.test(propertyId))) return respond(400, { error: 'Valid property_id required' });
   const jwt = /^Bearer (.+)$/.exec(req.headers.authorization || req.headers.Authorization || '')?.[1];
   if (!jwt) return respond(401, { error: 'Admin sign-in required' });
   try {
@@ -45,6 +46,13 @@ export async function handleAlloggiatiSupport(req, res, deps) {
     if (!user?.id) return respond(401, { error: 'Admin session expired' });
     const admin = await fetcher(`${url}/rest/v1/rpc/is_admin`, { method: 'POST', headers: { apikey: anonKey, Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' }, body: '{}' });
     if (!admin.ok || await admin.json() !== true) return respond(403, { error: 'Admin access required' });
+    // Ops table: connection state of every property in one read. Metadata
+    // only (never utente/password/wskey or the encrypted blob), no guest data,
+    // so no per-property view audit; the property dialog keeps its audit.
+    if (overview) {
+      const rows = await get('host_alloggiati_credentials?select=property_id,verified_at,wskey_expires_at,last_error,updated_at&order=property_id.asc&limit=1000');
+      return respond(200, { connections: rows.map(row => ({ property_id: row.property_id, verified_at: row.verified_at || null, wskey_expires_at: row.wskey_expires_at || null, updated_at: row.updated_at || null, last_error: row.last_error ? redactSupport(row.last_error).slice(0, 200) : null })) });
+    }
     const [property] = await get(`properties?id=eq.${encodeURIComponent(propertyId)}&select=id,name,alloggiati_autofile_mode,checkin_time,is_test,deleted_at&limit=1`);
     if (!property || property.deleted_at || property.is_test) return respond(404, { error: 'Active non-test property not found' });
     // Existing audit table: view records identify the admin, property and time.

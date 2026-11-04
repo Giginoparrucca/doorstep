@@ -62,7 +62,14 @@ const AllogRecords = createRequire(import.meta.url)('../lib/alloggiati-records.j
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // ── auth + property ownership check ─────────────────────────────────
-async function resolveHostAndProperty(req, propertyId) {
+async function callerIsAdmin(jwt) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/is_admin`, { method: 'POST', headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' }, body: '{}' });
+    return r.ok && (await r.json()) === true;
+  } catch (_) { return false; }
+}
+
+async function resolveHostAndProperty(req, propertyId, opts = {}) {
   if (!propertyId || typeof propertyId !== 'string') {
     return { error: { status: 400, body: { error: 'property_id required' } } };
   }
@@ -95,7 +102,12 @@ async function resolveHostAndProperty(req, propertyId) {
     const rows = await propRes.json();
     const prop = Array.isArray(rows) && rows[0];
     if (!prop) return { error: { status: 404, body: { error: 'Property not found' } } };
-    if (prop.owner_id !== hostId) return { error: { status: 403, body: { error: 'Not the property owner' } } };
+    if (prop.owner_id !== hostId) {
+      // An admin viewing a host's console may read the connection status
+      // (read-only metadata); every other action stays owner-only.
+      if (opts.allowAdmin && await callerIsAdmin(jwt)) return { hostId, propertyId, admin: true };
+      return { error: { status: 403, body: { error: 'Not the property owner' } } };
+    }
     return { hostId, propertyId };
   } catch (_) {
     return { error: { status: 500, body: { error: 'Property lookup failed' } } };
@@ -1240,7 +1252,7 @@ export default async function handler(req, res) {
 
   if (action.startsWith('support_')) return await handleAlloggiatiSupport(req, res, { url: SUPABASE_URL, anonKey: SUPABASE_ANON_KEY, serviceKey: SERVICE_KEY, get: sbGet, allog: AllogRecords, decrypt: decryptCredentials, generateToken, authenticationTest, test: soapTest });
 
-  const owner = await resolveHostAndProperty(req, propertyId);
+  const owner = await resolveHostAndProperty(req, propertyId, { allowAdmin: action === 'status' });
   if (owner.error) return res.status(owner.error.status).json(owner.error.body);
 
   if (action === 'status') {
@@ -1256,6 +1268,7 @@ export default async function handler(req, res) {
         wskey_expires_at:  row?.wskey_expires_at || null,
         last_error:        row?.last_error || null,
         updated_at:        row?.updated_at || null,
+        admin_view:        owner.admin === true,
       });
     } catch (e) {
       console.warn('[alloggiati] status failed:', e.message);

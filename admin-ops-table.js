@@ -4,7 +4,7 @@
   const defaults = () => ({ search: '', city: 'all', filter: 'all', sort: 'lastActive', direction: 'desc' });
   let state = defaults();
   const text = value => String(value ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase();
-  const columns = ['property', 'host', 'city', 'guests', 'completed', 'sent', 'failed', 'usage', 'setup', 'activity', 'lastActive'];
+  const columns = ['property', 'host', 'city', 'guests', 'completed', 'sent', 'alloggiati', 'failed', 'usage', 'setup', 'activity', 'lastActive'];
   function selectRows(rows, options) {
     const query = text(options.search).trim();
     const words = query.split(/\s+/).filter(Boolean);
@@ -13,6 +13,7 @@
       if (options.city !== 'all' && JSON.stringify(row.city || null) !== options.city) return false;
       switch (options.filter) {
         case 'failures': return row.failed != null && row.failed > 0;
+        case 'allog_connection': return row.alloggiati != null && row.alloggiati < 4;
         case 'no_usage': return row.usage === 0;
         case 'low_usage': return row.usage != null && row.usage < 0.5;
         case 'no_bookings': return row.hasBookings === false;

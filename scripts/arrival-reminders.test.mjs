@@ -32,8 +32,10 @@ function slice(name) {
   throw new Error('cannot extract ' + name);
 }
 
+const SupportContact = await import('../api/_support-contact.js');
 const ctx = vm.createContext({
   console,
+  supportWhatsappHtml: lang => SupportContact.supportWhatsappHtml(lang, '+393509398782'),
   APP_BASE_URL: 'https://app.welcomebnb.it',
   HOST_CONSOLE_URL: 'https://app.welcomebnb.it/host-console.html',
 });
@@ -66,6 +68,7 @@ assert.equal(ctx.esc(undefined), '');
   const html = ctx.renderArrivalHTML(property, rows, 'it');
   // Header carries property name.
   assert.match(html, /Arrivi domani presso Trullo di Prova/);
+  assert.match(html, /wa\.me\/393509398782/); assert.match(html, /Scrivici su WhatsApp/);
   // Booking link uses encoded parameters, points at APP_BASE_URL.
   assert.match(html, /https:\/\/app\.welcomebnb\.it\/\?b=ABC-123&amp;p=prop-1/);
   assert.match(html, /https:\/\/app\.welcomebnb\.it\/\?b=XYZ-999&amp;p=prop-1/);
@@ -128,6 +131,7 @@ const FORBIDDEN_IN_FILING = [
 }
 {
   const html = ctx.renderFilingHTML({ id: 'p', name: 'Casa', host_language: 'en' }, '2026-10-14', 1, 'en');
+  assert.match(html, /Chat on WhatsApp/); assert.match(html, /\+39 350 939 8782/);
   assert.match(html, /<strong>1<\/strong> guest checked in yesterday/);
   assert.match(html, /Filing reminder — Casa/);
   // Plural/singular switches on count=1 (English).

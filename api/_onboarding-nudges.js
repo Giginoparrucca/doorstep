@@ -20,6 +20,7 @@
 // Switch: ONBOARDING_NUDGES = 'on' sends; 'dry' computes and logs nothing;
 // anything else (default) does nothing.
 import { stopToken } from './_onboarding-stop.js';
+import { supportWhatsappHtml } from './_support-contact.js';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -80,14 +81,14 @@ export function renderNudgeEmail({ kind, lang, propertyName, step, doneCount, to
     ? (kind === '24h' ? `Hai completato ${doneCount} passaggi su ${total} per <strong>${esc(propertyName)}</strong>. Il prossimo è:` : `<strong>${esc(propertyName)}</strong> non è ancora pronta per i primi ospiti (${doneCount} su ${total}). Il prossimo passaggio è:`)
     : (kind === '24h' ? `You have completed ${doneCount} of ${total} steps for <strong>${esc(propertyName)}</strong>. The next one is:` : `<strong>${esc(propertyName)}</strong> is not ready for its first guests yet (${doneCount} of ${total}). The next step is:`);
   const help = support && support.whatsapp
-    ? `<a href="https://wa.me/${esc(String(support.whatsapp).replace(/^\+/, ''))}" style="color:#005BFF;">${it ? 'Preferisci che ti aiutiamo noi? Scrivici su WhatsApp' : 'Prefer that we help? Message us on WhatsApp'}</a>`
-    : `${it ? 'Preferisci che ti aiutiamo noi? Scrivici a' : 'Prefer that we help? Write to'} <a href="mailto:${esc(support && support.email || 'info@welcomebnb.it')}" style="color:#005BFF;">${esc(support && support.email || 'info@welcomebnb.it')}</a>`;
+    ? supportWhatsappHtml(it ? 'it' : 'en', support.whatsapp)
+    : `<p style="margin:0 0 24px;font-size:14px;">${it ? 'Preferisci che ti aiutiamo noi? Scrivici a' : 'Prefer that we help? Write to'} <a href="mailto:${esc(support && support.email || 'info@welcomebnb.it')}" style="color:#005BFF;">${esc(support && support.email || 'info@welcomebnb.it')}</a></p>`;
   const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#061A3D;">
   <p style="margin:0 0 12px;font-size:15px;line-height:1.5;">${intro}</p>
   <p style="margin:0 0 20px;font-size:17px;font-weight:600;">${esc(stepName)}</p>
   <p style="margin:0 0 24px;"><a href="${esc(link)}" style="display:inline-block;background:#005BFF;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;">${it ? 'Completa ora' : 'Complete it now'}</a></p>
-  <p style="margin:0 0 24px;font-size:14px;">${help}</p>
-  <p style="margin:0;color:#6B7A90;font-size:12px;">${it ? 'Ti scriviamo al massimo due volte per questa configurazione.' : 'We write at most twice about this setup.'} <a href="${esc(stopUrl)}" style="color:#6B7A90;">${it ? 'Non inviarmi più questi promemoria' : 'Stop these reminders'}</a></p>
+  ${help}
+  <p style="margin:24px 0 0;color:#6B7A90;font-size:12px;">${it ? 'Ti scriviamo al massimo due volte per questa configurazione.' : 'We write at most twice about this setup.'} <a href="${esc(stopUrl)}" style="color:#6B7A90;">${it ? 'Non inviarmi più questi promemoria' : 'Stop these reminders'}</a></p>
 </div>`;
   return { subject, html, link };
 }

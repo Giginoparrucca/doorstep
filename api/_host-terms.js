@@ -13,6 +13,7 @@
 import { createHash, createHmac, randomInt, timingSafeEqual } from 'node:crypto';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL } from './_environment.js';
 import { supabaseAuthHeaders } from './_supabase-auth.js';
+import { supportWhatsappText } from './_support-contact.js';
 
 const CODE_TTL_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
@@ -145,7 +146,8 @@ export async function handleHostTerms(req, res, deps = defaultHostTermsDeps()) {
         to: user.email, subject: 'Codice di conferma Condizioni WelcomeBnB',
         text: `Il tuo codice per confermare le Condizioni Generali di Servizio WelcomeBnB (versione ${current.version}) è: ${code}\n\n` +
           'Il codice vale 10 minuti. Se non hai richiesto tu questo codice, ignora questa email.\n\n' +
-          `Your code to confirm the WelcomeBnB Terms of Service (version ${current.version}) is: ${code}. It is valid for 10 minutes.`,
+          `Your code to confirm the WelcomeBnB Terms of Service (version ${current.version}) is: ${code}. It is valid for 10 minutes.` +
+          (supportWhatsappText('it') ? '\n\n' + supportWhatsappText('it') : ''),
       });
       if (!sent.ok) {
         if (codeRow?.id) await rest(`host_terms_codes?id=eq.${enc(codeRow.id)}`, { method: 'DELETE' }).catch(() => {});
@@ -251,6 +253,7 @@ async function sendReceipt(deps, to, doc, row, hostKind) {
     attachments.length ? 'I testi accettati sono allegati a questa email.' : '',
     '',
     'You accepted the WelcomeBnB Terms of Service above; the Italian text is the binding version.',
+    supportWhatsappText('it') ? '\n' + supportWhatsappText('it') : '',
   ].filter(l => l !== null).join('\n');
   return sendEmail(deps, { to, subject: `Copia delle Condizioni WelcomeBnB accettate (versione ${doc.version})`, text,
     attachments: attachments.length ? attachments : undefined });

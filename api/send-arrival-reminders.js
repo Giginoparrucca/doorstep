@@ -1,5 +1,6 @@
 import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { handleOnboardingStop } from './_onboarding-stop.js';
+import { supportWhatsappHtml } from './_support-contact.js';
 import { rejectInvalidEnvironment, SUPABASE_URL, APP_BASE_URL, HOST_CONSOLE_URL, rejectDemoIntegration } from './_environment.js';
 // api/send-arrival-reminders.js — Round 32 arrival reminder, Round 36
 // filing reminder, Round 46 storage purge.
@@ -577,6 +578,7 @@ function renderArrivalHTML(property, rows, lang) {
       <h2 style="margin:0 0 6px;font-size:20px;">${T.heading(propName)}</h2>
       <p style="margin:0 0 16px;color:#6B7A90;">${T.intro}</p>
       ${list}
+      ${supportWhatsappHtml(lang)}
       <p style="margin:20px 0 0;color:#6B7A90;font-size:12px;">${T.footer}</p>
     </div>`;
 }
@@ -624,6 +626,7 @@ function renderFilingHTML(property, yesterday, count, lang) {
         <li>${T.step2}</li>
         <li>${T.step3}</li>
       </ol>
+      ${supportWhatsappHtml(lang)}
       <p style="margin:20px 0 0;color:#6B7A90;font-size:12px;">${T.footer}</p>
     </div>`;
 }

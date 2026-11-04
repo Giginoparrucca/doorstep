@@ -39,6 +39,7 @@ import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL
 // invite-only flow is cosmetic — sb.auth.signUp() still works.
 
 import { applyCors } from './_cors.js';
+import { supportWhatsappHtml, supportWhatsappText } from './_support-contact.js';
 
 
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -245,7 +246,8 @@ async function _sendInviteEmail(email, actionLink) {
     '— — —\n\n' +
     'Welcome to WelcomeBnB!\n\n' +
     'Click the link below to set your password and sign in to the host console.\n' +
-    actionLink + '\n';
+    actionLink + '\n' +
+    (supportWhatsappText('it') ? '\n' + supportWhatsappText('it') + '\n' + supportWhatsappText('en') + '\n' : '');
   try {
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -295,11 +297,13 @@ function _renderInviteEmail(linkEsc) {
           <p style="margin:0 0 10px;line-height:1.55;">Qualcuno ti ha invitato a usare la console host di WelcomeBnB. Clicca sul pulsante qui sotto per impostare la tua password e accedere.</p>
           <p style="margin:0 0 12px;color:#4b5563;font-size:0.92rem;line-height:1.55;">Questo link scade dopo l'uso o dopo il periodo di validità impostato da Supabase. Se non lo usi oggi, chiedici un nuovo invito.</p>
           <p style="margin:16px 0;"><a href="${linkEsc}" style="display:inline-block;background:#111827;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:0.95rem;">Imposta la password e accedi →</a></p>
+          ${supportWhatsappHtml('it')}
           <hr style="border:0;border-top:1px solid #e5e7eb;margin:22px 0;">
           <h2 style="margin:0 0 8px;font-size:16pt;">Welcome to WelcomeBnB</h2>
           <p style="margin:0 0 10px;line-height:1.55;">Someone invited you to use the WelcomeBnB host console. Click the button below to set your password and sign in.</p>
           <p style="margin:0 0 12px;color:#4b5563;font-size:0.92rem;line-height:1.55;">This link expires after it is used or after the window set in Supabase. If you don't use it today, ask us for a fresh invite.</p>
           <p style="margin:16px 0;"><a href="${linkEsc}" style="display:inline-block;background:#111827;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:0.95rem;">Set your password and sign in →</a></p>
+          ${supportWhatsappHtml('en')}
         </td></tr>
         <tr><td style="padding:18px 32px 28px;color:#6b7280;font-size:0.78rem;line-height:1.5;">
           <p style="margin:0 0 6px;">Se il pulsante non funziona, apri questo link nel browser:<br><span style="word-break:break-all;color:#1f2937;">${linkEsc}</span></p>

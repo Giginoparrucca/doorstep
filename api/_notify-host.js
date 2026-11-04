@@ -1,5 +1,6 @@
 import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { SUPABASE_URL, APP_BASE_URL, environmentReady, IS_DEMO } from './_environment.js';
+import { supportWhatsappHtml, supportWhatsappText } from './_support-contact.js';
 // api/_notify-host.js — Round 42 shared host-notification pipeline.
 //
 // Called from api/guest-chat.js on every successful chat_messages insert.
@@ -218,7 +219,7 @@ export async function notifyHostAutofileAlert({ propertyId, hostId, lang, proper
     const results = await _fireChannels({
       settings, hostId, propertyId,
       convKey: 'autofile:' + kind,
-      trigger, text, url: url || defaultUrl, tag, emailAddr,
+      trigger, text: { ...text, lang }, url: url || defaultUrl, tag, emailAddr,
       // Autofile alerts always want to reach the host — the host might
       // only have email configured, or might be filtering push by tag.
       forceEmail: settings.email_mode !== 'off',
@@ -410,9 +411,11 @@ async function _sendEmail({ to, text, url }) {
       <div style="font-size:1.2rem;font-weight:600;margin-bottom:6px;">${_esc(text.title)}</div>
       <div style="font-size:0.92rem;color:#6B7A90;line-height:1.55;margin-bottom:18px;">${_esc(text.body)}</div>
       <a href="${_escAttr(url)}" style="display:inline-block;background:#005BFF;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600;font-size:0.9rem;">${_esc(text.button)}</a>
+      ${supportWhatsappHtml(text.lang === 'it' ? 'it' : 'en')}
     </div>
   </body></html>`;
-  const plain = `${text.title}\n${text.body}\n\n${text.button}: ${url}`;
+  const wa = supportWhatsappText(text.lang === 'it' ? 'it' : 'en');
+  const plain = `${text.title}\n${text.body}\n\n${text.button}: ${url}` + (wa ? `\n\n${wa}` : '');
   try {
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -565,12 +568,14 @@ function _fixedText(lang, propertyName) {
       title: `💬 Un ospite ha bisogno di te`,
       body:  `${propertyName} · apri la console per rispondere`,
       button: 'Apri la Chat',
+      lang: 'it',
     };
   }
   return {
     title: `💬 A guest needs you`,
     body:  `${propertyName} · open the console to reply`,
     button: 'Open Chat',
+    lang: 'en',
   };
 }
 function _fixedTestText(lang, propertyName) {
@@ -579,12 +584,14 @@ function _fixedTestText(lang, propertyName) {
       title: `Notifica di prova ✔`,
       body:  `${propertyName} · questa è una notifica di prova`,
       button: 'Apri la Console',
+      lang: 'it',
     };
   }
   return {
     title: `Test notification ✔`,
     body:  `${propertyName} · this is a test notification`,
     button: 'Open the Console',
+    lang: 'en',
   };
 }
 

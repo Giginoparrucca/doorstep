@@ -14,6 +14,9 @@ const demo = { APP_ENV: 'demo', DEMO_SUPABASE_PROJECT_REF: ref,
 assert.equal(readEnvironment({}).projectRef, PRODUCTION_REF);
 assert.equal(readEnvironment({}).appOrigin, PRODUCTION_ORIGIN);
 assert.equal(readEnvironment(demo).demo, true);
+assert.equal(readEnvironment(demo).support.whatsapp, null, 'demo never gets the production support WhatsApp');
+assert.equal(readEnvironment({}).support.whatsapp, '+393509398782');
+assert.equal(readEnvironment({ ...demo, SUPPORT_WHATSAPP_E164: '+390000000001' }).support.whatsapp, '+390000000001', 'demo can set its own');
 for (const key of ['DEMO_SUPABASE_PROJECT_REF', 'SUPABASE_URL', 'SUPABASE_ANON_KEY', 'APP_BASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'GUEST_TOKEN_SECRET']) {
   const env = { ...demo }; delete env[key]; assert.throws(() => readEnvironment(env), key);
 }

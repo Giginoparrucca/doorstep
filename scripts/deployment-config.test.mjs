@@ -15,4 +15,18 @@ assert.throws(() => deploymentConfig({ APP_ENV: 'typo' }));
 assert.throws(() => deploymentConfig({ VERCEL_PROJECT_NAME: 'welcomebnb-demo' }));
 assert.throws(() => deploymentConfig({ VERCEL_PROJECT_PRODUCTION_URL: 'demo.welcomebnb.it' }));
 assert.equal(deploymentConfig({ APP_ENV: 'demo', VERCEL_PROJECT_NAME: 'welcomebnb-demo' }).crons.length, 0);
-console.log('PASS deployment configuration: no demo schedules; production settings preserved; invalid modes fail closed.');
+// vercel.mjs: Vercel reads static keys without running code. They must be
+// literals in the exported object (no spread, no computed object), and the
+// exported config must equal the computed one.
+{
+  const fs = await import('node:fs');
+  const src = fs.readFileSync(new URL('../vercel.mjs', import.meta.url), 'utf8');
+  const body = src.slice(src.indexOf('export const config = {'));
+  assert.ok(body.startsWith('export const config = {'), 'config is an object literal');
+  assert.ok(!/\.\.\./.test(body), 'no spread in the exported object');
+  for (const key of ['buildCommand', 'outputDirectory']) assert.match(body, new RegExp(`\\n  ${key}: '[^']*',`), key + ' is a literal');
+  for (const key of ['framework', 'installCommand', 'devCommand', 'nodeVersion', 'git', 'github', 'relatedProjects']) assert.ok(!new RegExp(`\\n  ${key}:\\s*[^'\"\\n]`).test(body) || new RegExp(`\\n  ${key}: ('|null|true|false|\\d)`).test(body), key + ' literal if present');
+  const { config } = await import('../vercel.mjs');
+  assert.deepEqual(config, deploymentConfig(process.env), 'vercel.mjs exports exactly the computed configuration');
+}
+console.log('PASS deployment configuration: no demo schedules; production settings preserved; invalid modes fail closed; vercel.mjs static keys are literals and the export equals the computed config.');

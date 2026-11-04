@@ -13,7 +13,7 @@ function fn(name){const i=html.indexOf('function '+name+'(');assert.ok(i>=0);ret
 const styles=[...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m=>m[1]).join('\n');
 const since='2026-10-01T00:00:00Z',until='2026-10-25T12:00:00Z';
 const c=(id,extra={})=>({id,property_id:'p',booking_code:'B',submitted_at:since,arrival_date:'2026-10-10',...extra});
-const checkins=[c('full',{property_id:'full',booking_code:'F'}),c('1',{alloggiati_status:'filed',filed_at:since}),c('2',{autofile_last_error:'send_rejected',autofile_last_attempt_at:since})];
+const checkins=[c('full',{property_id:'full',booking_code:'F'}),c('1',{alloggiati_status:'filed',filed_at:since}),c('2',{autofile_last_error:'send_rejected',autofile_last_attempt_at:since}),c('late',{property_id:'empty',booking_code:null,submitted_at:'2026-09-01T00:00:00Z',alloggiati_status:'pending',autofile_last_error:'past_portal_window'})];
 const reservations=['B','C'].map(id=>({id,property_id:'p',booking_code:id,status:'active',entry_type:'reservation',checkin_date:'2026-10-10'})).concat(['full','zero'].map(id=>({id,property_id:id,booking_code:id==='full'?'F':'Z',status:'active',entry_type:'reservation',checkin_date:'2026-10-10'})));
 const events=[{id:'f',property_id:'full',booking_code:'F',event_type:'guest_link_opened',created_at:since},{id:'e',property_id:'p',booking_code:'B',event_type:'guest_link_opened',created_at:since}];
 const out=path.join(os.tmpdir(),'round64-admin-qa');fs.mkdirSync(out,{recursive:true});
@@ -72,6 +72,13 @@ AdminOpsMetrics.load(sb,{since:'${since}',until:'${until}'}).then(data=>{opsMetr
   await page.getByLabel('City',{exact:true}).selectOption(JSON.stringify('Roma'));assert.deepEqual(await visible(),[]);assert.match(await page.locator('[data-ops-empty]').textContent(),/No hosts or properties match/);
   await page.getByRole('button',{name:'Reset',exact:true}).click();
   await page.getByLabel('Show',{exact:true}).selectOption('failures');assert.deepEqual(await visible(),['p']);
+  await page.getByRole('button',{name:'Reset',exact:true}).click();
+  {const emptyRow=page.locator('tbody tr').filter({hasText:'Empty property'});const u=emptyRow.locator('[data-unconfirmed]');assert.equal((await u.textContent()).trim(),'1 not confirmed');assert.match(await u.getAttribute('title'),/may have filed by hand/);
+   assert.equal(await emptyRow.getByRole('button',{name:/Diagnose|failed attempt/}).count(),0,'no diagnostics link for a property without a connection');
+   const pCells=await page.locator('tbody tr').filter({hasText:'Fixture property'}).locator('td').allTextContents();assert.equal(pCells[7].trim(),'1','connected property keeps real failures');
+   await u.click();assert.equal(await page.evaluate(()=>window.clickedProperty),'empty','opens the host console');}
+  await page.getByLabel('Show',{exact:true}).selectOption('unconfirmed');assert.deepEqual(await visible(),['empty']);
+  await page.getByLabel('Show',{exact:true}).selectOption('failures');assert.deepEqual(await visible(),['p'],'unconfirmed is not a failure');
   await page.getByLabel('Show',{exact:true}).selectOption('allog_connection');assert.deepEqual(await visible(),['full','zero','empty'],'error, not verified, not connected');
   await page.getByLabel('Show',{exact:true}).selectOption('no_usage');assert.deepEqual(await visible(),['zero']);
   await page.getByLabel('Show',{exact:true}).selectOption('low_usage');assert.deepEqual(await visible(),['zero']);
@@ -91,5 +98,5 @@ AdminOpsMetrics.load(sb,{since:'${since}',until:'${until}'}).then(data=>{opsMetr
   await page.evaluate(()=>{allogConnections=null;fixtureRender();});assert.equal((await page.locator('tbody tr').first().locator('td').nth(6).textContent()).trim(),'—','unreadable status is a dash, never "not connected"');
   await page.evaluate(()=>{opsMetricsData.checkins=null;fixtureRender();});assert.equal(await page.locator('tbody tr').first().locator('td').nth(4).textContent(),'—');assert.deepEqual(errors,[]);await page.close();
  }
- console.log('PASS actual SDK paginated reads and Ops table: 390/1440px, 14 columns incl. Alloggiati connection (connected/error/not verified/not connected, mode, opens diagnostics, problems filter) and Terms (version · date, Non accettate, evidence JSON download), keyboard/numeric sorting, compound filters, null/zero, empty/reset/state persistence, viewport fit, no extra reads, failed reads and Console action');
+ console.log('PASS actual SDK paginated reads and Ops table: 390/1440px, 14 columns incl. Alloggiati connection (connected/error/not verified/not connected, mode, opens diagnostics, problems filter), «N not confirmed» for unconnected properties (opens the console, own filter, not counted as failures) and Terms (version · date, Non accettate, evidence JSON download), keyboard/numeric sorting, compound filters, null/zero, empty/reset/state persistence, viewport fit, no extra reads, failed reads and Console action');
 }finally{await browser.close();}

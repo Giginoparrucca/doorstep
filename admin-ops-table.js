@@ -13,6 +13,7 @@
       if (options.city !== 'all' && JSON.stringify(row.city || null) !== options.city) return false;
       switch (options.filter) {
         case 'failures': return row.failed != null && row.failed > 0;
+        case 'unconfirmed': return row.unconfirmed != null && row.unconfirmed > 0;
         case 'allog_connection': return row.alloggiati != null && row.alloggiati < 4;
         case 'no_usage': return row.usage === 0;
         case 'low_usage': return row.usage != null && row.usage < 0.5;

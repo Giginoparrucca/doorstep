@@ -1,4 +1,5 @@
 import { supabaseAuthHeaders } from './_supabase-auth.js';
+import { handleOnboardingStop } from './_onboarding-stop.js';
 import { rejectInvalidEnvironment, SUPABASE_URL, APP_BASE_URL, HOST_CONSOLE_URL, rejectDemoIntegration } from './_environment.js';
 // api/send-arrival-reminders.js — Round 32 arrival reminder, Round 36
 // filing reminder, Round 46 storage purge.
@@ -70,6 +71,18 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'GET or POST only' });
+  }
+
+  // Round 51 Phase 5 — public opt-out link from onboarding nudge emails
+  // (/api/onboarding-stop rewrite). Authorized by its HMAC signature, not by
+  // CRON_SECRET; GET only shows a confirmation, POST opts out.
+  if (new URL(req.url, 'http://x').searchParams.get('onboarding_stop') === '1') {
+    if (!SERVICE_KEY) return res.status(500).json({ error: 'SUPABASE_SERVICE_ROLE_KEY not set' });
+    return handleOnboardingStop(req, res, { serviceKey: SERVICE_KEY, patch: async (path, body, prefer) => {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { method: 'PATCH', headers: { ...supabaseAuthHeaders(SERVICE_KEY), 'Content-Type': 'application/json', Prefer: prefer }, body: JSON.stringify(body) });
+      if (!r.ok) throw new Error(`PATCH ${r.status}`);
+      return r.json();
+    } });
   }
 
   const auth = req.headers['authorization'] || '';

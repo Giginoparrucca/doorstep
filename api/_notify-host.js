@@ -372,6 +372,35 @@ async function _sendTelegram({ chatId, text, url }) {
   }
 }
 
+// Round 51 Phase 5 — plain transactional email with caller-built HTML
+// (onboarding nudges). Returns the Resend id for the CHANGELOG evidence.
+export async function sendHostEmail(to, subject, html) {
+  if (!RESEND_KEY) return { ok: false, error: 'no resend key' };
+  try {
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: REMINDER_FROM, to: [to], subject, html }),
+      signal: AbortSignal.timeout(8000),
+    });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) return { ok: false, error: `resend http ${r.status}: ${JSON.stringify(body).slice(0, 200)}` };
+    return { ok: true, id: body && body.id || null };
+  } catch (e) {
+    return { ok: false, error: String(e && e.message || e) };
+  }
+}
+
+// Account email of a host (service role reads /auth/v1/admin/users).
+export async function hostAccountEmail(hostId) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(hostId)}`, { headers: { ...supabaseAuthHeaders(SERVICE_KEY) }, signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return null;
+    const u = await r.json();
+    return (u && u.email || '').trim() || null;
+  } catch (_) { return null; }
+}
+
 // ── Email ──────────────────────────────────────────────────────────────
 async function _sendEmail({ to, text, url }) {
   if (!RESEND_KEY) return { ok: false, skipped: true, reason: 'no resend key' };

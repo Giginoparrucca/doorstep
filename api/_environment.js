@@ -9,6 +9,7 @@ export const SUPABASE_ANON_KEY = config?.publicKey || '';
 export const APP_BASE_URL = config?.appOrigin || '';
 export const HOST_CONSOLE_URL = config?.hostConsoleUrl || '';
 export const ALLOWED_ORIGINS = config?.allowedOrigins || [];
+export const SUPPORT_CONTACTS = config?.support || {};
 export function environmentReady() { return !configurationError; }
 export function rejectInvalidEnvironment(res) {
   if (!configurationError) return false;

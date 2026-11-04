@@ -2,7 +2,7 @@ import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { handleAlloggiatiSupport, redactSupport } from './_alloggiati-support.js';
 import { createFilingEvidence } from './_alloggiati-evidence.js';
 import { runTestCleanup } from './send-arrival-reminders.js';
-import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, rejectDemoIntegration, IS_DEMO } from './_environment.js';
+import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, rejectDemoIntegration, APP_BASE_URL, SUPPORT_CONTACTS, IS_DEMO } from './_environment.js';
 // api/alloggiati.js — Round 44 Phase 0.5
 //
 // Consolidated Alloggiati Web endpoint. Action-routed to stay under
@@ -45,7 +45,8 @@ import {
   test as soapTest,
   send as soapSend,
 } from './_alloggiati-soap.js';
-import { notifyHostAutofileAlert } from './_notify-host.js';
+import { notifyHostAutofileAlert, sendHostEmail, hostAccountEmail } from './_notify-host.js';
+import { runNudgePass } from './_onboarding-nudges.js';
 import { collectReceipts } from './_alloggiati-receipts.js';
 
 // Round 49 Phase 1 — the Alloggiati reference tables, line builder,
@@ -209,7 +210,7 @@ function _timingSafeStringCompare(a, b) {
 const AUTOFILE_TICK_BUDGET_MS = 45_000; // leave 15s headroom under Vercel's 60s cap
 const AUTOFILE_MAX_PROPS_PER_TICK = 25;  // Hobby safety net; most ticks process 1-3
 
-async function runAutofileTick(res, testCleanup) {
+async function runAutofileTick(res, testCleanup, opts = {}) {
   const started = Date.now();
   const receipts = await collectReceipts({ budgetMs: 12000 });
   const summary = {
@@ -305,7 +306,26 @@ async function runAutofileTick(res, testCleanup) {
     }
   } catch (e) { console.warn('[autofile_tick] alerts-only pass failed:', e.message); }
 
+  // Round 51 Phase 5 — onboarding nudge emails (switch ONBOARDING_NUDGES).
+  try { summary.onboarding_nudges = await runOnboardingNudges(opts.nudgeForce || null); }
+  catch (e) { summary.onboarding_nudges = { error: e.message }; console.warn('[autofile_tick] onboarding nudges failed:', e.message); }
+
   return res.status(200).json({ ok: true, ...summary, elapsed_ms: Date.now() - started });
+}
+
+async function nudgePatch(pathAndQuery, body, prefer) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${pathAndQuery}`, { method: 'PATCH', headers: { ...supabaseAuthHeaders(SERVICE_KEY), 'Content-Type': 'application/json', Prefer: prefer || 'return=minimal' }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error(`nudgePatch ${r.status}: ${await r.text().catch(() => '')}`);
+  return prefer === 'return=representation' ? r.json() : true;
+}
+async function sbInsert(table, body) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, { method: 'POST', headers: { ...supabaseAuthHeaders(SERVICE_KEY), 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error(`sbInsert ${r.status}`);
+  return true;
+}
+function runOnboardingNudges(force) {
+  return runNudgePass({ mode: String(process.env.ONBOARDING_NUDGES || 'off').trim(), force, appOrigin: APP_BASE_URL, serviceKey: SERVICE_KEY, support: SUPPORT_CONTACTS,
+    deps: { get: sbGet, patch: nudgePatch, post: sbInsert, userEmail: hostAccountEmail, send: sendHostEmail } });
 }
 
 function _romeDateYmd(date) {
@@ -1238,7 +1258,11 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, receipts });
     }
     const cleanup = await runTestCleanup(false);
-    return await runAutofileTick(res, cleanup);
+    // Round 51 Phase 5 test gate: the cron-secret caller may force one nudge
+    // for one named onboarding row (owner's own account), ignoring windows.
+    const nf = req.body && req.body.onboarding_nudge_test;
+    const nudgeForce = nf && /^[0-9a-f-]{36}$/i.test(nf.user_id || '') && /^[0-9a-f-]{36}$/i.test(nf.property_id || '') ? { user_id: nf.user_id, property_id: nf.property_id, kind: nf.kind === '72h' ? '72h' : '24h' } : null;
+    return await runAutofileTick(res, cleanup, { nudgeForce });
   }
 
   const allowed = applyCors(req, res);

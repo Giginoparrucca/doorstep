@@ -1033,6 +1033,42 @@ async function loadAllogConnections() {
   } catch (_) { return null; }
 }
 
+// Round 51 Phase 6 — onboarding readiness per property, computed on the
+// server with the same rule as the host checklist and the reminder emails
+// (support_readiness). null = could not be read (shown as a dash).
+let readinessByProperty = null;
+async function loadReadiness() {
+  try {
+    const { data } = await sb.auth.getSession();
+    const token = data?.session?.access_token;
+    if (!token) return null;
+    const r = await fetch('/api/alloggiati?action=support_readiness', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: '{}', signal: AbortSignal.timeout(20000) });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return new Map((j.properties || []).map(row => [row.property_id, row]));
+  } catch (_) { return null; }
+}
+const ONBOARDING_STEPS = [['property', 'Property data & codes'], ['calendar', 'Calendar'], ['content', 'Welcome content'], ['test', 'Test check-in'], ['notifications', 'Notifications']];
+const ONBOARDING_MISSING = { name: 'name', city: 'city', region: 'region', cir_code: 'CIN', cir_code_format: 'CIN format', ross1000_codice: 'ROSS1000 code', tax_rules: 'tourist tax', alloggiati: 'Alloggiati', ical_feeds: 'iCal feed', welcome_message: 'welcome message', wifi_name: 'Wi-Fi', checkin_instructions: 'check-in instructions', notification_channel: 'notification channel', test_checkin: 'test check-in' };
+function onboardingStepLabel(id) { return (ONBOARDING_STEPS.find(([k]) => k === id) || [id, id || '—'])[1]; }
+function onboardingDays(iso, now = Date.now()) { const t = Date.parse(iso); return Number.isFinite(t) ? Math.floor((now - t) / 86400000) : null; }
+// Help-widget events of the selected period, by property and by step.
+function onboardingHelpStats(events) {
+  const byProperty = new Map(), byStep = new Map();
+  for (const e of events || []) {
+    if (e.event_type !== 'support_channel_clicked' && e.event_type !== 'support_opened') continue;
+    const kind = e.event_type === 'support_opened' ? 'opened' : 'clicked';
+    const channel = (e.event_data && e.event_data.channel) || null, step = (e.event_data && e.event_data.step) || 'none';
+    if (e.property_id) {
+      const m = byProperty.get(e.property_id) || { opened: 0, clicked: 0, channels: {} };
+      m[kind]++; if (kind === 'clicked' && channel) m.channels[channel] = (m.channels[channel] || 0) + 1;
+      byProperty.set(e.property_id, m);
+    }
+    const st = byStep.get(step) || { opened: 0, clicked: 0 }; st[kind]++; byStep.set(step, st);
+  }
+  return { byProperty, byStep };
+}
+
 // Rank (sort key): 0 error, 1 key expired, 2 saved not verified, 3 not connected, 4 connected.
 function allogConnectionState(p, now = Date.now()) {
   if (!allogConnections) return null;
@@ -1074,6 +1110,7 @@ async function loadData() {
 
   const hostsPromise = sb.rpc('list_hosts_for_admin').then(r => r, err => ({ data: null, error: err }));
   const allogPromise = loadAllogConnections();
+  const readinessPromise = loadReadiness();
   let eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes, invitesRes, opsRes, termsRes, legalRes;
   try {
     [eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes, invitesRes, opsRes, termsRes, legalRes] = await Promise.all([
@@ -1117,6 +1154,7 @@ async function loadData() {
   const hostsRes = await hostsPromise;
   if (hostsRes.error) console.warn('list_hosts_for_admin failed (host attribution falls back to events):', hostsRes.error.message || hostsRes.error);
   allogConnections = await allogPromise;
+  readinessByProperty = await readinessPromise;
   hostEmailById = {};
   (hostsRes.data || []).forEach(h => { if (h && h.user_id && h.email) hostEmailById[h.user_id] = h.email; });
   allProperties = propsRes.data || [];
@@ -3110,6 +3148,53 @@ function escapeHtml(s) {
    Hosts & Properties (support path — viewAsHost must keep working),
    Data Retention, GDPR Objections, Event Log.
 ══════════════════════════════════════ */
+// Round 51 Phase 6 — onboarding: step funnel (how many properties completed
+// each step, help-widget use per step in the period) and the "Bloccati"
+// list (not ready 48 h after the host first saw the checklist, oldest first).
+let onboardingSort = { key: 'days', dir: 'desc' };
+function sortOnboarding(key) {
+  onboardingSort = onboardingSort.key === key ? { key, dir: onboardingSort.dir === 'desc' ? 'asc' : 'desc' } : { key, dir: key === 'done' ? 'asc' : 'desc' };
+  const box = document.getElementById('opsOnboarding');
+  if (box) box.outerHTML = renderOnboardingSection(window._onbEmails || {});
+}
+function renderOnboardingSection(userIdToEmail, now = Date.now()) {
+  window._onbEmails = userIdToEmail;
+  if (!readinessByProperty) return '<section id="opsOnboarding" aria-label="Onboarding"><div class="section-title">Onboarding</div><p role="status" style="font-size:0.75rem;color:var(--amber);">Readiness could not be loaded. Refresh to retry.</p></section>';
+  const props = allProperties.filter(p => !p.deleted_at && !p.is_test && readinessByProperty.has(p.id));
+  const help = onboardingHelpStats(allEvents);
+  const total = props.length;
+  const readyCount = props.filter(p => readinessByProperty.get(p.id).ready).length;
+  const funnel = ONBOARDING_STEPS.map(([id, label]) => {
+    const done = props.filter(p => (readinessByProperty.get(p.id).steps.find(st => st.id === id) || {}).done).length;
+    const h = help.byStep.get(id) || { opened: 0, clicked: 0 };
+    return { id, label, done, h };
+  });
+  const maxHelp = Math.max(0, ...funnel.map(f => f.h.opened + f.h.clicked));
+  const general = help.byStep.get('none') || { opened: 0, clicked: 0 };
+  const stuck = props.map(p => ({ p, rd: readinessByProperty.get(p.id) }))
+    .filter(({ rd }) => !rd.ready && rd.first_seen_at && now - Date.parse(rd.first_seen_at) > 48 * 3600000)
+    .map(x => ({ ...x, days: onboardingDays(x.rd.first_seen_at, now), clicks: (help.byProperty.get(x.p.id) || { opened: 0, clicked: 0 }) }));
+  const k = onboardingSort.key, sign = onboardingSort.dir === 'asc' ? 1 : -1;
+  const val = x => k === 'done' ? x.rd.done : k === 'clicks' ? x.clicks.opened + x.clicks.clicked : x.days;
+  stuck.sort((a, b) => sign * (val(a) - val(b)) || String(a.p.name || '').localeCompare(String(b.p.name || '')));
+  const th = (key, label) => `<th scope="col" aria-sort="${onboardingSort.key === key ? (onboardingSort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}"><button type="button" data-onb-sort="${key}" onclick="sortOnboarding('${key}')" style="border:0;background:transparent;font:inherit;cursor:pointer;padding:0;">${label}${onboardingSort.key === key ? (onboardingSort.dir === 'asc' ? ' ▲' : ' ▼') : ''}</button></th>`;
+  const reminders = rd => rd.nudges_opted_out ? 'Stopped by host' : [rd.nudge_24h_sent_at ? '24h ✓ ' + new Date(rd.nudge_24h_sent_at).toLocaleDateString('en-GB') : null, rd.nudge_72h_sent_at ? '72h ✓ ' + new Date(rd.nudge_72h_sent_at).toLocaleDateString('en-GB') : null].filter(Boolean).join(' · ') || (rd.checklist_dismissed_at ? 'Checklist dismissed' : 'None sent');
+  return `<section id="opsOnboarding" aria-label="Onboarding" style="margin-bottom:24px;">
+    <div class="section-title">Onboarding (${readyCount} of ${total} ready)</div>
+    <p style="font-size:0.72rem;color:var(--ink-soft);margin-bottom:8px;">Same 5-step readiness the host sees in the console checklist and the reminder emails use. Help = «Aiuto» widget opens and channel clicks in the selected period, by the step the host was on.</p>
+    <div style="overflow-x:auto;" tabindex="0" role="region" aria-label="Onboarding funnel">
+    <table class="data-table" data-onb-funnel style="width:100%;margin-bottom:16px;"><thead><tr><th scope="col">Step</th><th scope="col">Properties done</th><th scope="col">Help (opened · clicked)</th></tr></thead><tbody>
+      ${funnel.map(f => `<tr data-step="${f.id}"><td>${escapeHtml(f.label)}</td><td><strong>${f.done}</strong> / ${total}<div style="height:6px;background:var(--cream-2);border-radius:3px;margin-top:4px;max-width:180px;"><div style="height:6px;width:${total ? Math.round(f.done / total * 100) : 0}%;background:var(--green);border-radius:3px;"></div></div></td><td style="${maxHelp && f.h.opened + f.h.clicked === maxHelp ? 'color:var(--red);font-weight:600;' : ''}">${f.h.opened} · ${f.h.clicked}${maxHelp && f.h.opened + f.h.clicked === maxHelp ? ' — most help asked' : ''}</td></tr>`).join('')}
+      <tr><td style="color:var(--ink-soft);">Outside a step</td><td>—</td><td>${general.opened} · ${general.clicked}</td></tr>
+    </tbody></table></div>
+    <div class="section-title" style="font-size:0.95rem;">Bloccati (${stuck.length}) — not ready 48 h after first seeing the checklist</div>
+    <div style="overflow-x:auto;" tabindex="0" role="region" aria-label="Stuck hosts">
+    <table class="data-table" data-onb-stuck style="width:100%;"><thead><tr><th scope="col">Property</th><th scope="col">Host</th>${th('days', 'Started')}${th('done', 'Readiness')}<th scope="col">Stuck on</th><th scope="col">Reminders</th>${th('clicks', 'Help')}<th scope="col">Actions</th></tr></thead><tbody>
+      ${stuck.map(({ p, rd, days, clicks }) => { const step = rd.steps.find(st => st.id === rd.first_incomplete) || { missing: [] }; const email = userIdToEmail[p.owner_id] || ''; return `<tr data-onb-row="${escapeHtml(p.id)}"><td><strong>${escapeHtml(p.name || 'Unnamed')}</strong></td><td>${escapeHtml(email ? email.split('@')[0] : (p.host_names || '—'))}${email ? `<br><span style="font-size:0.65rem;color:var(--ink-soft)">${escapeHtml(email)}</span>` : ''}</td><td>${days} days ago</td><td><strong>${rd.done}/${rd.total}</strong></td><td>${escapeHtml(onboardingStepLabel(rd.first_incomplete))}${step.missing.length ? `<br><span style="font-size:0.65rem;color:var(--ink-soft)">Missing: ${escapeHtml(step.missing.map(m => ONBOARDING_MISSING[m] || m).join(', '))}</span>` : ''}</td><td style="font-size:0.72rem;">${escapeHtml(reminders(rd))}</td><td>${clicks.opened + clicks.clicked ? `${clicks.opened} opened · ${clicks.clicked} clicked${Object.keys(clicks.channels || {}).length ? `<br><span style="font-size:0.65rem;color:var(--ink-soft)">${escapeHtml(Object.entries(clicks.channels).map(([c, n]) => c + ' ' + n).join(', '))}</span>` : ''}` : '0'}</td><td><button type="button" onclick="viewAsHost('${escapeHtml(p.id)}')" style="padding:4px 8px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.65rem;cursor:pointer;">Console</button></td></tr>`; }).join('') || '<tr><td colspan="8" style="text-align:center;padding:16px;color:var(--ink-soft);">No host is stuck right now.</td></tr>'}
+    </tbody></table></div>
+  </section>`;
+}
+
 function renderOpsTab() {
   // Rebuild the lightweight per-host aggregate the Hosts & Properties
   // table wants. Same shape as renderDeepDive's version but sourced from
@@ -3136,6 +3221,7 @@ function renderOpsTab() {
     renderInvitesPanel() +
     renderPilotHostsEditor() +
     renderHostsPropertiesTable(userStats, userIdToEmail) +
+    renderOnboardingSection(userIdToEmail) +
     renderRetentionSection() +
     renderGdprSection() +
     renderOpsEventLog();
@@ -3545,7 +3631,7 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
       <label style="display:grid;gap:4px;flex:1 1 220px;">Search<input data-ops-search type="search" placeholder="Property, host, city or ID" style="font:inherit;padding:8px;min-width:0;border:1px solid var(--border);border-radius:6px;"></label>
       <label style="display:grid;gap:4px;">City<select data-ops-city aria-label="City" style="font:inherit;padding:8px;max-width:100%;border:1px solid var(--border);border-radius:6px;"><option value="all">All cities</option></select></label>
       <label style="display:grid;gap:4px;">Show<select data-ops-filter aria-label="Show" style="font:inherit;padding:8px;max-width:100%;border:1px solid var(--border);border-radius:6px;">
-        <option value="all">All rows</option><option value="failures">Alloggiati failures</option><option value="unconfirmed">Unconfirmed filings (not connected)</option><option value="allog_connection">Alloggiati not connected or with problems</option><option value="no_usage">No guest app usage (0%)</option><option value="low_usage">Low guest app usage (&lt;50%)</option><option value="no_bookings">No eligible bookings</option><option value="setup">Incomplete setup (&lt;80%)</option><option value="unavailable">Metrics unavailable</option><option value="no_property">Accounts without properties</option>
+        <option value="all">All rows</option><option value="failures">Alloggiati failures</option><option value="unconfirmed">Unconfirmed filings (not connected)</option><option value="allog_connection">Alloggiati not connected or with problems</option><option value="no_usage">No guest app usage (0%)</option><option value="low_usage">Low guest app usage (&lt;50%)</option><option value="no_bookings">No eligible bookings</option><option value="setup">Setup not ready</option><option value="unavailable">Metrics unavailable</option><option value="no_property">Accounts without properties</option>
       </select></label>
       <button type="button" data-ops-reset style="font:inherit;padding:8px 12px;border:1px solid var(--border);border-radius:6px;cursor:pointer;">Reset</button>
     </div>
@@ -3570,7 +3656,10 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
           const setupScore = [p.wifi_name, p.host_names, p.host_phone, p.address, p.cir_code].filter(Boolean).length;
           const setupPct = Math.round(setupScore / 5 * 100);
           const setupColor = setupPct >= 80 ? 'var(--green)' : setupPct >= 40 ? 'var(--amber)' : 'var(--red)';
-          return `<tr class="${adminRowClass(p)}"${attrs({propertyId:p.id,property:p.name || 'Unnamed',host:p._email || p.host_names || null,city:p.city || null,guests:p._checkin_count ?? 0,completed:checkinsAvailable ? m.completed : null,sent:checkinsAvailable ? m.sent : null,failed:checkinsAvailable ? failedReal : null,unconfirmed:checkinsAvailable ? unconfirmed : null,alloggiati:(allogConnectionState(p) || {}).rank ?? null,usage:usageAvailable && m.bookings ? m.used / m.bookings : null,hasBookings:usageAvailable ? m.bookings > 0 : null,setup:setupPct,activity:s.sessions.size || 0,lastActive:timestamp(s.lastSeen),missingMetrics:!checkinsAvailable || !usageAvailable,search:[p.name,p.id,p._email,p.host_names,p.host_phone,p.city,p.region].filter(Boolean).join(' ')})}>
+          const rd = readinessByProperty ? readinessByProperty.get(p.id) || null : null;
+          const rdPct = rd ? Math.round(rd.done / rd.total * 100) : null;
+          const rdColor = rd ? (rd.ready ? 'var(--green)' : rd.done >= 3 ? 'var(--amber)' : 'var(--red)') : null;
+          return `<tr class="${adminRowClass(p)}"${attrs({propertyId:p.id,property:p.name || 'Unnamed',host:p._email || p.host_names || null,city:p.city || null,guests:p._checkin_count ?? 0,completed:checkinsAvailable ? m.completed : null,sent:checkinsAvailable ? m.sent : null,failed:checkinsAvailable ? failedReal : null,unconfirmed:checkinsAvailable ? unconfirmed : null,alloggiati:(allogConnectionState(p) || {}).rank ?? null,usage:usageAvailable && m.bookings ? m.used / m.bookings : null,hasBookings:usageAvailable ? m.bookings > 0 : null,setup:readinessByProperty ? rdPct : setupPct,ready:rd ? rd.ready : null,activity:s.sessions.size || 0,lastActive:timestamp(s.lastSeen),missingMetrics:!checkinsAvailable || !usageAvailable,search:[p.name,p.id,p._email,p.host_names,p.host_phone,p.city,p.region].filter(Boolean).join(' ')})}>
             <td><strong>${p.name || 'Unnamed'}</strong><br>${copyableId(p.id, 'Property id')}</td>
             <td>${p._email ? `<strong>${p._email.split('@')[0]}</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">${p._email}</span>` : `${p.host_names || '—'}<br><span style="font-size:0.65rem;color:var(--ink-soft)">${p.host_phone || 'No account'}</span>`}</td>
             <td>${p.city || '—'}${p.region ? '<br><span style="font-size:0.65rem;color:var(--ink-soft)">' + p.region + '</span>' : ''}</td>
@@ -3580,7 +3669,7 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
             <td>${allogConnectionCell(p)}</td>
             <td style="text-align:center;color:${failedReal ? 'var(--red)' : 'inherit'};">${!checkinsAvailable ? unavailable : `${failedReal ? `<button type="button" onclick="showAlloggiatiSupport('${p.id}')" title="${m.missed && !notConnected ? `${m.failed - m.missed} failed attempt(s) · ${m.missed} missed (portal deadline passed, unfiled)` : 'Diagnose Alloggiati failures'} — open diagnostics" style="border:0;background:transparent;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;">${failedReal}</button>` : (unconfirmed ? '' : '0')}${unconfirmed ? `${failedReal ? '<br>' : ''}<button type="button" data-unconfirmed onclick="viewAsHost('${p.id}')" title="Past the portal deadline and never marked as sent. Not connected to Alloggiati, so nothing is filed automatically: the host may have filed by hand without pressing «Segna inviato», or not filed at all. Opens the host console." style="border:0;background:transparent;color:var(--amber);text-decoration:underline;cursor:pointer;font:inherit;white-space:nowrap;">${unconfirmed} not confirmed</button>` : ''}`}</td>
             <td style="text-align:center;white-space:nowrap;">${usageAvailable ? (m.bookings ? `<strong>${Math.round(m.used / m.bookings * 100)}%</strong><br><span style="font-size:0.65rem;color:var(--ink-soft);">${m.used} / ${m.bookings} bookings</span>` : '<span title="No eligible bookings arriving in this period">—</span>') : unavailable}</td>
-            <td style="text-align:center;"><span style="color:${setupColor};font-weight:600;">${setupPct}%</span></td>
+            <td style="text-align:center;white-space:nowrap;">${readinessByProperty ? (rd ? `<span style="color:${rdColor};font-weight:600;" title="${escapeHtml(rd.steps.filter(st => !st.done).map(st => onboardingStepLabel(st.id) + (st.missing.length ? ': ' + st.missing.map(k => ONBOARDING_MISSING[k] || k).join(', ') : '')).join(' · ') || 'All steps done')}">${rd.done}/${rd.total}${rd.ready ? ' ✓' : ''}</span><br><span style="font-size:0.65rem;color:var(--ink-soft);">${rd.ready ? 'Ready' : escapeHtml(onboardingStepLabel(rd.first_incomplete))}${rd.first_seen_at && !rd.ready ? ' · ' + onboardingDays(rd.first_seen_at) + 'd' : ''}</span>` : '—') : `<span style="color:${setupColor};font-weight:600;">${setupPct}%</span>`}</td>
             <td style="font-size:0.72rem;">${s.sessions.size || 0} sess · ${s.saves || 0} saves · ${s.exports || 0} exp</td>
             <td style="font-size:0.72rem;color:var(--ink-soft);">${s.lastSeen ? new Date(s.lastSeen).toLocaleDateString() : '—'}</td>
             <td style="font-size:0.72rem;white-space:nowrap;">${hostTermsCell(p.owner_id)}</td>
@@ -3593,7 +3682,7 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
             </div></td>
           </tr>`;
         }).join('')}
-        ${orphanedUsers.map(([email, s]) => `<tr style="opacity:0.55;"${attrs({propertyId:null,property:'No property',host:email,city:null,guests:0,completed:null,sent:null,alloggiati:null,failed:null,unconfirmed:null,usage:null,hasBookings:null,setup:null,activity:s.sessions.size,lastActive:timestamp(s.lastSeen),search:email+' No property'})}>
+        ${orphanedUsers.map(([email, s]) => `<tr style="opacity:0.55;"${attrs({propertyId:null,property:'No property',host:email,city:null,guests:0,completed:null,sent:null,alloggiati:null,failed:null,unconfirmed:null,usage:null,hasBookings:null,setup:null,ready:null,activity:s.sessions.size,lastActive:timestamp(s.lastSeen),search:email+' No property'})}>
           <td style="font-style:italic;color:var(--ink-soft);">No property</td>
           <td><strong>${email.split('@')[0]}</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">${email}</span></td>
           <td>—</td><td style="text-align:center;">0</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>

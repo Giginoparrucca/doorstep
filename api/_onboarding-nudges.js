@@ -93,6 +93,47 @@ export function renderNudgeEmail({ kind, lang, propertyName, step, doneCount, to
   return { subject, html, link };
 }
 
+// Readiness of one property from the same inputs as the console checklist
+// (host-onboarding.js _loadReadinessInputs): credentials saved, notification
+// settings, test check-in, skips/decisions, region rule.
+export function readinessFor(prop, row, creds, ns) {
+  return Readiness.computeReadiness({
+    property: prop, taxRules: Array.isArray(prop.tax_rules) ? prop.tax_rules : [],
+    alloggiatiCreds: creds ? { configured: true, verified_at: creds.verified_at || null } : null,
+    notificationSettings: ns || null, hasTestCheckin: !!(row && row.test_checkin_done_at),
+    onboardingState: row || { skips: {} }, regionCompliance: regionComplianceFor(prop.region, prop.city),
+  });
+}
+
+// Round 51 Phase 6 — admin readiness report: every live, non-test property
+// with its readiness and onboarding state. Four reads, computed here so the
+// admin view, the nudge emails and the host checklist use one rule. No guest
+// data, no credentials (only whether some are saved).
+export async function readinessReport({ get }) {
+  const [props, rows, creds, settings] = await Promise.all([
+    get('properties?deleted_at=is.null&is_test=is.false&select=*&order=id.asc&limit=1000'),
+    get('host_onboarding?select=user_id,property_id,first_seen_at,completed_at,test_checkin_done_at,skips,checklist_dismissed_at,nudge_24h_sent_at,nudge_72h_sent_at,nudges_opted_out&limit=5000'),
+    get('host_alloggiati_credentials?select=property_id,verified_at&limit=5000'),
+    get('host_notification_settings?select=host_id,push_enabled,telegram_enabled,email_mode&limit=5000'),
+  ]);
+  const byKey = new Map(rows.map(r => [r.user_id + '|' + r.property_id, r]));
+  const credBy = new Map(creds.map(c => [c.property_id, c]));
+  const nsBy = new Map(settings.map(n => [n.host_id, n]));
+  return props.map(prop => {
+    const row = byKey.get(prop.owner_id + '|' + prop.id) || null;
+    const r = readinessFor(prop, row, credBy.get(prop.id) || null, nsBy.get(prop.owner_id) || null);
+    return {
+      property_id: prop.id, owner_id: prop.owner_id || null,
+      ready: r.ready, done: r.doneCount, total: r.total, first_incomplete: r.firstIncompleteStep,
+      steps: r.steps.map(st => ({ id: st.id, done: !!st.done, skipped: !!st.skipped, missing: [...(st.missing || [])] })),
+      first_seen_at: row ? row.first_seen_at : null, completed_at: row ? row.completed_at : null,
+      checklist_dismissed_at: row ? row.checklist_dismissed_at : null,
+      nudge_24h_sent_at: row ? row.nudge_24h_sent_at : null, nudge_72h_sent_at: row ? row.nudge_72h_sent_at : null,
+      nudges_opted_out: row ? !!row.nudges_opted_out : false,
+    };
+  });
+}
+
 // The pass. `deps` keeps network access injectable for tests:
 //   get(path) / patch(path, body, prefer) → PostgREST via service role
 //   post(path, body) → PostgREST insert
@@ -120,12 +161,7 @@ export async function runNudgePass({ mode, now = new Date(), deps, appOrigin, se
       if (!prop || prop.deleted_at || prop.is_test || prop.owner_id !== row.user_id) { results.push({ ...r, outcome: 'skipped_property' }); continue; }
       const [creds] = await deps.get(`host_alloggiati_credentials?property_id=eq.${encodeURIComponent(prop.id)}&select=verified_at&limit=1`);
       const [ns] = await deps.get(`host_notification_settings?host_id=eq.${encodeURIComponent(row.user_id)}&select=push_enabled,telegram_enabled,email_mode&limit=1`);
-      const readiness = Readiness.computeReadiness({
-        property: prop, taxRules: Array.isArray(prop.tax_rules) ? prop.tax_rules : [],
-        alloggiatiCreds: creds ? { configured: true, verified_at: creds.verified_at || null } : null,
-        notificationSettings: ns || null, hasTestCheckin: !!row.test_checkin_done_at,
-        onboardingState: row, regionCompliance: regionComplianceFor(prop.region, prop.city),
-      });
+      const readiness = readinessFor(prop, row, creds, ns);
       const kind = force ? (force.kind || '24h') : selectNudge(row, readiness, now);
       if (!kind) { results.push({ ...r, outcome: readiness.ready ? 'ready' : 'not_due' }); continue; }
       const step = readiness.firstIncompleteStep || 'property';

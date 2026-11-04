@@ -46,7 +46,7 @@ import {
   send as soapSend,
 } from './_alloggiati-soap.js';
 import { notifyHostAutofileAlert, sendHostEmail, hostAccountEmail } from './_notify-host.js';
-import { runNudgePass } from './_onboarding-nudges.js';
+import { runNudgePass, readinessReport } from './_onboarding-nudges.js';
 import { collectReceipts } from './_alloggiati-receipts.js';
 
 // Round 49 Phase 1 — the Alloggiati reference tables, line builder,
@@ -1274,7 +1274,7 @@ export default async function handler(req, res) {
   const body = req.body || {};
   const propertyId = String(body.property_id || '').trim();
 
-  if (action.startsWith('support_')) return await handleAlloggiatiSupport(req, res, { url: SUPABASE_URL, anonKey: SUPABASE_ANON_KEY, serviceKey: SERVICE_KEY, get: sbGet, allog: AllogRecords, decrypt: decryptCredentials, generateToken, authenticationTest, test: soapTest });
+  if (action.startsWith('support_')) return await handleAlloggiatiSupport(req, res, { url: SUPABASE_URL, anonKey: SUPABASE_ANON_KEY, serviceKey: SERVICE_KEY, get: sbGet, allog: AllogRecords, decrypt: decryptCredentials, generateToken, authenticationTest, test: soapTest, readiness: () => readinessReport({ get: sbGet }) });
 
   const owner = await resolveHostAndProperty(req, propertyId, { allowAdmin: action === 'status' });
   if (owner.error) return res.status(owner.error.status).json(owner.error.body);

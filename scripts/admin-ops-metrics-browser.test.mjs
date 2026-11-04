@@ -36,6 +36,7 @@ function adminRowClass(){return '';}function copyableId(id){return id;}function 
 ${fn('escapeHtml')}
 let hostTermsByHost={owner:[{id:'acc-1',host_id:'owner',version:1,document_id:'doc-1',text_sha256:'a'.repeat(64),host_kind:'private',method:'password_login+email_otp',account_email:'host@example.invalid',created_at:'2026-11-01T10:00:00Z'}]};
 let legalDocsById={'doc-1':{id:'doc-1',kind:'host_terms',version:1,text_sha256:'a'.repeat(64),specific_clauses:[{ref:'15.2',label:'foro competente'}]}};
+let readinessByProperty=null;
 let allogConnections=new Map([['p',{property_id:'p',verified_at:'2026-11-01T09:00:00Z',wskey_expires_at:'2099-01-01T00:00:00Z',last_error:null,updated_at:'2026-11-01T08:00:00Z'}],['full',{property_id:'full',verified_at:null,wskey_expires_at:null,last_error:'authentication_failed',updated_at:'2026-10-30T08:00:00Z'}],['zero',{property_id:'zero',verified_at:null,wskey_expires_at:null,last_error:null,updated_at:'2026-10-30T08:00:00Z'}]]);
 allProperties[0].alloggiati_autofile_mode='live';
 function showAlloggiatiSupport(id){window.supportOpened=id;}

@@ -62,7 +62,7 @@ try{
   if(url.endsWith('/rpc/is_admin'))return ok(adminAllowed);
   if(url.includes('/rest/v1/properties?'))return ok([{id:property,name:'Fixture',owner_id:'owner',alloggiati_autofile_mode:'live'}]);
   if(url.endsWith('/admin_impersonation_log'))return ok(null);
-  if(url.includes('/rest/v1/host_alloggiati_credentials?')||url.includes('/rest/v1/checkins?')||url.includes('/rest/v1/alloggiati_filing_log?'))return ok([]);
+  if(url.includes('/rest/v1/host_alloggiati_credentials?')||url.includes('/rest/v1/checkins?')||url.includes('/rest/v1/alloggiati_filing_log?')||url.includes('/rest/v1/host_onboarding?')||url.includes('/rest/v1/host_notification_settings?'))return ok([]);
   throw Error('Unexpected external request');
  };
  async function dispatch(action){const response={setHeader(){},status(code){this.code=code;return this;},json(data){this.data=data;return this;}};await handler({method:'POST',query:{action},headers:{origin:'https://app.welcomebnb.it',authorization:'Bearer fixture-admin'},body:{property_id:property}},response);return response;}
@@ -72,6 +72,8 @@ try{
  assert.deepEqual(Object.keys(adminStatus.data).sort(),['admin_view','configured','last_error','updated_at','verified_at','wskey_expires_at']);
  for(const action of ['save','verify','validate','send','delete'])assert.equal((await dispatch(action)).code,403,action+' remains owner-only');
  const ov=await dispatch('support_overview');assert.equal(ov.code,200);assert.deepEqual(ov.data,{connections:[]});
- adminAllowed=false;assert.equal((await dispatch('support_status')).code,403);assert.equal((await dispatch('status')).code,403,'non-admin non-owner refused');assert.equal((await dispatch('support_overview')).code,403,'overview is admin-only');
+ const rdy=await dispatch('support_readiness');assert.equal(rdy.code,200);assert.equal(rdy.data.properties.length,1);assert.equal(rdy.data.properties[0].property_id,property);assert.equal(rdy.data.properties[0].ready,false);assert.equal(rdy.data.properties[0].total,5);
+ assert.ok(!JSON.stringify(rdy.data).match(/utente|password|wskey|credentials_enc|surname|document/i),'readiness carries no credentials or guest data');
+ adminAllowed=false;assert.equal((await dispatch('support_status')).code,403);assert.equal((await dispatch('status')).code,403,'non-admin non-owner refused');assert.equal((await dispatch('support_overview')).code,403,'overview is admin-only');assert.equal((await dispatch('support_readiness')).code,403,'readiness is admin-only');
 }finally{globalThis.fetch=originalFetch;}
 console.log('PASS real dispatcher support access and admin read-only status and overview, owner-only save/verify/validate/send/delete');

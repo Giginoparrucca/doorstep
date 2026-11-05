@@ -1033,6 +1033,101 @@ async function loadAllogConnections() {
   } catch (_) { return null; }
 }
 
+// Round 71 — host health (api/admin-host-health): coverage, filing, autofile,
+// credentials, setup gaps, upcoming arrivals, activity, colour + reasons.
+// { error } when it could not be read: shown as a notice, never as "all green".
+let hostHealth = null;
+async function loadHostHealth() {
+  try {
+    const { data } = await sb.auth.getSession();
+    const token = data?.session?.access_token;
+    if (!token) return { error: 'Not signed in' };
+    const r = await fetch('/api/admin-host-health', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: '{}', signal: AbortSignal.timeout(30000) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return { error: j.error || ('HTTP ' + r.status) };
+    return j;
+  } catch (e) { return { error: 'Host health could not be loaded' }; }
+}
+const HH_DOT = { red: '🔴', amber: '🟠', green: '🟢', grey: '⚪' };
+const HH_COLOR = { red: 'var(--red)', amber: 'var(--amber)', green: 'var(--green)', grey: 'var(--ink-soft)' };
+function hhDate(d) { return d ? new Date(d + (String(d).length === 10 ? 'T12:00:00Z' : '')).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : ''; }
+// Open the deep dive of the host who owns this property, scrolled to it.
+function openHostHealth(propertyId) {
+  const p = hostHealth && hostHealth.properties ? hostHealth.properties.find(x => x.property_id === propertyId) : null;
+  const email = p && p.owner_email;
+  if (!email) return;
+  const sel = document.getElementById('userFilter');
+  if (![...sel.options].some(o => o.value === email)) sel.add(new Option(email.split('@')[0], email));
+  sel.value = email;
+  setActiveTab('deepdive');
+  setTimeout(() => { const el = document.getElementById('hh-' + propertyId); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50);
+}
+// Overview: Action needed (red first, then date) + hosts by health.
+function renderHealthOverview() {
+  if (!hostHealth || hostHealth.error) return `<section id="hhOverview" aria-label="Host health"><div class="section-title">Action needed</div><p role="status" style="font-size:0.78rem;color:var(--amber);">${escapeHtml(hostHealth ? hostHealth.error : 'Loading host health…')}. Refresh to retry.</p></section>`;
+  const items = hostHealth.action_needed || [];
+  const line = it => `<li><button type="button" data-hh-open="${escapeHtml(it.property_id)}" onclick="openHostHealth('${escapeHtml(it.property_id)}')" style="border:0;background:transparent;font:inherit;cursor:pointer;text-align:left;padding:6px 0;color:var(--ink);width:100%;">${HH_DOT[it.color]} <strong>${escapeHtml(it.name || 'Unnamed')}</strong> · ${escapeHtml(it.text || '')}</button></li>`;
+  const hosts = hostHealth.properties || [];
+  return `<section id="hhOverview" aria-label="Host health" style="margin-bottom:22px;">
+    <div class="section-title">Action needed (${items.length})</div>
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:8px 16px;box-shadow:var(--shadow);margin-bottom:14px;">
+      ${items.length ? `<ul data-hh-actions style="list-style:none;margin:0;padding:0;font-size:0.85rem;">${items.map(line).join('')}</ul>` : '<p style="font-size:0.85rem;color:var(--ink-soft);margin:8px 0;">Nothing needs attention right now.</p>'}
+    </div>
+    <div class="section-title" style="font-size:0.95rem;">Hosts by health</div>
+    <div data-hh-hosts style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;">
+      ${hosts.map(h => `<button type="button" data-hh-card="${escapeHtml(h.property_id)}" onclick="openHostHealth('${escapeHtml(h.property_id)}')" style="text-align:left;font:inherit;cursor:pointer;background:var(--white);border:1px solid var(--border);border-left:4px solid ${HH_COLOR[h.health.color]};border-radius:var(--radius);padding:10px 12px;box-shadow:var(--shadow);color:var(--ink);">
+        <div style="font-weight:600;font-size:0.85rem;">${HH_DOT[h.health.color]} ${escapeHtml(h.name || 'Unnamed')}</div>
+        <div style="font-size:0.72rem;color:var(--ink-soft);margin-top:3px;">${escapeHtml(h.health.reasons[0] || 'All good')}</div>
+      </button>`).join('')}
+    </div>
+    <p style="font-size:0.68rem;color:var(--ink-soft);margin-top:8px;">Computed ${escapeHtml(new Date(hostHealth.generated_at).toLocaleString('en-GB'))}. Guests are shown as surname initial and arrival date only.</p>
+  </section>`;
+}
+function hhTile(label, value, target, status, hint, extra = '') {
+  return `<div data-hh-tile="${escapeHtml(label)}" style="flex:1 1 200px;min-width:0;background:var(--white);border:1px solid var(--border);border-top:4px solid ${HH_COLOR[status]};border-radius:var(--radius);padding:12px 14px;box-shadow:var(--shadow);">
+    <div class="stat-label">${escapeHtml(label)}</div>
+    <div style="font-size:1.4rem;font-weight:700;color:${HH_COLOR[status]};margin:2px 0;">${escapeHtml(value)}</div>
+    <div style="font-size:0.68rem;color:var(--ink-soft);">target ${escapeHtml(target)}</div>${extra}
+    ${hint && status !== 'green' ? `<div data-hh-hint style="font-size:0.74rem;margin-top:6px;color:var(--ink);">${escapeHtml(hint)}</div>` : ''}
+  </div>`;
+}
+// Deep dive of one host: one block per property they own.
+function renderHostHealthDetail(email) {
+  if (!hostHealth || hostHealth.error) return `<p role="status" style="font-size:0.78rem;color:var(--amber);">${escapeHtml(hostHealth ? hostHealth.error : 'Loading host health…')}. Refresh to retry.</p>`;
+  const mine = (hostHealth.properties || []).filter(p => p.owner_email && p.owner_email === email);
+  if (!mine.length) return '<p style="font-size:0.8rem;color:var(--ink-soft);">No live property for this host.</p>';
+  return mine.map(p => {
+    const c = p.coverage, f = p.filing, cr = p.credentials, a = p.activity;
+    const bars = `<div style="display:flex;gap:3px;align-items:flex-end;height:26px;margin-top:6px;" aria-label="Coverage by week, oldest first">${c.weeks.map(w => `<div title="${w.weeks_ago === 0 ? 'This week' : w.weeks_ago + ' weeks ago'}: ${w.covered}/${w.total}" style="flex:1;height:${w.total ? Math.max(3, Math.round((w.pct || 0) / 100 * 24)) : 2}px;background:${w.total ? (w.pct >= 85 ? 'var(--green)' : w.pct >= 50 ? 'var(--amber)' : 'var(--red)') : 'var(--border)'};border-radius:2px;"></div>`).join('')}</div>`;
+    const covValue = c.status === 'grey' ? 'No arrivals in 30 days' : `${c.pct}% (${c.covered}/${c.total})`;
+    const covExtra = (c.status === 'grey' ? '' : bars) + `<div style="font-size:0.68rem;color:var(--ink-soft);margin-top:4px;">Link reached guest: ${c.link_reached_pct === null ? '—' : c.link_reached_pct + '%'}${c.unlinkable ? ` · ${c.unlinkable} without booking code (not counted)` : ''}</div>`;
+    const ot = f.on_time;
+    const tiles = `<div data-hh-tiles style="display:flex;flex-wrap:wrap;gap:10px;margin:10px 0 14px;">
+      ${hhTile('Check-in coverage (30 days)', covValue, '≥ 85%', c.status, c.hint, covExtra)}
+      ${hhTile('Filed on time (30 days)', ot.total ? `${ot.pct}% (${ot.on_time}/${ot.total})` : 'Nothing due', '100%', ot.status, ot.hint, f.late_pec_30d ? `<div style="font-size:0.68rem;color:var(--ink-soft);margin-top:4px;">${f.late_pec_30d} filed late via PEC</div>` : '')}
+      ${hhTile('Overdue now', String(f.overdue.count), '0', f.overdue.status, f.overdue.hint, (f.overdue.due_today ? `<div style="font-size:0.68rem;color:var(--ink-soft);margin-top:4px;">${f.overdue.due_today} due today (not late yet)</div>` : '') + (f.old_unfiled && f.old_unfiled.count ? `<div style="font-size:0.68rem;color:var(--amber);margin-top:4px;">${f.old_unfiled.count} old unfiled since ${escapeHtml(hhDate(f.old_unfiled.oldest))}: ${escapeHtml(f.old_unfiled.hint)}</div>` : ''))}
+    </div>`;
+    const sub = t => `<div style="font-weight:600;font-size:0.85rem;margin:12px 0 6px;">${t}</div>`;
+    const box = inner => `<div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;box-shadow:var(--shadow);font-size:0.8rem;">${inner}</div>`;
+    const overdueList = f.overdue.rows.length ? sub('Overdue guests (surname initial · arrival · last error)') + box(`<ul style="margin:0;padding-left:18px;">${f.overdue.rows.map(r => `<li>${escapeHtml(r.guest)} · arr. ${escapeHtml(hhDate(r.arrival_date))}${r.last_error ? ' · ' + escapeHtml(r.last_error) : ''}</li>`).join('')}</ul>`) : '';
+    const upcoming = p.upcoming.length ? box(`<ul style="margin:0;padding-left:18px;">${p.upcoming.map(u => `<li>${escapeHtml(hhDate(u.checkin_date))} · ${escapeHtml(u.platform || '—')} · link ${u.link_reached ? 'opened by guest' : 'not opened yet'}</li>`).join('')}</ul><div style="margin-top:6px;color:var(--ink-soft);">${escapeHtml(HostHealthHints.upcoming)}</div>`) : box('<span style="color:var(--ink-soft);">None.</span>');
+    const attempts = p.autofile.last.length ? `<table class="data-table" style="width:100%;font-size:0.74rem;margin-top:6px;"><thead><tr><th scope="col">When</th><th scope="col">Trigger</th><th scope="col">Outcome</th><th scope="col">Error</th></tr></thead><tbody>${p.autofile.last.map(l => `<tr><td>${escapeHtml(new Date(l.run_at).toLocaleString('en-GB'))}</td><td>${escapeHtml(l.trigger)}</td><td style="color:${l.ok ? 'var(--green)' : 'var(--red)'};">${escapeHtml(l.outcome)}</td><td>${escapeHtml(l.error_code || '')}</td></tr>`).join('')}</tbody></table>` : '<div style="color:var(--ink-soft);margin-top:4px;">No automatic filing attempts recorded.</div>';
+    const credLine = `<div><span style="color:${HH_COLOR[cr.status]};font-weight:600;">${cr.configured ? (cr.problem ? '⚠ ' + escapeHtml(cr.problem) : '✓ Connected') : 'Not connected'}</span> · mode <strong>${escapeHtml(cr.mode)}</strong>${cr.verified_at ? ' · verified ' + escapeHtml(hhDate(cr.verified_at.slice(0, 10))) : ''}${cr.wskey_expires_at ? ' · key expires ' + escapeHtml(hhDate(cr.wskey_expires_at.slice(0, 10))) : ''}</div>${p.autofile.hint ? `<div style="margin-top:6px;color:var(--red);">${escapeHtml(p.autofile.hint)}</div>` : ''}`;
+    const gaps = p.setup_gaps.length ? box(`<ul style="margin:0;padding-left:18px;">${p.setup_gaps.map(g => `<li>${escapeHtml(g.label)}</li>`).join('')}</ul><button type="button" onclick="viewAsHost('${escapeHtml(p.property_id)}')" style="margin-top:8px;padding:4px 10px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.72rem;cursor:pointer;">Open host console</button>`) : box('<span style="color:var(--green);">No setup gaps.</span>');
+    const act = box(`<span style="color:${HH_COLOR[a.status]};font-weight:600;">${a.last_at ? 'Last host activity ' + escapeHtml(new Date(a.last_at).toLocaleDateString('en-GB')) + ' (' + a.days_idle + ' days ago)' : 'No host activity recorded'}</span>${a.status === 'grey' ? ' · no reservations in the last or next 30 days' : ''}<div style="color:var(--ink-soft);margin-top:4px;">Amber after 7 days, red after 14, only while the property has reservations.</div>`);
+    return `<section id="hh-${escapeHtml(p.property_id)}" data-hh-property="${escapeHtml(p.property_id)}" aria-label="Health of ${escapeHtml(p.name || 'property')}" style="margin-bottom:26px;">
+      <div class="section-title">${HH_DOT[p.health.color]} ${escapeHtml(p.name || 'Unnamed')}</div>
+      ${p.health.reasons.length ? `<div data-hh-reasons style="font-size:0.8rem;color:var(--ink);">${p.health.reasons.map(r => escapeHtml(r)).join(' · ')}</div>` : '<div style="font-size:0.8rem;color:var(--green);">All good.</div>'}
+      ${tiles}${overdueList}
+      ${sub('Upcoming arrivals without check-in (next 48 h)')}${upcoming}
+      ${sub('Automatic filing and Alloggiati connection')}${box(credLine + attempts)}
+      ${sub('Setup gaps')}${gaps}
+      ${sub('Activity')}${act}
+    </section>`;
+  }).join('');
+}
+const HostHealthHints = { upcoming: 'Nudge guest / tell host.' };
+
 // Round 51 Phase 6 — onboarding readiness per property, computed on the
 // server with the same rule as the host checklist and the reminder emails
 // (support_readiness). null = could not be read (shown as a dash).
@@ -1111,6 +1206,7 @@ async function loadData() {
   const hostsPromise = sb.rpc('list_hosts_for_admin').then(r => r, err => ({ data: null, error: err }));
   const allogPromise = loadAllogConnections();
   const readinessPromise = loadReadiness();
+  const hostHealthPromise = loadHostHealth();
   let eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes, invitesRes, opsRes, termsRes, legalRes;
   try {
     [eventsRes, propsRes, checkinsRes, recosRes, chatRes, pilotRes, invitesRes, opsRes, termsRes, legalRes] = await Promise.all([
@@ -1155,6 +1251,7 @@ async function loadData() {
   if (hostsRes.error) console.warn('list_hosts_for_admin failed (host attribution falls back to events):', hostsRes.error.message || hostsRes.error);
   allogConnections = await allogPromise;
   readinessByProperty = await readinessPromise;
+  hostHealth = await hostHealthPromise;
   hostEmailById = {};
   (hostsRes.data || []).forEach(h => { if (h && h.user_id && h.email) hostEmailById[h.user_id] = h.email; });
   allProperties = propsRes.data || [];
@@ -1856,7 +1953,10 @@ function renderDeepDive() {
   const isUserView = selectedUser !== 'all';
 
   if (events.length === 0) {
-    document.getElementById('content').innerHTML = '<div class="loading">No events for this selection.</div>';
+    // Round 71: a host with no console events in the period still has a health view.
+    document.getElementById('content').innerHTML = isUserView
+      ? `<div class="section-title">Host health · ${escapeHtml(selectedUser.split('@')[0])}</div>` + renderHostHealthDetail(selectedUser) + '<div class="loading">No console events for this host in the selected period.</div>'
+      : '<div class="loading">No events for this selection.</div>';
     return;
   }
 
@@ -1967,7 +2067,13 @@ function renderDeepDive() {
       </div>`;
   }
 
-  // Stats
+  // Round 71: a selected host gets the health detail (targets, colours,
+  // hints) instead of the raw console-usage counts; «All users» keeps the
+  // overview counts under the Action needed list.
+  if (isUserView) {
+    html += `<div class="section-title">Host health · ${escapeHtml(selectedUser.split('@')[0])}</div>` + renderHostHealthDetail(selectedUser);
+  } else {
+  html += renderHealthOverview();
   html += `<div class="section-title">Overview${isUserView ? ' · ' + selectedUser.split('@')[0] : ''}</div>
     <div class="stats">
       ${!isUserView ? `<div class="stat">
@@ -2006,6 +2112,7 @@ function renderDeepDive() {
         <div class="stat-sub">generated</div>
       </div>
     </div>`;
+  }
 
   // ══════════════════════════════════════
   // GUEST ACTIVITY — aggregated from guest_* events
@@ -2161,8 +2268,8 @@ function renderDeepDive() {
     }
   }
 
-  // Daily activity
-  if (sortedDays.length > 1) {
+  // Daily activity (removed from the per-host view in Round 71: no target or action)
+  if (!isUserView && sortedDays.length > 1) {
     html += `<div class="section-title">Daily Activity</div>
       <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);">
         <div style="display:flex;align-items:flex-end;gap:2px;height:60px;">
@@ -2178,8 +2285,8 @@ function renderDeepDive() {
       </div>`;
   }
 
-  // Feature usage
-  if (featureUsage.length > 0) {
+  // Feature usage (removed from the per-host view in Round 71)
+  if (!isUserView && featureUsage.length > 0) {
     html += `<div class="section-title">Feature Usage</div>
       <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);">
         <div class="bar-chart">
@@ -2196,8 +2303,8 @@ function renderDeepDive() {
       </div>`;
   }
 
-  // Panel time
-  if (panelTimeEntries.length > 0) {
+  // Panel time (removed from the per-host view in Round 71)
+  if (!isUserView && panelTimeEntries.length > 0) {
     html += `<div class="section-title">Time Spent per Section</div>
       <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);">
         <div class="bar-chart">
@@ -2960,7 +3067,7 @@ function renderPilotTab() {
   // ── ZONE C: recent activity feed ────────────────────────────────────
   const zoneC = renderPilotActivityFeed(propToEmail);
 
-  document.getElementById('content').innerHTML = zoneA + zoneB + zoneC;
+  document.getElementById('content').innerHTML = renderHealthOverview() + zoneA + zoneB + zoneC;
 }
 
 // Zone B — one card per host. Classifier picks the status label, sparkline

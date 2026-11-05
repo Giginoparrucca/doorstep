@@ -52,11 +52,11 @@ const base = (x = {}) => ({ property: prop(), now: NOW, reservations: [], checki
   assert.equal(r.filing.on_time.status, 'red');
   assert.equal(r.filing.overdue.count, 2); assert.deepEqual(r.filing.overdue.rows.map(x => x.arrival_date), ['2026-10-25', '2026-11-04']);
   assert.deepEqual([r.filing.old_unfiled.count, r.filing.old_unfiled.oldest], [1, '2026-09-01'], 'older than 30 days: old unfiled, not overdue');
-  assert.match(r.health.reasons.join(' '), /1 old unfiled record \(since 2026-09-01\)/);
+  assert.match(r.health.reasons.join(' '), /1 old unfiled record \(since 1 Sep\)/);
   assert.equal(r.filing.overdue.due_today, 1); assert.equal(r.filing.late_pec_30d, 1);
   assert.deepEqual(r.filing.overdue.rows.map(x => x.guest), ['R.', 'R.'], 'surname initial only');
   assert.ok(!JSON.stringify(r).includes('Rossi') && !JSON.stringify(r).includes('Verdi'), 'no surname leaves the module');
-  assert.equal(r.health.color, 'red'); assert.match(r.health.reasons[0], /^2 filings overdue \(arr\. 2026-10-25\)$/);
+  assert.equal(r.health.color, 'red'); assert.match(r.health.reasons[0], /^2 filings overdue \(arr\. 25 Oct\)$/);
   // Only old unfiled rows → amber, not red.
   const oldOnly = H.computeHostHealth(base({ checkins: [ci('H', '2026-09-01')], reservations: [res('A', '2026-11-20')] }));
   assert.equal(oldOnly.filing.overdue.count, 0); assert.equal(oldOnly.health.color, 'amber');

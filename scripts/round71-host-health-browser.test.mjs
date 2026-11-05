@@ -19,12 +19,13 @@ const prop = (id, name, owner, x = {}) => ({ id, name, owner_id: owner, timezone
 const res = (pid, code, d) => ({ id: pid + code, property_id: pid, booking_code: code, checkin_date: d, platform: 'airbnb', entry_type: 'reservation', status: 'active' });
 const ci = (pid, code, d, x = {}) => ({ id: pid + code + d + (x.n || ''), property_id: pid, booking_code: code, surname: 'Rossi', arrival_date: d, filed_at: null, ...x });
 const cases = [
-  { p: prop('red', 'Casa Rossa', 'o1'), reservations: [res('red', 'A', '2026-11-01'), res('red', 'B', '2026-11-02')], checkins: [ci('red', 'A', '2026-11-01'), ci('red', 'A', '2026-11-01', { n: 2, surname: 'Bianchi' })], creds: okCreds('red'), recos: 12 },
+  { p: prop('red', 'Casa Rossa', 'o1'), reservations: [res('red', 'A', '2026-11-01'), res('red', 'B', '2026-11-02')], checkins: [ci('red', 'A', '2026-11-01'), ci('red', 'A', '2026-11-01', { n: 2, surname: 'Bianchi' })], creds: okCreds('red'), recos: 12,
+    log: [{ property_id: 'red', trigger: 'autofile', outcome: 'test_rejected', error_code: 'validation_failed', run_at: '2026-11-02T08:00:00Z', checkin_ids: ['redA2026-11-01', 'redA2026-11-012'], error_detail: 'redA2026-11-01: SCHEDINA_CAMPO_NON_CORRETTO: Ospite con Capo Gruppo o Capo Famiglia Mancante' }] },
   { p: prop('amber', 'Borgo Ambra', 'o2', { cir_code: '' }), reservations: [res('amber', 'C', '2026-11-03'), res('amber', 'D', '2026-11-06')], checkins: [ci('amber', 'C', '2026-11-03', { filed_at: '2026-11-03T12:00:00Z' })], creds: okCreds('amber'), recos: 4, codes: ['C'] },
   { p: prop('green', 'Villa Verde', 'o3'), reservations: [res('green', 'E', '2026-11-01')], checkins: [ci('green', 'E', '2026-11-01', { filed_at: '2026-11-01T12:00:00Z' })], creds: okCreds('green'), recos: 15, codes: ['E'] },
   { p: prop('grey', 'Casa Grigia', 'o4'), reservations: [], checkins: [], creds: okCreds('grey'), recos: 15 },
 ];
-const results = H.sortByHealth(cases.map(c => Object.assign(H.computeHostHealth({ property: c.p, now: NOW, reservations: c.reservations, checkins: c.checkins, filingLog: [], credentials: c.creds, onboarding: { skips: {} },
+const results = H.sortByHealth(cases.map(c => Object.assign(H.computeHostHealth({ property: c.p, now: NOW, reservations: c.reservations, checkins: c.checkins, filingLog: c.log || [], credentials: c.creds, onboarding: { skips: {} },
   recommendationCount: c.recos, guestEventCodes: c.codes || [], lastActivityAt: '2026-11-04T10:00:00Z', regionCompliance: null }), { owner_email: c.p.owner_id + '@example.invalid' })));
 const payload = { generated_at: NOW, properties: results, action_needed: H.actionNeeded(results) };
 
@@ -66,6 +67,11 @@ try {
     assert.match(t[1], /Filed on time.*target 100%/s);
     assert.match(t[2], /Overdue now\s*2\s*target 0/); assert.match(t[2], /must file today or send a PEC/);
     const detail = await page.locator('[data-hh-property="red"]').textContent();
+    // The original transmission failure, crisp, on the Overdue tile and per guest.
+    assert.equal((await page.locator('[data-hh-property="red"] [data-hh-why] strong').textContent()).trim(), 'Group head missing');
+    assert.match(await page.locator('[data-hh-property="red"] [data-hh-why-original]').textContent(), /Portal: SCHEDINA_CAMPO_NON_CORRETTO — Ospite con Capo Gruppo o Capo Famiglia Mancante/);
+    assert.match(detail, /R\. · arr\. 1 Nov · Group head missing/);
+    assert.match(detail, /portal rejected the guest data|Group head missing/);
     assert.match(detail, /R\. · arr\. 1 Nov/); assert.ok(!/Rossi|Bianchi/.test(detail), 'surname initial only');
     assert.match(detail, /Upcoming arrivals without check-in/); assert.match(detail, /Automatic filing and Alloggiati connection/); assert.match(detail, /Setup gaps/); assert.match(detail, /Activity/);
     // Green tile shows no hint; amber property shows its gaps and console link.

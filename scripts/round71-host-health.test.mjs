@@ -85,7 +85,16 @@ const base = (x = {}) => ({ property: prop(), now: NOW, reservations: [], checki
   assert.match(data.autofile.hint, /rejected the guest data, not the login \(SCHEDINA_CAMPO_NON_CORRETTO: Ospite con Capo Gruppo o Capo Famiglia Mancante\)/);
   assert.match(data.autofile.hint, /past the portal deadline: the host must use «Invio tardivo»/, 'arrival 31 Oct, today 5 Nov: window closed');
   assert.ok(!/credentials/.test(data.autofile.hint)); assert.match(data.health.reasons.join(' '), /portal rejected the guest data 3 times in a row \(not the login\)/);
-  assert.equal(data.autofile.last[0].kind, 'data'); assert.equal(data.autofile.last[0].reason, 'SCHEDINA_CAMPO_NON_CORRETTO: Ospite con Capo Gruppo o Capo Famiglia Mancante');
+  assert.equal(data.autofile.last[0].kind, 'data'); assert.deepEqual(data.autofile.last[0].reason, { code: 'SCHEDINA_CAMPO_NON_CORRETTO', message: 'Ospite con Capo Gruppo o Capo Famiglia Mancante', short: 'Group head missing' });
+  // Overdue tile «why» = the original portal reason of the overdue guests (the row itself only says past_portal_window).
+  const why = H.computeHostHealth(base({ filingLog: [ { ...rej('2026-11-01T22:50:00Z'), error_detail: 'c-CAR2026-10-31: SCHEDINA_CAMPO_NON_CORRETTO: Ospite con Capo Gruppo o Capo Famiglia Mancante' } ],
+    reservations: [res('CAR', '2026-10-31')], checkins: [ci('CAR', '2026-10-31', { autofile_last_error: 'past_portal_window' }), ci('CAR', '2026-10-31', { n: 2, autofile_last_error: 'past_portal_window' })] }));
+  assert.deepEqual(why.filing.overdue.rows.map(r => r.reason.short), ['Group head missing', 'Portal deadline passed'], 'guest covered by the attempt gets its reason; the other falls back to its own error');
+  assert.deepEqual(why.filing.overdue.why, { short: 'Group head missing', code: 'SCHEDINA_CAMPO_NON_CORRETTO', message: 'Ospite con Capo Gruppo o Capo Famiglia Mancante', guests: 1 });
+  // checkin_ids also link an attempt to its guests.
+  const byIds = H.computeHostHealth(base({ filingLog: [{ property_id: P, trigger: 'autofile', outcome: 'test_rejected', error_code: 'validation_failed', run_at: '2026-11-04T10:00:00Z', error_detail: 'SCHEDINA_CAMPO_NON_CORRETTO | ok', checkin_ids: ['c-K2026-11-03'] }],
+    checkins: [ci('K', '2026-11-03')] }));
+  assert.deepEqual(byIds.filing.overdue.rows[0].reason, { code: 'SCHEDINA_CAMPO_NON_CORRETTO', message: null, short: 'Invalid guest field' });
   assert.equal(data.autofile.last[3].kind, 'portal', 'cred_error with a timeout is the portal, not the login');
   assert.ok(!JSON.stringify(data).includes('ade978ef'), 'only the portal code and message leave the module');
   assert.equal(data.autofile.last_attempt_at, '2026-11-01T22:50:00Z');
@@ -149,5 +158,11 @@ const base = (x = {}) => ({ property: prop(), now: NOW, reservations: [], checki
   const list = [mk('g', 'green', 'x'), mk('a1', 'amber', 'gap', null, '2026-11-06'), mk('r2', 'red', '1 filing overdue', '2026-11-03'), mk('r1', 'red', '2 filings overdue', '2026-11-01'), mk('grey', 'grey', 'none'), mk('a2', 'amber', 'cov')];
   assert.deepEqual(H.actionNeeded(list).map(x => x.property_id), ['r1', 'r2', 'a1', 'a2']);
   assert.deepEqual(H.sortByHealth(list).map(x => x.health.color), ['red', 'red', 'amber', 'amber', 'green', 'grey']); }
+
+// Crisp labels.
+{ const t = [['SCHEDINA_CAMPO_NON_CORRETTO', 'Data di nascita non valida', 'Birth date wrong'], ['SCHEDINA_X', 'Stato di cittadinanza non valido', 'Citizenship wrong'], ['SCHEDINA_X', 'Numero documento non valido', 'Document wrong'],
+    ['SCHEDINA_X', 'Comune di nascita errato', 'Birthplace wrong'], ['past_portal_window', null, 'Portal deadline passed'], ['timeout', null, 'Portal not answering'], ['generate_token_failed', null, 'Login failed'], ['group_member_invalid', null, 'Other group guest invalid']];
+  for (const [c, m, want] of t) assert.equal(H.shortReason(c, m), want, c + ' ' + m);
+  assert.equal(H.portalReason('passport AB1234567 rejected'), null, 'a document number never matches as a code'); }
 
 console.log('PASS round71 host health: coverage (multi-guest once, unlinkable, blocks/echo/cancelled/test excluded, 30-day window, weekly bars, link-reach hint, 85/50 thresholds), filing on time (property-tz deadline, not-yet-due excluded, excluded rows), overdue vs due today, late PEC, non-Rome timezone, autofile last-3 (evidence rows ignored), credentials rules, setup gaps (ROSS1000 by region, skips, legacy welcome), upcoming 48 h, activity, health colours/reasons, action-needed order, surname initial only');

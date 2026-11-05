@@ -80,7 +80,13 @@ const base = (x = {}) => ({ property: prop(), now: NOW, reservations: [], checki
 
 // Credentials.
 { const c = x => H.computeHostHealth(base({ credentials: x })).credentials;
-  assert.equal(c(null).status, 'red', 'missing while live');
+  // Not connected while live = manual filing: amber, red only with overdue filings (Daniele, 5 Nov 2026).
+  assert.equal(c(null).status, 'amber', 'missing while live, nothing overdue'); assert.equal(c(null).problem, 'not connected (manual filing only)');
+  { const withRes = H.computeHostHealth(base({ credentials: null, reservations: [res('A', '2026-11-20')] }));
+    assert.equal(withRes.health.color, 'amber'); assert.match(withRes.health.reasons.join(' '), /Alloggiati not connected \(manual filing only\)/);
+    assert.ok(!withRes.setup_gaps.some(g => g.key === 'alloggiati'), 'not repeated as a setup gap');
+    const withOverdue = H.computeHostHealth(base({ credentials: null, reservations: [res('A', '2026-11-03')], checkins: [ci('A', '2026-11-03')] }));
+    assert.equal(withOverdue.credentials.status, 'red'); assert.equal(withOverdue.health.color, 'red'); assert.match(withOverdue.health.reasons.join(' '), /Alloggiati not connected/); }
   assert.equal(H.computeHostHealth(base({ credentials: null, property: prop({ alloggiati_autofile_mode: 'off' }) })).credentials.status, 'grey');
   assert.equal(c({ ...okCreds, verified_at: null }).status, 'red'); assert.equal(c({ ...okCreds, last_error: 'auth_failed' }).status, 'red');
   assert.equal(c({ ...okCreds, wskey_expires_at: '2026-11-12T00:00:00Z' }).status, 'amber'); assert.equal(c({ ...okCreds, wskey_expires_at: '2026-11-01T00:00:00Z' }).problem, 'key expired');
@@ -94,6 +100,7 @@ const base = (x = {}) => ({ property: prop(), now: NOW, reservations: [], checki
   assert.deepEqual(gaps({ property: prop({ tax_rate_eur: null, ical_feeds: [] }), onboarding: { skips: { tax_not_applicable: true, direct_only: true } } }), []);
   assert.deepEqual(gaps({ property: prop({ welcome_message_it: '', welcome_message: 'legacy' }) }), [], 'legacy welcome message counts');
   assert.deepEqual(gaps({ credentials: { ...okCreds, verified_at: null }, property: prop({ alloggiati_autofile_mode: 'off' }) }), [], 'unverified is already a red credentials reason');
+  assert.deepEqual(gaps({ credentials: null }), [], 'not connected while live is a health reason, not a gap');
   assert.deepEqual(gaps({ credentials: null, property: prop({ alloggiati_autofile_mode: 'off' }) }), ['alloggiati'], 'missing while off: a gap, not red'); }
 
 // Upcoming 48 h without check-in.
@@ -105,6 +112,15 @@ const base = (x = {}) => ({ property: prop(), now: NOW, reservations: [], checki
 { const r = H.computeHostHealth(base({ reservations: [res('A', '2026-11-20')], lastActivityAt: '2026-10-10T10:00:00Z' }));
   assert.equal(r.activity.status, 'red'); assert.equal(r.activity.days_idle, 25); assert.match(r.health.reasons.join(' '), /host inactive for 25 days/);
   const quiet = H.computeHostHealth(base({ lastActivityAt: '2026-09-01T10:00:00Z' })); assert.equal(quiet.activity.status, 'grey', 'no reservations: inactivity is not flagged'); }
+
+// No reservations in the last/next 30 days → grey even with other reasons (Daniele, 5 Nov 2026),
+// except overdue filings, which stay red; the reasons are kept.
+{ const quiet = H.computeHostHealth(base({ credentials: { ...okCreds, verified_at: null }, property: prop({ cir_code: '' }) }));
+  assert.equal(quiet.health.color, 'grey'); assert.equal(quiet.health.reasons[0], 'no reservations in the last or next 30 days');
+  assert.match(quiet.health.reasons.join(' '), /Alloggiati saved, never verified/); assert.match(quiet.health.reasons.join(' '), /CIN missing/);
+  const legal = H.computeHostHealth(base({ checkins: [ci('Z', '2026-11-02')] }));
+  assert.equal(legal.health.color, 'red', 'overdue filing without a reservation stays red'); assert.match(legal.health.reasons[0], /1 filing overdue/);
+  assert.deepEqual(H.actionNeeded([quiet, legal]).map(x => x.color), ['red'], 'grey properties are not in Action needed'); }
 
 // Green host.
 { const r = H.computeHostHealth(base({ reservations: [res('A', '2026-11-01')], checkins: [ci('A', '2026-11-01', { filed_at: '2026-11-01T15:00:00Z', alloggiati_status: 'filed' })], guestEventCodes: ['A'] }));

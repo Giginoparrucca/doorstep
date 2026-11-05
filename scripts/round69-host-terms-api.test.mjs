@@ -16,7 +16,9 @@ assert.ok(guestSrc.includes("if (req.query?.host_terms === '1') return handleHos
 assert.ok(guestSrc.indexOf("host_terms === '1'") > guestSrc.indexOf("if (req.method !== 'POST')"), 'after the CORS and POST checks');
 assert.ok(guestSrc.indexOf("host_terms === '1'") < guestSrc.indexOf('verifyFromAuthHeader(auth)'), 'before the guest-token check (host JWT instead)');
 assert.ok(read('lib/deployment-config.mjs').toString().includes("{source:'/api/host-terms',destination:'/api/guest?host_terms=1'}"), 'rewrite present');
-assert.equal(fs.readdirSync(new URL('api/', root)).filter(n => n.endsWith('.js') && !n.startsWith('_')).length, 12, 'function budget still 12');
+// Host terms stay mounted on /api/guest (no own function). Vercel Pro since 5 Nov 2026: the list, not a cap, is checked.
+assert.ok(!fs.existsSync(new URL('api/host-terms.js', root)), 'host terms have no function of their own');
+assert.deepEqual(fs.readdirSync(new URL('api/', root)).filter(n => n.endsWith('.js') && !n.startsWith('_')).sort(), ['admin-host-health.js', 'admin-invite-host.js', 'alloggiati.js', 'chat.js', 'guest-token.js', 'guest.js', 'ical-sync.js', 'parse-tax-delibera.js', 'push-config.js', 'scan-document.js', 'send-arrival-reminders.js', 'telegram-link.js', 'telegram-webhook.js'], 'hosting functions (add deliberately)');
 
 // ── In-memory stand-in ───────────────────────────────────────────────────
 const HOST = randomUUID(), OTHER = randomUUID(), PEPPER = 'fictional-pepper-0123456789abcdef';
@@ -199,4 +201,4 @@ assert.equal((await call({ action: 'status' })).body.accepted, false, 'v2 with r
 docs[1].published_at = new Date(clock + 86400000).toISOString();
 assert.equal((await call({ action: 'status' })).body.current.version, 1, 'unpublished future version ignored');
 
-console.log('PASS round69-host-terms-api: mounted on /api/guest via /api/host-terms (budget still 12); no/bad JWT 401; flag off → accepted; fail closed without service key or pepper; codes emailed, never returned, stored as keyed hash; 3 per 15 min; failed email frees the slot; stale version/text, missing host kind, general-only, specific-only refused; wrong codes counted, 6th attempt blocked; expired and other host codes refused; success writes one evidence row (host kind, method, IP, user agent, times) and emails a receipt with clause list, hashes and exact texts, receipt id stored; retry idempotent; re-acceptance follows requires_reacceptance');
+console.log('PASS round69-host-terms-api: mounted on /api/guest via /api/host-terms (no own function); no/bad JWT 401; flag off → accepted; fail closed without service key or pepper; codes emailed, never returned, stored as keyed hash; 3 per 15 min; failed email frees the slot; stale version/text, missing host kind, general-only, specific-only refused; wrong codes counted, 6th attempt blocked; expired and other host codes refused; success writes one evidence row (host kind, method, IP, user agent, times) and emails a receipt with clause list, hashes and exact texts, receipt id stored; retry idempotent; re-acceptance follows requires_reacceptance');

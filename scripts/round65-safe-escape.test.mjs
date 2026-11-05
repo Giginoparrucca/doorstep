@@ -28,7 +28,8 @@ for(const name of ['index.html','admin.html']){
 }
 const headers=deploymentConfig({}).headers;assert.ok(headers.some(r=>r.source==='/(.*)'&&JSON.stringify(r.headers)===JSON.stringify(securityHeaders)));
 assert.ok(deploymentConfig({}).rewrites.some(r=>r.source==='/api/csp-report'&&r.destination==='/api/guest?csp_report=1'));
-assert.ok(fs.readdirSync(new URL('../api/',import.meta.url)).filter(n=>n.endsWith('.js')&&!n.startsWith('_')).length<=12,'current hosting function budget');
+// Vercel Pro since 5 Nov 2026 (no 12-function cap): the exact function list keeps additions deliberate.
+assert.deepEqual(fs.readdirSync(new URL('../api/',import.meta.url)).filter(n=>n.endsWith('.js')&&!n.startsWith('_')).sort(),['admin-host-health.js', 'admin-invite-host.js', 'alloggiati.js', 'chat.js', 'guest-token.js', 'guest.js', 'ical-sync.js', 'parse-tax-delibera.js', 'push-config.js', 'scan-document.js', 'send-arrival-reminders.js', 'telegram-link.js', 'telegram-webhook.js'],'hosting functions (add deliberately)');
 assert.ok(headers.some(r=>r.source==='/app-config.js'),'existing cache policy retained');
 assert.ok(resourcePolicy.includes('report-uri /api/csp-report'));assert.ok(resourcePolicy.includes('wss://*.supabase.co'));
 assert.ok(!securityHeaders.find(x=>x.key==='Content-Security-Policy').value.includes('script-src'),'resource restriction remains report-only');

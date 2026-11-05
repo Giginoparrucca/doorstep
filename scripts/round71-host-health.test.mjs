@@ -74,7 +74,25 @@ const base = (x = {}) => ({ property: prop(), now: NOW, reservations: [], checki
   const failing = [log('test_rejected', '2026-11-05T08:00:00Z'), log('evidence_completed', '2026-11-05T08:00:01Z'), log('cred_error', '2026-11-04T08:00:00Z'), log('test_rejected', '2026-11-03T08:00:00Z'), log('filed', '2026-11-01T08:00:00Z')];
   const r = H.computeHostHealth(base({ filingLog: failing, reservations: [res('A', '2026-11-04')], checkins: [ci('A', '2026-11-04', { filed_at: '2026-11-04T12:00:00Z' })] }));
   assert.equal(r.autofile.last_three_failed, true); assert.equal(r.autofile.last.length, 4, 'evidence row excluded'); assert.equal(r.autofile.hint, H.HINTS.failures);
-  assert.equal(r.health.color, 'red'); assert.match(r.health.reasons.join(' '), /last 3 automatic filings failed/);
+  assert.equal(r.autofile.failure_kind, 'login', 'a cred_error among the last 3 → login problem');
+  assert.equal(r.health.color, 'red'); assert.match(r.health.reasons.join(' '), /Alloggiati login failing \(3 attempts\)/);
+  // Caralis case: the portal rejected the guest data 3 times (login fine) → data hint with the portal reason, never the credentials hint.
+  const rej = t => ({ property_id: P, trigger: 'autofile', outcome: 'test_rejected', error_code: 'validation_failed', run_at: t,
+    error_detail: 'ade978ef-f9af-4edc-aae2-5108f7dcf9e4: SCHEDINA_CAMPO_NON_CORRETTO: Ospite con Capo Gruppo o Capo Famiglia Mancante' });
+  const data = H.computeHostHealth(base({ filingLog: [rej('2026-11-01T22:50:00Z'), rej('2026-11-01T22:40:00Z'), rej('2026-11-01T22:30:00Z'), { property_id: P, trigger: 'autofile', outcome: 'cred_error', error_code: 'timeout', run_at: '2026-11-01T22:00:00Z' }],
+    reservations: [res('CAR', '2026-10-31')], checkins: [ci('CAR', '2026-10-31')] }));
+  assert.equal(data.autofile.failure_kind, 'data');
+  assert.match(data.autofile.hint, /rejected the guest data, not the login \(SCHEDINA_CAMPO_NON_CORRETTO: Ospite con Capo Gruppo o Capo Famiglia Mancante\)/);
+  assert.match(data.autofile.hint, /past the portal deadline: the host must use «Invio tardivo»/, 'arrival 31 Oct, today 5 Nov: window closed');
+  assert.ok(!/credentials/.test(data.autofile.hint)); assert.match(data.health.reasons.join(' '), /portal rejected the guest data 3 times in a row \(not the login\)/);
+  assert.equal(data.autofile.last[0].kind, 'data'); assert.equal(data.autofile.last[0].reason, 'SCHEDINA_CAMPO_NON_CORRETTO: Ospite con Capo Gruppo o Capo Famiglia Mancante');
+  assert.equal(data.autofile.last[3].kind, 'portal', 'cred_error with a timeout is the portal, not the login');
+  assert.ok(!JSON.stringify(data).includes('ade978ef'), 'only the portal code and message leave the module');
+  assert.equal(data.autofile.last_attempt_at, '2026-11-01T22:50:00Z');
+  // Timeouts only → portal hint.
+  const to = t => ({ property_id: P, trigger: 'autofile', outcome: 'cred_error', error_code: 'timeout', run_at: t });
+  const portal = H.computeHostHealth(base({ filingLog: [to('2026-11-05T08:00:00Z'), to('2026-11-05T07:50:00Z'), to('2026-11-05T07:40:00Z')] }));
+  assert.equal(portal.autofile.failure_kind, 'portal'); assert.match(portal.autofile.hint, /did not answer \(timeouts\)/);
   const recovered = H.computeHostHealth(base({ filingLog: [log('filed', '2026-11-05T09:00:00Z'), ...failing] }));
   assert.equal(recovered.autofile.last_three_failed, false); }
 

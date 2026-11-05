@@ -63,7 +63,7 @@ export async function buildHostHealth({ now = new Date(), deps = {} } = {}) {
     getAll(`ota_reservations?${scope}&is_test=is.false&deleted_at=is.null&entry_type=eq.reservation&status=eq.active&covered_by_reservation_id=is.null&checkin_date=gte.${from}&checkin_date=lte.${to}&select=id,property_id,booking_code,checkin_date,platform,entry_type,status,covered_by_reservation_id,created_by,created_at&order=id.asc`),
     getAll(`checkins?${scope}&is_test=is.false&deleted_at=is.null&arrival_date=gte.${from}&select=id,property_id,booking_code,surname,arrival_date,filed_at,autofile_excluded,alloggiati_status,autofile_last_error,filing_method&order=id.asc`),
     getAll(`checkins?${scope}&is_test=is.false&deleted_at=is.null&arrival_date=lt.${from}&filed_at=is.null&autofile_excluded=is.false&select=id,property_id,booking_code,surname,arrival_date,filed_at,autofile_excluded,alloggiati_status,autofile_last_error,filing_method&order=id.asc`),
-    getAll(`alloggiati_filing_log?${scope}&outcome=not.like.evidence_*&select=property_id,trigger,outcome,error_code,run_at&order=run_at.desc`),
+    getAll(`alloggiati_filing_log?${scope}&outcome=not.like.evidence_*&run_at=gte.${HostHealth.addDays(base, -60)}&select=property_id,trigger,outcome,error_code,error_detail,run_at&order=run_at.desc`),
     get(`host_alloggiati_credentials?${scope}&select=property_id,verified_at,wskey_expires_at,last_error`),
     getAll(`host_onboarding?${scope}&select=user_id,property_id,skips&order=property_id.asc,user_id.asc`),
     getAll(`recommendations?${scope}&is_test=is.false&deleted_at=is.null&select=property_id&order=id.asc`),

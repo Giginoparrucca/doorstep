@@ -1951,7 +1951,7 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       <fieldset class="settings-edit-fieldset" disabled style="border:0;padding:0;margin:0;min-width:0;">
       <div class="form-card">
         <div class="form-card-title" data-h="reminder_title">Arrival reminders</div>
-        <div class="form-card-desc" data-h="reminder_desc">Every day at 07:00 in the property's timezone, WelcomeBnB emails you a digest of guests arriving tomorrow with their unique booking links, so you can forward them by WhatsApp or email. Leave the email blank to turn reminders off.</div>
+        <div class="form-card-desc" data-h="reminder_desc">Every day at the time you choose (07:00 unless you change it), in the property's timezone, WelcomeBnB emails you a digest of guests arriving tomorrow with their unique booking links, so you can forward them by WhatsApp or email. Leave the email blank to turn reminders off.</div>
         <div class="form-grid">
           <div class="form-group">
             <label class="form-label" data-h="reminder_email">Reminder email</label>
@@ -1976,7 +1976,12 @@ tr:hover td { background: rgba(250,246,240,0.6); }
               <option value="Asia/Dubai">Asia/Dubai</option>
               <option value="UTC">UTC</option>
             </select>
-            <div class="form-hint" data-h="reminder_tz_hint">Used to compute "tomorrow" — reminders always fire at 07:00 local.</div>
+            <div class="form-hint" data-h="reminder_tz_hint">Used to compute "tomorrow" and the send time below.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="propReminderHour" data-h="reminder_hour">Send time</label>
+            <select class="form-select" id="propReminderHour"><option value="6">06:00</option><option value="7">07:00</option><option value="8">08:00</option><option value="9">09:00</option><option value="10">10:00</option><option value="11">11:00</option><option value="12">12:00</option><option value="13">13:00</option><option value="14">14:00</option><option value="15">15:00</option><option value="16">16:00</option><option value="17">17:00</option><option value="18">18:00</option><option value="19">19:00</option><option value="20">20:00</option><option value="21">21:00</option></select>
+            <div class="form-hint" data-h="reminder_hour_hint">Local time of the property; follows summer/winter time automatically.</div>
           </div>
         </div>
         <!-- Round 45 hotfix — Arrival Reminders is now gated by the
@@ -4760,11 +4765,13 @@ const HT = {
     ical_save_first: 'Save the property first, then click Sync now.',
     // Round 32 — arrival reminders (single-line values; applyLang collapses newlines)
     reminder_title: 'Arrival reminders',
-    reminder_desc: 'Every day at 07:00 in the property\'s timezone, WelcomeBnB emails you a digest of guests arriving tomorrow with their unique booking links, so you can forward them by WhatsApp or email. Leave the email blank to turn reminders off.',
+    reminder_desc: 'Every day at the time you choose (07:00 unless you change it), in the property\'s timezone, WelcomeBnB emails you a digest of guests arriving tomorrow with their unique booking links, so you can forward them by WhatsApp or email. Leave the email blank to turn reminders off.',
     reminder_email: 'Reminder email',
     reminder_email_hint: 'Where the daily digest arrives. Use your own address.',
     reminder_tz: 'Property timezone',
-    reminder_tz_hint: 'Used to compute "tomorrow" — reminders always fire at 07:00 local.',
+    reminder_tz_hint: 'Used to compute "tomorrow" and the send time below.',
+    reminder_hour: 'Send time',
+    reminder_hour_hint: 'Local time of the property; follows summer/winter time automatically.',
     // Round 26 — Dashboard: Upcoming reservations panel
     dash_upcoming_title: 'Upcoming reservations',
     dash_upcoming_empty: 'No upcoming reservations in the next 60 days. Add an iCal feed in Property settings.',
@@ -5355,11 +5362,13 @@ const HT = {
     ical_save_first: 'Salva prima la proprietà, poi clicca Sincronizza ora.',
     // Round 32 — promemoria arrivi
     reminder_title: 'Promemoria arrivi',
-    reminder_desc: 'Ogni giorno alle 07:00 nel fuso orario della proprietà, WelcomeBnB ti invia via email un riepilogo degli ospiti in arrivo domani con i loro link di prenotazione unici, così puoi inoltrarli per WhatsApp o email. Lascia vuota l\'email per disattivare i promemoria.',
+    reminder_desc: 'Ogni giorno all\'ora che scegli (07:00 se non la cambi), nel fuso orario della proprietà, WelcomeBnB ti invia via email un riepilogo degli ospiti in arrivo domani con i loro link di prenotazione unici, così puoi inoltrarli per WhatsApp o email. Lascia vuota l\'email per disattivare i promemoria.',
     reminder_email: 'Email promemoria',
     reminder_email_hint: 'Dove arriva il riepilogo giornaliero. Usa il tuo indirizzo.',
     reminder_tz: 'Fuso orario proprietà',
-    reminder_tz_hint: 'Usato per calcolare "domani" — i promemoria partono sempre alle 07:00 locali.',
+    reminder_tz_hint: 'Usato per calcolare "domani" e l\'ora di invio qui sotto.',
+    reminder_hour: 'Ora di invio',
+    reminder_hour_hint: 'Ora locale della proprietà; segue automaticamente l\'ora legale/solare.',
     // Round 26 — Dashboard: prenotazioni in arrivo
     dash_upcoming_title: 'Prenotazioni in arrivo',
     dash_upcoming_empty: 'Nessuna prenotazione nei prossimi 60 giorni. Aggiungi un feed iCal nelle impostazioni della proprietà.',
@@ -8874,11 +8883,12 @@ async function saveProperty(scope = 'property') {
     host_email: (document.getElementById('propHostEmail')?.value || '').trim() || null,
     ical_feeds: collectIcalFeeds(),
     reminder_email: (document.getElementById('propReminderEmail')?.value || '').trim() || null,
+    reminder_hour: Math.min(21, Math.max(6, parseInt(document.getElementById('propReminderHour')?.value || '7', 10) || 7)),
     questura_pec: (document.getElementById('propQuesturaPec')?.value || '').trim().toLowerCase() || null,
     timezone: document.getElementById('propTimezone')?.value || 'Europe/Rome',
   };
   if (typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled) return false;
-  const settingsKeys = new Set(['tax_rate_eur','tax_max_nights','tax_max_nights_basis','tax_max_total_eur','tax_exempt_under_age','tax_rules','tax_declared_exemptions','tax_source_note','tax_verified_at','ical_feeds','reminder_email','timezone','questura_pec']);
+  const settingsKeys = new Set(['tax_rate_eur','tax_max_nights','tax_max_nights_basis','tax_max_total_eur','tax_exempt_under_age','tax_rules','tax_declared_exemptions','tax_source_note','tax_verified_at','ical_feeds','reminder_email','reminder_hour','timezone','questura_pec']);
   for (const key of Object.keys(update)) if (settingsKeys.has(key) !== (scope === 'settings')) delete update[key];
   if (scope === 'settings' && !_taxCfgValidatePeriods()) return false;
   if (scope === 'settings' && update.questura_pec && (update.questura_pec.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(update.questura_pec))) {
@@ -9943,6 +9953,7 @@ async function saveArrivalReminders(btn) {
 
   const email = (emailEl.value || '').trim();
   const timezone = (tzEl.value || 'Europe/Rome').trim();
+  const reminderHour = Math.min(21, Math.max(6, parseInt(document.getElementById('propReminderHour')?.value || '7', 10) || 7));
   // Light email format guard — an empty value is the documented way to
   // turn reminders off, so blank passes.
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -9954,9 +9965,9 @@ async function saveArrivalReminders(btn) {
   if (resultEl) { resultEl.textContent = it ? 'Salvataggio…' : 'Saving…'; resultEl.style.color = 'var(--ink-soft)'; }
   try {
     const { data, error } = await sb.from('properties')
-      .update({ reminder_email: email || null, timezone })
+      .update({ reminder_email: email || null, timezone, reminder_hour: reminderHour })
       .eq('id', propertyId)
-      .select('reminder_email, timezone')
+      .select('reminder_email, timezone, reminder_hour')
       .maybeSingle();
     if (error) {
       console.warn('[reminders] save failed:', error.message);
@@ -16988,6 +16999,7 @@ function fillPropertyForm(data) {
   if (typeof renderIcalExportCard === 'function') renderIcalExportCard();
   if (typeof loadAlloggiatiCard === 'function') loadAlloggiatiCard();
   if (el('propReminderEmail')) el('propReminderEmail').value = data.reminder_email || '';
+  if (el('propReminderHour')) el('propReminderHour').value = String(Number.isInteger(data.reminder_hour) ? data.reminder_hour : 7);
   if (el('propQuesturaPec')) el('propQuesturaPec').value = data.questura_pec || '';
   if (el('propTimezone')) el('propTimezone').value = data.timezone || 'Europe/Rome';
   propertyEditor.reset(data);

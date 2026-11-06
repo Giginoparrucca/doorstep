@@ -4,7 +4,7 @@ const prod = deploymentConfig({});
 assert.equal(prod.functions['api/chat.js'].includeFiles, 'lib/**', 'chat must package the shared entry validator tables');
 assert.deepEqual(prod.crons, [
   { path: '/api/ical-sync', schedule: '0 4 * * *' },
-  { path: '/api/send-arrival-reminders', schedule: '0 5 * * *' },
+  { path: '/api/send-arrival-reminders', schedule: '5 * * * *' }, // hourly (Vercel Pro): each property at its reminder_hour
 ]);
 const demo = deploymentConfig({ APP_ENV: 'demo' });
 assert.deepEqual(demo.crons, []);

@@ -113,7 +113,7 @@ export default async function handler(req, res) {
   try {
     props = await pgrestGET(
       // Round 37.6 — host_language too, so the digest renders in EN or IT.
-      'properties?select=id,name,reminder_email,timezone,welcome_message,host_language&' +
+      'properties?select=id,name,reminder_email,timezone,reminder_hour,welcome_message,host_language&' +
       'reminder_email=not.is.null&deleted_at=is.null',
     );
   } catch (e) {
@@ -127,15 +127,11 @@ export default async function handler(req, res) {
   for (const p of props) {
     const tz = p.timezone || 'Europe/Rome';
     const local = localParts(nowUTC, tz);
-    // Vercel Hobby crons are once-per-day (see vercel.json — 05:00 UTC).
-    // 05:00 UTC lands at 06:00-07:00 Europe local depending on DST, and
-    // similar mornings across most European TZs. We accept a 5-10 local
-    // window so a property in any of those zones still fires on both
-    // sides of a DST change. Anything outside the window is skipped —
-    // avoids sending mail at 22:00 local for far-off timezones. The
-    // *_sent_at markers guarantee no double-send if the cron ever fires
-    // more than once per day.
-    if (!force && (local.hour < 5 || local.hour > 10)) {
+    // Hourly job (Vercel Pro, 6 Nov 2026): each property is sent at the hour
+    // its host chose (reminder_hour, local time, default 7), so the time no
+    // longer moves with summer/winter time. A missed hourly run is caught up
+    // during the next 3 hours; the *_sent_at markers prevent duplicates.
+    if (!force && !reminderDue(local.hour, p.reminder_hour)) {
       perProperty.push({ property_id: p.id, skipped: `local_hour=${local.hour}` });
       continue;
     }
@@ -331,6 +327,12 @@ async function sendEmail(to, subject, html, dry) {
 }
 
 // ── Time helpers ─────────────────────────────────────────────────────────
+export const REMINDER_CATCH_UP_HOURS = 3;
+// Due at the chosen local hour and for a few hours after (catch-up).
+export function reminderDue(localHour, reminderHour) {
+  const h = Number.isInteger(reminderHour) && reminderHour >= 6 && reminderHour <= 21 ? reminderHour : 7;
+  return localHour >= h && localHour <= h + REMINDER_CATCH_UP_HOURS;
+}
 function localParts(dt, tz) {
   const dtf = new Intl.DateTimeFormat('en-CA', {
     timeZone: tz,

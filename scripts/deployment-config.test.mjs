@@ -25,6 +25,7 @@ assert.equal(deploymentConfig({ APP_ENV: 'demo', VERCEL_PROJECT_NAME: 'welcomebn
   assert.ok(body.startsWith('export const config = {'), 'config is an object literal');
   assert.ok(!/\.\.\./.test(body), 'no spread in the exported object');
   for (const key of ['buildCommand', 'outputDirectory']) assert.match(body, new RegExp(`\\n  ${key}: '[^']*',`), key + ' is a literal');
+  assert.match(body, /\n  regions: \['dub1'\],/, 'regions is a literal (Dublin)');
   for (const key of ['framework', 'installCommand', 'devCommand', 'nodeVersion', 'git', 'github', 'relatedProjects']) assert.ok(!new RegExp(`\\n  ${key}:\\s*[^'\"\\n]`).test(body) || new RegExp(`\\n  ${key}: ('|null|true|false|\\d)`).test(body), key + ' literal if present');
   const { config } = await import('../vercel.mjs');
   assert.deepEqual(config, deploymentConfig(process.env), 'vercel.mjs exports exactly the computed configuration');

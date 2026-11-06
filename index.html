@@ -5343,6 +5343,7 @@ async function sendChat() {
     let buffer = '';
     let escalated = false;
     let followups = [];
+    let serverSaved = false; // 6 Nov 2026: the server saves the AI reply itself
 
     while (true) {
       const { done, value } = await reader.read();
@@ -5371,6 +5372,7 @@ async function sendChat() {
           } else if (payload.type === 'done') {
             escalated = !!payload.escalated;
             followups = Array.isArray(payload.followups) ? payload.followups : [];
+            serverSaved = payload.saved === true;
           } else if (payload.type === 'error') {
             throw new Error(payload.message || 'stream error');
           }
@@ -5397,7 +5399,7 @@ async function sendChat() {
     }
 
     chatHistory.push({ role: 'assistant', content: fullReply });
-    saveChatMsg('bot', fullReply);
+    if (!serverSaved) saveChatMsg('bot', fullReply);
 
     if (escalated) {
       chatEscalated = true;

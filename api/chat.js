@@ -405,21 +405,11 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}${serv
       if (savedText && SERVICE_KEY) {
         saved = await insertRowWithRetry('chat_messages', { property_id: propertyId, booking_code: v.payload.b || null, sender: 'bot', message: savedText.slice(0, 8000), is_test: v.payload.t === true });
       }
+      // Usage is recorded BEFORE closing the response: after res.end() Vercel
+      // may stop the function, which lost the row for most answers (6 Nov 2026).
+      await recordUsage({ property_id: propertyId, session_id: sessionId, endpoint: 'chat', input_tokens: inputTokens, output_tokens: outputTokens });
       safeWrite(`data: ${JSON.stringify({ type: 'done', escalated, followups, saved })}\n\n`);
       try { res.end(); } catch (_) {}
-      // AWAIT the usage insert — Vercel serverless ends the invocation at
-      // handler return, so a fire-and-forget promise gets cancelled. The
-      // client already has its reply; the await only delays the invocation
-      // exit, not the response.
-      try {
-        await recordUsage({
-          property_id: propertyId,
-          session_id: sessionId,
-          endpoint: 'chat',
-          input_tokens: inputTokens,
-          output_tokens: outputTokens,
-        });
-      } catch (e) { console.warn('[chat] usage insert failed:', e); }
       return;
     }
 

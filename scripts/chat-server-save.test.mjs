@@ -30,7 +30,7 @@ async function run(opts = {}) {
     if (url.endsWith('/rest/v1/chat_messages') && init.method === 'POST') { inserts.push({ table: 'chat_messages', row: JSON.parse(init.body) }); return opts.chatSaveFails ? new Response('no', { status: 500 }) : new Response(null, { status: 201 }); }
     if (url.endsWith('/rest/v1/api_usage') && init.method === 'POST') {
       if (usageThrows-- > 0) throw new TypeError('fetch failed: other side closed');
-      inserts.push({ table: 'api_usage', row: JSON.parse(init.body) }); return new Response(null, { status: 201 });
+      inserts.push({ table: 'api_usage', row: JSON.parse(init.body), afterEnd: !!globalThis.__resEnded }); return new Response(null, { status: 201 });
     }
     if (url.includes('/properties?')) return Response.json([property]);
     if (url.includes('/rpc/')) return Response.json(state);
@@ -39,7 +39,8 @@ async function run(opts = {}) {
   const res = { statusCode: 200, headers: {}, body: null, written: '', writableEnded: false, destroyed: false,
     setHeader(k, v) { this.headers[k] = v; }, status(n) { this.statusCode = n; return this; }, json(v) { this.body = v; return this; },
     write(v) { if (this.destroyed) throw new Error('write after the guest left'); this.written += v; if (opts.leaveAfterFirstText && /"type":"text"/.test(v)) this.destroyed = true; },
-    end() { if (this.destroyed) throw new Error('end after the guest left'); this.writableEnded = true; } };
+    end() { if (this.destroyed) throw new Error('end after the guest left'); this.writableEnded = true; globalThis.__resEnded = true; } };
+  globalThis.__resEnded = false;
   await handler({ method: 'POST', headers: { origin: 'https://app.welcomebnb.it', authorization: 'Bearer ' + tokenFor(opts.test) },
     body: { stream: true, lang: 'it', messages: [{ role: 'user', content: 'Miglior ristorante vicino?' }] } }, res);
   const done = (res.written.match(/data: (\{"type":"done".*?\})\n\n/) || [])[1];
@@ -52,7 +53,8 @@ try {
     const bot = inserts.find(i => i.table === 'chat_messages').row;
     assert.deepEqual(bot, { property_id: pid, booking_code: booking, sender: 'bot', message: 'Prova la **Trattoria** in piazza.', is_test: false });
     assert.equal(done.saved, true, 'done event says the reply is saved');
-    assert.ok(inserts.some(i => i.table === 'api_usage' && i.row.endpoint === 'chat' && i.row.output_tokens === 7)); }
+    assert.ok(inserts.some(i => i.table === 'api_usage' && i.row.endpoint === 'chat' && i.row.output_tokens === 7));
+    assert.ok(inserts.filter(i => i.table === 'api_usage').every(i => !i.afterEnd), 'usage recorded before the response closes (Vercel may stop the function after it)'); }
   // Test sessions stay test rows.
   { const { inserts } = await run({ test: true }); assert.equal(inserts.find(i => i.table === 'chat_messages').row.is_test, true); }
   // Save refused → saved:false, so the guest app saves it as before.

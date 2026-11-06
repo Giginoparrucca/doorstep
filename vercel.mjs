@@ -11,7 +11,10 @@ const dynamic = deploymentConfig();
 export const config = {
   buildCommand: 'node scripts/build-config.mjs',
   outputDirectory: '.',
-  regions: dynamic.regions,
+  // Literal: the computed value was never applied (production ran in iad1,
+  // Washington, until 6 Nov 2026). dub1 = Dublin, next to the Supabase
+  // database (EU, Ireland). deployment-config.test checks it equals the lib.
+  regions: ['dub1'],
   rewrites: dynamic.rewrites,
   crons: dynamic.crons,
   functions: dynamic.functions,

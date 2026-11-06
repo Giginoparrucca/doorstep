@@ -4417,6 +4417,7 @@ const HT = {
     chat_resolved_status: 'Conversation resolved — guest returned to AI concierge',
     chat_escalated: '⚠️ Guest requested human assistance',
     chat_you: 'You',
+    chat_no_ai_reply: 'No AI reply recorded: the guest left before the answer arrived, or the AI did not respond. Reply here if needed.',
     // Round 11.4 — chat archive + active filter
     chat_active_only: 'Active stays only',
     // Round 13.1 — privacy modal
@@ -5022,6 +5023,7 @@ const HT = {
     chat_resolved_status: 'Conversazione risolta — l\'ospite è tornato al concierge AI',
     chat_escalated: '⚠️ L\'ospite ha richiesto assistenza umana',
     chat_you: 'Tu',
+    chat_no_ai_reply: 'Nessuna risposta AI registrata: l’ospite ha chiuso prima che arrivasse, oppure l’AI non ha risposto. Rispondi qui se serve.',
     // Round 11.4 — archivio chat + filtro soggiorni attivi
     chat_active_only: 'Solo soggiorni attivi',
     // Round 13.1 — privacy modal
@@ -14259,14 +14261,23 @@ async function loadHostChat() {
     </div>`;
   }
 
-  container.innerHTML = archivedBanner + nameHeader + statusBanner + selectedMsgs.map(m => {
+  // 6 Nov 2026: a guest message the AI never answered (nothing but another
+  // guest message after it, not escalated to the host, older than 2 minutes)
+  // gets a note, so a question never looks silently ignored.
+  const _escalatedBefore = i => selectedMsgs.slice(0, i).some(x => x.sender === 'system' && x.message?.includes('escalat') && !x.message?.includes('resolved') && !x.message?.includes('returned to AI'));
+  const _noAiReply = (m, i) => {
+    if (m.sender !== 'guest' || Date.now() - Date.parse(m.created_at) < 120000 || _escalatedBefore(i)) return false;
+    const next = selectedMsgs.slice(i + 1).find(x => x.sender !== 'system' || x.message?.includes('escalat'));
+    return !next || next.sender === 'guest';
+  };
+  container.innerHTML = archivedBanner + nameHeader + statusBanner + selectedMsgs.map((m, i) => {
     const time = new Date(m.created_at).toLocaleTimeString(hostLang==='it'?'it-IT':'en-GB', {hour:'2-digit',minute:'2-digit'});
     const date = new Date(m.created_at).toLocaleDateString(hostLang==='it'?'it-IT':'en-GB');
     if (m.sender === 'guest') {
       return `<div style="align-self:flex-start;max-width:85%;background:var(--cream-2);border-radius:12px 12px 12px 2px;padding:10px 14px;">
         <div style="font-size:0.72rem;color:var(--ink-soft);margin-bottom:3px;">${date} ${time}</div>
         <div style="font-size:0.88rem;color:var(--ink);line-height:1.5;">${chatSafe(m.message)}</div>
-      </div>`;
+      </div>${_noAiReply(m, i) ? `<div data-no-ai-reply style="align-self:flex-start;max-width:85%;font-size:0.74rem;color:var(--amber);padding:0 4px 6px;">⚠️ ${chatSafe(h('chat_no_ai_reply'))}</div>` : ''}`;
     } else if (m.sender === 'host') {
       return `<div style="align-self:flex-end;max-width:85%;background:var(--warm);border-radius:12px 12px 2px 12px;padding:10px 14px;">
         <div style="font-size:0.72rem;color:rgba(255,255,255,0.6);margin-bottom:3px;">${h('chat_you')} · ${time}</div>

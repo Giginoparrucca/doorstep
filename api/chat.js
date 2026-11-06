@@ -295,6 +295,10 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}${serv
       const TAG_OPEN = '<reply>';
       const TAG_CLOSE = '</reply>';
 
+      // Writes after the guest left (closed the app, switched page) must not
+      // break the request: the answer is still saved below.
+      const safeWrite = chunk => { try { if (!res.writableEnded && !res.destroyed) res.write(chunk); } catch (_) {} };
+      let emitted = '';
       const flushText = (delta) => {
         fullText += delta;
         let toEmit = '';
@@ -326,7 +330,8 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}${serv
           }
         }
         if (toEmit) {
-          res.write(`data: ${JSON.stringify({ type: 'text', text: toEmit })}\n\n`);
+          emitted += toEmit;
+          safeWrite(`data: ${JSON.stringify({ type: 'text', text: toEmit })}\n\n`);
         }
       };
 
@@ -372,7 +377,7 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}${serv
       }
 
       const sources = formatSourceLinks(sourceLinks);
-      if (sources) res.write(`data: ${JSON.stringify({ type: 'text', text: sources })}\n\n`);
+      if (sources) { emitted += sources; safeWrite(`data: ${JSON.stringify({ type: 'text', text: sources })}\n\n`); }
       const replyMatch = fullText.match(/<reply>([\s\S]*?)<\/reply>/);
       const replyText = replyMatch ? replyMatch[1].trim() : fullText.trim();
       // Round 34.1: Sofia sometimes forgets the [ESCALATE] marker even
@@ -391,8 +396,17 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}${serv
       // api/guest-chat.js on the actual chat_messages insert. Nothing here now.
       // TELEGRAM_CHAT_ID env var is unused; you can delete it on Vercel.
 
-      res.write(`data: ${JSON.stringify({ type: 'done', escalated, followups })}\n\n`);
-      res.end();
+      // Save the AI reply on the server (Daniele, 6 Nov 2026), exactly the text
+      // the guest saw, so the host sees it even if the guest left before the
+      // end. «saved» tells the guest app not to save it again; when the save
+      // fails the app saves it as before.
+      const savedText = emitted.replace(/\[ESCALATE\]/g, '').trim();
+      let saved = false;
+      if (savedText && SERVICE_KEY) {
+        saved = await insertRowWithRetry('chat_messages', { property_id: propertyId, booking_code: v.payload.b || null, sender: 'bot', message: savedText.slice(0, 8000), is_test: v.payload.t === true });
+      }
+      safeWrite(`data: ${JSON.stringify({ type: 'done', escalated, followups, saved })}\n\n`);
+      try { res.end(); } catch (_) {}
       // AWAIT the usage insert — Vercel serverless ends the invocation at
       // handler return, so a fire-and-forget promise gets cancelled. The
       // client already has its reply; the await only delays the invocation
@@ -575,27 +589,36 @@ async function callRPC(name, args, opts = {}) {
   });
 }
 
-// Insert one api_usage row. Called fire-and-forget after every successful
-// Anthropic call. Deliberately best-effort — a failed insert must not
-// break the guest UX.
+// POST one row with a single retry on a network failure. After a long
+// streamed answer (web search: 10–20 s) the pooled connection to Supabase is
+// often already closed by the other side («other side closed», ECONNRESET):
+// 3 of 4 web-search answers lost their usage row on 5 Nov 2026. A fresh
+// attempt opens a new connection.
+export async function insertRowWithRetry(table, row, deps = {}) {
+  const f = deps.fetch || fetch;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const r = await f(`${SUPABASE_URL}/rest/v1/${table}`, {
+        method: 'POST',
+        headers: { ...supabaseAuthHeaders(SERVICE_KEY), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify(row),
+      });
+      if (r.ok) return true;
+      console.warn(`[chat] ${table} insert failed:`, r.status);
+      return false; // an HTTP refusal is not retried
+    } catch (e) {
+      if (attempt === 2) { console.warn(`[chat] ${table} insert exception:`, String(e && e.message || e)); return false; }
+      await new Promise(resolve => setTimeout(resolve, deps.retryDelayMs ?? 250));
+    }
+  }
+  return false;
+}
+
+// Insert one api_usage row after every successful Anthropic call.
+// Best-effort — a failed insert must not break the guest UX.
 async function recordUsage(row) {
   if (!SERVICE_KEY) return;
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/api_usage`, {
-      method: 'POST',
-      headers: {
-        ...supabaseAuthHeaders(SERVICE_KEY),
-        'Content-Type': 'application/json',
-        Prefer: 'return=minimal',
-      },
-      body: JSON.stringify(row),
-    });
-    if (!r.ok) {
-      console.warn('[chat] api_usage insert failed:', r.status, await r.text().catch(() => ''));
-    }
-  } catch (e) {
-    console.warn('[chat] api_usage insert exception:', e);
-  }
+  await insertRowWithRetry('api_usage', row);
 }
 
 // Send a graceful "concierge unavailable, connecting you with the host"

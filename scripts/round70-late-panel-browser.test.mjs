@@ -17,7 +17,7 @@ const block = slice('// ── Round 70 — «Invio tardivo»: late Alloggiati f
 assert.ok(!/innerHTML/.test(block.slice(block.indexOf('function openLateFilingPanel'))), 'panel builds the DOM with textContent');
 
 // Static: the PEC field is saved with the settings, validated, filled.
-assert.ok(/settingsKeys = new Set\(\[[^\]]*'questura_pec'\]\)/.test(source), 'questura_pec saved with Settings');
+assert.ok(/settingsKeys = new Set\(\[[^\]]*'questura_pec'[^\]]*\]\)/.test(source), 'questura_pec saved with Settings');
 assert.ok(source.includes("questura_pec: (document.getElementById('propQuesturaPec')?.value || '').trim().toLowerCase() || null,"));
 assert.ok(source.includes("if (el('propQuesturaPec')) el('propQuesturaPec').value = data.questura_pec || '';"));
 assert.ok(source.includes("toast(h('questura_pec_invalid'))"), 'malformed PEC refused before saving');

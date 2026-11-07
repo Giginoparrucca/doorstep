@@ -2020,6 +2020,18 @@ tr:hover td { background: rgba(250,246,240,0.6); }
       </div>
       </fieldset>
 
+      <!-- 7 Nov 2026 — the host can require the main guest's invoice details. -->
+      <fieldset class="settings-edit-fieldset" disabled style="border:0;padding:0;margin:0;min-width:0;">
+      <div class="form-card" id="invoiceRequiredCard">
+        <div class="form-card-title" data-h="invoice_required_title">Invoice details</div>
+        <div class="form-card-desc" data-h="invoice_required_desc">When on, the main guest must enter street, postcode and invoice email at check-in (plus codice fiscale and province if resident in Italy). Companions are never asked.</div>
+        <label style="display:flex;align-items:center;gap:10px;font-size:0.9rem;cursor:pointer;">
+          <input type="checkbox" id="propInvoiceRequired" style="width:18px;height:18px;">
+          <span data-h="invoice_required_label">Require invoice details from the main guest</span>
+        </label>
+      </div>
+      </fieldset>
+
       <!-- Round 40 Task 6 · Removed 2026-09-30 — the "Privacy & data /
            Delete all check-in records" card was pulled out of the host
            console. Retention purges are automatic (Round 36 auto-purges
@@ -7845,6 +7857,9 @@ Object.assign(HT.en, {
   late_export_none: 'Every selected guest is late: the portal no longer accepts their arrival date. Use «Late filing» on each booking.',
   late_close: 'Close',
   questura_pec_title: 'Questura PEC (optional)',
+  invoice_required_title: 'Invoice details',
+  invoice_required_desc: 'When on, the main guest must enter street, postcode and invoice email at check-in (plus codice fiscale and province if resident in Italy). Companions are never asked.',
+  invoice_required_label: 'Require invoice details from the main guest',
   questura_pec_desc: 'Used only for late Alloggiati filings: the address appears in the «Late filing» panel so you can send the data to your Questura.',
   questura_pec_find: 'Find your Questura',
   questura_pec_label: 'Questura PEC address',
@@ -7868,6 +7883,9 @@ Object.assign(HT.it, {
   late_export_none: 'Tutti gli ospiti selezionati sono in ritardo: il portale non accetta più la loro data di arrivo. Usa «Invio tardivo» su ogni prenotazione.',
   late_close: 'Chiudi',
   questura_pec_title: 'PEC Questura (facoltativa)',
+  invoice_required_title: 'Dati per la fattura',
+  invoice_required_desc: 'Se attivo, l’ospite principale deve inserire via, CAP ed email per la fattura al check-in (più codice fiscale e provincia se residente in Italia). Agli accompagnatori non viene chiesto nulla.',
+  invoice_required_label: 'Richiedi i dati per la fattura all’ospite principale',
   questura_pec_desc: 'Serve solo per gli invii Alloggiati in ritardo: l\'indirizzo compare nel pannello «Invio tardivo» per inviare i dati alla tua Questura.',
   questura_pec_find: 'Trova la tua Questura',
   questura_pec_label: 'Indirizzo PEC della Questura',
@@ -8885,10 +8903,11 @@ async function saveProperty(scope = 'property') {
     reminder_email: (document.getElementById('propReminderEmail')?.value || '').trim() || null,
     reminder_hour: Math.min(21, Math.max(6, parseInt(document.getElementById('propReminderHour')?.value || '7', 10) || 7)),
     questura_pec: (document.getElementById('propQuesturaPec')?.value || '').trim().toLowerCase() || null,
+    invoice_required: document.getElementById('propInvoiceRequired')?.checked === true,
     timezone: document.getElementById('propTimezone')?.value || 'Europe/Rome',
   };
   if (typeof IS_ADMIN_VIEW !== 'undefined' && IS_ADMIN_VIEW && !_adminEditEnabled) return false;
-  const settingsKeys = new Set(['tax_rate_eur','tax_max_nights','tax_max_nights_basis','tax_max_total_eur','tax_exempt_under_age','tax_rules','tax_declared_exemptions','tax_source_note','tax_verified_at','ical_feeds','reminder_email','reminder_hour','timezone','questura_pec']);
+  const settingsKeys = new Set(['tax_rate_eur','tax_max_nights','tax_max_nights_basis','tax_max_total_eur','tax_exempt_under_age','tax_rules','tax_declared_exemptions','tax_source_note','tax_verified_at','ical_feeds','reminder_email','reminder_hour','timezone','questura_pec','invoice_required']);
   for (const key of Object.keys(update)) if (settingsKeys.has(key) !== (scope === 'settings')) delete update[key];
   if (scope === 'settings' && !_taxCfgValidatePeriods()) return false;
   if (scope === 'settings' && update.questura_pec && (update.questura_pec.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(update.questura_pec))) {
@@ -17001,6 +17020,7 @@ function fillPropertyForm(data) {
   if (el('propReminderEmail')) el('propReminderEmail').value = data.reminder_email || '';
   if (el('propReminderHour')) el('propReminderHour').value = String(Number.isInteger(data.reminder_hour) ? data.reminder_hour : 7);
   if (el('propQuesturaPec')) el('propQuesturaPec').value = data.questura_pec || '';
+  if (el('propInvoiceRequired')) el('propInvoiceRequired').checked = data.invoice_required === true;
   if (el('propTimezone')) el('propTimezone').value = data.timezone || 'Europe/Rome';
   propertyEditor.reset(data);
   if (data.host_names) {

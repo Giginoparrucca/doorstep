@@ -2019,6 +2019,11 @@ const T = {
     val_residence_place: 'Please pick the comune of residence from the list (required for residents of Italy).',
     val_residence_postcode: 'Please enter the postcode of residence.',
     invoice_toggle: 'Need an invoice? Add your details (optional)',
+    invoice_toggle_required: 'Invoice details (required by your host)',
+    val_invoice_address_required: 'Please enter your street and number for the invoice.',
+    val_invoice_postcode_required: 'Please enter your postcode for the invoice.',
+    val_invoice_email_required: 'Please enter the email where you want the invoice.',
+    val_fiscal_code_required: 'Please enter your codice fiscale for the invoice.',
     fiscal_code_label: 'Codice fiscale (if you have one)',
     residence_address_label: 'Street and number',
     residence_province_label: 'Province (2 letters)',
@@ -2193,6 +2198,11 @@ const T = {
     val_residence_place: 'Seleziona il comune di residenza dall\'elenco (obbligatorio per chi risiede in Italia).',
     val_residence_postcode: 'Inserisci il CAP di residenza.',
     invoice_toggle: 'Ti serve la fattura? Aggiungi i tuoi dati (facoltativo)',
+    invoice_toggle_required: "Dati per la fattura (richiesti dall'host)",
+    val_invoice_address_required: 'Inserisci via e numero civico per la fattura.',
+    val_invoice_postcode_required: 'Inserisci il CAP per la fattura.',
+    val_invoice_email_required: "Inserisci l'email a cui inviare la fattura.",
+    val_fiscal_code_required: 'Inserisci il codice fiscale per la fattura.',
     fiscal_code_label: 'Codice fiscale (se ne hai uno)',
     residence_address_label: 'Via e numero civico',
     residence_province_label: 'Provincia (sigla)',
@@ -3492,6 +3502,11 @@ function updateResidenceUI() {
   }
   const invoice = document.getElementById('invoiceSection');
   if (invoice) invoice.style.display = main ? '' : 'none';
+  if (main && _invoiceRequired()) {
+    const t = document.querySelector('#invoiceToggle [data-i18n]');
+    if (t) { t.setAttribute('data-i18n', 'invoice_toggle_required'); t.textContent = T[lang].invoice_toggle_required; }
+    toggleInvoiceSection(true);
+  }
   const prov = document.getElementById('residenceProvinceGroup');
   if (prov) prov.style.display = _residencePlaceApplies() ? '' : 'none';
   const hint = document.getElementById('residencePrefillHint');
@@ -3507,6 +3522,21 @@ function onResidenceCountryChange() {
 function _fillResidenceProvince(entry) {
   const prov = document.getElementById('residenceProvince');
   if (prov && entry && /^[A-Z]{2}$/.test(entry.prov || '') && entry.prov !== 'EE') prov.value = entry.prov;
+}
+// 7 Nov 2026 — the host can require the main guest's invoice details.
+function _invoiceRequired() { return propertyData?.invoice_required === true; }
+function _invoiceRequiredErrors(get, residenceCountry) {
+  if (!_invoiceRequired()) return [];
+  const errs = [];
+  const v = id => (get(id) || '').trim();
+  if (!v('address')) errs.push(T[lang].val_invoice_address_required);
+  if (!v('postcode')) errs.push(T[lang].val_invoice_postcode_required);
+  if (!v('email')) errs.push(T[lang].val_invoice_email_required);
+  if (isItalianCountry(residenceCountry || '')) {
+    if (!v('fiscal')) errs.push(T[lang].val_fiscal_code_required);
+    if (!v('province')) errs.push(T[lang].val_residence_province);
+  }
+  return errs;
 }
 function toggleInvoiceSection(force) {
   const fields = document.getElementById('invoiceFields');
@@ -3546,6 +3576,9 @@ function _residenceInvoiceErrors() {
     if (prov && _residencePlaceApplies() && !/^[A-Za-z]{2}$/.test(prov)) errors.push(T[lang].val_residence_province);
     const mail = document.getElementById('invoiceEmail').value.trim();
     if (mail && !_isInvoiceEmail(mail)) { toggleInvoiceSection(true); errors.push(T[lang].val_invoice_email); }
+    const ids = { address: 'residenceAddress', postcode: 'residencePostcode', email: 'invoiceEmail', fiscal: 'fiscalCode', province: 'residenceProvince' };
+    const req = _invoiceRequiredErrors(k => document.getElementById(ids[k])?.value, country);
+    if (req.length) { toggleInvoiceSection(true); errors.push(...req); }
   }
   return errors;
 }
@@ -4549,6 +4582,12 @@ async function saveGuestEdit(idx) {
   else if (_cf && _cf.value.trim() && !window.CodiceFiscale?.isValid(_cf.value)) { _resErr = T[lang].val_fiscal_code; _resEl = _cf; }
   else if (_rpv && _rpv.value.trim() && !/^[A-Za-z]{2}$/.test(_rpv.value.trim())) { _resErr = T[lang].val_residence_province; _resEl = _rpv; }
   else if (_im && _im.value.trim() && !_isInvoiceEmail(_im.value.trim())) { _resErr = T[lang].val_invoice_email; _resEl = _im; }
+  if (!_resErr && _im) {
+    // Main guest edit (the invoice fields are only shown for the main guest).
+    const _edIds = { address: 'ed_raddress', postcode: 'ed_rpostcode', email: 'ed_imail', fiscal: 'ed_fiscal', province: 'ed_rprov' };
+    const _req = _invoiceRequiredErrors(k => document.getElementById(_edIds[k] + idx)?.value, _rcVal);
+    if (_req.length) { _resErr = _req[0]; _resEl = _im; }
+  }
   if (_resErr) {
     alert(_resErr);
     if (_resEl) { _resEl.focus(); _resEl.style.borderColor = 'var(--red)'; setTimeout(() => _resEl.style.borderColor = '', 3000); }

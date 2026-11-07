@@ -381,6 +381,8 @@ const PROPERTY_PUBLIC_FIELDS = [
   'checkin_instructions', 'checkin_instructions_it', 'checkin_instructions_en',
   'checkout_instructions', 'checkout_instructions_it', 'checkout_instructions_en',
   'transport_info', 'transport_info_it', 'transport_info_en',
+  // 7 Nov 2026 — the host requires the main guest's invoice details.
+  'invoice_required',
 ];
 // Fields revealed only AFTER the entry-release policy allows entry. For
 // every OFF-path property that resolves to legacy_available|locked, this
@@ -667,9 +669,10 @@ async function doCheckinList(res, propertyId, bookingCode, isTest, sessionExpUni
 async function doCheckinInsert(res, propertyId, incomingBookingCode, sessionId, body, isTest) {
   const inRecord = normalizeInvoiceFields(body.record || {});
   const errors = validateCheckinRecord(inRecord, { requireAll: true });
-  const region = await readPropertyRegion(propertyId);
-  if (region === undefined) return res.status(503).json({ error: 'property_unavailable' });
-  errors.push(...validateResidence(inRecord, region));
+  const rules = await readPropertyRules(propertyId);
+  if (rules === undefined) return res.status(503).json({ error: 'property_unavailable' });
+  errors.push(...validateResidence(inRecord, rules.region));
+  errors.push(...validateInvoiceRequired(inRecord, rules.invoiceRequired));
   if (errors.length) return res.status(400).json({ error: 'validation_failed', fields: errors });
 
   // Walk-in mint when the token has no booking code.
@@ -797,14 +800,15 @@ async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, is
   const scopeFilter = `id=eq.${encodeURIComponent(id)}&property_id=eq.${encodeURIComponent(propertyId)}` +
     `&is_test=eq.${isTest === true ? 'true' : 'false'}&deleted_at=is.null` +
     (bookingCode ? `&booking_code=eq.${encodeURIComponent(bookingCode)}` : '');
-  const [currentRes, region] = await Promise.all([
-    pgrestGET(`checkins?${scopeFilter}&select=residence_country,residence_place,residence_postcode&limit=1`),
-    readPropertyRegion(propertyId),
+  const [currentRes, rules] = await Promise.all([
+    pgrestGET(`checkins?${scopeFilter}&select=guest_type,residence_country,residence_place,residence_postcode,residence_address,residence_province,fiscal_code,invoice_email&limit=1`),
+    readPropertyRules(propertyId),
   ]);
-  if (!currentRes.ok || region === undefined) return res.status(503).json({ error: 'checkin_unavailable' });
+  if (!currentRes.ok || rules === undefined) return res.status(503).json({ error: 'checkin_unavailable' });
   const [current] = await currentRes.json();
   if (!current) return res.status(409).json({ error: 'already_filed' });
-  const residenceErrors = validateResidence({ ...current, ...fields }, region);
+  const merged = { ...current, ...fields, guest_type: current.guest_type };
+  const residenceErrors = [...validateResidence(merged, rules.region), ...validateInvoiceRequired(merged, rules.invoiceRequired)];
   if (residenceErrors.length) return res.status(400).json({ error: 'validation_failed', fields: residenceErrors });
 
   const patch = pickFields(fields, CHECKIN_WRITE_FIELDS);
@@ -1197,16 +1201,32 @@ function validateResidence(rec, region) {
   return errors;
 }
 
-// The property's region, or undefined when it cannot be read.
-async function readPropertyRegion(propertyId) {
+// The property's region and invoice setting, or undefined when they cannot be read.
+async function readPropertyRules(propertyId) {
   try {
-    const r = await pgrestGET(`properties?id=eq.${encodeURIComponent(propertyId)}&deleted_at=is.null&select=region&limit=1`);
+    const r = await pgrestGET(`properties?id=eq.${encodeURIComponent(propertyId)}&deleted_at=is.null&select=region,invoice_required&limit=1`);
     if (!r.ok) return undefined;
     const [row] = await r.json();
-    return row ? (row.region || null) : undefined;
+    return row ? { region: row.region || null, invoiceRequired: row.invoice_required === true } : undefined;
   } catch (_) {
     return undefined;
   }
+}
+
+// 7 Nov 2026 — when the host requires invoice details, the main guest
+// (single or head) must give street, postcode and invoice email, plus codice
+// fiscale and province when resident in Italy (foreign residents usually have
+// no codice fiscale). Companions are never asked.
+const MAIN_GUEST_TYPES = new Set(['single', 'head', 'group']);
+function validateInvoiceRequired(rec, invoiceRequired) {
+  if (!invoiceRequired || !MAIN_GUEST_TYPES.has(String(rec.guest_type || '').toLowerCase())) return [];
+  const errors = [];
+  const str = (v) => (typeof v === 'string' ? v.trim() : '');
+  for (const f of ['residence_address', 'residence_postcode', 'invoice_email']) if (!str(rec[f])) errors.push(f);
+  if (ITALY_NAMES.has(str(rec.residence_country).toLowerCase())) {
+    for (const f of ['fiscal_code', 'residence_province']) if (!str(rec[f])) errors.push(f);
+  }
+  return errors;
 }
 
 // Crockford base32 — unambiguous human-readable, 8 chars = 40 bits of

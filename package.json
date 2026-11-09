@@ -9,7 +9,7 @@
     "test:all": "node scripts/run-tests.mjs all"
   },
   "dependencies": {
-    "web-push": "3.6.7"
+    "web-push": "4.0.0"
   },
   "devDependencies": {
     "jsqr": "1.4.0",

@@ -6496,6 +6496,7 @@ function _toggleUpcomingOverflow(btn) {
 // Round 40 Task 5 — Ospiti → Calendario paints the calendar into its
 // own panel body. Reuses _renderUpcomingCalendarBody(), which was the
 // dashboard's calendar rendering — no logic duplicated.
+let _calAllReservationCodes = new Set();
 async function renderCalendarPanel() {
   const body = document.getElementById('calendarPanelBody');
   if (!body || !propertyId) return;
@@ -7409,6 +7410,9 @@ async function _renderUpcomingCalendarBody(buildHeader) {
       .order('checkin_date', { ascending: true });
     if (error) { console.warn('Calendar reservations load failed:', error.message); }
     else rows = data || [];
+  // Every booking code in the month, before the room filter: a check-in tied
+  // to one of them never names another booking (date-overlap fallback below).
+  _calAllReservationCodes = new Set(rows.map(x => x.booking_code).filter(Boolean));
   // Room filters must be mutually exclusive. Previously a selected room
   // also included every unassigned booking, making the buttons appear
   // ineffective when most OTA imports had no room_id.
@@ -7440,6 +7444,7 @@ async function _renderUpcomingCalendarBody(buildHeader) {
   const isHeadType = t => t === 'single' || t === 'head' || t === 'group';
   // Same pure projection as the exporter. Imported blocks retain original
   // dates in storage/details; only redundant occupied nights disappear.
+  const _calReservationCodes = new Set([..._calAllReservationCodes, ...rows.map(x => x.booking_code).filter(Boolean)]);
   const enriched = CalendarRoundtrip.projectRows(rows).map(r => {
     const isBlock  = r.entry_type === 'block';
     const isDirect = r.platform === 'direct';
@@ -7459,9 +7464,15 @@ async function _renderUpcomingCalendarBody(buildHeader) {
     } else {
       let matched = r.booking_code ? dated.filter(c => c.booking_code === r.booking_code) : [];
       if (matched.length === 0) {
+        // Date-overlap fallback, only for check-ins that belong to no other
+        // booking (no code, or a code with no reservation in view) and that
+        // are in the same room. 9 Nov 2026: a Bellatrase guest's long stay
+        // was shown as the name of a Battaglia booking with no check-ins yet.
         matched = dated.filter(c =>
           c.arrival_date < r.checkout_date &&
-          (!c.departure_date || c.departure_date > r.checkin_date)
+          (!c.departure_date || c.departure_date > r.checkin_date) &&
+          (!c.booking_code || !_calReservationCodes.has(c.booking_code)) &&
+          (!r.room_id || !c.room_id || c.room_id === r.room_id)
         );
       }
       if (matched.length > 0) {

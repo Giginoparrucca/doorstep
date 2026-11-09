@@ -222,7 +222,7 @@ const {document,window}=parseHTML('<html><body><main id="calendar"></main></body
 let calendarRows=[d,mismatch],clicked=[];
 const query=new Proxy({}, {get(_,key){if(key==='then')return resolve=>resolve({data:structuredClone(calendarRows)});return ()=>query;}});
 const ctx=vm.createContext({document,window,console,Date,Intl,CalendarRoundtrip:C,propertyId:'p1',propertyData:{},hostLang:'it',
-  APP_CONFIG:{mode:'production'},APP_ORIGIN:'https://fixture.invalid',allCheckins:[],allRooms:[],_calendarRoomFilter:null,_upcomingCalYear:2026,_upcomingCalMonth:9,
+  APP_CONFIG:{mode:'production'},APP_ORIGIN:'https://fixture.invalid',allCheckins:[],allRooms:[],_calendarRoomFilter:null,_calAllReservationCodes:new Set(),_upcomingCalYear:2026,_upcomingCalMonth:9,
   _upcomingCalSelectedDay:null,_upcomingRowsById:{},sb:{from:()=>query},h:k=>k,
   ensureReservationBookingCodes:async rows=>rows,_cleanOtaGuestName:n=>n,_showReservationDetail:id=>clicked.push(id)});
 for(const name of ['_r39Pad','_r39IsoDate','_r39ParseISO','_r39AddDays','_r39DowMon','_r39WeekdayLabels','_r39MonthLabel'])vm.runInContext(fn(name),ctx);
@@ -240,6 +240,31 @@ for(const lang of ['it','en']) {
   assert.equal(document.querySelectorAll('.cal-bar-block').length,0);
   assert.equal((await ctx._computeReservationOverlap('p1','2026-10-10','2026-10-13','direct')).length,0,'identical redundant block does not obstruct unchanged direct edit');
   calendarRows=[d,mismatch];
+}
+// 9 Nov 2026: a booking with no check-ins of its own must not borrow the name
+// of another room's guest whose stay overlaps (Battaglia showed «APROSIO»).
+{
+  ctx.hostLang='it';ctx.allRooms=[{id:'roomA',name:'Battaglia'},{id:'roomB',name:'Bellatrase'}];
+  const cuomo=direct('cuomo',{booking_code:'CON-CUOMO',guest_name:'Cuomo',room_id:'roomA',checkin_date:'2026-10-12',checkout_date:'2026-10-14'});
+  const aprosio=direct('aprosio',{booking_code:'CON-APROSIO',guest_name:'Aprosio',room_id:'roomB',checkin_date:'2026-10-05',checkout_date:'2026-10-30'});
+  ctx.allCheckins=[{booking_code:'CON-APROSIO',room_id:'roomB',surname:'APROSIO',name:'LAVINIA',guest_type:'single',arrival_date:'2026-10-05',departure_date:'2026-10-30'}];
+  const label=async rows=>{calendarRows=rows;document.getElementById('calendar').innerHTML=await ctx._renderUpcomingCalendarBody(()=> '');
+    return [...document.querySelectorAll('.cal-bar')].map(b=>b.textContent.trim());};
+  let bars=await label([cuomo,aprosio]);
+  assert.ok(bars.some(t=>/^Battaglia · Cuomo/.test(t)),'own guest name: '+bars.join(' | '));
+  assert.ok(!bars.some(t=>/^Battaglia · APROSIO/.test(t)),'never another booking\'s guest');
+  // Also when the Bellatrase booking is filtered out of view (room filter): its code is still known.
+  ctx._calAllReservationCodes=new Set(['CON-CUOMO','CON-APROSIO']);
+  bars=await label([cuomo]);assert.ok(bars.some(t=>/Cuomo/.test(t))&&!bars.some(t=>/APROSIO/.test(t)),'filtered view: '+bars.join(' | '));
+  // A legacy check-in without a booking code, same room, overlapping: still matched (the fallback's purpose).
+  ctx._calAllReservationCodes=new Set();
+  ctx.allCheckins=[{booking_code:null,room_id:'roomA',surname:'ROSSI',name:'ANNA',guest_type:'head',arrival_date:'2026-10-12',departure_date:'2026-10-14'}];
+  bars=await label([cuomo,aprosio]);assert.ok(bars.some(t=>/^Battaglia · ROSSI ANNA/.test(t)),'legacy same-room check-in: '+bars.join(' | '));
+  // …but not from another room.
+  ctx.allCheckins=[{booking_code:null,room_id:'roomB',surname:'ROSSI',name:'ANNA',guest_type:'head',arrival_date:'2026-10-12',departure_date:'2026-10-14'}];
+  bars=await label([cuomo]);assert.ok(bars.some(t=>/Cuomo/.test(t))&&!bars.some(t=>/ROSSI/.test(t)),'other room: '+bars.join(' | '));
+  ctx.allRooms=[];ctx.allCheckins=[];calendarRows=[d,mismatch];
+  console.log('PASS calendar names: own booking name, never another room\'s or booking\'s guest (also in a filtered view), legacy no-code check-ins only in the same room');
 }
 // Browser IIFE actually loads without a CommonJS environment.
 const browserContext=vm.createContext({window:{},Date});vm.runInContext(readFileSync(new URL('../lib/calendar-roundtrip.js',import.meta.url),'utf8'),browserContext);

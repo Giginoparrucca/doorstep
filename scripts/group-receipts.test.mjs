@@ -16,7 +16,7 @@ const ctx = vm.createContext({ document, window, console, hostLang:'en', propert
   sb:{storage:{from:bucket=>({createSignedUrl:async(path,ttl)=>{signed.push({bucket,path,ttl});return {data:{signedUrl:'https://fixture.invalid/'+encodeURIComponent(path)}};}})}},
   alert:message=>alerts.push(message), toast:()=>{} });
 window.open = (url,target,features) => opened.push({url,target,features});
-for (const name of ['_isValidPastDOB','_guestTypeLabel','viewGroupReceipts','renderCheckins','viewGuest']) vm.runInContext(fn(name),ctx);
+for (const name of ['_isValidPastDOB','_guestTypeLabel','_isFiledRetained','viewGroupReceipts','renderCheckins','viewGuest']) vm.runInContext(fn(name),ctx);
 vm.runInContext('async '+fn('_openAlloggiatiReceipt'),ctx);
 const row = (id,extra={})=>({id,property_id:'p1',booking_code:'GROUP',name:'Sample',surname:'Guest',guest_type:'member',date_of_birth:'1980-01-01',arrival_date:'2026-10-10',alloggiati_status:'filed',filed_at:'2026-10-11T12:00:00Z',...extra});
 const button = ()=>document.querySelector('.checkin-group-header [data-guide="checkin-receipt-btn"]');

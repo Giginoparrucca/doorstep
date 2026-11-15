@@ -100,6 +100,7 @@ import { submitEntryCheckin } from './_entry-submission-save.js';
 import { verifyFromAuthHeader } from './_guest-token.js';
 import { applyCors } from './_cors.js';
 import { mintWalkinCode } from './_booking-code.js';
+import { propertyIsReadOnly, readOnlyBody } from './_billing.js';
 import { notifyHostForChatInsert } from './_notify-host.js';
 import { handleHostTerms } from './_host-terms.js';
 import { createRequire } from 'node:module';
@@ -675,8 +676,11 @@ async function doCheckinInsert(res, propertyId, incomingBookingCode, sessionId, 
   errors.push(...validateInvoiceRequired(inRecord, rules.invoiceRequired));
   if (errors.length) return res.status(400).json({ error: 'validation_failed', fields: errors });
 
-  // Walk-in mint when the token has no booking code.
+  // Walk-in mint when the token has no booking code. Round 72: a walk-in is
+  // a new booking, refused for a read-only account (trial/subscription
+  // ended + grace). Guests of an existing booking are never blocked.
   let bookingCode = incomingBookingCode;
+  if (!bookingCode && !isTest && await propertyIsReadOnly(propertyId)) return res.status(403).json(readOnlyBody());
   if (!bookingCode) bookingCode = mintWalkinCode();
 
   const row = pickFields(inRecord, CHECKIN_WRITE_FIELDS);

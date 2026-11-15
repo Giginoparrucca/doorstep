@@ -435,6 +435,46 @@ evidence:
   - legal/CONDIZIONI_GENERALI_v1.md
 ```
 
+### 13. Host subscriptions and billing (Gestione abbonamenti e fatturazione host)
+
+Round 72. Free trial, grace period, read-only mode, manual bank-transfer payments, free-for-life grants and the reminder emails about them. Nothing is active until the launch switch (`billing_settings.launch_at`) is set on SRLS day. Card/SEPA payments and e-invoicing are Round 73 (Stripe, Fatture in Cloud) and will be added here then.
+
+```yaml
+id: host-subscriptions-billing
+role: controller (WelcomeBnB)
+purpose:
+  - Run the host's free trial, grace period and read-only mode, and record payments received by bank transfer
+  - Send trial reminders, the launch email and the switch-to-paid notice to the host's account email
+  - Keep the accounting and contract record of each host's plan, payments and admin decisions (extensions, free for life)
+data_subjects:
+  - Hosts
+personal_data:
+  - Account id and email, host language
+  - Trial start and end, paid-until date, payment method (bank transfer), free-for-life reason, reminder send times
+  - Billing events - admin email (actor), old and new values, reason or note
+recipients:
+  - Resend (reminder, launch and switch-to-paid emails; no guest data)
+  - Sub-processors - Supabase, Vercel
+international_transfers:
+  - USA - Resend (OWNER - confirm DPA)
+retention:
+  - Subscription rows and billing events - 10 years from the end of the financial year (art. 2220 c.c. accounting records); append-only events, no foreign key to the account so they outlive it
+security_measures:
+  - Hosts read only their own subscription and events, admins all; only the server (service role) writes; nobody deletes; events cannot be changed or deleted by any role (database trigger)
+  - Admin actions checked on the server (caller JWT, is_admin) before any read; every change writes one event with the admin email and reason
+  - Billing never blocks guests who already have a link, Alloggiati filing or exports; checks fail open
+legal_basis:
+  - Art. 6(1)(b) performance of the contract with the host (Terms Art. 4)
+  - Art. 6(1)(c) legal obligation to keep accounting records (art. 2220 c.c., DPR 600/1973)
+evidence:
+  - supabase/migrations/20261115090000_round72_trial_billing.sql
+  - supabase/migrations/20261115100000_round72_read_only_rls.sql
+  - supabase/migrations/20261115110000_round72_launch.sql
+  - api/_trial-reminders.js
+  - api/_admin-billing.js
+  - legal/CONDIZIONI_GENERALI_v1.md
+```
+
 ## Owner decisions collected from this register
 
 1. **Retention periods** where none is enforced today: live check-ins, police receipts and filing log, marketing consents, past calendar reservations, chat Q&A archive, entry-release audit, admin log, notification log and closed host accounts.

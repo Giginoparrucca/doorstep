@@ -20,6 +20,37 @@ Daniele confirmed the plain-language recap on 5 November 2026 («Yes. Go ahead»
 
 **Round 71 closed (5 November 2026).** All four phases shipped (PRs #288, #289). **Parked for a later round:** guest engagement, chat response time, cost per host. **Open decision for Daniele:** keep «Alloggiati not connected while mode live» as red, or make it red only for properties with reservations / amber «manual filing only»; and whether a property with no reservations should be grey even with a red reason.
 
+### Hotfix — filed check-ins can no longer be deleted (Claude, 14–15 November 2026)
+
+**Daniele asked** whether check-in data can be deleted after it has been filed to Alloggiati. It could, which breaks the TULPS art. 109 retention rule. The Round 48/49 lock only blocked field edits. **Open routes found:**
+- the console row menu «Elimina» (hard delete);
+- the unexposed bulk deletes;
+- the `purge_booking` RPC (SECURITY DEFINER, executable by `authenticated`);
+- direct API DELETE under the owner policies;
+- soft delete, after which `purge_old_data` removed the row 30 days later;
+- clearing `filed_at`;
+- flipping the row to `is_test`, after which the test purges took it;
+- the admin 🗑 soft delete and «mark as test».
+
+No filed record was lost: all 271 filed rows are present, every ID in the filing log exists, and there were 0 filed and soft-deleted rows.
+
+**Fix:** migration `20261114090000_filed_checkins_retained.sql` adds the `checkins_filed_retained_guard` trigger (BEFORE UPDATE OR DELETE). It applies to real rows with `filed_at` set or status `filed`, and refuses for every API role, cascade and definer function:
+- DELETE;
+- setting `deleted_at`;
+- clearing `filed_at`;
+- switching on `is_test`.
+
+«Sblocca per correggere» (filed → correction → edit → re-file) is unchanged, and the row stays. The only bypass is a direct postgres/supabase_admin session with no API JWT claims (SQL editor, migrations, pg_cron), for deliberate end-of-retention or legal-order deletions. TRUNCATE on `checkins` is revoked from anon/authenticated. Host console: «Elimina» is hidden on filed guests (`_isFiledRetained`), and a refused delete shows an IT/EN explanation pointing to the correction flow.
+
+**Migration applied to production before merge** and recorded (`20261114090000`). Production probe as a host JWT, in a transaction that always rolls back:
+- delete, trash, `is_test` and `purge_booking`: all refused with `checkin_filed_retained`;
+- harmless update: allowed;
+- trigger present; `authenticated` TRUNCATE false.
+
+**Tests:** new `scripts/filed-checkins-retained.test.mjs` runs the real migration twice in PGlite with the real filed-edit lock, plus console wiring. Without the trigger it fails («authenticated: no delete»). `group-receipts.test.mjs` harness now loads the new helper. Local `npm run test:all`: **PASS 141 / FAIL 1 / SKIP 3**. The one failure was that harness, fixed and re-run green; the PR `regression` run then passed the whole suite. Skips are the standing three.
+
+**Gate:** PR #302 merged as `edf0d51`; main `regression` 43700943183 and automatic `production security smoke` 43701226967 green; production console serves the fix.
+
 ### Hotfix — calendar showed another guest's name on a booking without check-ins (Claude, 9 November 2026)
 
 **Reported by Daniele** (7contrade, admin view): the 12–14 Nov booking CON-N2VYRZ (direct, room Battaglia, guest «Cuomo», no check-ins yet) appeared in the calendar as «Battaglia · APROSIO…», the guest of a long Bellatrase stay. **Cause:** `_renderUpcomingCalendarBody` names a bar from its own check-ins by booking code. When there are none, it fell back to any checked-in guest whose dates overlapped, across the whole property and regardless of room, and also counted the booking as checked in. **Fix:** the date-overlap fallback (kept for old check-ins saved without a booking code) now only uses check-ins that belong to no booking in the month (no code, or a code with no reservation, collected before the room filter) and that are in the same room when both have one. Otherwise the bar shows the booking's own guest name. No other console view uses this fallback. **Tests:** `calendar-roundtrip.test.mjs` adds the reported case (own name, never another room's or booking's guest, also with a room filter), a legacy no-code check-in matched in the same room only; verified failing against the previous code («Battaglia · APROSIO LAVINIA»). Local `npm run test:all`: **PASS 141 / FAIL 0 / SKIP 3** (standing skips). **Gate:** PR #301 merged as `1c2f27b`; main `regression` 42721060165 and automatic `production security smoke` 42721599018 green; production console serves the fix.

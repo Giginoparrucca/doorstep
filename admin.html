@@ -1076,11 +1076,12 @@ function renderHealthOverview() {
     <div class="section-title" style="font-size:0.95rem;">Hosts by health</div>
     <div data-hh-hosts style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;">
       ${hosts.map(h => `<button type="button" data-hh-card="${escapeHtml(h.property_id)}" onclick="openHostHealth('${escapeHtml(h.property_id)}')" style="text-align:left;font:inherit;cursor:pointer;background:var(--white);border:1px solid var(--border);border-left:4px solid ${HH_COLOR[h.health.color]};border-radius:var(--radius);padding:10px 12px;box-shadow:var(--shadow);color:var(--ink);">
-        <div style="font-weight:600;font-size:0.85rem;">${HH_DOT[h.health.color]} ${escapeHtml(h.name || 'Unnamed')}</div>
+        <div style="font-weight:600;font-size:0.85rem;">${HH_DOT[h.health.color]} ${escapeHtml(h.name || 'Unnamed')} ${typeof billingChipHtml === 'function' ? billingChipHtml(h.billing) : ''}</div>
         <div style="font-size:0.72rem;color:var(--ink-soft);margin-top:3px;">${escapeHtml(h.health.reasons[0] || 'All good')}</div>
       </button>`).join('')}
     </div>
     <p style="font-size:0.68rem;color:var(--ink-soft);margin-top:8px;">Computed ${escapeHtml(new Date(hostHealth.generated_at).toLocaleString('en-GB'))}. Guests are shown as surname initial and arrival date only.</p>
+    ${typeof renderBillingSettings === 'function' ? renderBillingSettings() : ''}
   </section>`;
 }
 function hhTile(label, value, target, status, hint, extra = '') {
@@ -1096,7 +1097,8 @@ function renderHostHealthDetail(email) {
   if (!hostHealth || hostHealth.error) return `<p role="status" style="font-size:0.78rem;color:var(--amber);">${escapeHtml(hostHealth ? hostHealth.error : 'Loading host health…')}. Refresh to retry.</p>`;
   const mine = (hostHealth.properties || []).filter(p => p.owner_email && p.owner_email === email);
   if (!mine.length) return '<p style="font-size:0.8rem;color:var(--ink-soft);">No live property for this host.</p>';
-  return mine.map(p => {
+  const billingOwner = mine.find(p => p.billing && p.owner_id);
+  return (billingOwner && typeof renderBillingBox === 'function' ? renderBillingBox(billingOwner.billing, billingOwner.owner_id) : '') + mine.map(p => {
     const c = p.coverage, f = p.filing, cr = p.credentials, a = p.activity;
     const bars = `<div style="display:flex;gap:3px;align-items:flex-end;height:26px;margin-top:6px;" aria-label="Coverage by week, oldest first">${c.weeks.map(w => `<div title="${w.weeks_ago === 0 ? 'This week' : w.weeks_ago + ' weeks ago'}: ${w.covered}/${w.total}" style="flex:1;height:${w.total ? Math.max(3, Math.round((w.pct || 0) / 100 * 24)) : 2}px;background:${w.total ? (w.pct >= 85 ? 'var(--green)' : w.pct >= 50 ? 'var(--amber)' : 'var(--red)') : 'var(--border)'};border-radius:2px;"></div>`).join('')}</div>`;
     const covValue = c.status === 'grey' ? 'No arrivals in 30 days' : `${c.pct}% (${c.covered}/${c.total})`;
@@ -1127,6 +1129,84 @@ function renderHostHealthDetail(email) {
   }).join('');
 }
 const HostHealthHints = { upcoming: 'Nudge guest / tell host.' };
+
+// Round 72 Phase 4 — billing per host account (api/admin-host-health,
+// action billing_*; admin verified on the server). The chip, row and last 5
+// events come with the host-health payload (p.billing).
+const BILLING_EVENT_LABEL = { trial_started: 'Prova iniziata', trial_extended: 'Prova estesa', trial_end_set: 'Data di pagamento fissata', trial_shortened: 'Prova accorciata',
+  free_forever_on: 'Gratis a vita: sì', free_forever_off: 'Gratis a vita: no', marked_paid: 'Segnato pagato', expired: 'Prova scaduta', read_only: 'Sola lettura', reminder_sent: 'Promemoria inviato' };
+function billingYmd(offsetDays = 0) { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome' }).format(new Date(Date.now() + offsetDays * 86400000)); }
+function billingLastDay(iso) { return iso ? new Date(new Date(iso).getTime() - 1).toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' }) : '—'; }
+function billingChipHtml(b) {
+  if (!b || !b.chip) return '';
+  const s = b.state && b.state.state;
+  const color = s === 'read_only' ? 'var(--red)' : s === 'grace' ? 'var(--amber)' : s === 'active' || s === 'free' ? 'var(--green)' : 'var(--ink-soft)';
+  return `<span data-billing-chip style="display:inline-block;font-size:0.68rem;font-weight:600;padding:1px 7px;border-radius:10px;border:1px solid ${color};color:${color};white-space:nowrap;">${escapeHtml(b.chip)}</span>`;
+}
+async function adminBilling(action, body) {
+  try {
+    const { data } = await sb.auth.getSession();
+    const token = data?.session?.access_token;
+    if (!token) return adminToast('Not signed in', 'error');
+    const r = await fetch('/api/admin-host-health', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ action, ...body }), signal: AbortSignal.timeout(30000) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return adminToast('Billing: ' + (BILLING_ERRORS[j.error] || j.error || ('HTTP ' + r.status)), 'error');
+    adminToast(j.unchanged ? 'Nessuna modifica (già così)' : ('Fatto' + (j.email_sent === true ? ' · email inviata all’host' : j.email_sent === false ? ' · email NON inviata' : '')), 'success');
+    hostHealth = await loadHostHealth();
+    renderView();
+    return j;
+  } catch (e) { adminToast('Billing: request failed', 'error'); }
+}
+const BILLING_ERRORS = { reason_required: 'motivo obbligatorio', note_required: 'nota obbligatoria quando l’host ha chiesto', notice_too_short: 'servono almeno 7 giorni di preavviso (o spunta «l’host ha chiesto»)',
+  date_in_past: 'la data non può essere nel passato', date_invalid: 'data non valida', days_invalid: 'giorni non validi', free_forever: 'l’host è gratis a vita: prima toglilo', not_switchable: 'host già pagante',
+  iban_invalid: 'IBAN non valido', price_invalid: 'prezzo non valido', user_id_invalid: 'host non valido' };
+function billingVal(id) { const el = document.getElementById(id); return el ? (el.type === 'checkbox' ? el.checked : el.value.trim()) : ''; }
+function billingExtend(uid, days) { return adminBilling('billing_extend', { user_id: uid, ...(days ? { days } : { until: billingVal('bx-until-' + uid) }), reason: billingVal('bx-reason-' + uid) }); }
+function billingSwitch(uid) { return adminBilling('billing_switch_to_paid', { user_id: uid, due_date: billingVal('bs-date-' + uid), host_asked: billingVal('bs-asked-' + uid) === true, note: billingVal('bs-note-' + uid) }); }
+function billingFree(uid, on) { return adminBilling('billing_free_forever', { user_id: uid, on, reason: billingVal('bf-reason-' + uid) }); }
+function billingPaid(uid) { return adminBilling('billing_mark_paid', { user_id: uid, paid_on: billingVal('bp-on-' + uid), ...(billingVal('bp-until-' + uid) ? { paid_until: billingVal('bp-until-' + uid) } : {}), note: billingVal('bp-note-' + uid) }); }
+function billingSaveSettings() {
+  const euro = billingVal('bset-price'); const cents = euro === '' ? undefined : Math.round(Number(String(euro).replace(',', '.')) * 100);
+  return adminBilling('billing_settings', { ...(cents !== undefined ? { annual_price_cents: cents } : {}), bank_transfer_iban: billingVal('bset-iban'), bank_transfer_holder: billingVal('bset-holder') });
+}
+function renderBillingBox(b, uid) {
+  if (!b || !uid) return '';
+  const u = escapeHtml(uid), sub = b.subscription || {}, st = b.state || {};
+  const inp = 'padding:4px 6px;border:1px solid var(--border);border-radius:4px;font:inherit;font-size:0.76rem;max-width:100%;box-sizing:border-box;';
+  const btn = 'padding:4px 10px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.74rem;cursor:pointer;';
+  const row = (title, inner) => `<div style="border-top:1px solid var(--border);padding:8px 0;"><div style="font-weight:600;font-size:0.78rem;margin-bottom:4px;">${title}</div><div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">${inner}</div></div>`;
+  const details = [sub.trial_ends_at ? 'prova fino al ' + billingLastDay(sub.trial_ends_at) : '', sub.paid_until ? 'pagato fino al ' + billingLastDay(sub.paid_until) : '', sub.free_forever_reason ? 'gratis: ' + sub.free_forever_reason : ''].filter(Boolean).join(' · ');
+  const events = (b.events || []).map(e => `<li>${escapeHtml(new Date(e.created_at).toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' }))} · ${escapeHtml(BILLING_EVENT_LABEL[e.action] || e.action)} · ${escapeHtml(e.actor)}${e.reason ? ' · ' + escapeHtml(e.reason) : ''}</li>`).join('');
+  const isFree = st.state === 'free' && st.reason === 'free_forever';
+  return `<section data-billing-box="${u}" aria-label="Abbonamento" style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;box-shadow:var(--shadow);font-size:0.8rem;margin-bottom:18px;">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;"><strong>Abbonamento</strong> ${billingChipHtml(b)} <span style="color:var(--ink-soft);">${escapeHtml(details)}</span></div>
+    ${events ? `<ul data-billing-events style="margin:6px 0 4px;padding-left:18px;color:var(--ink-soft);font-size:0.74rem;">${events}</ul>` : '<div style="color:var(--ink-soft);font-size:0.74rem;margin:4px 0;">Nessun evento.</div>'}
+    ${row('Estendi prova', `<button type="button" style="${btn}" data-billing-extend="7" onclick="billingExtend('${u}',7)">+7</button><button type="button" style="${btn}" onclick="billingExtend('${u}',14)">+14</button><button type="button" style="${btn}" onclick="billingExtend('${u}',30)">+30</button>
+      <label>o fino al <input type="date" id="bx-until-${u}" min="${billingYmd()}" style="${inp}"></label><button type="button" style="${btn}" onclick="billingExtend('${u}')">Estendi</button>
+      <input type="text" id="bx-reason-${u}" placeholder="Motivo (obbligatorio)" style="${inp}flex:1 1 180px;">`)}
+    ${row('Passa a pagamento', `<label>pagamento dal <input type="date" id="bs-date-${u}" min="${billingYmd(7)}" value="${billingYmd(7)}" style="${inp}"></label>
+      <label style="display:flex;gap:4px;align-items:center;"><input type="checkbox" id="bs-asked-${u}" onchange="document.getElementById('bs-date-${u}').min=this.checked?'${billingYmd()}':'${billingYmd(7)}'"> L’host ha chiesto di abbonarsi ora</label>
+      <input type="text" id="bs-note-${u}" placeholder="Nota (obbligatoria se l’host ha chiesto)" style="${inp}flex:1 1 180px;"><button type="button" style="${btn}" data-billing-switch onclick="billingSwitch('${u}')">Passa a pagamento</button>`)}
+    ${row('Gratis a vita', `<input type="text" id="bf-reason-${u}" placeholder="Motivo (obbligatorio)" style="${inp}flex:1 1 180px;"><button type="button" style="${btn}" data-billing-free="${isFree ? 'off' : 'on'}" onclick="billingFree('${u}',${isFree ? 'false' : 'true'})">${isFree ? 'Togli gratis a vita' : 'Rendi gratis a vita'}</button>`)}
+    ${row('Segna pagato (bonifico)', `<label>pagato il <input type="date" id="bp-on-${u}" value="${billingYmd()}" max="${billingYmd()}" style="${inp}"></label><label>fino al <input type="date" id="bp-until-${u}" style="${inp}"></label>
+      <input type="text" id="bp-note-${u}" placeholder="Nota" style="${inp}flex:1 1 140px;"><button type="button" style="${btn}" data-billing-paid onclick="billingPaid('${u}')">Segna pagato</button>`)}
+  </section>`;
+}
+function renderBillingSettings() {
+  const s = hostHealth && hostHealth.billing_settings;
+  if (!s) return '';
+  const inp = 'padding:4px 6px;border:1px solid var(--border);border-radius:4px;font:inherit;font-size:0.76rem;max-width:100%;box-sizing:border-box;';
+  return `<section data-billing-settings aria-label="Billing settings" style="margin:14px 0 22px;">
+    <div class="section-title" style="font-size:0.95rem;">Abbonamenti · impostazioni</div>
+    <div style="background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;box-shadow:var(--shadow);font-size:0.8rem;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+      <span>Lancio: <strong>${s.launch_at ? escapeHtml(new Date(s.launch_at).toLocaleString('it-IT', { timeZone: 'Europe/Rome' })) : 'non ancora (nessun host vede nulla)'}</strong></span>
+      <label>Prezzo annuo € <input type="text" inputmode="decimal" id="bset-price" value="${escapeHtml(String((s.annual_price_cents || 0) / 100))}" style="${inp}width:80px;"></label>
+      <label>IBAN <input type="text" id="bset-iban" value="${escapeHtml(s.bank_transfer_iban || '')}" style="${inp}width:240px;"></label>
+      <label>Intestatario <input type="text" id="bset-holder" value="${escapeHtml(s.bank_transfer_holder || '')}" style="${inp}width:180px;"></label>
+      <button type="button" onclick="billingSaveSettings()" style="padding:4px 10px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.74rem;cursor:pointer;">Salva</button>
+    </div>
+  </section>`;
+}
 
 // Round 51 Phase 6 — onboarding readiness per property, computed on the
 // server with the same rule as the host checklist and the reminder emails

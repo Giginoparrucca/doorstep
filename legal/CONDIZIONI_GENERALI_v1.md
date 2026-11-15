@@ -31,9 +31,21 @@ In vigore dal [data di entrata in vigore].
 
 ## Art. 4 — Corrispettivi
 
-4.1 I piani del Servizio e i relativi prezzi sono indicati nelle condizioni economiche. Nessun importo è dovuto senza che l'Host le abbia accettate in modo espresso prima del primo addebito. Il Fornitore può offrire il Servizio, o alcune funzioni, gratuitamente.
+4.1 Il Fornitore può offrire un periodo di uso gratuito. Il Fornitore comunica all'Host via email e nel Servizio la data in cui l'uso gratuito termina. Durante l'uso gratuito non è dovuto alcun importo e non è richiesto alcun metodo di pagamento.
 
-4.2 Il Fornitore può modificare i prezzi o introdurre piani a pagamento comunicandolo all'Host con almeno 30 giorni di preavviso. Chi non accetta può recedere ed esportare i propri Dati ai sensi dell'art. 13. Se l'Host è un consumatore, restano fermi i diritti previsti dal Codice del Consumo per i contratti a distanza, compreso il recesso entro 14 giorni.
+4.2 Al termine della prova, il Servizio costa 60 euro all'anno, IVA inclusa, per ogni account Host, indipendentemente dal numero di Strutture. Il prezzo è pagato in anticipo per un anno.
+
+4.3 Il pagamento avviene con carta o addebito SEPA tramite il fornitore di pagamenti indicato nel Servizio, oppure con bonifico. Il Fornitore emette fattura elettronica.
+
+4.4 L'abbonamento si rinnova automaticamente ogni anno, salvo disdetta. Almeno 30 giorni prima del rinnovo il Fornitore invia un promemoria via email con la data, l'importo e il modo per disdire. La disdetta si fa dal Servizio o scrivendo a info@welcomebnb.it e ha effetto alla scadenza dell'anno pagato.
+
+4.5 Se al termine della prova o alla scadenza l'importo non è pagato, l'Host ha 7 giorni per pagare con accesso completo. Poi l'account passa in sola lettura: l'Host può consultare ed esportare tutti i propri Dati, ma non creare nuovi link, prenotazioni o check-in, né modificare le Strutture. Il check-in degli Ospiti che hanno già ricevuto il link e l'Invio automatico delle loro schedine continuano a funzionare.
+
+4.6 Il Fornitore può concedere a singoli Host una prova più lunga o l'uso gratuito del Servizio. Questo non modifica le condizioni degli altri Host. Il Fornitore può terminare in anticipo la prova, o l'uso gratuito concesso, con un preavviso di almeno 7 giorni via email; il pagamento è dovuto solo dalla data indicata nell'avviso.
+
+4.7 Il Fornitore può modificare i prezzi con almeno 30 giorni di preavviso; il nuovo prezzo vale dal rinnovo successivo. Chi non accetta può disdire ai sensi dell'art. 4.4.
+
+4.8 Diritto di recesso del consumatore. Se l'Host è un consumatore può recedere entro 14 giorni dal primo pagamento, senza motivazione, con una richiesta a info@welcomebnb.it, e riceve il rimborso integrale.
 
 ## Art. 5 — Adempimenti di legge: restano dell'Host
 
@@ -105,7 +117,7 @@ L'Host tiene indenne il Fornitore da richieste di terzi, compresi Ospiti e autor
 
 13.1 Il contratto è a tempo indeterminato.
 
-13.2 L'Host può recedere in qualsiasi momento, senza costi, con una richiesta a info@welcomebnb.it.
+13.2 L'Host può recedere in qualsiasi momento con una richiesta a info@welcomebnb.it. Il recesso ha effetto alla scadenza dell'anno già pagato; gli importi già pagati non sono rimborsati, salvo l'art. 4.8.
 
 13.3 Il Fornitore può recedere con 30 giorni di preavviso via email, o subito in caso di violazione grave di queste Condizioni, uso illecito del Servizio o ordine dell'autorità.
 
@@ -128,11 +140,15 @@ L'Host tiene indenne il Fornitore da richieste di terzi, compresi Ospiti e autor
 L'Host dichiara di aver letto queste Condizioni e di approvare specificamente, ai sensi degli artt. 1341 e 1342 c.c., i seguenti articoli:
 
 - 3.3 — modifica o rimozione di funzioni del Servizio;
+- 4.4 — rinnovo automatico annuale;
+- 4.5 — passaggio dell'account in sola lettura in caso di mancato pagamento;
+- 4.6 — fine anticipata della prova o dell'uso gratuito con preavviso di 7 giorni;
 - 5.2 e 5.3 — adempimenti di legge che restano a carico dell'Host anche con l'Invio automatico;
 - 6.4 — nessuna garanzia sull'accettazione degli invii da parte dei Portali pubblici;
 - 9.1 e 9.2 — nessuna garanzia di continuità del Servizio e dei servizi di terzi;
 - 10.2 e 10.3 — limitazioni ed esclusioni di responsabilità e massimale;
 - 11 — manleva a carico dell'Host;
+- 13.2 — nessun rimborso degli importi già pagati in caso di recesso, salvo l'art. 4.8;
 - 13.3 — recesso del Fornitore, anche immediato;
 - 14 — modifiche delle Condizioni da parte del Fornitore;
 - 15.2 — foro competente.

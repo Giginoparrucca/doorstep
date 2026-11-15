@@ -247,6 +247,9 @@ async function sendReceipt(deps, to, doc, row, hostKind) {
     '',
     `Dichiarazione: ${hostKind === 'business' ? 'uso con partita IVA (attività imprenditoriale o professionale)' : 'uso come privato, senza partita IVA'}.`,
     '',
+    // Round 72: price and plan (Art. 4) stated in the receipt.
+    'Condizioni economiche (art. 4): uso gratuito fino alla data che ti comunichiamo via email e nel Servizio; poi 60 € l\'anno, IVA inclusa, per account host (qualunque numero di strutture), pagati in anticipo, con rinnovo automatico annuale salvo disdetta. Nulla è dovuto durante l\'uso gratuito.',
+    '',
     'Hai approvato specificamente, ai sensi degli artt. 1341 e 1342 c.c., queste clausole:',
     clauses,
     '',

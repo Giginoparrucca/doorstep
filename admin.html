@@ -1192,6 +1192,74 @@ function renderBillingBox(b, uid) {
       <input type="text" id="bp-note-${u}" placeholder="Nota" style="${inp}flex:1 1 140px;"><button type="button" style="${btn}" data-billing-paid onclick="billingPaid('${u}')">Segna pagato</button>`)}
   </section>`;
 }
+// Round 72 Phase 6 — «Lancia» (SRLS day): per-host free-until dates
+// (default launch + 30, never before launch + 7), free for life with a
+// reason, preview (nothing written), then one transaction on the server.
+let launchPlan = null;
+function launchVal(id) { const el = document.getElementById(id); return el ? (el.type === 'checkbox' ? el.checked : el.value.trim()) : ''; }
+async function billingLaunchPrepare() {
+  const j = await adminBillingRaw('billing_launch_preview', {});
+  if (!j) return;
+  launchPlan = { launch_at: j.launch_at, hosts: j.hosts || [], result: null };
+  renderView();
+}
+function billingLaunchApplyAll() {
+  const d = launchVal('launch-all-date'); if (!d || !launchPlan) return;
+  launchPlan.hosts.forEach(hh => { const el = document.getElementById('launch-date-' + hh.user_id); if (el && !document.getElementById('launch-free-' + hh.user_id)?.checked) el.value = d; });
+}
+function billingLaunchPayload() {
+  return launchPlan.hosts.filter(hh => !hh.has_row).map(hh => launchVal('launch-free-' + hh.user_id) === true
+    ? { user_id: hh.user_id, free_forever_reason: launchVal('launch-reason-' + hh.user_id) || 'gratis a vita (lancio)' }
+    : { user_id: hh.user_id, last_free_day: launchVal('launch-date-' + hh.user_id) });
+}
+async function billingLaunch(dry) {
+  if (!launchPlan) return;
+  if (!dry && !confirm('Lanciare adesso? Da questo momento il conto alla rovescia della prova parte per tutti gli host elencati, con le date scelte.')) return;
+  const j = await adminBillingRaw('billing_launch', { launch_at: launchPlan.launch_at, hosts: billingLaunchPayload(), dry });
+  if (!j) return;
+  launchPlan.result = j;
+  if (!dry) { launchPlan = null; hostHealth = await loadHostHealth(); }
+  adminToast(dry ? `Anteprima: ${j.hosts.filter(x => x.outcome === 'would_create').length} prove, ${j.hosts.filter(x => x.outcome === 'would_set_free').length} gratis a vita, ${j.skipped_existing} già presenti` : `Lanciato: ${j.created} prove, ${j.free_forever} gratis a vita`, 'success');
+  renderView();
+}
+async function billingLaunchEmails(dry) {
+  if (!dry && !confirm('Inviare adesso l’email di lancio a ogni host (una sola volta per host)?')) return;
+  const j = await adminBillingRaw('billing_launch_emails', { dry });
+  if (!j) return;
+  const n = k => j.results.filter(r => r.outcome === k).length;
+  adminToast(dry ? `Anteprima: ${n('would_send')} email da inviare, ${n('already_sent')} già inviate` : `Email di lancio: ${n('sent')} inviate, ${n('send_failed')} non riuscite, ${n('already_sent')} già inviate`, n('send_failed') ? 'error' : 'success');
+}
+async function adminBillingRaw(action, body) {
+  try {
+    const { data } = await sb.auth.getSession();
+    const token = data?.session?.access_token;
+    if (!token) { adminToast('Not signed in', 'error'); return null; }
+    const r = await fetch('/api/admin-host-health', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ action, ...body }), signal: AbortSignal.timeout(60000) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { adminToast('Lancio: ' + (BILLING_ERRORS[j.error] || j.error || ('HTTP ' + r.status)), 'error'); return null; }
+    return j;
+  } catch (e) { adminToast('Lancio: request failed', 'error'); return null; }
+}
+function renderLaunchControls(s) {
+  const btn = 'padding:4px 10px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.74rem;cursor:pointer;';
+  const inp = 'padding:4px 6px;border:1px solid var(--border);border-radius:4px;font:inherit;font-size:0.76rem;max-width:100%;box-sizing:border-box;';
+  if (s.launch_at) return `<div data-launch-done style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:0.78rem;">Email di lancio: <button type="button" style="${btn}" data-launch-emails="dry" onclick="billingLaunchEmails(true)">Anteprima</button><button type="button" style="${btn}" data-launch-emails="send" onclick="billingLaunchEmails(false)">Invia email di lancio</button></div>`;
+  if (!launchPlan) return `<div style="margin-top:8px;"><button type="button" style="${btn}" data-launch-prepare onclick="billingLaunchPrepare()">Prepara lancio</button> <span style="font-size:0.72rem;color:var(--ink-soft);">Solo il giorno della SRLS (vedi docs/legal/LAUNCH_RUNBOOK.md).</span></div>`;
+  const rows = launchPlan.hosts.map(hh => {
+    const u = escapeHtml(hh.user_id);
+    if (hh.has_row) return `<tr><td>${escapeHtml(hh.email)}</td><td colspan="2" style="color:var(--ink-soft);">ha già un abbonamento: non cambia</td></tr>`;
+    return `<tr data-launch-host="${u}"><td style="overflow-wrap:anywhere;">${escapeHtml(hh.email)} <span style="color:var(--ink-soft);">(${hh.properties} strutt.${hh.all_test ? ', solo test' : ''})</span></td>
+      <td><input type="date" id="launch-date-${u}" value="${escapeHtml(hh.suggested_last_free_day)}" min="${escapeHtml(hh.earliest_last_free_day)}" style="${inp}"></td>
+      <td><label style="display:flex;gap:4px;align-items:center;"><input type="checkbox" id="launch-free-${u}" ${hh.all_test ? 'checked' : ''}> Gratis a vita</label><input type="text" id="launch-reason-${u}" placeholder="Motivo" value="${hh.all_test ? 'account di test' : ''}" style="${inp}width:140px;"></td></tr>`;
+  }).join('');
+  const res = launchPlan.result ? `<div data-launch-preview style="font-size:0.74rem;margin-top:6px;">Anteprima: ${launchPlan.result.hosts.map(x => escapeHtml(x.outcome + (x.last_free_day ? ' fino al ' + x.last_free_day : ''))).join(' · ')}</div>` : '';
+  return `<div data-launch-plan style="margin-top:10px;width:100%;">
+    <div style="font-size:0.78rem;margin-bottom:6px;">Lancio al <strong>${escapeHtml(new Date(launchPlan.launch_at).toLocaleString('it-IT', { timeZone: 'Europe/Rome' }))}</strong>. Ultimo giorno gratuito per ogni host (minimo lancio + 7 giorni):</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px;"><input type="date" id="launch-all-date" style="${inp}"><button type="button" style="${btn}" onclick="billingLaunchApplyAll()">Applica a tutti</button></div>
+    <div style="overflow-x:auto;" tabindex="0" role="region" aria-label="Host al lancio"><table class="data-table" style="width:100%;font-size:0.74rem;"><thead><tr><th scope="col">Host</th><th scope="col">Gratis fino al</th><th scope="col">Gratis a vita</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"><button type="button" style="${btn}" data-launch-dry onclick="billingLaunch(true)">Anteprima (non scrive nulla)</button><button type="button" style="${btn}background:var(--warm);color:#fff;border-color:var(--warm);" data-launch-go onclick="billingLaunch(false)">Lancia</button></div>${res}
+  </div>`;
+}
 function renderBillingSettings() {
   const s = hostHealth && hostHealth.billing_settings;
   if (!s) return '';
@@ -1204,6 +1272,7 @@ function renderBillingSettings() {
       <label>IBAN <input type="text" id="bset-iban" value="${escapeHtml(s.bank_transfer_iban || '')}" style="${inp}width:240px;"></label>
       <label>Intestatario <input type="text" id="bset-holder" value="${escapeHtml(s.bank_transfer_holder || '')}" style="${inp}width:180px;"></label>
       <button type="button" onclick="billingSaveSettings()" style="padding:4px 10px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.74rem;cursor:pointer;">Salva</button>
+      ${typeof renderLaunchControls === 'function' ? renderLaunchControls(s) : ''}
     </div>
   </section>`;
 }

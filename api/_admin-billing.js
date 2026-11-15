@@ -68,6 +68,22 @@ export function renderSwitchToPaidEmail({ lang, dueYmd, priceEur = 60 }) {
   return { subject, html, text };
 }
 
+// One-off launch email (runbook step 5), with that host's own date.
+export function renderLaunchEmail({ lang, lastFreeDay, priceEur = 60, consoleUrl = 'https://app.welcomebnb.it/host-console.html' }) {
+  const en = lang === 'en';
+  const price = Number(priceEur).toLocaleString(en ? 'en-GB' : 'it-IT', { maximumFractionDigits: 2 });
+  let date = '';
+  if (lastFreeDay) { const [y, m, d] = lastFreeDay.split('-').map(Number); date = new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString(en ? 'en-GB' : 'it-IT', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }); }
+  const subject = en ? 'New WelcomeBnB terms: sign in to accept them' : 'Nuove condizioni WelcomeBnB: accedi per firmarle';
+  const text = lastFreeDay
+    ? (en ? `New WelcomeBnB terms: sign in to accept them. You can keep using WelcomeBnB for free until ${date}; after that it costs €${price}/year, VAT included.`
+          : `Nuove condizioni WelcomeBnB: accedi per firmarle. Puoi continuare a usare WelcomeBnB gratis fino al ${date}; poi costa ${price} € l'anno, IVA inclusa.`)
+    : (en ? 'New WelcomeBnB terms: sign in to accept them. WelcomeBnB stays free for you.'
+          : 'Nuove condizioni WelcomeBnB: accedi per firmarle. Per te WelcomeBnB resta gratuito.');
+  const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#061A3D;font-size:15px;line-height:1.5;"><p>${esc(text)}</p><p><a href="${esc(consoleUrl)}" style="display:inline-block;background:#005BFF;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;">${en ? 'Open the console' : 'Apri la console'}</a></p></div>`;
+  return { subject, html, text };
+}
+
 function bad(error, status = 400) { return { status, body: { error } }; }
 
 // deps: get(path) → rows; patch(path, body) → rows; insert(table, row) → rows;
@@ -95,6 +111,45 @@ export async function handleBillingAction(action, body, { actor, deps, now = new
     patch.updated_at = now.toISOString();
     const rows = await deps.patch('billing_settings?id=eq.1', patch);
     return { status: 200, body: { ok: true, settings: rows[0] || null } };
+  }
+
+  // ── Phase 6: launch (preview, Lancia, launch emails) ──
+  if (action === 'billing_launch_preview') {
+    const [settings] = await deps.get('billing_settings?id=eq.1&select=launch_at&limit=1');
+    const launchAt = settings && settings.launch_at ? settings.launch_at : (body.launch_at || now.toISOString());
+    const hosts = await deps.rpc('billing_launch_candidates', { p_launch_at: launchAt });
+    return { status: 200, body: { ok: true, launch_at: launchAt, already_launched: !!(settings && settings.launch_at), hosts } };
+  }
+  if (action === 'billing_launch') {
+    if (!Array.isArray(body.hosts)) return bad('hosts_required');
+    try {
+      const out = await deps.rpc('billing_launch', { p_launch_at: body.launch_at || now.toISOString(), p_hosts: body.hosts, p_actor: actor, p_dry: body.dry !== false });
+      return { status: 200, body: { ok: true, ...out } };
+    } catch (e) {
+      const m = String(e && e.message || e);
+      return bad(/earlier than launch/.test(m) ? 'date_before_launch_plus_7' : /not an eligible host/.test(m) ? 'host_not_eligible' : /last free day required/.test(m) ? 'date_required' : 'launch_failed');
+    }
+  }
+  if (action === 'billing_launch_emails') {
+    const [settings] = await deps.get('billing_settings?id=eq.1&select=launch_at,annual_price_cents&limit=1');
+    if (!settings || !settings.launch_at) return bad('not_launched', 409);
+    const subs = await deps.get('host_subscriptions?select=user_id,status,trial_ends_at,reminders_sent&order=user_id.asc&limit=1000');
+    const results = [];
+    for (const sub of subs) {
+      if ((sub.reminders_sent || {}).launch) { results.push({ user_id: sub.user_id, outcome: 'already_sent' }); continue; }
+      const to = await deps.userEmail(sub.user_id);
+      if (!to) { results.push({ user_id: sub.user_id, outcome: 'no_email' }); continue; }
+      const lang = (await deps.lang(sub.user_id)) === 'en' ? 'en' : 'it';
+      const msg = renderLaunchEmail({ lang, lastFreeDay: sub.status === 'free_forever' ? null : lastDay(sub.trial_ends_at), priceEur: (settings.annual_price_cents ?? 6000) / 100, consoleUrl: deps.consoleUrl });
+      if (body.dry !== false) { results.push({ user_id: sub.user_id, outcome: 'would_send', to, subject: msg.subject }); continue; }
+      const claimed = await deps.patch(`host_subscriptions?user_id=eq.${enc(sub.user_id)}&reminders_sent->>launch=is.null`, { reminders_sent: { ...(sub.reminders_sent || {}), launch: now.toISOString() } });
+      if (!Array.isArray(claimed) || claimed.length !== 1) { results.push({ user_id: sub.user_id, outcome: 'already_claimed' }); continue; }
+      const sent = await deps.send(to, msg.subject, msg.html);
+      if (!sent.ok) await deps.patch(`host_subscriptions?user_id=eq.${enc(sub.user_id)}`, { reminders_sent: sub.reminders_sent || {} }).catch(() => {});
+      await deps.event({ user_id: sub.user_id, actor, action: 'reminder_sent', new_value: { milestone: 'launch', ok: !!sent.ok, resend_id: sent.id || null }, reason: sent.ok ? null : String(sent.error || 'send failed').slice(0, 300) });
+      results.push({ user_id: sub.user_id, outcome: sent.ok ? 'sent' : 'send_failed' });
+    }
+    return { status: 200, body: { ok: true, dry_run: body.dry !== false, results } };
   }
 
   const userId = String(body.user_id || '');

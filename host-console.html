@@ -4807,6 +4807,7 @@ const HT = {
     all_checkins_title: 'All Guest Check-ins',
     btn_delete_all: '🗑 Delete All', btn_expand_all: '▾ Expand all', btn_collapse_all: '▸ Collapse all',
     delete_confirm: 'Delete record for {name}? This cannot be undone.',
+    delete_filed_blocked: 'This guest was filed to Alloggiati: the record must be kept (TULPS art. 109) and cannot be deleted. To fix a mistake use Edit → Unlock to correct.',
     delete_all_confirm: 'Delete ALL {count} check-in records? This cannot be undone.',
     delete_all_confirm2: 'Are you sure? Type "DELETE" to confirm.',
     deleted_record: '{name}\'s record deleted',
@@ -5403,6 +5404,7 @@ const HT = {
     all_checkins_title: 'Tutti i Check-in Ospiti',
     btn_delete_all: '🗑 Elimina Tutto', btn_expand_all: '▾ Espandi tutti', btn_collapse_all: '▸ Comprimi tutti',
     delete_confirm: 'Eliminare il record di {name}? Questa azione è irreversibile.',
+    delete_filed_blocked: 'Questo ospite è già stato inviato ad Alloggiati: il record va conservato (art. 109 TULPS) e non si può eliminare. Per correggere un errore usa Modifica → Sblocca per correggere.',
     delete_all_confirm: 'Eliminare TUTTI i {count} record di check-in? Questa azione è irreversibile.',
     delete_all_confirm2: 'Sei sicuro? Digita "ELIMINA" per confermare.',
     deleted_record: 'Record di {name} eliminato',
@@ -8525,8 +8527,8 @@ function renderCheckins() {
                 style="display:block;width:100%;text-align:left;background:none;border:none;padding:8px 14px;font-size:0.82rem;color:var(--warm);cursor:pointer;font-family:inherit;">${h('btn_edit_single') || 'Edit'}</button>
               <button type="button" onclick="event.stopPropagation();_closeRowMenus();_toggleAutofileExcluded('${c.id}')"
                 style="display:block;width:100%;text-align:left;background:none;border:none;padding:8px 14px;font-size:0.82rem;color:var(--ink);cursor:pointer;font-family:inherit;border-top:1px solid var(--border);">${h(c.autofile_excluded ? 'btn_autofile_include' : 'btn_autofile_exclude')}</button>
-              <button type="button" onclick="event.stopPropagation();_closeRowMenus();deleteCheckin('${c.id}','${escName}')"
-                style="display:block;width:100%;text-align:left;background:none;border:none;padding:8px 14px;font-size:0.82rem;color:var(--red);cursor:pointer;font-family:inherit;border-top:1px solid var(--border);">${h('btn_delete_single')}</button>
+              ${_isFiledRetained(c) ? '' : `<button type="button" onclick="event.stopPropagation();_closeRowMenus();deleteCheckin('${c.id}','${escName}')"
+                style="display:block;width:100%;text-align:left;background:none;border:none;padding:8px 14px;font-size:0.82rem;color:var(--red);cursor:pointer;font-family:inherit;border-top:1px solid var(--border);">${h('btn_delete_single')}</button>`}
             </div>
           </td>
         </tr>`;
@@ -8538,8 +8540,16 @@ function renderCheckins() {
   if (cc) cc.textContent = allCheckins.length;
 }
 
+// 14 Nov 2026 — a check-in filed to Alloggiati is kept (TULPS art. 109).
+// The database refuses the delete (checkins_filed_retained_guard); the
+// console hides «Elimina» and explains instead of failing.
+function _isFiledRetained(c) {
+  return !!c && c.is_test !== true && (!!c.filed_at || c.alloggiati_status === 'filed');
+}
+
 async function deleteCheckin(id, name) {
   if (!id) { console.error('No ID to delete'); toast(hostLang === 'it' ? 'Errore: ID mancante' : 'Error: no ID'); return; }
+  if (_isFiledRetained(allCheckins.find(c => c.id === id))) { toast(h('delete_filed_blocked')); return; }
   if (!confirm(h('delete_confirm').replace('{name}', name))) return;
 
   // Find the row so we know its booking_code (to clean analytics too)
@@ -8573,7 +8583,7 @@ async function deleteCheckin(id, name) {
   if (error) {
     console.error('Delete error:', error);
     if (row) { allCheckins.splice(rowIdx, 0, row); renderCheckins(); renderDashboard(); }
-    toast('Error: ' + error.message);
+    toast(/checkin_filed_retained/.test(error.message || '') ? h('delete_filed_blocked') : 'Error: ' + error.message);
     return;
   }
   if (!deleted || deleted.length === 0) {

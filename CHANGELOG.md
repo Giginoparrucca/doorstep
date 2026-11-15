@@ -7,6 +7,20 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Round 72 — 30-day trial, admin extensions, soft lock and economic terms (confirmed 2026-11-15)
+
+Daniele confirmed the plain-language recap on 15 November 2026 («go ahead»). Specification: `PLAN_round72_trial_billing.md`. Builds trial tracking, soft paywall → 7-day grace → read-only, admin billing actions, the economic terms draft and the launch runbook. **Nothing charges anyone and nothing is visible until `billing_settings.launch_at` is set on SRLS day.** Round 73 (Stripe + e-invoicing) stays blocked on the SRLS and the commercialista. Round 71 is closed (table below kept as history); Round 51 (6b, 7), Round 63 (GPT) and open Round 67 phases keep their ownership.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 1 — Data model | in-progress — Claude Opus 5.5 | |
+| 2 — Server enforcement + reminders | pending | |
+| 3 — Host console | pending | |
+| 4 — Admin | pending | |
+| 5 — Terms text | pending | |
+| 6 — Launch runbook | pending | Code ships now; runbook steps blocked — owner action (SRLS) |
+| 7 — Regression + close | pending | |
+
 ### Round 71 — Admin host health: who do I call today? (confirmed 2026-11-05)
 
 Daniele confirmed the plain-language recap on 5 November 2026 («Yes. Go ahead»), after upgrading Vercel (so the health endpoint gets its own function). Specification: `PLAN_round71_admin_host_health.md`. Admin-only: check-in coverage, filing/compliance, Action needed list and host health score. **Parked for a later round:** guest engagement, chat response time, cost per host. Runs alongside Round 51 (Phase 6b and 7 open, Claude), Round 63 (GPT) and open Round 67 phases; their ownership is unchanged.

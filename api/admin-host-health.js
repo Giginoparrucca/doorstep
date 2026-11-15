@@ -12,6 +12,8 @@ import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY } from './_environment.js';
 import { applyCors } from './_cors.js';
 import { regionComplianceFor } from './_onboarding-nudges.js';
+import { handleBillingAction, billingChip } from './_admin-billing.js';
+import { sendHostEmail, hostAccountEmail } from './_notify-host.js';
 
 const require = createRequire(import.meta.url);
 const HostHealth = require('../lib/host-health.js');
@@ -106,8 +108,52 @@ export async function buildHostHealth({ now = new Date(), deps = {} } = {}) {
     r.owner_email = userById.get(p.owner_id)?.email || null;
     return r;
   });
+  // Round 72 — billing status per host account (chip, row, last 5 events).
+  const billing = await readBilling(owners, now, deps).catch(e => ({ error: String(e.message || e).slice(0, 120) }));
+  for (const r of results) r.billing = billing.byOwner ? billing.byOwner[r.owner_id] || null : null;
   const sorted = HostHealth.sortByHealth(results);
-  return { generated_at: now.toISOString(), properties: sorted, action_needed: HostHealth.actionNeeded(sorted) };
+  return { generated_at: now.toISOString(), properties: sorted, action_needed: HostHealth.actionNeeded(sorted),
+    billing_settings: billing.settings || null, billing_error: billing.error || null };
+}
+
+async function rpcState(userId, now, deps = {}) {
+  const f = deps.fetch || globalThis.fetch;
+  const r = await f(`${SUPABASE_URL}/rest/v1/rpc/billing_access_state`, { method: 'POST', headers: { ...supabaseAuthHeaders(SERVICE_KEY), 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ p_user: userId, p_now: now.toISOString() }), signal: AbortSignal.timeout(10000) });
+  if (!r.ok) throw new Error(`billing state ${r.status}`);
+  return r.json();
+}
+export async function readBilling(owners, now, deps = {}) {
+  const [settings] = await sbGet('billing_settings?id=eq.1&select=*&limit=1', deps);
+  const ids = owners.length ? owners : ['00000000-0000-0000-0000-000000000000'];
+  const subs = await sbGetAll(`host_subscriptions?user_id=in.${enc(inList(ids))}&select=*&order=user_id.asc`, deps);
+  const events = await sbGetAll(`billing_events?user_id=in.${enc(inList(ids))}&select=user_id,actor,action,old_value,new_value,reason,created_at&order=created_at.desc,id.asc`, deps);
+  const byOwner = {};
+  for (const o of owners) {
+    const state = await rpcState(o, now, deps);
+    byOwner[o] = { state, chip: billingChip(state), subscription: subs.find(x => x.user_id === o) || null,
+      events: events.filter(e => e.user_id === o).slice(0, 5) };
+  }
+  return { settings: settings || null, byOwner };
+}
+
+function billingDeps(deps = {}) {
+  if (deps.billing) return deps.billing;
+  const f = deps.fetch || globalThis.fetch;
+  const write = async (method, path, body) => {
+    const r = await f(`${SUPABASE_URL}/rest/v1/${path}`, { method, headers: { ...supabaseAuthHeaders(SERVICE_KEY), 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: JSON.stringify(body), signal: AbortSignal.timeout(10000) });
+    if (!r.ok) throw new Error(`${method} ${path.split('?')[0]} ${r.status}`);
+    return r.json();
+  };
+  return {
+    get: path => sbGet(path, deps),
+    patch: (path, body) => write('PATCH', path, body),
+    insert: (table, row) => write('POST', table, row),
+    event: row => write('POST', 'billing_events', row),
+    userEmail: hostAccountEmail,
+    lang: async id => { const [p] = await sbGet(`properties?owner_id=eq.${enc(id)}&deleted_at=is.null&select=host_language&order=created_at.asc&limit=1`, deps).catch(() => []); return p?.host_language || 'it'; },
+    send: sendHostEmail,
+  };
 }
 
 async function listUsers(deps = {}) {
@@ -135,6 +181,11 @@ export default async function handler(req, res, deps = {}) {
   try {
     const gate = await verifyAdmin(req, deps);
     if (gate.error) return res.status(gate.status).json({ error: gate.error });
+    const action = String(req.body?.action || '');
+    if (action.startsWith('billing_')) {
+      const out = await handleBillingAction(action, req.body || {}, { actor: gate.user.email || gate.user.id, deps: billingDeps(deps) });
+      return res.status(out.status).json(out.body);
+    }
     const payload = await buildHostHealth({ deps });
     return res.status(200).json(payload);
   } catch (e) {

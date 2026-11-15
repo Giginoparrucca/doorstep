@@ -29,7 +29,7 @@ const bullets = art16.split('\n').filter(l => l.startsWith('- ')).map(l => {
   const cut = body.indexOf(' — ');
   return { ref: body.slice(0, cut), label: body.slice(cut + 3) };
 });
-assert.equal(bullets.length, 9, 'Art. 16 lists nine clause groups');
+assert.equal(bullets.length, 13, 'Art. 16 lists thirteen clause groups (Round 72 adds 4.4, 4.5, 4.6, 13.2)');
 
 const db = new PGlite();
 const host = randomUUID(), other = randomUUID(), adminId = randomUUID();

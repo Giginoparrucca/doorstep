@@ -40,3 +40,14 @@ Round 69 (`PLAN_round69_host_terms.md`). Hosts accept the Terms of Service (Cond
 ## Evidence for a dispute
 
 Admin → Hosts & Properties → "Scarica prova" downloads every acceptance row of that host (version, text and annex SHA-256, times of general acceptance, specific approval and code verification, host kind, method `password_login+email_otp`, account email, IP, user agent, receipt email id) plus the version rows they refer to. Together with the committed text at that version (git history) and the receipt email, this shows what was accepted, when and how. Retention: life of the account plus 10 years (ROPA activity 12).
+
+## Questions for the lawyer (Round 72 — economic terms)
+
+Round 72 added the economic conditions to the v1 draft (`legal/CONDIZIONI_GENERALI_v1.md` Art. 4, 13.2 and four new Art. 16 items: 4.4, 4.5, 4.6, 13.2). Still marked BOZZA. Please confirm or correct:
+
+1. Is a **full refund within 14 days of the first payment** (Art. 4.8) the right way to meet the consumer withdrawal right (art. 52 ff. Codice del Consumo), instead of the pro-rata rules of art. 57?
+2. Does the **tacit annual renewal** (Art. 4.4) need anything beyond the 30-day reminder email and the specific approval under art. 1341 c.c.?
+3. Is **read-only mode after non-payment** (Art. 4.5) acceptable, given that exports and data download always stay available and police filing for guests already invited keeps running?
+4. Is **"IVA inclusa"** the correct price display for both private hosts (consumers) and business hosts with a partita IVA?
+
+Also note: the trial end date is deliberately *communicated* (email + console) and never promised as "30 days from signing" (Art. 4.1): existing hosts get the date Daniele sets at launch (≥ 7 days' notice), new hosts 30 days from activation.

@@ -1371,6 +1371,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
   </div>
 
   <div class="content">
+    <!-- Round 72 — trial / grace / read-only banner (renderHostBillingBanner). -->
+    <div id="hostBillingBanner" role="status" style="display:none;"></div>
     <div id="onboardingPropertyAttention" style="display:none;"></div>
 
     <!-- ════════════ DASHBOARD ════════════ -->
@@ -1786,6 +1788,9 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <div class="form-card-title" data-terms-title>Terms of Service</div>
         <div class="form-card-desc"><span data-terms-state></span> <a data-terms-link href="#" target="_blank" rel="noopener" style="color:var(--warm);">Read the text</a></div>
       </div>
+
+      <!-- Round 72 — subscription status and how to pay (renderHostBillingSettings). -->
+      <div class="form-card" id="hostBillingSettingsCard" style="display:none;"></div>
 
       <fieldset class="settings-edit-fieldset" disabled style="border:0;padding:0;margin:0;min-width:0;">
       <div class="form-card">
@@ -5439,6 +5444,7 @@ function h(key) { return HT[hostLang][key] || HT['en'][key] || key; }
 function setHostLang(l) {
   hostLang = l;
   if (typeof renderHostTermsSettings === 'function') renderHostTermsSettings();
+  if (typeof renderHostBillingBanner === 'function') { renderHostBillingBanner(); renderHostBillingSettings(); }
   // Round 37.6 — persist the host's language on the current property so
   // the daily reminder cron sends emails in this language. Best-effort;
   // failures don't block the UI switch. Uses the Round 20.2
@@ -5768,6 +5774,7 @@ async function showPanel(id, btn) {
   if (id === 'contacts') loadMarketingContacts();
   if (id === 'settings' && typeof renderIreservationPanel === 'function') void renderIreservationPanel(true);
   if (id === 'settings' && typeof renderHostTermsSettings === 'function') renderHostTermsSettings();
+  if (id === 'settings' && typeof renderHostBillingSettings === 'function') renderHostBillingSettings();
   if (id === 'calendar') renderCalendarPanel(); // Round 40 T5
   // Round 43 — "Come funziona" pill next to the panel title. Uses a
   // lightweight loader pill until host-guides.js is lazy-loaded on
@@ -16391,6 +16398,185 @@ function _showHostTermsWindow(status) {
   });
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// Round 72 Phase 3 — trial banner, end-of-trial window, read-only mode and
+// Settings → Abbonamento. State from rpc host_access_state (the same rule as
+// the server and RLS). Before launch the state is 'prelaunch' and nothing is
+// shown. Never in the admin ?p= view. Runs after ensureHostTerms(), so the
+// terms window always comes first. All text via textContent; h() keys only.
+// The server and RLS enforce read-only on their own: this is the UI side.
+// ══════════════════════════════════════════════════════════════════════
+Object.assign(HT.en, {
+  billing_banner_trial: 'Free trial: {n} days left', billing_banner_trial_last: 'Free trial: last day',
+  billing_banner_grace: 'Trial ended: full access for {n} more days', billing_banner_ro: 'Read-only account: subscribe to make changes',
+  billing_subscribe: 'Subscribe', billing_contact: 'Contact us', billing_download: 'Download my data', billing_continue: 'Continue', billing_logout: 'Sign out',
+  billing_pw_title: 'Your free trial has ended',
+  billing_pw_grace: 'You keep full access for {n} more days. After that the account becomes read-only: you can always see and export your data.',
+  billing_pw_ro: 'Your account is read-only: you can see and export all your data, but you cannot create new links or reservations or edit your properties.',
+  billing_pw_price: 'WelcomeBnB costs €{price} per year, VAT included, per host account (any number of properties).',
+  billing_pw_guests: 'Guests who already have their link can still check in, and their Alloggiati filing keeps running.',
+  billing_bank_title: 'Pay by bank transfer', billing_bank_iban: 'IBAN', billing_bank_holder: 'Account holder', billing_bank_amount: 'Amount', billing_bank_causale: 'Payment reference',
+  billing_bank_missing: 'Bank details are coming soon: write to us and we will reply straight away.',
+  billing_bank_after: 'After the transfer, write to us: we activate the subscription within one working day.',
+  billing_contact_email: 'Email', billing_contact_whatsapp: 'WhatsApp',
+  billing_ro_tooltip: 'Read-only account: subscribe to make changes',
+  billing_card_title: 'Subscription', billing_card_howto: 'How to pay',
+  billing_state_trial: 'Free trial until {date}', billing_state_grace: 'Trial ended on {date}: full access until {grace}',
+  billing_state_ro: 'Read-only since {date}', billing_state_active: 'Subscription active until {date}', billing_state_free: 'Free use granted by WelcomeBnB',
+});
+Object.assign(HT.it, {
+  billing_banner_trial: 'Prova gratuita: mancano {n} giorni', billing_banner_trial_last: 'Prova gratuita: ultimo giorno',
+  billing_banner_grace: 'Prova terminata: accesso completo ancora per {n} giorni', billing_banner_ro: 'Account in sola lettura: abbonati per modificare',
+  billing_subscribe: 'Abbonati', billing_contact: 'Contattaci', billing_download: 'Scarica i miei dati', billing_continue: 'Continua', billing_logout: 'Esci',
+  billing_pw_title: 'La prova è terminata',
+  billing_pw_grace: 'Hai ancora accesso completo per {n} giorni. Poi l’account passa in sola lettura: potrai sempre consultare ed esportare i tuoi dati.',
+  billing_pw_ro: 'Il tuo account è in sola lettura: puoi consultare ed esportare tutti i dati, ma non creare nuovi link o prenotazioni né modificare le strutture.',
+  billing_pw_price: 'WelcomeBnB costa {price} € l’anno, IVA inclusa, per account host (qualunque numero di strutture).',
+  billing_pw_guests: 'Gli ospiti che hanno già il link possono fare il check-in e l’invio ad Alloggiati delle loro schedine continua.',
+  billing_bank_title: 'Pagamento con bonifico', billing_bank_iban: 'IBAN', billing_bank_holder: 'Intestatario', billing_bank_amount: 'Importo', billing_bank_causale: 'Causale',
+  billing_bank_missing: 'I dati per il bonifico arriveranno a breve: scrivici e ti rispondiamo subito.',
+  billing_bank_after: 'Dopo il bonifico scrivici: attiviamo l’abbonamento entro un giorno lavorativo.',
+  billing_contact_email: 'Email', billing_contact_whatsapp: 'WhatsApp',
+  billing_ro_tooltip: 'Account in sola lettura: abbonati per modificare',
+  billing_card_title: 'Abbonamento', billing_card_howto: 'Come pagare',
+  billing_state_trial: 'Prova gratuita fino al {date}', billing_state_grace: 'Prova terminata il {date}: accesso completo fino al {grace}',
+  billing_state_ro: 'In sola lettura dal {date}', billing_state_active: 'Abbonamento attivo fino al {date}', billing_state_free: 'Uso gratuito concesso da WelcomeBnB',
+});
+let _hostAccess = null;
+// Console actions a read-only account cannot use (the server/RLS refuse them anyway).
+const BILLING_RO_BLOCKED = new Set(['startSettingsEdit', 'saveSettingsEdit', 'startPropertyEdit', 'savePropertyEdit', 'addProperty',
+  'toggleRulesEditMode', 'saveRules', 'addRule', 'addPresetRule', 'confirmDeleteRule', 'toggleRecosEditMode', 'saveRecos', 'addReco', 'confirmDeleteReco',
+  'addRoom', 'deleteRoom', 'openReservationForm', 'editDirectReservation', 'syncIcalNow', 'syncCalendarsFromDashboard', 'addIcalFeed', 'removeIcalFeed',
+  'chooseCoverPhoto', 'openHostPortalEditor', 'saveHostPortalLink', 'removeHostPortalLink', 'saveGuestLockbox', 'generateLockboxCode', 'rotateIcalExportToken', 'firstTimeSetup']);
+function _billingReadOnly() { return !!_hostAccess && _hostAccess.state === 'read_only'; }
+function _billingEl(tag, css, text) { const el = document.createElement(tag); if (css) el.style.cssText = css; if (text != null) el.textContent = text; return el; }
+function _billingLastDay(endIso) {
+  if (!endIso) return '';
+  return new Date(new Date(endIso).getTime() - 1).toLocaleDateString(hostLang === 'it' ? 'it-IT' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Rome' });
+}
+function _billingPrice(a) { const p = Number(a && a.price_eur || 60); return p.toLocaleString(hostLang === 'it' ? 'it-IT' : 'en-GB', { maximumFractionDigits: 2 }); }
+async function initHostBilling() {
+  try {
+    if (typeof _isAdminView !== 'function' || _isAdminView()) return;
+    const { data, error } = await sb.rpc('host_access_state');
+    if (error || !data) return; // unknown: show nothing (server still enforces)
+    _hostAccess = data;
+    // WhatsApp link comes from the server (configured number, never hard-coded here).
+    if (_hostTermsStatus && _hostTermsStatus.support_whatsapp_url) _hostAccess.support_whatsapp_url = _hostTermsStatus.support_whatsapp_url;
+  } catch (_) { return; }
+  _applyBillingReadOnly();
+  renderHostBillingBanner();
+  renderHostBillingSettings();
+  if (_hostAccess.state === 'grace' || _hostAccess.state === 'read_only') _showBillingPaywall();
+  if (/^#abbonamento\b/.test(location.hash || '')) { try { await showPanel('settings'); document.getElementById('hostBillingSettingsCard')?.scrollIntoView({ block: 'start' }); } catch (_) {} }
+}
+function renderHostBillingBanner() {
+  const el = document.getElementById('hostBillingBanner');
+  if (!el) return;
+  const a = _hostAccess; let text = '', tone = 'info';
+  if (a && a.state === 'trial' && Number(a.days_left) <= 7) text = Number(a.days_left) <= 1 ? h('billing_banner_trial_last') : h('billing_banner_trial').replace('{n}', a.days_left);
+  else if (a && a.state === 'grace') { text = h('billing_banner_grace').replace('{n}', a.grace_days_left); tone = 'warn'; }
+  else if (a && a.state === 'read_only') { text = h('billing_banner_ro'); tone = 'warn'; }
+  el.replaceChildren();
+  if (!text) { el.style.display = 'none'; return; }
+  el.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;margin:0 0 14px;padding:10px 14px;border-radius:10px;font-size:0.86rem;'
+    + (tone === 'warn' ? 'background:rgba(232,184,75,0.14);border:1px solid rgba(232,184,75,0.55);color:#5c4410;' : 'background:rgba(0,91,255,0.06);border:1px solid rgba(0,91,255,0.18);color:var(--ink,#061A3D);');
+  el.dataset.billingState = a.state;
+  el.appendChild(_billingEl('span', 'font-weight:600;', text));
+  const b = _billingEl('button', '', h('billing_subscribe')); b.type = 'button'; b.className = 'btn btn-primary btn-sm'; b.dataset.billingSubscribe = '1';
+  b.onclick = () => (a.state === 'trial' ? _openBillingSettings() : _showBillingPaywall(true));
+  el.appendChild(b);
+}
+async function _openBillingSettings() { try { await showPanel('settings'); document.getElementById('hostBillingSettingsCard')?.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} }
+function _billingPayBox(a) {
+  const box = _billingEl('div', 'border:1px solid var(--border,#d9e1ee);border-radius:10px;padding:12px 14px;background:#fff;font-size:0.86rem;line-height:1.5;');
+  box.dataset.billingPay = '1';
+  box.appendChild(_billingEl('div', 'font-weight:600;margin-bottom:6px;', h('billing_bank_title')));
+  if (a.bank_transfer_iban) {
+    const email = (typeof _trackEmail === 'string' && _trackEmail) || '';
+    for (const [k, v] of [['billing_bank_iban', a.bank_transfer_iban], ['billing_bank_holder', a.bank_transfer_holder || ''], ['billing_bank_amount', _billingPrice(a) + ' €'], ['billing_bank_causale', 'WelcomeBnB ' + email]]) {
+      const row = _billingEl('div', 'display:flex;flex-wrap:wrap;gap:6px;');
+      row.append(_billingEl('span', 'color:var(--ink-soft,#6B7A90);min-width:110px;', h(k)), _billingEl('strong', 'word-break:break-all;', v));
+      if (k === 'billing_bank_iban') row.lastChild.dataset.billingIban = '1';
+      box.appendChild(row);
+    }
+    box.appendChild(_billingEl('p', 'margin:8px 0 0;color:var(--ink-soft,#6B7A90);', h('billing_bank_after')));
+  } else box.appendChild(_billingEl('p', 'margin:0;', h('billing_bank_missing')));
+  box.appendChild(_billingContacts(a));
+  return box;
+}
+function _billingContacts(a) {
+  const row = _billingEl('div', 'display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;');
+  const mail = _billingEl('a', '', h('billing_contact_email') + ': info@welcomebnb.it'); mail.href = 'mailto:info@welcomebnb.it?subject=' + encodeURIComponent('WelcomeBnB – ' + h('billing_card_title')); mail.className = 'btn btn-secondary btn-sm';
+  row.appendChild(mail);
+  if (a.support_whatsapp_url && /^https:\/\//.test(a.support_whatsapp_url)) {
+    const wa = _billingEl('a', '', '💬 ' + h('billing_contact_whatsapp')); wa.className = 'btn btn-secondary btn-sm'; wa.target = '_blank'; wa.rel = 'noopener';
+    wa.href = a.support_whatsapp_url;
+    row.appendChild(wa);
+  }
+  return row;
+}
+function _showBillingPaywall(fromBanner) {
+  const a = _hostAccess; if (!a || (a.state !== 'grace' && a.state !== 'read_only')) return;
+  document.getElementById('hostBillingOverlay')?.remove();
+  const o = _billingEl('div', 'position:fixed;inset:0;z-index:99990;background:rgba(6,26,61,0.55);overflow-y:auto;font-family:inherit;');
+  o.id = 'hostBillingOverlay'; o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true');
+  const card = _billingEl('div', 'max-width:560px;margin:8vh auto;background:var(--cream,#F7F9FC);border-radius:14px;padding:22px 18px;box-sizing:border-box;width:calc(100% - 32px);display:flex;flex-direction:column;gap:12px;color:var(--ink,#061A3D);');
+  card.appendChild(_billingEl('h2', "font-family:'Playfair Display',serif;font-size:1.3rem;margin:0;", h('billing_pw_title')));
+  card.appendChild(_billingEl('p', 'margin:0;font-size:0.9rem;', a.state === 'grace' ? h('billing_pw_grace').replace('{n}', a.grace_days_left) : h('billing_pw_ro')));
+  card.appendChild(_billingEl('p', 'margin:0;font-size:0.9rem;font-weight:600;', h('billing_pw_price').replace('{price}', _billingPrice(a))));
+  card.appendChild(_billingEl('p', 'margin:0;font-size:0.82rem;color:var(--ink-soft,#6B7A90);', h('billing_pw_guests')));
+  const pay = _billingPayBox(a); pay.style.display = fromBanner ? '' : 'none'; card.appendChild(pay);
+  const btns = _billingEl('div', 'display:flex;flex-wrap:wrap;gap:8px;');
+  const mk = (key, cls, fn, id) => { const b = _billingEl('button', '', h(key)); b.type = 'button'; b.className = 'btn ' + cls; b.id = id; b.onclick = fn; btns.appendChild(b); return b; };
+  mk('billing_subscribe', 'btn-primary', () => { pay.style.display = ''; }, 'billingPwSubscribe');
+  mk('billing_contact', 'btn-secondary', () => { pay.style.display = ''; pay.querySelector('a')?.focus(); }, 'billingPwContact');
+  mk('billing_download', 'btn-secondary', async () => { o.remove(); try { await showPanel('export'); } catch (_) {} }, 'billingPwDownload');
+  if (a.state === 'grace') mk('billing_continue', 'btn-secondary', () => o.remove(), 'billingPwContinue');
+  mk('billing_logout', 'btn-secondary', async () => { try { await sb.auth.signOut(); } catch (_) {} location.reload(); }, 'billingPwLogout');
+  card.appendChild(btns); o.appendChild(card); document.body.appendChild(o);
+}
+// Read-only: disable the edit actions listed above (also ones rendered later)
+// with a tooltip, and stop their clicks. Reads, exports, filing, chat stay.
+function _applyBillingReadOnly() {
+  document.body.classList.toggle('billing-read-only', _billingReadOnly());
+  if (!_billingReadOnly()) return;
+  const mark = root => (root.querySelectorAll ? root.querySelectorAll('[onclick]') : []).forEach(el => {
+    const fn = (/^\s*(?:event\.stopPropagation\(\);\s*)?(?:_closeRowMenus\(\);\s*)?([A-Za-z_$][\w$]*)\(/.exec(el.getAttribute('onclick') || '') || [])[1];
+    if (fn && BILLING_RO_BLOCKED.has(fn)) { el.setAttribute('aria-disabled', 'true'); el.dataset.billingRo = '1'; el.title = h('billing_ro_tooltip'); }
+  });
+  mark(document);
+  if (!window._billingRoObserver) {
+    window._billingRoObserver = new MutationObserver(ms => { if (_billingReadOnly()) ms.forEach(m => m.addedNodes.forEach(n => n.nodeType === 1 && (mark(n.parentNode || n)))); });
+    window._billingRoObserver.observe(document.body, { childList: true, subtree: true });
+    document.addEventListener('click', e => {
+      if (!_billingReadOnly()) return;
+      const el = e.target && e.target.closest && e.target.closest('[data-billing-ro="1"]');
+      if (!el) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      if (typeof toast === 'function') toast(h('billing_ro_tooltip'));
+    }, true);
+  }
+}
+function renderHostBillingSettings() {
+  const card = document.getElementById('hostBillingSettingsCard');
+  if (!card) return;
+  const a = _hostAccess;
+  if (!a || !['trial', 'grace', 'read_only', 'active', 'free'].includes(a.state)) { card.style.display = 'none'; return; }
+  card.style.display = ''; card.replaceChildren();
+  card.appendChild(_billingEl('div', '', h('billing_card_title'))).className = 'form-card-title';
+  let state = '';
+  if (a.state === 'trial') state = h('billing_state_trial').replace('{date}', _billingLastDay(a.trial_ends_at));
+  else if (a.state === 'grace') state = h('billing_state_grace').replace('{date}', _billingLastDay(a.ended_at)).replace('{grace}', _billingLastDay(a.grace_ends_at));
+  else if (a.state === 'read_only') state = h('billing_state_ro').replace('{date}', new Date(a.since).toLocaleDateString(hostLang === 'it' ? 'it-IT' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Rome' }));
+  else if (a.state === 'active') state = h('billing_state_active').replace('{date}', _billingLastDay(a.paid_until));
+  else state = h('billing_state_free');
+  const desc = card.appendChild(_billingEl('div', 'font-weight:600;', state)); desc.className = 'form-card-desc'; desc.dataset.billingStateText = a.state;
+  if (a.state === 'free') return;
+  card.appendChild(_billingEl('div', 'margin:6px 0 10px;font-size:0.86rem;', h('billing_pw_price').replace('{price}', _billingPrice(a))));
+  if (a.state !== 'active') { card.appendChild(_billingEl('div', 'font-weight:600;font-size:0.86rem;margin-bottom:6px;', h('billing_card_howto'))); card.appendChild(_billingPayBox(a)); }
+}
+
 async function init() {
   // Round 21.1: the chat cursor became per-property; clean up the old
   // global key if it's still lingering from a previous version.
@@ -16434,6 +16620,8 @@ async function init() {
   if (!adminPropId) {
     if (!await ensureHostTerms()) { document.getElementById('loginOverlay')?.classList.remove('hidden'); return; }
   }
+  // Round 72 — trial/grace/read-only UI (after the terms window, never in ?p=).
+  if (!adminPropId && typeof initHostBilling === 'function') initHostBilling();
 
   // 1. Load the FULL list of properties this user owns (Round 21 multi-property)
   try {

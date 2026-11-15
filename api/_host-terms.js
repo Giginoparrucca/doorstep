@@ -11,9 +11,9 @@
 // accepted, so the console never shows the window. HOST_TERMS_PEPPER keys the
 // code hashes; without it no code can be issued or checked.
 import { createHash, createHmac, randomInt, timingSafeEqual } from 'node:crypto';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL } from './_environment.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, SUPPORT_CONTACTS } from './_environment.js';
 import { supabaseAuthHeaders } from './_supabase-auth.js';
-import { supportWhatsappText } from './_support-contact.js';
+import { supportWhatsappText, whatsappLink } from './_support-contact.js';
 
 const CODE_TTL_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
@@ -125,6 +125,9 @@ export async function handleHostTerms(req, res, deps = defaultHostTermsDeps()) {
       return res.status(200).json({
         enforce: deps.enforce, accepted: deps.enforce ? accepted : true, current: publicCurrent,
         accepted_version: last ? last.version : null, accepted_at: last ? last.created_at : null,
+        // Round 72: support contact for the console's subscription window.
+        support_whatsapp: (SUPPORT_CONTACTS && SUPPORT_CONTACTS.whatsapp) || null,
+        support_whatsapp_url: (SUPPORT_CONTACTS && SUPPORT_CONTACTS.whatsapp) ? whatsappLink(SUPPORT_CONTACTS.whatsapp, lang === 'en' ? 'en' : 'it') : null,
       });
     }
     if (!current) return fail(503, 'unavailable');

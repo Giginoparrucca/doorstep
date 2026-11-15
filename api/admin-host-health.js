@@ -9,7 +9,7 @@
 // the payload is never logged.
 import { createRequire } from 'node:module';
 import { supabaseAuthHeaders } from './_supabase-auth.js';
-import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY } from './_environment.js';
+import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL } from './_environment.js';
 import { applyCors } from './_cors.js';
 import { regionComplianceFor } from './_onboarding-nudges.js';
 import { handleBillingAction, billingChip } from './_admin-billing.js';
@@ -153,6 +153,13 @@ function billingDeps(deps = {}) {
     userEmail: hostAccountEmail,
     lang: async id => { const [p] = await sbGet(`properties?owner_id=eq.${enc(id)}&deleted_at=is.null&select=host_language&order=created_at.asc&limit=1`, deps).catch(() => []); return p?.host_language || 'it'; },
     send: sendHostEmail,
+    consoleUrl: `${APP_BASE_URL || 'https://app.welcomebnb.it'}/host-console.html`,
+    rpc: async (name, args) => {
+      const r = await f(`${SUPABASE_URL}/rest/v1/rpc/${name}`, { method: 'POST', headers: { ...supabaseAuthHeaders(SERVICE_KEY), 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(args), signal: AbortSignal.timeout(20000) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(String(j.message || j.error || `rpc ${name} ${r.status}`));
+      return j;
+    },
   };
 }
 

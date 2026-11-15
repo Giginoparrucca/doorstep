@@ -4,6 +4,7 @@ import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, rejectDemoIn
 import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
 import { fetchPublicIcal, feedErrorCode } from './_safe-ical-fetch.js';
+import { ownerBillingState, readOnlyBody } from './_billing.js';
 const CalendarRoundtrip = createRequire(import.meta.url)('../lib/calendar-roundtrip.js');
 // api/ical-sync.js — Round 26 iCal calendar sync (with Round 32.5 cron mode).
 //
@@ -133,6 +134,7 @@ async function handleUserSync(req, res, jwt) {
   }
 
   // 1. Verify the JWT and get the user id.
+  let callerId = null;
   try {
     const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
       headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${jwt}` },
@@ -140,9 +142,12 @@ async function handleUserSync(req, res, jwt) {
     if (!userRes.ok) return res.status(401).json({ error: 'Invalid token' });
     const user = await userRes.json();
     if (!user?.id) return res.status(401).json({ error: 'Invalid token' });
+    callerId = user.id;
   } catch (e) {
     return res.status(401).json({ error: 'Auth check failed' });
   }
+  // Round 72: no calendar imports for a read-only account.
+  if ((await ownerBillingState(callerId)) === 'read_only') return res.status(403).json(readOnlyBody());
 
   // 2. Verify the caller owns this property and pull its feeds. Uses the
   // caller's own JWT so RLS is the source of truth for ownership.
@@ -183,7 +188,7 @@ async function handleCronSync(res) {
   let props;
   try {
     const r = await pgrestGET(
-      'properties?select=id,name,ical_feeds&deleted_at=is.null',
+      'properties?select=id,name,owner_id,ical_feeds&deleted_at=is.null',
       auth[0], auth[1],
     );
     if (!r.ok) {
@@ -201,6 +206,12 @@ async function handleCronSync(res) {
   const perProperty = [];
   let totalSynced = 0, totalCancelled = 0;
   for (const p of withFeeds) {
+    // Round 72: calendar sync is paused for read-only accounts (no new
+    // reservations); it resumes by itself once the host subscribes.
+    if ((await ownerBillingState(p.owner_id)) === 'read_only') {
+      perProperty.push({ property_id: p.id, name: p.name, skipped: 'read_only' });
+      continue;
+    }
     try {
       const r = await syncOnePropertyFeeds(p.id, p.ical_feeds, auth[0], auth[1]);
       totalSynced    += r.synced || 0;

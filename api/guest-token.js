@@ -30,6 +30,7 @@ import { runStoragePurgePass } from './send-arrival-reminders.js';
 import { mintWalkinCode } from './_booking-code.js';
 import { signGuestToken } from './_guest-token.js';
 import { applyCors } from './_cors.js';
+import { propertyIsReadOnly, ownerBillingState, readOnlyBody } from './_billing.js';
 
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -78,6 +79,8 @@ export default async function handler(req, res) {
       const storage = paths.length ? await runStoragePurgePass(false, paths) : { deleted: 0 };
       return res.status(200).json({ ok: true, storage });
     }
+    // Round 72: a read-only account creates no new (test) bookings.
+    if (await propertyIsReadOnly(req.body.property_id || '')) return res.status(403).json(readOnlyBody());
     const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/create_onboarding_test_booking`, {
       method: 'POST',
       headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' },
@@ -95,6 +98,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'session_id required' });
   }
   const bc = booking_code && typeof booking_code === 'string' ? booking_code : null;
+  let bookingKnown = false;
   // Round 34.4: is_test carried into the token payload so guest-chat and
   // api_usage can tag rows without trusting the request body of a
   // subsequent call. Coerced to a strict boolean.
@@ -111,12 +115,13 @@ export default async function handler(req, res) {
     });
   }
 
+  let ownerId = null;
   // Verify the property exists and hasn't been soft-deleted. This is the
   // single "does the caller's URL point somewhere real" gate.
   try {
     const r = await fetch(
       `${SUPABASE_URL}/rest/v1/properties?id=eq.${encodeURIComponent(property_id)}` +
-      `&deleted_at=is.null&select=id`,
+      `&deleted_at=is.null&select=id,owner_id`,
       {
         headers: {
           ...supabaseAuthHeaders(SERVICE_KEY),
@@ -133,6 +138,7 @@ export default async function handler(req, res) {
     if (!rows || rows.length === 0) {
       return res.status(404).json({ error: 'Property not found' });
     }
+    ownerId = rows[0].owner_id || null;
   } catch (e) {
     console.error('[guest-token] property lookup exception', e);
     return res.status(500).json({ error: 'Property lookup exception' });
@@ -149,7 +155,16 @@ export default async function handler(req, res) {
       const rows = await r.json();
       if (bc.startsWith('WB-TEST') && !rows[0]) return res.status(410).json({ error: 'Test booking expired' });
       if (rows[0]?.is_test === true) t = true;
+      bookingKnown = !!rows[0];
     } catch (_) { return res.status(503).json({ error: 'Booking lookup unavailable' }); }
+  }
+  // Round 72: a read-only account (trial/subscription ended + grace) gets no
+  // NEW guest links. Guests who already have one keep working: a booking
+  // that exists (reservation, or check-ins already saved under the code).
+  // A walk-in link (no booking code) would create a new booking → refused.
+  // Any error reading the state lets the guest through (fail open).
+  if ((await ownerBillingState(ownerId)) === 'read_only' && !(bc && (bookingKnown || await bookingHasCheckins(property_id, bc)))) {
+    return res.status(403).json(readOnlyBody());
   }
   const { token, payload } = signGuestToken({ p: property_id, s: session_id, b: bc, t });
 
@@ -173,6 +188,16 @@ export default async function handler(req, res) {
     is_test: t,
     expires_at: new Date(payload.exp * 1000).toISOString(),
   });
+}
+
+async function bookingHasCheckins(propertyId, bookingCode) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/checkins?property_id=eq.${encodeURIComponent(propertyId)}&booking_code=eq.${encodeURIComponent(bookingCode)}&deleted_at=is.null&select=id&limit=1`, {
+      headers: { ...supabaseAuthHeaders(SERVICE_KEY) },
+    });
+    if (!r.ok) return true; // fail open
+    return (await r.json()).length > 0;
+  } catch (_) { return true; }
 }
 
 // Round 34.2 — mirrors the pattern in api/chat.js checkChatLimits and

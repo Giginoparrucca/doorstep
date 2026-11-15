@@ -1,7 +1,9 @@
 import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { handleOnboardingStop } from './_onboarding-stop.js';
 import { supportWhatsappHtml } from './_support-contact.js';
-import { rejectInvalidEnvironment, SUPABASE_URL, APP_BASE_URL, HOST_CONSOLE_URL, rejectDemoIntegration } from './_environment.js';
+import { rejectInvalidEnvironment, SUPABASE_URL, APP_BASE_URL, HOST_CONSOLE_URL, rejectDemoIntegration, SUPPORT_CONTACTS } from './_environment.js';
+import { runTrialReminderPass } from './_trial-reminders.js';
+import { sendHostEmail, hostAccountEmail } from './_notify-host.js';
 // api/send-arrival-reminders.js — Round 32 arrival reminder, Round 36
 // filing reminder, Round 46 storage purge.
 //
@@ -107,6 +109,7 @@ export default async function handler(req, res) {
   const runArrival = passOnly === '' || passOnly === 'arrival';
   const runFiling  = passOnly === '' || passOnly === 'filing';
   const runStorage = passOnly === '' || passOnly === 'storage';
+  const runTrial   = passOnly === '' || passOnly === 'trial';
 
   const nowUTC = new Date();
   let props;
@@ -168,6 +171,13 @@ export default async function handler(req, res) {
     ? await runTestCleanup(dry)
     : { skipped: 'pass filter' };
 
+  // PASS D — Round 72 trial reminders (09:00 Rome + catch-up; nothing
+  // before launch). Never changes the status code of the call.
+  const trialReminders = runTrial
+    ? await runTrialReminderPass({ now: nowUTC, force, dry, appOrigin: APP_BASE_URL, support: SUPPORT_CONTACTS, deps: trialDeps() })
+        .catch(e => ({ error: 'trial pass exception: ' + String(e && e.message || e).slice(0, 200) }))
+    : { skipped: 'pass filter' };
+
   // One-line summary for the Vercel log. Counts only — never paths
   // (they are guest document filenames).
   console.log(
@@ -183,6 +193,7 @@ export default async function handler(req, res) {
     total_filing_sent:  totalFilingSent,
     per_property: perProperty,
     storagePurge,
+    trialReminders,
     dry_run: !!dry,
   });
 }
@@ -382,6 +393,37 @@ function pgrestPATCH(path, body) {
     return true;
   });
 }
+function trialDeps() {
+  return {
+    get: pgrestGET,
+    state: async (userId, nowIso) => {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/billing_access_state`, { method: 'POST',
+        headers: { ...supabaseAuthHeaders(SERVICE_KEY), 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ p_user: userId, p_now: nowIso }) });
+      if (!r.ok) throw new Error(`state ${r.status}`);
+      return r.json();
+    },
+    patch: async (path, body, prefer) => {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { method: 'PATCH',
+        headers: { ...supabaseAuthHeaders(SERVICE_KEY), 'Content-Type': 'application/json', Prefer: prefer || 'return=minimal' }, body: JSON.stringify(body) });
+      if (!r.ok) throw new Error(`PATCH ${path.split('?')[0]} ${r.status}`);
+      return prefer === 'return=representation' ? r.json() : true;
+    },
+    post: async (table, row) => {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, { method: 'POST',
+        headers: { ...supabaseAuthHeaders(SERVICE_KEY), 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(row) });
+      if (!r.ok) throw new Error(`POST ${table} ${r.status}`);
+      return true;
+    },
+    userEmail: hostAccountEmail,
+    lang: async userId => {
+      const [p] = await pgrestGET(`properties?owner_id=eq.${encodeURIComponent(userId)}&deleted_at=is.null&select=host_language&order=created_at.asc&limit=1`).catch(() => []);
+      return p?.host_language || 'it';
+    },
+    send: sendHostEmail,
+  };
+}
+
 function pgrestDELETE(path) {
   return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     method: 'DELETE',

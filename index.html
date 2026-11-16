@@ -4685,13 +4685,19 @@ async function saveGuestEdit(idx) {
 
 async function uploadFile(file, folder, submissionId) {
   if (!file) return null;
+  // Round 74 (audit WBNB-Y001): uploads go through a short-lived permission
+  // from our server for one fixed path in this booking's folder; the browser
+  // can no longer write to the documents bucket on its own.
   try {
-    const ext = file.name.split('.').pop();
-    const prefix = submissionId ? `${propertyId}/${submissionId}/` : '';
-    const path = `${folder}/${prefix}${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-    const { data, error } = await sb.storage.from('documents').upload(path, file);
+    if (folder !== 'id-photos' || !submissionId) return null;
+    const ext = String(file.name || '').split('.').pop().toLowerCase();
+    const byExt = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', heic: 'image/heic', heif: 'image/heif', pdf: 'application/pdf' };
+    const contentType = (file.type && file.type !== 'application/octet-stream') ? file.type : (byExt[ext] || '');
+    const signed = await _guestCall('upload_url', { submission_id: submissionId, content_type: contentType });
+    if (!signed || !signed.ok || !signed.data?.path || !signed.data?.token) { console.warn('Upload skipped:', signed?.data?.error || signed?.status); return null; }
+    const { data, error } = await sb.storage.from('documents').uploadToSignedUrl(signed.data.path, signed.data.token, file, { contentType });
     if (error) { console.warn('Upload skipped:', error.message); return null; }
-    return data.path;
+    return data?.path || signed.data.path;
   } catch (e) { console.warn('Upload failed, continuing:', e); return null; }
 }
 

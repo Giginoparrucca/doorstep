@@ -63,8 +63,8 @@ const reservationRow = (over = {}) => ({
   entry_type: 'reservation',
   room_id: null,
   keybox_code: '9876',
-  checkin_date: '2026-11-01',
-  checkout_date: '2026-11-05',
+  checkin_date: '2099-11-01',
+  checkout_date: '2099-11-05',
   ...over,
 });
 
@@ -77,7 +77,7 @@ const checkinRow = (over = {}) => ({
   guest_type: 'head', surname: 'Synthetic', name: 'Person', sex: 'F', date_of_birth: '2000-01-01',
   place_of_birth: 'London', birth_country: 'United Kingdom', citizenship: 'United Kingdom',
   document_type: 'passport', document_number: 'FICTIONAL123', doc_issue_place: 'London',
-  arrival_date: '2026-11-01', departure_date: '2026-11-02', nights: 1,
+  arrival_date: '2099-11-01', departure_date: '2099-11-02', nights: 1,
   keybox_code: null,
   submitted_at: new Date(Date.now() - 3600 * 1000).toISOString(),
   ...over,
@@ -405,7 +405,7 @@ function snapshot(state, pg) {
       booking_id: EA_BOOKING_ID, property_id: PROPERTY_ID, booking_code: BOOKING_CODE,
       is_test: false, state_version: 'sv1', identity_version: EA_IDENT,
       roster_version: 'rv1', roster_source: 'host', roster_confirmed: true,
-      expected_count: 8, arrival_date: '2026-11-01', departure_date: '2026-11-05',
+      expected_count: 8, arrival_date: '2099-11-01', departure_date: '2099-11-05',
       reservation_id: RESERVATION_ID, released_manually: true, manual_audit_id: AUDIT_ID,
       slots: Array.from({ length: 8 }, (_, i) => ({
         id: `slot-${i + 1}`, ordinal: i + 1, created_at: '2026-10-28T03:22:40Z',
@@ -444,14 +444,14 @@ function snapshot(state, pg) {
   const EA_IDENT = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb6';
   const pg = mockPgrest([
     ['properties?', [propertyRow({ entry_checkin_required: true, use_per_guest_lockbox: true, rotating_lockbox_enabled: false })]],
-    ['ota_reservations?', [reservationRow({ keybox_code: null, room_id: null, checkout_date: '2026-11-02' })]],
+    ['ota_reservations?', [reservationRow({ keybox_code: null, room_id: null, checkout_date: '2099-11-02' })]],
     ['checkins?', [checkinRow({ keybox_code: '7777', guest_type: 'single' })]],
   ]);
   const callRPC = async () => ({ ok: true, json: async () => snapshot({
     booking_id: EA_BOOKING_ID, property_id: PROPERTY_ID, booking_code: BOOKING_CODE,
     is_test: false, state_version: 'sv2', identity_version: EA_IDENT,
     roster_version: 'rv2', roster_source: 'reservation', roster_confirmed: true,
-    expected_count: 1, arrival_date: '2026-11-01', departure_date: '2026-11-02',
+    expected_count: 1, arrival_date: '2099-11-01', departure_date: '2099-11-02',
     reservation_id: RESERVATION_ID, released_manually: false, manual_audit_id: null,
     slots: [{ id: 'slot-only', ordinal: 1, created_at: '2026-10-28T03:22:40Z' }],
     submissions: [{ slot_id: 'slot-only', checkin_id: CHECKIN_ID, bound_at: '2026-10-28T04:00:00Z' }],

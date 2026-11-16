@@ -5,7 +5,7 @@
 
 import { createHash } from 'node:crypto';
 import { validatePersistedEntrySubmission } from './_entry-submission-validation.js';
-import { evaluateEntryRelease, projectEntryInstructions } from './_entry-release-policy.js';
+import { evaluateEntryRelease, projectEntryInstructions, arrivalReleaseInstant } from './_entry-release-policy.js';
 
 const PROPERTY_FIELDS = [
   'id', 'deleted_at', 'access_method', 'keybox_code',
@@ -18,6 +18,9 @@ const PROPERTY_FIELDS = [
   // response stays byte-equivalent to the prior bookingHasCheckin() path.
   'entry_checkin_required',
   'entry_release_time', 'entry_release_timezone',
+  // Round 74 (audit WBNB-R003): the stay's end decides how long entry
+  // information stays visible.
+  'timezone', 'checkout_time',
 ].join(',');
 
 const RESERVATION_FIELDS = [
@@ -28,6 +31,7 @@ const RESERVATION_FIELDS = [
 const CHECKIN_FIELDS = [
   'id', 'property_id', 'booking_code', 'is_test', 'deleted_at',
   'guest_type', 'keybox_code', 'submitted_at', 'room_id',
+  'arrival_date', 'departure_date',
 ].join(',');
 
 const ROOM_FIELDS = ['id', 'property_id', 'deleted_at', 'door_code', 'name', 'beds'].join(',');
@@ -43,6 +47,25 @@ export function stableBookingId(propertyId, bookingCode, isTest) {
 }
 
 const isTestLiteral = v => v === true ? 'true' : 'false';
+
+// Round 74 (audit WBNB-R003, decision D2): entry information is visible until
+// the latest checkout time on the departure day + 2 hours (property time
+// zone). checkout_time is free text in production ("08:00-11:00",
+// "10:00:00-10:30", "07:11:00"): the latest HH:MM in it wins; none → 11:00.
+export const ENTRY_GRACE_AFTER_CHECKOUT_MS = 2 * 3600 * 1000;
+export function latestCheckoutTime(text) {
+  const times = [...String(text || '').matchAll(/(?:^|[^\d])([01]?\d|2[0-3]):([0-5]\d)/g)].map(m => `${m[1].padStart(2, '0')}:${m[2]}`);
+  return times.length ? times.sort().at(-1) : '11:00';
+}
+export function entryEntitlementEnd(departureDate, checkoutTime, timezone) {
+  // A date column may arrive as 'YYYY-MM-DD' or as a midnight timestamp.
+  const raw = departureDate instanceof Date ? departureDate.toISOString() : String(departureDate || '');
+  const m = /^(\d{4}-\d{2}-\d{2})(?:T00:00:00(?:\.000)?Z)?$/.exec(raw);
+  if (!m) return null;
+  departureDate = m[1];
+  const at = arrivalReleaseInstant(departureDate, latestCheckoutTime(checkoutTime), timezone || 'Europe/Rome');
+  return at ? new Date(Date.parse(at) + ENTRY_GRACE_AFTER_CHECKOUT_MS).toISOString() : null;
+}
 const enc = encodeURIComponent;
 
 // Read a single PostgREST path and parse the body. Returns null on any
@@ -121,6 +144,18 @@ export async function loadEntryReleaseSnapshot(opts) {
   if (resRows === null) return null;
   if (resRows.length > 1) return null;
   let reservation = resRows[0] || null;
+  // Round 74 (WBNB-R003): no active reservation is NOT a new standalone
+  // stay when the code belongs to a cancelled or deleted reservation: that
+  // booking is revoked. Only a code that never had a reservation (an
+  // explicit walk-in / direct check-in) is treated as standalone.
+  let revoked = false;
+  if (!reservation) {
+    const anyRes = await readRows(pgrestGET,
+      `ota_reservations?property_id=eq.${enc(propertyId)}&booking_code=eq.${enc(bookingCode)}` +
+      `&is_test=eq.${isTestLiteral(isTest)}&select=id,status,deleted_at&limit=5`, 5);
+    if (anyRes === null) return null;
+    revoked = anyRes.length > 0;
+  }
 
   // 3. Check-ins for the booking — used for legacy_has_checkin AND for the
   //    rotating-code "single leader" projection path.
@@ -232,15 +267,29 @@ export async function loadEntryReleaseSnapshot(opts) {
     is_test: isTest === true,
   });
 
+  // Entitlement ends at checkout + grace, never later than the session; a
+  // fresh session (link renewal) cannot extend it. Unknown end → closed.
+  const departure = eaState?.departure_date || reservation?.checkout_date
+    || checkinRows.map(r => r.departure_date instanceof Date ? r.departure_date.toISOString().slice(0, 10) : r.departure_date).filter(Boolean).sort().at(-1) || null;
+  const entitlementEnd = entryEntitlementEnd(departure, property.checkout_time,
+    property.entry_timezone || property.timezone);
+  // Nothing known about the stay AND nothing saved yet (fresh walk-in link,
+  // no reservation): there is nothing to reveal, keep the session so the
+  // guest sees "check in first". Any other unknown end fails closed.
+  const nothingYet = !eaState && !reservation && checkinRows.length === 0 && !revoked;
+  const validUntil = entitlementEnd
+    ? (Date.parse(entitlementEnd) < Date.parse(sessionIso) ? entitlementEnd : sessionIso)
+    : (nothingYet ? sessionIso : null);
+
   const booking = {
     property_id: propertyId,
     booking_id: bookingId,
     is_test: isTest === true,
     booking_code: bookingCode,
     deleted_at: null,
-    status: eaState?.status || 'active',
+    status: revoked ? 'cancelled' : (eaState?.status || 'active'),
     identity_version: identityVersion,
-    valid_until: sessionIso,
+    valid_until: validUntil,
     room_id: eaState ? eaState.resolved_room_id ?? null : resolvedRoomId,
     expected_count: eaState?.expected_count ?? null,
     arrival_date: eaState?.arrival_date || reservation?.checkin_date || null,

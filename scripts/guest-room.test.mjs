@@ -22,7 +22,7 @@ async function run(o = {}) {
   const prop = { id:pid, name:'Fictional house', entry_checkin_required:o.on === true,
     keybox_code:'FIXED-EARLIER', access_method:'ACCESS-EARLIER', show_fixed_lockbox_to_guest:true };
   const checkins = o.checkins ?? (o.checked === false ? [] : [{ id:'fictional-checkin',
-    property_id:pid, booking_code:booking, is_test:isTest, room_id:o.checkinRoom ?? null }]);
+    property_id:pid, booking_code:booking, is_test:isTest, room_id:o.checkinRoom ?? null, departure_date:'2099-01-02' }]);
   const reservations = o.reservations ?? [{...reservation,is_test:isTest}];
   const snapshotProp = { ...prop, keybox_code:'FIXED-SNAPSHOT', access_method:'ACCESS-SNAPSHOT', ...o.snapshotProp };
   const state = { snapshot_version:2, property_id:pid, booking_code:booking, is_test:isTest,
@@ -48,6 +48,8 @@ async function run(o = {}) {
       assert.equal(u.searchParams.get('id'),`eq.${pid}`);
       return response([prop]);
     }
+    // Round 74: the revocation lookup (any status, ids only) when no active reservation exists.
+    if (path === 'ota_reservations' && u.searchParams.get('select') === 'id,status,deleted_at') return response(o.revokedRows ?? []);
     if (['checkins','ota_reservations','property_rooms'].includes(path)) {
       assert.equal(u.searchParams.get('property_id'),`eq.${pid}`);
       assert.equal(u.searchParams.get('deleted_at'),'is.null');

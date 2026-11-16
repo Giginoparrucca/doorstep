@@ -45,7 +45,7 @@ async function run(options = {}) {
     if (url.includes('/checkins?') || url.includes('/ota_reservations?') || url.includes('/recommendations?') || url.includes('/rules?')) {
       assert.ok(url.includes('property_id=eq.' + pid));
     }
-    if (url.includes('/checkins?') && options.legacyCheckin) return Response.json([{ id: 'fictional-guest', property_id: pid, booking_code: booking, is_test: false }]);
+    if (url.includes('/checkins?') && options.legacyCheckin) return Response.json([{ id: 'fictional-guest', property_id: pid, booking_code: booking, is_test: false, arrival_date: '2099-01-01', departure_date: '2099-01-02' }]);
     return new Response('[]', { headers: { 'content-range': '0-0/0' } });
   };
   const res = { statusCode: 200, headers: {}, body: null, written: '',

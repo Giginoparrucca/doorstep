@@ -1,3 +1,4 @@
+import '../lib/log-scrub.mjs'; // Round 67 Phase 6 — every log line is scrubbed (load first)
 // Round 71 — admin host health. One payload for all live properties:
 // coverage, filing, autofile/credentials, setup gaps, upcoming arrivals
 // without check-in, activity and the health colour with its reasons.

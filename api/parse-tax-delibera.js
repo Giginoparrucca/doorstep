@@ -1,3 +1,4 @@
+import '../lib/log-scrub.mjs'; // Round 67 Phase 6 — every log line is scrubbed (load first)
 import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY } from './_environment.js';
 // api/parse-tax-delibera.js — Round 37 (redux)

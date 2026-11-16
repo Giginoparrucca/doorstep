@@ -1,3 +1,4 @@
+import '../lib/log-scrub.mjs'; // Round 67 Phase 6 — every log line is scrubbed (load first)
 import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { handleOnboardingStop } from './_onboarding-stop.js';
 import { supportWhatsappHtml } from './_support-contact.js';

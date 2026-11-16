@@ -1,3 +1,4 @@
+import '../lib/log-scrub.mjs'; // Round 67 Phase 6 — every log line is scrubbed (load first)
 import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { handleAlloggiatiSupport, redactSupport } from './_alloggiati-support.js';
 import { auditAfter } from './_admin-audit.js';

@@ -16,4 +16,4 @@ Remediated at main commit: see the Round 74 Phase 7 merge (PR #317) in `CHANGELO
 
 ## Not in scope (audit follow-ups, still open)
 
-Done 16 Nov: leaked-password protection enabled (advisor warning gone); branch protection already requires `regression`. Still open: seven mutable function search paths, `pg_net` in `public`, review of the 20 authenticated SECURITY DEFINER functions, inline-handler removal (Round 65 Phase 5c), Postgres minor upgrade, and the large unreviewed surface listed in the audit's coverage register.
+Done 16 Nov: leaked-password protection enabled (advisor warning gone); branch protection already requires `regression`. Done in Round 75 (16 Nov): search paths pinned on the 7 functions; 20 authenticated SECURITY DEFINER functions reviewed (6 made server-only, 14 kept with caller checks); `pg_net` kept by design — see `docs/security/ADVISOR_EXCEPTIONS.md`. Still open: inline-handler removal (Round 65 Phase 5c), Postgres minor upgrade, and the large unreviewed surface listed in the audit's coverage register.

@@ -4151,6 +4151,51 @@ setInterval(_sessionCheckIdle, 60 * 1000);
 setTimeout(_sessionCheckIdle, 250);
 _sessionShowExpiredIfNeeded();
 
+function _authEmailErrorText(error) {
+  const tooSoon = error && (error.status === 429 || /after \d+ seconds|rate limit/i.test(error.message || ''));
+  if (!tooSoon) return (error && error.message) || '';
+  return hostLang === 'it'
+    ? 'Ti abbiamo appena mandato un link: attendi un minuto e apri solo l’ultima email ricevuta (ogni nuova richiesta annulla il link precedente).'
+    : 'We have just sent you a link: wait a minute and open only the newest email (each new request cancels the previous link).';
+}
+// 16 Nov 2026 — explain links that no longer work instead of a bare login
+// screen: Supabase sends people back with #error_code=otp_expired (expired or
+// already replaced by a newer email); our 24-hour invite page sends
+// ?invite=expired|revoked|already. The email is prefilled when known and the
+// guidance is to request ONE new link and open only the newest email.
+function _authLinkNotice() {
+  let kind = null, email = '';
+  try {
+    const q = new URLSearchParams(location.search), h = new URLSearchParams((location.hash || '').replace(/^#/, ''));
+    const inv = q.get('invite');
+    if (inv === 'expired' || inv === 'revoked' || inv === 'already') kind = inv;
+    else if (h.get('error_code') === 'otp_expired' || (h.get('error') === 'access_denied' && /expired|invalid/i.test(h.get('error_description') || ''))) kind = 'expired';
+    email = q.get('email') || '';
+    if (kind) {
+      const clean = new URL(location.href); clean.hash = ''; ['invite', 'email'].forEach(k => clean.searchParams.delete(k));
+      history.replaceState(null, '', clean.toString());
+    }
+  } catch (_) { return null; }
+  if (!kind) return null;
+  const it = hostLang === 'it';
+  const text = {
+    expired: it ? 'Il link che hai aperto non è più valido: è scaduto oppure è stato sostituito da uno più recente. Inserisci la tua email e premi «Password dimenticata?» qui sotto una sola volta: ti mandiamo un link nuovo. Apri solo l’ultima email ricevuta.'
+                : 'The link you opened is no longer valid: it expired or was replaced by a newer one. Enter your email and press "Forgot password?" below once: we will send you a new link. Open only the newest email.',
+    revoked: it ? 'Questo invito non è più attivo. Scrivi a info@welcomebnb.it per riceverne uno nuovo.' : 'This invitation is no longer active. Email info@welcomebnb.it for a new one.',
+    already: it ? 'Hai già creato la tua password: accedi con email e password. Se non la ricordi, premi «Password dimenticata?».' : 'You have already created your password: sign in with email and password. If you forgot it, press "Forgot password?".',
+  }[kind];
+  return { kind, email, text };
+}
+function showAuthLinkNotice() {
+  const n = _authLinkNotice();
+  if (!n) return;
+  const errEl = document.getElementById('loginError');
+  const emailEl = document.getElementById('loginEmail');
+  if (emailEl && n.email && !emailEl.value) emailEl.value = n.email;
+  if (errEl) { errEl.textContent = n.text; errEl.dataset.linkNotice = n.kind; errEl.classList.add('show'); }
+  document.getElementById('loginOverlay')?.classList.remove('hidden');
+}
+
 async function forgotPassword() {
   const email = document.getElementById('loginEmail').value.trim();
   const errEl = document.getElementById('loginError');
@@ -4164,7 +4209,10 @@ async function forgotPassword() {
     redirectTo: `${window.location.origin}/host-console.html`,
   });
   if (error) {
-    errEl.textContent = error.message;
+    // 16 Nov 2026: Supabase answers 429 "only request this after N seconds"
+    // when the button is pressed repeatedly; each new email also cancels the
+    // previous link, so say both in plain words.
+    errEl.textContent = _authEmailErrorText(error);
     errEl.classList.add('show');
   } else {
     errEl.style.color = 'var(--green)';
@@ -4203,7 +4251,10 @@ async function firstTimeSetup() {
     redirectTo: `${window.location.origin}/host-console.html`,
   });
   if (error) {
-    errEl.textContent = error.message;
+    // 16 Nov 2026: Supabase answers 429 "only request this after N seconds"
+    // when the button is pressed repeatedly; each new email also cancels the
+    // previous link, so say both in plain words.
+    errEl.textContent = _authEmailErrorText(error);
     errEl.classList.add('show');
     return;
   }
@@ -17238,6 +17289,7 @@ function fillPropertyForm(data) {
   }
 }
 
+try { showAuthLinkNotice(); } catch (_) {}
 init();
 setTimeout(() => setHostLang('it'), 200);
 </script>

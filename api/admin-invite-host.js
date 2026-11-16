@@ -39,6 +39,8 @@ import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL
 // invite-only flow is cosmetic — sb.auth.signUp() still works.
 
 import { applyCors } from './_cors.js';
+import { createHmac, timingSafeEqual } from 'node:crypto';
+import { take } from './_rate-limit.js';
 import { supportWhatsappHtml, supportWhatsappText } from './_support-contact.js';
 
 
@@ -57,6 +59,12 @@ const MAX_BODY_BYTES = 4 * 1024;
 export default async function handler(req, res) {
   if (rejectInvalidEnvironment(res)) return;
   if (rejectDemoIntegration(res, 'invitations')) return;
+  // 16 Nov 2026 — the invite email carries our own 24-hour link. Opening it
+  // shows a small page (GET, no side effects: email scanners open links
+  // automatically); its button asks for a fresh Supabase link (POST), which
+  // is used within seconds, so Supabase's 1-hour link lifetime never bites.
+  const openToken = req.method === 'GET' ? String((req.query && req.query.open) || new URL(req.url || '/', 'http://x').searchParams.get('open') || '') : '';
+  if (openToken) return renderOpenPage(res, openToken);
   const allowed = applyCors(req, res);
   if (req.method === 'OPTIONS') return res.status(allowed ? 200 : 403).end();
   if (!allowed)                 return res.status(403).json({ error: 'Origin not allowed' });
@@ -71,6 +79,7 @@ export default async function handler(req, res) {
   }
 
   if (!SERVICE_KEY) return res.status(500).json({ error: 'Server misconfigured (service key missing)' });
+  if (req.body && req.body.action === 'open') return handleOpen(req, res);
 
   // Bearer token from the caller — verify against the auth endpoint,
   // then confirm admin server-side.
@@ -142,13 +151,14 @@ async function doInvite(email, actorId, notes) {
     notes,
   }, { Prefer: 'resolution=merge-duplicates,return=minimal' });
 
-  const sent = await _sendInviteEmail(email, linkRes.url);
+  const link = inviteOpenUrl(email);
+  const sent = await _sendInviteEmail(email, link);
   if (!sent.ok) {
     // Record the row anyway; expose the link so the admin can send
     // manually (from their personal mailbox).
-    return { ok: false, stage: 'send', detail: sent.error, link: linkRes.url };
+    return { ok: false, stage: 'send', detail: sent.error, link };
   }
-  return { ok: true, action: 'invite', email, email_id: sent.id || null, link: linkRes.url };
+  return { ok: true, action: 'invite', email, email_id: sent.id || null, link };
 }
 
 async function doResend(email, actorId) {
@@ -166,11 +176,12 @@ async function doResend(email, actorId) {
     invited_at: new Date().toISOString(),
     invited_by: actorId,
   });
-  const sent = await _sendInviteEmail(email, linkRes.url);
+  const link = inviteOpenUrl(email);
+  const sent = await _sendInviteEmail(email, link);
   if (!sent.ok) {
-    return { ok: false, stage: 'send', detail: sent.error, link: linkRes.url };
+    return { ok: false, stage: 'send', detail: sent.error, link };
   }
-  return { ok: true, action: 'resend', email, email_id: sent.id || null, link: linkRes.url };
+  return { ok: true, action: 'resend', email, email_id: sent.id || null, link };
 }
 
 // Returns the confirmation URL without sending any email. The admin UI
@@ -179,7 +190,7 @@ async function doResend(email, actorId) {
 async function doGenerateLink(email) {
   const linkRes = await _generateInviteLink(email);
   if (!linkRes.ok) return { ok: false, stage: 'generatelink', status: linkRes.status, detail: linkRes.text };
-  return { ok: true, action: 'generate_link', email, link: linkRes.url };
+  return { ok: true, action: 'generate_link', email, link: inviteOpenUrl(email) };
 }
 
 // ── Invite link + email helpers ─────────────────────────────────────────
@@ -295,13 +306,13 @@ function _renderInviteEmail(linkEsc) {
         <tr><td style="padding:16px 32px 0;">
           <h2 style="margin:0 0 8px;font-size:16pt;">Benvenuto in WelcomeBnB</h2>
           <p style="margin:0 0 10px;line-height:1.55;">Qualcuno ti ha invitato a usare la console host di WelcomeBnB. Clicca sul pulsante qui sotto per impostare la tua password e accedere.</p>
-          <p style="margin:0 0 12px;color:#4b5563;font-size:0.92rem;line-height:1.55;">Questo link scade dopo l'uso o dopo il periodo di validità impostato da Supabase. Se non lo usi oggi, chiedici un nuovo invito.</p>
+          <p style="margin:0 0 12px;color:#4b5563;font-size:0.92rem;line-height:1.55;">Il link è valido 24 ore. Se scade, dalla pagina di accesso puoi chiederne uno nuovo.</p>
           <p style="margin:16px 0;"><a href="${linkEsc}" style="display:inline-block;background:#111827;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:0.95rem;">Imposta la password e accedi →</a></p>
           ${supportWhatsappHtml('it')}
           <hr style="border:0;border-top:1px solid #e5e7eb;margin:22px 0;">
           <h2 style="margin:0 0 8px;font-size:16pt;">Welcome to WelcomeBnB</h2>
           <p style="margin:0 0 10px;line-height:1.55;">Someone invited you to use the WelcomeBnB host console. Click the button below to set your password and sign in.</p>
-          <p style="margin:0 0 12px;color:#4b5563;font-size:0.92rem;line-height:1.55;">This link expires after it is used or after the window set in Supabase. If you don't use it today, ask us for a fresh invite.</p>
+          <p style="margin:0 0 12px;color:#4b5563;font-size:0.92rem;line-height:1.55;">The link is valid for 24 hours. If it expires, you can ask for a new one from the sign-in page.</p>
           <p style="margin:16px 0;"><a href="${linkEsc}" style="display:inline-block;background:#111827;color:#fff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;font-size:0.95rem;">Set your password and sign in →</a></p>
           ${supportWhatsappHtml('en')}
         </td></tr>
@@ -418,4 +429,82 @@ async function pgrestPATCH(path, body) {
   });
   if (!r.ok) throw new Error('pgrest PATCH ' + path + ' → ' + r.status + ' ' + await r.text().catch(() => ''));
   return true;
+}
+
+// ── 16 Nov 2026: 24-hour invite links ───────────────────────────────────
+// Token = base64url({e: email, x: expiry seconds}) + '.' + HMAC-SHA256,
+// keyed by a value derived from the service key (no new secret to manage).
+export const INVITE_LINK_TTL_SECONDS = 24 * 3600;
+const b64u = buf => Buffer.from(buf).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+function inviteKey() { return createHmac('sha256', String(SERVICE_KEY || 'no-key')).update('welcomebnb-invite-link-v1').digest(); }
+export function signInviteToken(email, nowMs = Date.now(), ttl = INVITE_LINK_TTL_SECONDS) {
+  const payload = b64u(JSON.stringify({ e: normEmail(email), x: Math.floor(nowMs / 1000) + ttl }));
+  return payload + '.' + b64u(createHmac('sha256', inviteKey()).update(payload).digest());
+}
+// → { ok, email, expired } ; ok false = forged or garbled.
+export function verifyInviteToken(token, nowMs = Date.now()) {
+  const [payload, sig] = String(token || '').split('.');
+  if (!payload || !sig || payload.length > 600) return { ok: false };
+  const want = b64u(createHmac('sha256', inviteKey()).update(payload).digest());
+  const a = Buffer.from(sig), b = Buffer.from(want);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return { ok: false };
+  let data; try { data = JSON.parse(Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')); } catch (_) { return { ok: false }; }
+  const email = normEmail(data && data.e);
+  if (!email || !isEmailShape(email) || !Number.isFinite(data.x)) return { ok: false };
+  return { ok: true, email, expired: Math.floor(nowMs / 1000) >= data.x };
+}
+export function inviteOpenUrl(email) {
+  return `${APP_BASE_URL || 'https://app.welcomebnb.it'}/api/admin-invite-host?open=${encodeURIComponent(signInviteToken(email))}`;
+}
+const consoleBase = () => INVITE_REDIRECT_TO || `${APP_BASE_URL || ''}/host-console.html`;
+
+export function renderOpenPage(res, token) {
+  const v = verifyInviteToken(token);
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  const expiredUrl = `${consoleBase()}?invite=expired${v.ok ? '&email=' + encodeURIComponent(v.email) : ''}`;
+  const valid = v.ok && !v.expired;
+  const body = !valid
+    ? `<h1>Link non più valido · Link no longer valid</h1>
+       <p>Questo link d'invito è scaduto. Nella pagina di accesso puoi chiederne uno nuovo.</p>
+       <p>This invitation link has expired. You can ask for a new one on the sign-in page.</p>
+       <p><a class="btn" id="go" href="${_escAttr(expiredUrl)}">Vai all'accesso · Go to sign-in</a></p>`
+    : `<h1>Benvenuto in WelcomeBnB · Welcome</h1>
+       <p>Premi il pulsante per creare la tua password.<br>Press the button to create your password.</p>
+       <p><button class="btn" id="go" type="button">Crea la mia password · Create my password</button></p>
+       <p id="msg" role="status"></p>
+       <script>
+       document.getElementById('go').addEventListener('click', async function () {
+         var b = this; b.disabled = true; var m = document.getElementById('msg'); m.textContent = '…';
+         try {
+           var r = await fetch('/api/admin-invite-host', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'open', token: ${JSON.stringify(token)} }) });
+           var j = await r.json().catch(function () { return {}; });
+           if (j.url) { location.href = j.url; return; }
+           if (j.redirect) { location.href = j.redirect; return; }
+           m.textContent = 'Non riusciamo ad aprire il link ora. Riprova tra un minuto o scrivi a info@welcomebnb.it. · We could not open the link now. Try again in a minute or email info@welcomebnb.it.';
+         } catch (e) { m.textContent = 'Errore di rete, riprova. · Network error, please retry.'; }
+         b.disabled = false;
+       });
+       </script>`;
+  return res.status(valid ? 200 : 410).send(`<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>WelcomeBnB</title>
+<style>body{margin:0;font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#F7F9FC;color:#061A3D}main{max-width:460px;margin:12vh auto;padding:28px 22px;background:#fff;border-radius:14px;box-shadow:0 2px 10px rgba(6,26,61,.08)}h1{font-size:1.2rem;margin:0 0 12px}p{line-height:1.5;font-size:.95rem}.btn{display:inline-block;background:#005BFF;color:#fff;border:0;border-radius:10px;padding:12px 18px;font:inherit;font-weight:600;cursor:pointer;text-decoration:none}.btn:disabled{opacity:.6}</style></head>
+<body><main>${body}</main></body></html>`);
+}
+
+export async function handleOpen(req, res, deps = {}) {
+  res.setHeader('Cache-Control', 'no-store');
+  const v = verifyInviteToken(req.body && req.body.token, deps.now ? deps.now() : Date.now());
+  const base = consoleBase();
+  if (!v.ok) return res.status(400).json({ error: 'invalid_link' });
+  if (v.expired) return res.status(410).json({ error: 'expired', redirect: `${base}?invite=expired&email=${encodeURIComponent(v.email)}` });
+  const gate = await (deps.take || take)('invite_open', v.email, { limit: 10 });
+  if (!gate.ok) return res.status(429).json({ error: 'rate_limited' });
+  let row = null;
+  try { [row] = (await (deps.pgrestGET || pgrestGET)(`/rest/v1/pilot_invites?email=eq.${encodeURIComponent(v.email)}&select=status&limit=1`)) || []; } catch (_) { row = null; }
+  if (!row || row.status === 'revoked') return res.status(410).json({ error: 'revoked', redirect: `${base}?invite=revoked` });
+  if (row.status === 'accepted') return res.status(200).json({ redirect: `${base}?invite=already&email=${encodeURIComponent(v.email)}` });
+  const linkRes = await (deps.generateLink || _generateInviteLink)(v.email);
+  if (!linkRes.ok || !linkRes.url) return res.status(503).json({ error: 'link_unavailable' });
+  return res.status(200).json({ url: linkRes.url });
 }

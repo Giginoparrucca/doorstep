@@ -16,4 +16,4 @@ Remediated at main commit: see the Round 74 Phase 7 merge (PR #317) in `CHANGELO
 
 ## Not in scope (audit follow-ups, still open)
 
-Leaked-password protection (Supabase Auth setting — owner), seven mutable function search paths, `pg_net` in `public`, review of the 20 authenticated SECURITY DEFINER functions, branch-protection verification (owner access), inline-handler removal (Round 65 Phase 5c), Postgres minor upgrade, and the large unreviewed surface listed in the audit's coverage register.
+Done 16 Nov: leaked-password protection enabled (advisor warning gone); branch protection already requires `regression`. Still open: seven mutable function search paths, `pg_net` in `public`, review of the 20 authenticated SECURITY DEFINER functions, inline-handler removal (Round 65 Phase 5c), Postgres minor upgrade, and the large unreviewed surface listed in the audit's coverage register.

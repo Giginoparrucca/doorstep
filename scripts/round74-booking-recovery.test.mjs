@@ -55,9 +55,15 @@ for (const role of ['anon', 'authenticated']) assert.equal((await db.query(`sele
 
 // ── Actual handler ──
 const usage = []; let limiterFails = false, rpcCalls = 0;
-const originalFetch = global.fetch;
+const originalFetch = global.fetch; const rateHits = new Map();
 global.fetch = async (url, init = {}) => {
   url = String(url);
+  // Round 74 Phase 5: atomic counter (rpc rate_take) emulated per scope/key.
+  if (url.includes('/rpc/rate_take')) {
+    if (limiterFails ?? false) return new Response('down', { status: 503 });
+    const a = JSON.parse(init.body); const k = a.p_scope + '|' + a.p_key; rateHits.set(k, (rateHits.get(k) || 0) + 1);
+    return Response.json({ allowed: rateHits.get(k) <= a.p_limit, hits: rateHits.get(k), limit: a.p_limit, retry_after: 600 });
+  }
   if (url.includes('/rpc/guest_recover_booking')) { rpcCalls++; const a = JSON.parse(init.body); return Response.json(await rec(a.p_surname, a.p_doc_last4, { p: a.p_property, date: a.p_arrival, test: a.p_is_test })); }
   if (url.includes('/rest/v1/api_usage') && init.method === 'POST') { usage.push({ ...JSON.parse(init.body), at: Date.now() }); return new Response(null, { status: 201 }); }
   if (url.includes('/rest/v1/api_usage?')) {
@@ -87,17 +93,18 @@ try {
     await lookup({ surname: 'ROSSI', arrival_date: '2026-12-10', doc_last4: '0000' }, { ip: '198.51.100.22' })];
   for (const g of generic) { assert.equal(g.status, 200); assert.deepEqual(g.body, { found: false }, 'not found / ambiguous / wrong proof look the same'); }
   // Client-chosen session IDs do not reset the limit: 10 per address per hour.
-  usage.length = 0;
+  usage.length = 0; rateHits.clear();
   for (let i = 0; i < 10; i++) assert.equal((await lookup({ surname: 'X' + i, arrival_date: '2026-12-10', doc_last4: '0000' }, { ip: '192.0.2.50', sid: 'sess-' + i })).status, 200);
   r = await lookup({ surname: 'ROSSI', arrival_date: '2026-12-10', doc_last4: '4567' }, { ip: '192.0.2.50', sid: 'brand-new-session' });
   assert.equal(r.status, 429, 'new session id, same address: still limited');
   assert.ok(usage.every(u => /^ip:[0-9a-f]{32}$/.test(u.session_id)), 'usage keyed on a hashed address, never the raw IP');
+  assert.ok([...rateHits.keys()].every(k => /^lookup_(address\|ip:[0-9a-f]{32}|property\|[0-9a-f-]{36})$/.test(k)), 'counters keyed on hashed address / property only');
   assert.ok(!JSON.stringify(usage).includes('192.0.2.50'));
   // Property cap: 30 per hour across addresses.
-  usage.length = 0;
+  usage.length = 0; rateHits.clear();
   for (let i = 0; i < 30; i++) await lookup({ surname: 'Y' + i, arrival_date: '2026-12-10', doc_last4: '0000' }, { ip: '192.0.2.' + (100 + i) });
   assert.equal((await lookup({ surname: 'ROSSI', arrival_date: '2026-12-10', doc_last4: '4567' }, { ip: '192.0.2.250' })).status, 429, 'property cap');
-  usage.length = 0;
+  usage.length = 0; rateHits.clear();
   assert.equal((await lookup({ surname: 'ROSSI', arrival_date: '2026-12-10', doc_last4: '4567' }, { ip: null })).status, 429, 'no trusted address: refused');
   limiterFails = true;
   assert.equal((await lookup({ surname: 'ROSSI', arrival_date: '2026-12-10', doc_last4: '4567' })).status, 429, 'limiter unreadable: fail closed');

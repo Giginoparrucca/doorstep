@@ -30,6 +30,7 @@ import { runStoragePurgePass } from './send-arrival-reminders.js';
 import { mintWalkinCode } from './_booking-code.js';
 import { signGuestToken } from './_guest-token.js';
 import { applyCors } from './_cors.js';
+import { takeAll, addressKey, LIMITS } from './_rate-limit.js';
 import { propertyIsReadOnly, ownerBillingState, readOnlyBody } from './_billing.js';
 
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -38,7 +39,6 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 // low; a legitimate guest re-mints at most a few times per session (page
 // reload, booking_code resolution, 401 retry). 20 is comfortable headroom
 // but nowhere near enough for the oracle attack this closes.
-const MINT_HOURLY_LIMIT_PER_SESSION = 20;
 
 export default async function handler(req, res) {
   if (rejectInvalidEnvironment(res)) return;
@@ -106,7 +106,13 @@ export default async function handler(req, res) {
 
   // Rate-limit BEFORE the DB lookup so a limited-out caller can't use
   // this endpoint as a property-existence oracle either.
-  const gate = await checkMintRateLimit(session_id);
+  // Round 74 (audit WBNB-Y002): limits keyed on the caller's network address
+  // and the property, reserved atomically; a new session ID resets nothing.
+  // If the counter store is down, an in-memory bound per instance applies.
+  const gate = await takeAll([
+    { scope: 'mint_address', key: addressKey(req), limit: LIMITS.mint_address },
+    { scope: 'mint_property', key: String(property_id).slice(0, 80), limit: LIMITS.mint_property },
+  ]).then(g => g.ok ? { ok: true } : { ok: false, retry_after_seconds: g.retry_after || 900 });
   if (!gate.ok) {
     res.setHeader('Retry-After', String(gate.retry_after_seconds));
     return res.status(429).json({
@@ -198,42 +204,6 @@ async function bookingHasCheckins(propertyId, bookingCode) {
     if (!r.ok) return true; // fail open
     return (await r.json()).length > 0;
   } catch (_) { return true; }
-}
-
-// Round 34.2 — mirrors the pattern in api/chat.js checkChatLimits and
-// api/scan-document.js checkScanLimits. Fail OPEN on Supabase blip so a
-// network hiccup can't lock the app out of minting; only positive limit
-// hits produce a 429.
-async function checkMintRateLimit(sessionId) {
-  if (!sessionId) return { ok: true };
-  const hourAgoISO = new Date(Date.now() - 3600 * 1000).toISOString();
-  try {
-    const r = await fetch(
-      `${SUPABASE_URL}/rest/v1/api_usage?session_id=eq.${encodeURIComponent(sessionId)}` +
-      `&endpoint=eq.token_mint&created_at=gte.${encodeURIComponent(hourAgoISO)}` +
-      `&select=id`,
-      {
-        headers: {
-          ...supabaseAuthHeaders(SERVICE_KEY),
-          Accept: 'application/json',
-          Prefer: 'count=exact',
-        },
-      },
-    );
-    if (!r.ok) return { ok: true };
-    const rows = await r.json().catch(() => []);
-    const range = r.headers.get('content-range') || '';
-    let count = Array.isArray(rows) ? rows.length : 0;
-    const m = range.match(/\/(\d+)$/);
-    if (m) count = Number(m[1]);
-    if (count >= MINT_HOURLY_LIMIT_PER_SESSION) {
-      return { ok: false, retry_after_seconds: 900 };
-    }
-    return { ok: true };
-  } catch (e) {
-    console.warn('[guest-token] rate-limit check failed, allowing through:', e);
-    return { ok: true };
-  }
 }
 
 async function recordUsage(row) {

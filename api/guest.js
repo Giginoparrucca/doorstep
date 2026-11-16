@@ -102,6 +102,7 @@ import { verifyFromAuthHeader } from './_guest-token.js';
 import { applyCors } from './_cors.js';
 import { mintWalkinCode } from './_booking-code.js';
 import { propertyIsReadOnly, readOnlyBody } from './_billing.js';
+import { takeAll, LIMITS } from './_rate-limit.js';
 import { notifyHostForChatInsert } from './_notify-host.js';
 import { handleHostTerms } from './_host-terms.js';
 import { createRequire } from 'node:module';
@@ -170,6 +171,18 @@ export default async function handler(req, res) {
     if (action === 'property')         return await doProperty(res, propertyId, bookingCode, isTest, v.payload.exp);
     if (action === 'keybox')           return await doGuestKeybox(res, propertyId, bookingCode, isTest, v.payload.exp);
     if (action === 'checkin_list')     return await doCheckinList(res, propertyId, bookingCode, isTest, v.payload.exp);
+    // Round 74 (audit WBNB-Y002): check-in writes and analytics are capped per
+    // caller address (and per booking for writes), reserved atomically; an
+    // unreachable counter falls back to a bounded per-instance limit.
+    if (['checkin_insert', 'checkin_update', 'track_event'].includes(action)) {
+      const who = clientKey(req);
+      const rules = action === 'track_event'
+        ? [{ scope: 'event_address', key: who, limit: LIMITS.event_address }]
+        : [{ scope: 'write_address', key: who, limit: LIMITS.write_address },
+           { scope: 'write_booking', key: `${propertyId}|${bookingCode || 'walk-in:' + sessionId}`.slice(0, 200), limit: LIMITS.write_booking }];
+      const gate = await takeAll(rules);
+      if (!gate.ok) { res.setHeader('Retry-After', String(gate.retry_after || 600)); return res.status(429).json({ error: 'rate_limited' }); }
+    }
     if (action === 'checkin_insert')   return await doCheckinInsert(res, propertyId, bookingCode, sessionId, body, isTest);
     if (action === 'checkin_update')   return await doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, isTest, v.payload.exp);
     if (action === 'checkin_lookup')   return await doCheckinLookup(res, propertyId, sessionId, body, isTest, req);
@@ -896,8 +909,6 @@ async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, is
 // Vercel, not by the client) and on the property, never on the client-chosen
 // session ID; an unreadable limiter refuses recovery (fail closed: recovery is
 // optional, the host can always resend the link).
-export const LOOKUP_LIMIT_PER_CLIENT_HOUR = 10;
-export const LOOKUP_LIMIT_PER_PROPERTY_HOUR = 30;
 export const LOOKUP_FORBIDDEN = /[*%_\\\u0000-\u001f\u007f]/;
 export function clientKey(req) {
   const h = req && req.headers || {};
@@ -946,8 +957,6 @@ async function doCheckinLookup(res, propertyId, sessionId, body, isTest, req) {
 // check-in is saved the server reads the file's first bytes and refuses
 // anything that is not really a JPEG/PNG/WebP/HEIC image or a PDF.
 export const UPLOAD_TYPES = Object.freeze({ 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif', 'application/pdf': 'pdf' });
-export const UPLOAD_LIMIT_PER_CLIENT_HOUR = 20;
-export const UPLOAD_LIMIT_PER_PROPERTY_HOUR = 150;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 async function doUploadUrl(res, propertyId, sessionId, body, isTest, req) {
   const submissionId = String(body.submission_id || '');
@@ -971,17 +980,13 @@ async function doUploadUrl(res, propertyId, sessionId, body, isTest, req) {
 }
 async function uploadRateLimit(who, propertyId) {
   if (!who) return { ok: false };
-  const hourAgoISO = new Date(Date.now() - 3600 * 1000).toISOString();
-  const count = async filter => {
-    const r = await pgrestGET(`api_usage?${filter}&endpoint=eq.upload_sign&created_at=gte.${encodeURIComponent(hourAgoISO)}&select=id`, { headers: { Prefer: 'count=exact' } });
-    if (!r.ok) throw new Error('limiter');
-    return readCount(r.headers.get('content-range'), await r.json());
-  };
-  try {
-    if (await count(`session_id=eq.${encodeURIComponent(who)}`) >= UPLOAD_LIMIT_PER_CLIENT_HOUR) return { ok: false };
-    if (await count(`property_id=eq.${encodeURIComponent(propertyId)}`) >= UPLOAD_LIMIT_PER_PROPERTY_HOUR) return { ok: false };
-    return { ok: true };
-  } catch (_) { return { ok: true }; } // limiter down: the bucket's size/type caps still bound the cost; check-in is never blocked
+  // Counter store down → bounded per instance (the bucket's size/type caps
+  // still apply); check-in is never blocked by this.
+  const g = await takeAll([
+    { scope: 'upload_address', key: who, limit: LIMITS.upload_address },
+    { scope: 'upload_property', key: String(propertyId), limit: LIMITS.upload_property },
+  ]);
+  return { ok: g.ok };
 }
 // First bytes → real file kind.
 export function sniffDocument(bytes) {
@@ -1014,18 +1019,11 @@ export async function verifyIdPhoto(propertyId, path, deps = {}) {
 
 async function checkLookupRateLimit(who, propertyId) {
   if (!who) return { ok: false, retry_after_seconds: 900 }; // no trusted identity: refuse
-  const hourAgoISO = new Date(Date.now() - 3600 * 1000).toISOString();
-  const count = async filter => {
-    const r = await pgrestGET(`api_usage?${filter}&endpoint=eq.checkin_lookup&created_at=gte.${encodeURIComponent(hourAgoISO)}&select=id`,
-      { headers: { Prefer: 'count=exact' } });
-    if (!r.ok) throw new Error('limiter ' + r.status);
-    return readCount(r.headers.get('content-range'), await r.json());
-  };
-  try {
-    if (await count(`session_id=eq.${encodeURIComponent(who)}`) >= LOOKUP_LIMIT_PER_CLIENT_HOUR) return { ok: false, retry_after_seconds: 900 };
-    if (await count(`property_id=eq.${encodeURIComponent(propertyId)}`) >= LOOKUP_LIMIT_PER_PROPERTY_HOUR) return { ok: false, retry_after_seconds: 900 };
-    return { ok: true };
-  } catch (_) { return { ok: false, retry_after_seconds: 300 }; } // fail closed
+  const g = await takeAll([
+    { scope: 'lookup_address', key: who, limit: LIMITS.lookup_address, onFailure: 'closed' },
+    { scope: 'lookup_property', key: String(propertyId), limit: LIMITS.lookup_property, onFailure: 'closed' },
+  ]);
+  return g.ok ? { ok: true } : { ok: false, retry_after_seconds: g.retry_after || 900 };
 }
 
 // ── action: consent_withdraw ──────────────────────────────────────────

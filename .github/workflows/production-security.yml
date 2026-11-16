@@ -30,7 +30,7 @@ jobs:
         with:
           # The exact commit that passed regression (automatic) or the invoking main commit (manual).
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
       - name: Install the locked tools before exposing the database credential

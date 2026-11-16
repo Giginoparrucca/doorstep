@@ -13,8 +13,8 @@ Daniele confirmed the plain-language recap on 16 November 2026 («go ahead»). S
 
 | Phase | Status | Where / test gate |
 |---|---|---|
-| 1 — search_path | in-progress — Claude Opus 5.5 | |
-| 2 — SECURITY DEFINER review | pending | |
+| 1 — search_path | shipped — PR #318 — Claude Opus 5.5 | Migration `20261116140000_round75_function_search_path.sql`: `alter function … set search_path = pg_catalog` on the 7 advisor-flagged functions (`anonymize_text`, `compute_season`, `_ota_reservations_touch_updated_at`, `_pilot_hosts_touch_updated_at`, `_tax_rulesets_touch_updated_at`, `tg_touch_updated_at`, `checkins_prevent_filed_edit`); bodies unchanged — they call only built-ins (production source scan: `regexp_replace`, `EXTRACT`, `TRIM`, `now()`). **Tests:** new `scripts/round75-search-path.test.mjs` (PGlite, migration twice and on an empty database: config pinned, anonymisation/season/touch/filed-guard behave as before). Local `npm run test:all`: **PASS 155 / FAIL 0 / SKIP 3** (standing skips). **Applied to production 16 Nov**, recorded `round75_function_search_path`; verified: all 7 `search_path=pg_catalog`; live calls `anonymize_text` → «[EMAIL] … [PHONE] … [NAME]», `compute_season` Aug/Nov/late-Dec → high/low/high. |
+| 2 — SECURITY DEFINER review | in-progress — Claude Opus 5.5 | |
 | 3 — pg_net | pending | |
 | 4 — Regression + close | pending | |
 

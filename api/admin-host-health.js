@@ -13,6 +13,8 @@ import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL
 import { applyCors } from './_cors.js';
 import { regionComplianceFor } from './_onboarding-nudges.js';
 import { handleBillingAction, billingChip } from './_admin-billing.js';
+import { handleDsarAction } from './_admin-dsar.js';
+import { take } from './_rate-limit.js';
 import { sendHostEmail, hostAccountEmail } from './_notify-host.js';
 
 const require = createRequire(import.meta.url);
@@ -163,6 +165,26 @@ function billingDeps(deps = {}) {
   };
 }
 
+// Round 67 Phase 4 — data-subject requests (api/_admin-dsar.js).
+function dsarDeps(deps = {}) {
+  if (deps.dsar) return deps.dsar;
+  const f = deps.fetch || globalThis.fetch;
+  const billing = billingDeps(deps);
+  return {
+    get: path => sbGet(path, deps),
+    rpc: billing.rpc,
+    take: (scope, key, opts) => take(scope, key, opts, { fetch: f }),
+    // 7-day signed link to one stored document photo (private bucket).
+    sign: async (path, seconds) => {
+      const r = await f(`${SUPABASE_URL}/storage/v1/object/sign/documents/${String(path).split('/').map(enc).join('/')}`, { method: 'POST', headers: { ...supabaseAuthHeaders(SERVICE_KEY), 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: seconds }), signal: AbortSignal.timeout(10000) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.signedURL) throw new Error('sign ' + r.status);
+      return `${SUPABASE_URL}/storage/v1${j.signedURL.startsWith('/') ? '' : '/'}${j.signedURL}`;
+    },
+    audit: async () => {}, // Phase 5 records these in admin_access_events
+  };
+}
+
 async function listUsers(deps = {}) {
   const f = deps.fetch || globalThis.fetch;
   const out = [];
@@ -193,11 +215,16 @@ export default async function handler(req, res, deps = {}) {
       const out = await handleBillingAction(action, req.body || {}, { actor: gate.user.email || gate.user.id, deps: billingDeps(deps) });
       return res.status(out.status).json(out.body);
     }
+    if (action.startsWith('dsar_')) {
+      const out = await handleDsarAction(action, req.body || {}, { actor: gate.user.email || gate.user.id, actorId: gate.user.id, deps: dsarDeps(deps) });
+      return res.status(out.status).json(out.body);
+    }
     const payload = await buildHostHealth({ deps });
     return res.status(200).json(payload);
   } catch (e) {
     // Never a silent empty result: the admin sees that the read failed.
     console.warn('[admin-host-health] failed:', String(e && e.message || e).slice(0, 200));
-    return res.status(503).json({ error: 'Host health unavailable. Retry in a moment.' });
+    const failed = String(req.body?.action || '').startsWith('dsar_') ? 'Privacy request failed: nothing was changed by the failed step. Retry in a moment.' : 'Host health unavailable. Retry in a moment.';
+    return res.status(503).json({ error: failed });
   }
 }

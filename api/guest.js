@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { rejectInvalidEnvironment, SUPABASE_URL } from './_environment.js';
 import handleCspReport from './_csp-report.js';
@@ -171,7 +172,7 @@ export default async function handler(req, res) {
     if (action === 'checkin_list')     return await doCheckinList(res, propertyId, bookingCode, isTest, v.payload.exp);
     if (action === 'checkin_insert')   return await doCheckinInsert(res, propertyId, bookingCode, sessionId, body, isTest);
     if (action === 'checkin_update')   return await doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, isTest, v.payload.exp);
-    if (action === 'checkin_lookup')   return await doCheckinLookup(res, propertyId, sessionId, body, isTest);
+    if (action === 'checkin_lookup')   return await doCheckinLookup(res, propertyId, sessionId, body, isTest, req);
     if (action === 'consent_withdraw') return await doConsentWithdraw(res, propertyId, body);
     if (action === 'consent_save')     return await doConsentSave(res, propertyId, bookingCode, body, isTest);
     if (action === 'track_event')      return await doTrackEvent(res, propertyId, bookingCode, sessionId, body, isTest);
@@ -421,7 +422,6 @@ const CHECKIN_READ_FIELDS = [
   'booking_code', 'submitted_at', 'keybox_code',
 ];
 
-const CHECKIN_LOOKUP_HOURLY_LIMIT_PER_SESSION = 10;
 
 
 // ── action: property ──────────────────────────────────────────────────
@@ -921,79 +921,72 @@ async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, is
 }
 
 // ── action: checkin_lookup ────────────────────────────────────────────
-async function doCheckinLookup(res, propertyId, sessionId, body, isTest) {
+// Round 74 Phase 1 (audit WBNB-R001). Recovery returns a booking code only
+// for a literal match of surname + arrival date + the last 4 letters/digits
+// of the document number (decision D1), and only when exactly one booking
+// matches — computed in guest_recover_booking (no LIKE/ILIKE, so wildcard
+// characters are never patterns). Wildcards and control characters are
+// refused up front. "Not found", "ambiguous" and "wrong proof" all give the
+// same answer. The limit is keyed on the caller's network address (set by
+// Vercel, not by the client) and on the property, never on the client-chosen
+// session ID; an unreadable limiter refuses recovery (fail closed: recovery is
+// optional, the host can always resend the link).
+export const LOOKUP_LIMIT_PER_CLIENT_HOUR = 10;
+export const LOOKUP_LIMIT_PER_PROPERTY_HOUR = 30;
+export const LOOKUP_FORBIDDEN = /[*%_\\\u0000-\u001f\u007f]/;
+export function clientKey(req) {
+  const h = req && req.headers || {};
+  const ip = String(h['x-real-ip'] || String(h['x-forwarded-for'] || '').split(',')[0] || '').trim();
+  if (!ip) return null;
+  return 'ip:' + createHmac('sha256', String(SERVICE_KEY || 'no-key')).update(ip).digest('hex').slice(0, 32);
+}
+async function doCheckinLookup(res, propertyId, sessionId, body, isTest, req) {
+  const notFound = () => res.status(200).json({ found: false });
   const surname = String(body.surname || '').trim();
   const arrivalDate = String(body.arrival_date || '').trim();
+  const docLast4 = String(body.doc_last4 || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
   if (!surname || !arrivalDate) {
     return res.status(400).json({ error: 'surname and arrival_date required' });
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(arrivalDate)) {
     return res.status(400).json({ error: 'arrival_date must be ISO yyyy-mm-dd' });
   }
+  if (!/^[A-Z0-9]{4}$/.test(docLast4)) return res.status(400).json({ error: 'doc_last4 required' });
+  if (surname.length > 80 || LOOKUP_FORBIDDEN.test(surname)) return notFound();
 
-  // Rate limit — 10 per session per rolling hour. If this trips, a bot
-  // sweeping surnames can't learn booking codes faster than that cap.
-  const gate = await checkLookupRateLimit(sessionId);
+  const who = clientKey(req);
+  const gate = await checkLookupRateLimit(who, propertyId);
   if (!gate.ok) {
     res.setHeader('Retry-After', String(gate.retry_after_seconds));
     return res.status(429).json({ error: 'rate_limited', retry_after_seconds: gate.retry_after_seconds });
   }
-
-  // Case-insensitive exact match on surname (not ilike '%...%' — exact
-  // match of the whole string, lowered). PostgREST ilike with no
-  // wildcard IS an exact-case-insensitive match.
-  const path =
-    `checkins?property_id=eq.${encodeURIComponent(propertyId)}` +
-    `&arrival_date=eq.${encodeURIComponent(arrivalDate)}` +
-    `&surname=ilike.${encodeURIComponent(surname)}` +
-    `&is_test=eq.${isTest === true ? 'true' : 'false'}` +
-    `&deleted_at=is.null` +
-    `&select=booking_code`;
-  const r = await pgrestGET(path);
   try {
     await recordUsage({
-      property_id: propertyId, session_id: sessionId,
+      property_id: propertyId, session_id: who || ('session:' + sessionId),
       endpoint: 'checkin_lookup', input_tokens: 0, output_tokens: 0,
     });
   } catch (_) {}
+  const r = await callRPC('guest_recover_booking', { p_property: propertyId, p_arrival: arrivalDate, p_surname: surname, p_doc_last4: docLast4, p_is_test: isTest === true });
   if (!r.ok) return res.status(500).json({ error: 'checkin_lookup failed' });
-  const rows = await r.json();
-  // Pick the first matching booking_code; count how many rows share it.
-  const byCode = new Map();
-  for (const row of rows) {
-    const k = row.booking_code || null;
-    byCode.set(k, (byCode.get(k) || 0) + 1);
-  }
-  if (byCode.size === 0) return res.status(200).json({ found: false });
-  // If multiple codes match, surface the one with the most rows (same
-  // booking most likely). No PII returned.
-  let bestCode = null, bestN = -1;
-  for (const [k, n] of byCode) if (n > bestN) { bestCode = k; bestN = n; }
-  return res.status(200).json({
-    found: true,
-    property_id: propertyId,
-    booking_code: bestCode,
-    guests: bestN,
-  });
+  const out = await r.json().catch(() => null);
+  if (!out || out.found !== true || !out.booking_code) return notFound();
+  return res.status(200).json({ found: true, property_id: propertyId, booking_code: out.booking_code, guests: out.guests || 1 });
 }
 
-async function checkLookupRateLimit(sessionId) {
-  if (!sessionId) return { ok: true };
+async function checkLookupRateLimit(who, propertyId) {
+  if (!who) return { ok: false, retry_after_seconds: 900 }; // no trusted identity: refuse
   const hourAgoISO = new Date(Date.now() - 3600 * 1000).toISOString();
+  const count = async filter => {
+    const r = await pgrestGET(`api_usage?${filter}&endpoint=eq.checkin_lookup&created_at=gte.${encodeURIComponent(hourAgoISO)}&select=id`,
+      { headers: { Prefer: 'count=exact' } });
+    if (!r.ok) throw new Error('limiter ' + r.status);
+    return readCount(r.headers.get('content-range'), await r.json());
+  };
   try {
-    const r = await pgrestGET(
-      `api_usage?session_id=eq.${encodeURIComponent(sessionId)}` +
-      `&endpoint=eq.checkin_lookup&created_at=gte.${encodeURIComponent(hourAgoISO)}` +
-      `&select=id`,
-      { headers: { Prefer: 'count=exact' } },
-    );
-    if (!r.ok) return { ok: true };
-    const count = readCount(r.headers.get('content-range'), await r.json());
-    if (count >= CHECKIN_LOOKUP_HOURLY_LIMIT_PER_SESSION) {
-      return { ok: false, retry_after_seconds: 900 };
-    }
+    if (await count(`session_id=eq.${encodeURIComponent(who)}`) >= LOOKUP_LIMIT_PER_CLIENT_HOUR) return { ok: false, retry_after_seconds: 900 };
+    if (await count(`property_id=eq.${encodeURIComponent(propertyId)}`) >= LOOKUP_LIMIT_PER_PROPERTY_HOUR) return { ok: false, retry_after_seconds: 900 };
     return { ok: true };
-  } catch (_) { return { ok: true }; }
+  } catch (_) { return { ok: false, retry_after_seconds: 300 }; } // fail closed
 }
 
 // ── action: consent_withdraw ──────────────────────────────────────────

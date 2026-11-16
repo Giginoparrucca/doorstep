@@ -1128,6 +1128,10 @@ function icon(name, cls) {
         <label class="form-label" style="font-size:0.65rem;" data-i18n="lookup_date">Arrival date</label>
         <input class="form-input" type="date" id="lookupDate">
       </div>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label class="form-label" style="font-size:0.65rem;" for="lookupDoc" data-i18n="lookup_doc">Last 4 characters of your ID document number</label>
+        <input class="form-input" type="text" id="lookupDoc" maxlength="4" autocomplete="off" autocapitalize="characters" inputmode="text" data-i18n-placeholder="lookup_doc_hint" placeholder="e.g., 4567">
+      </div>
       <button class="btn-checkin" onclick="lookupCheckin()" id="lookupBtn" style="width:100%;padding:10px;font-size:0.75rem;" data-i18n="lookup_btn">Find My Check-in</button>
       <div id="lookupError" style="display:none;margin-top:8px;padding:8px 12px;background:var(--red-bg);border-radius:8px;border:1px solid rgba(224,69,94,0.15);font-size:0.68rem;color:var(--red);"></div>
       <div id="lookupLoading" style="display:none;margin-top:8px;text-align:center;font-size:0.68rem;color:var(--ink-soft);" data-i18n="lookup_searching">Searching...</div>
@@ -2112,7 +2116,8 @@ const T = {
     lookup_date: 'Arrival date',
     lookup_btn: 'Find My Check-in',
     lookup_searching: 'Searching...',
-    lookup_not_found: 'No check-in found with this surname and date. Please check your details and try again.',
+    lookup_not_found: 'We could not find your check-in with these details. Check them and try again, or ask your host for your check-in link.',
+    lookup_doc: 'Last 4 characters of your ID document number', lookup_doc_hint: 'e.g., 4567', lookup_err_doc: 'Enter the last 4 letters or digits of the document you used at check-in.',
     lookup_err_surname: 'Please enter your surname.',
     lookup_err_date: 'Please enter your arrival date.',
     lookup_error: 'Something went wrong. Please try again.',
@@ -2287,7 +2292,8 @@ const T = {
     lookup_date: 'Data di arrivo',
     lookup_btn: 'Trova il Mio Check-in',
     lookup_searching: 'Ricerca in corso...',
-    lookup_not_found: 'Nessun check-in trovato con questo cognome e data. Controlla i dati e riprova.',
+    lookup_not_found: 'Non troviamo il check-in con questi dati. Controllali e riprova, oppure chiedi il link del check-in al tuo host.',
+    lookup_doc: 'Ultimi 4 caratteri del numero del documento', lookup_doc_hint: 'es. 4567', lookup_err_doc: 'Inserisci le ultime 4 lettere o cifre del documento usato per il check-in.',
     lookup_err_surname: 'Inserisci il tuo cognome.',
     lookup_err_date: 'Inserisci la data di arrivo.',
     lookup_error: 'Qualcosa è andato storto. Riprova.',
@@ -2649,6 +2655,13 @@ async function lookupCheckin() {
     errEl.style.display = 'block';
     return;
   }
+  // Round 74 (audit WBNB-R001): proof of the booking besides surname and date.
+  const docLast4 = (document.getElementById('lookupDoc')?.value || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  if (docLast4.length !== 4) {
+    errEl.textContent = T[lang].lookup_err_doc;
+    errEl.style.display = 'block';
+    return;
+  }
 
   loadEl.style.display = 'block';
   document.getElementById('lookupBtn').disabled = true;
@@ -2663,6 +2676,7 @@ async function lookupCheckin() {
     const look = await _guestCall('checkin_lookup', {
       surname: surname.toUpperCase(),
       arrival_date: date,
+      doc_last4: docLast4,
     });
 
     loadEl.style.display = 'none';

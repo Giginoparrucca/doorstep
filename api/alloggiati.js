@@ -1,5 +1,6 @@
 import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { handleAlloggiatiSupport, redactSupport } from './_alloggiati-support.js';
+import { auditAfter } from './_admin-audit.js';
 import { createFilingEvidence } from './_alloggiati-evidence.js';
 import { runTestCleanup } from './send-arrival-reminders.js';
 import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, rejectDemoIntegration, APP_BASE_URL, SUPPORT_CONTACTS, IS_DEMO } from './_environment.js';
@@ -1278,6 +1279,8 @@ export default async function handler(req, res) {
 
   const owner = await resolveHostAndProperty(req, propertyId, { allowAdmin: action === 'status' });
   if (owner.error) return res.status(owner.error.status).json(owner.error.body);
+  // Round 67 Phase 5 — an admin reading another host's connection status.
+  if (owner.admin) await auditAfter({ actorId: owner.hostId, action: 'alloggiati_admin_status', targetTable: 'properties', targetId: propertyId, req, route: 'alloggiati' });
 
   if (action === 'status') {
     try {

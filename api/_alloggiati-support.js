@@ -1,3 +1,4 @@
+import { auditAfter } from './_admin-audit.js';
 import { supabaseAuthHeaders } from './_supabase-auth.js';
 // Admin support reads and explicit SOAP Test only. This module has no Send capability.
 import { parseFilingEvidence } from './_alloggiati-evidence.js';
@@ -51,6 +52,10 @@ export async function handleAlloggiatiSupport(req, res, deps) {
     // so no per-property view audit; the property dialog keeps its audit.
     // Round 51 Phase 6: onboarding readiness of every property (computed by
     // the caller's readiness function; no guest data, no credentials).
+    // Round 67 Phase 5 — overview/readiness reads are journalled; per-
+    // property reads already write admin_impersonation_log (mirrored into
+    // the journal by trigger).
+    if (overview) await auditAfter({ actorId: user.id, actorEmail: user.email || null, action: 'alloggiati_support_read', targetTable: 'properties', metadata: { view: action }, req, route: 'alloggiati' }, { fetch: fetcher, serviceKey });
     if (action === 'support_readiness') {
       if (typeof deps.readiness !== 'function') return respond(503, { error: 'Readiness unavailable' });
       return respond(200, { properties: await deps.readiness() });

@@ -15,6 +15,7 @@ import { regionComplianceFor } from './_onboarding-nudges.js';
 import { handleBillingAction, billingChip } from './_admin-billing.js';
 import { handleDsarAction } from './_admin-dsar.js';
 import { take } from './_rate-limit.js';
+import { auditFirst, auditAfter, recordAdminEvent, AUDIT_UNAVAILABLE } from './_admin-audit.js';
 import { sendHostEmail, hostAccountEmail } from './_notify-host.js';
 
 const require = createRequire(import.meta.url);
@@ -165,6 +166,26 @@ function billingDeps(deps = {}) {
   };
 }
 
+// Round 67 Phase 5 — journal writer (injectable for tests).
+function auditDeps(deps = {}) {
+  if (deps.audit) return deps.audit;
+  const d = { fetch: deps.fetch };
+  return { first: ev => auditFirst(ev, d), after: ev => auditAfter(ev, d) };
+}
+// Recent journal entries for the admin page (newest first), with the chain
+// check. Filters: action prefix, since (ISO date), limit ≤ 500.
+export async function listAuditEvents(body = {}, deps = {}) {
+  const prefix = String(body.action_prefix || '');
+  if (prefix && !/^[a-z_]{2,40}$/.test(prefix)) return { status: 400, body: { error: 'invalid_filter' } };
+  const since = String(body.since || '');
+  if (since && !/^\d{4}-\d{2}-\d{2}$/.test(since)) return { status: 400, body: { error: 'invalid_filter' } };
+  const limit = Math.min(Math.max(parseInt(body.limit, 10) || 200, 1), 500);
+  const filters = [prefix ? `action=like.${enc(prefix)}*` : '', since ? `occurred_at=gte.${since}` : ''].filter(Boolean).join('&');
+  const events = await sbGet(`admin_access_events?${filters ? filters + '&' : ''}select=id,occurred_at,actor_email,action,outcome,target_table,target_id,metadata&order=id.desc&limit=${limit}`, deps);
+  const chain = await billingDeps(deps).rpc('admin_audit_verify', {}).catch(() => null);
+  return { status: 200, body: { events, chain } };
+}
+
 // Round 67 Phase 4 — data-subject requests (api/_admin-dsar.js).
 function dsarDeps(deps = {}) {
   if (deps.dsar) return deps.dsar;
@@ -181,7 +202,7 @@ function dsarDeps(deps = {}) {
       if (!r.ok || !j.signedURL) throw new Error('sign ' + r.status);
       return `${SUPABASE_URL}/storage/v1${j.signedURL.startsWith('/') ? '' : '/'}${j.signedURL}`;
     },
-    audit: async () => {}, // Phase 5 records these in admin_access_events
+    audit: async () => {}, // the handler wrapper records the journal entry
   };
 }
 
@@ -211,15 +232,41 @@ export default async function handler(req, res, deps = {}) {
     const gate = await verifyAdmin(req, deps);
     if (gate.error) return res.status(gate.status).json({ error: gate.error });
     const action = String(req.body?.action || '');
+    // Round 67 Phase 5 — every admin action is journalled (admin_access_events):
+    // changes and personal-data exports are recorded before they run (or not
+    // run at all) and again with their outcome; reads after.
+    const audit = auditDeps(deps);
+    const who = { actorId: gate.user.id, actorEmail: gate.user.email || null, req, route: 'admin-host-health' };
+    const outcomeOf = status => status < 300 ? 'ok' : status < 500 ? 'refused' : 'error';
     if (action.startsWith('billing_')) {
-      const out = await handleBillingAction(action, req.body || {}, { actor: gate.user.email || gate.user.id, deps: billingDeps(deps) });
+      const body = req.body || {};
+      const target = /^[0-9a-f-]{36}$/i.test(String(body.user_id || '')) ? { targetTable: 'auth_users', targetId: body.user_id } : { targetTable: 'billing_settings' };
+      const ev = { ...who, ...target, action };
+      const isRead = action === 'billing_launch_preview' || (action === 'billing_launch_emails' && body.dry !== false) || (action === 'billing_launch' && body.dry !== false);
+      if (!isRead && !(await audit.first(ev))) return res.status(AUDIT_UNAVAILABLE.status).json(AUDIT_UNAVAILABLE.body);
+      const out = await handleBillingAction(action, body, { actor: gate.user.email || gate.user.id, deps: billingDeps(deps) });
+      await audit.after({ ...ev, outcome: outcomeOf(out.status), metadata: { status: out.status, dry_run: isRead } });
       return res.status(out.status).json(out.body);
     }
     if (action.startsWith('dsar_')) {
-      const out = await handleDsarAction(action, req.body || {}, { actor: gate.user.email || gate.user.id, actorId: gate.user.id, deps: dsarDeps(deps) });
+      const real = action === 'dsar_erase' && req.body?.dry_run === false;
+      const ev = { ...who, action: action === 'dsar_export' ? 'dsar_export' : real ? 'dsar_erase' : 'dsar_erase_preview', targetTable: 'data_subject' };
+      if (!(await audit.first(ev))) return res.status(AUDIT_UNAVAILABLE.status).json(AUDIT_UNAVAILABLE.body);
+      let detail = {};
+      const d = { ...dsarDeps(deps), audit: async e => { detail = { identifier_kind: e.identifier_kind, counts: e.counts, document_links: e.document_links === true }; } };
+      let out;
+      try { out = await handleDsarAction(action, req.body || {}, { actor: gate.user.email || gate.user.id, actorId: gate.user.id, deps: d }); }
+      catch (e) { await audit.after({ ...ev, outcome: 'error' }); throw e; }
+      await audit.after({ ...ev, outcome: outcomeOf(out.status), metadata: { status: out.status, ...detail } });
+      return res.status(out.status).json(out.body);
+    }
+    if (action === 'audit_list') {
+      const out = await listAuditEvents(req.body || {}, deps);
+      await audit.after({ ...who, action: 'audit_read', targetTable: 'admin_access_events', outcome: outcomeOf(out.status), metadata: { rows: out.body.events ? out.body.events.length : 0 } });
       return res.status(out.status).json(out.body);
     }
     const payload = await buildHostHealth({ deps });
+    await audit.after({ ...who, action: 'host_health_read', targetTable: 'properties', metadata: { properties: (payload.properties || []).length } });
     return res.status(200).json(payload);
   } catch (e) {
     // Never a silent empty result: the admin sees that the read failed.

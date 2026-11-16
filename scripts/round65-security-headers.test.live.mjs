@@ -10,4 +10,4 @@ for(const path of ['/','/host-console.html','/admin.html','/api/guest','/api/csp
  for(const {key,value}of securityHeaders)assert.equal(res.headers.get(key),value,path+' '+key);
  await res.body?.cancel();
 }
-console.log('PASS production guest/host/admin/API report-only CSP, immediate framing/base/object protection, HSTS, nosniff, referrer and camera-compatible permissions headers');
+console.log('PASS production guest/host/admin/API enforced CSP (resources, framing, base, object; reporting on), HSTS, nosniff, referrer and camera-compatible permissions headers');

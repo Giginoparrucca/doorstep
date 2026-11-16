@@ -348,6 +348,7 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
     <button data-tab="pilot"   onclick="setActiveTab('pilot')"   style="padding:8px 16px;border:1px solid var(--warm);background:var(--warm);color:#fff;border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Pilot</button>
     <button data-tab="deepdive" onclick="setActiveTab('deepdive')" style="padding:8px 16px;border:1px solid var(--border);background:var(--white);color:var(--ink-soft);border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Deep dive</button>
     <button data-tab="ops"     onclick="setActiveTab('ops')"     style="padding:8px 16px;border:1px solid var(--border);background:var(--white);color:var(--ink-soft);border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Ops</button>
+    <button data-tab="privacy" onclick="setActiveTab('privacy')" style="padding:8px 16px;border:1px solid var(--border);background:var(--white);color:var(--ink-soft);border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Privacy</button>
   </div>
   <div id="content"><div class="loading">Loading analytics…</div></div>
 </div>
@@ -358,6 +359,7 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
 <script src="/admin-ops-metrics.js?v=70.1"></script>
 <script src="/admin-ops-table.js?v=64.2"></script>
 <script src="/admin-alloggiati-support.js?v=70.1"></script>
+<script src="/admin-dsar.js?v=67.4"></script>
 <script src="/vendor/supabase-2.118.0.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
@@ -2093,6 +2095,7 @@ function _r14BuildEngagement(events, checkins, properties, propToEmail) {
 function renderView() {
   if (activeTab === 'pilot')    return renderPilotTab();
   if (activeTab === 'ops')      return renderOpsTab();
+  if (activeTab === 'privacy')  return window.DsarAdmin ? window.DsarAdmin.render() : null;
   return renderDeepDive();
 }
 

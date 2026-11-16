@@ -2132,6 +2132,8 @@ const T = {
     // Round 48 Phase 2 — guest-side edit after submission.
     wb_edit_btn: 'Edit',
     wb_filed_lock: 'Details already sent to the police — ask your host to correct them.',
+    edit_party_filed: 'The dates were not changed: some guests of this booking have already been sent to the police. Ask your host to change the dates.',
+    edit_bad_dates: 'The departure date must be after the arrival date.',
     edit_filed_409: 'Details already sent to the police — ask your host to correct them.',
     lookup_err_rate: 'Too many lookups. Please wait a moment and try again.',
   },
@@ -2308,6 +2310,8 @@ const T = {
     // Round 48 Fase 2 — modifiche dell\'ospite dopo l\'invio.
     wb_edit_btn: 'Modifica',
     wb_filed_lock: 'Dati già inviati alla Questura — chiedi all\'host di correggerli.',
+    edit_party_filed: 'Le date non sono state cambiate: alcuni ospiti di questa prenotazione sono già stati inviati alla Polizia. Chiedi all’host di cambiare le date.',
+    edit_bad_dates: 'La data di partenza deve essere successiva a quella di arrivo.',
     edit_filed_409: 'Dati già inviati alla Questura — chiedi all\'host di correggerli.',
     lookup_err_rate: 'Troppe ricerche. Attendi un momento e riprova.',
   }
@@ -4644,7 +4648,8 @@ async function saveGuestEdit(idx) {
   if (isWelcomeBack) {
     const r = await _guestCall('checkin_update', { id: g._dbId, fields: updates });
     if (r && r.status === 409) {
-      alert(T[lang].edit_filed_409 || T[lang].wb_filed_lock || 'Details already sent to the police — ask your host to correct them.');
+      // Round 74: a stay-date change is all-or-nothing for the party.
+      alert(r.data?.error === 'party_filed' ? T[lang].edit_party_filed : (T[lang].edit_filed_409 || T[lang].wb_filed_lock || 'Details already sent to the police — ask your host to correct them.'));
       // Re-fetch the list so the Edit button on this row flips to
       // the lock state (editable will now be false for this row).
       try {
@@ -4656,7 +4661,7 @@ async function saveGuestEdit(idx) {
       return;
     }
     if (r && r.status === 400 && Array.isArray(r.data?.fields)) {
-      const msg = { residence_country: T[lang].val_residence_country, residence_place: T[lang].val_residence_place,
+      const msg = { departure_date: T[lang].edit_bad_dates, residence_country: T[lang].val_residence_country, residence_place: T[lang].val_residence_place,
         residence_postcode: T[lang].val_residence_postcode, fiscal_code: T[lang].val_fiscal_code,
         residence_province: T[lang].val_residence_province };
       alert(r.data.fields.map(f => msg[f] || f).join('\n'));

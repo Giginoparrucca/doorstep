@@ -796,6 +796,10 @@ async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, is
   const id = String(body.id || '').trim();
   const fields = normalizeInvoiceFields(body.fields || {});
   if (!id) return res.status(400).json({ error: 'id required' });
+  // Round 74 (audit WBNB-R002): only a booking-bound link may edit, and only
+  // rows of that booking. A property-only token edits nothing.
+  if (!bookingCode) return res.status(403).json({ error: 'booking_required' });
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return res.status(404).json({ error: 'not_found' });
   const errors = validateCheckinRecord(fields, { requireAll: false });
   if (errors.length) return res.status(400).json({ error: 'validation_failed', fields: errors });
 
@@ -803,14 +807,14 @@ async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, is
   // before it became mandatory: check the row as it will be after the patch.
   const scopeFilter = `id=eq.${encodeURIComponent(id)}&property_id=eq.${encodeURIComponent(propertyId)}` +
     `&is_test=eq.${isTest === true ? 'true' : 'false'}&deleted_at=is.null` +
-    (bookingCode ? `&booking_code=eq.${encodeURIComponent(bookingCode)}` : '');
+    `&booking_code=eq.${encodeURIComponent(bookingCode)}`;
   const [currentRes, rules] = await Promise.all([
     pgrestGET(`checkins?${scopeFilter}&select=guest_type,residence_country,residence_place,residence_postcode,residence_address,residence_province,fiscal_code,invoice_email&limit=1`),
     readPropertyRules(propertyId),
   ]);
   if (!currentRes.ok || rules === undefined) return res.status(503).json({ error: 'checkin_unavailable' });
   const [current] = await currentRes.json();
-  if (!current) return res.status(409).json({ error: 'already_filed' });
+  if (!current) return res.status(404).json({ error: 'not_found' }); // not in this booking
   const merged = { ...current, ...fields, guest_type: current.guest_type };
   const residenceErrors = [...validateResidence(merged, rules.region), ...validateInvoiceRequired(merged, rules.invoiceRequired)];
   if (residenceErrors.length) return res.status(400).json({ error: 'validation_failed', fields: residenceErrors });
@@ -821,73 +825,25 @@ async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, is
   // Edits correct personal details only; a changed role would silently stop
   // that guest counting towards the entry release.
   delete patch.guest_type;
-  patch.guest_edited_at = new Date().toISOString();
-  patch.checkin_reopened_at = null;
 
-  // Conditional PATCH. The filters pin us to the token's property +
-  // booking, and alloggiati_status=not.in.(filed,filing) enforces
-  // "editable until filed OR claimed by the autofile tick" (Round 49
-  // Phase 2). Prefer: return=representation lets us tell "no row
-  // updated" (filed/filing → 409) apart from "row updated".
-  const scope = bookingCode
-    ? `&booking_code=eq.${encodeURIComponent(bookingCode)}`
-    : '';
-  const r = await fetch(
-    `${SUPABASE_URL}/rest/v1/checkins?id=eq.${encodeURIComponent(id)}` +
-    `&property_id=eq.${encodeURIComponent(propertyId)}` +
-    `&is_test=eq.${isTest === true ? 'true' : 'false'}&deleted_at=is.null` +
-    scope +
-    `&alloggiati_status=not.in.(filed,filing)`,
-    {
-      method: 'PATCH',
-      headers: {
-        ...supabaseAuthHeaders(SERVICE_KEY),
-        'Content-Type': 'application/json',
-        Prefer: 'return=representation',
-      },
-      body: JSON.stringify(patch),
-    }
-  );
+  // Round 74 (audit WBNB-R002 + Y003): one trusted, atomic operation
+  // (guest_update_checkin) checks id + property + booking + test mode +
+  // editable state, applies the edit and, when the main guest changes the
+  // stay dates, updates the whole party in the same transaction — or
+  // refuses and changes nothing. No partial success is ever reported.
+  const r = await callRPC('guest_update_checkin', { p_property: propertyId, p_booking: bookingCode, p_is_test: isTest === true, p_id: id, p_patch: patch });
   if (!r.ok) {
     const t = await r.text().catch(() => '');
-    return res.status(500).json({ error: 'checkin_update failed', detail: t });
+    const code = (/(booking_required|not_found|already_filed|party_filed|invalid_dates)/.exec(t) || [])[1];
+    if (code === 'not_found') return res.status(404).json({ error: 'not_found' });
+    if (code === 'already_filed') return res.status(409).json({ error: 'already_filed' });
+    if (code === 'party_filed') return res.status(409).json({ error: 'party_filed' });
+    if (code === 'invalid_dates') return res.status(400).json({ error: 'validation_failed', fields: ['departure_date'] });
+    if (code === 'booking_required') return res.status(403).json({ error: 'booking_required' });
+    return res.status(503).json({ error: 'checkin_update_failed' });
   }
-  const rows = await r.json();
-  if (!Array.isArray(rows) || rows.length === 0) {
-    return res.status(409).json({ error: 'already_filed' });
-  }
-  const updated = rows[0];
-
-  // If the main guest changed arrival/departure, fan the change out to
-  // every row in the same booking. We only recognise this when the
-  // updated row's guest_type is a main-guest kind and the fields set
-  // includes arrival_date or departure_date.
-  const mainGuestKinds = new Set(['single', 'head', 'group']);
-  if (bookingCode && mainGuestKinds.has(updated.guest_type) &&
-      ('arrival_date' in patch || 'departure_date' in patch)) {
-    const fanPatch = {};
-    if ('arrival_date' in patch)   fanPatch.arrival_date   = patch.arrival_date;
-    if ('departure_date' in patch) fanPatch.departure_date = patch.departure_date;
-    if ('nights' in patch)         fanPatch.nights         = patch.nights;
-    try {
-      await fetch(
-        `${SUPABASE_URL}/rest/v1/checkins` +
-        `?property_id=eq.${encodeURIComponent(propertyId)}` +
-        `&booking_code=eq.${encodeURIComponent(bookingCode)}` +
-        `&is_test=eq.${isTest === true ? 'true' : 'false'}&deleted_at=is.null` +
-        `&alloggiati_status=not.in.(filed,filing)` +
-        `&id=neq.${encodeURIComponent(id)}`,
-        {
-          method: 'PATCH',
-          headers: {
-            ...supabaseAuthHeaders(SERVICE_KEY),
-            'Content-Type': 'application/json', Prefer: 'return=minimal',
-          },
-          body: JSON.stringify(fanPatch),
-        }
-      );
-    } catch (e) { console.warn('[guest] booking date fan-out failed:', e.message); }
-  }
+  const updated = await r.json().catch(() => null);
+  if (!updated || updated.id !== id) return res.status(503).json({ error: 'checkin_update_failed' });
 
   try {
     await recordUsage({
@@ -912,9 +868,9 @@ async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, is
   const sessionValidUntil = Number.isFinite(sessionExpUnixSec)
     ? new Date(sessionExpUnixSec * 1000).toISOString()
     : null;
-  const allowKeyboxProjection = bookingCode ? await entryReleaseAllows({
+  const allowKeyboxProjection = await entryReleaseAllows({
     pgrestGET, callRPC, propertyId, bookingCode, isTest, sessionValidUntil,
-  }) : false;
+  });
   if (!allowKeyboxProjection) delete out.keybox_code;
 
   return res.status(200).json({ updated: out });

@@ -41,6 +41,7 @@ import { rejectInvalidEnvironment, SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL
 import { applyCors } from './_cors.js';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { take } from './_rate-limit.js';
+import { auditFirst, auditAfter, AUDIT_UNAVAILABLE } from './_admin-audit.js';
 import { supportWhatsappHtml, supportWhatsappText } from './_support-contact.js';
 
 
@@ -86,7 +87,7 @@ export default async function handler(req, res) {
   const auth = req.headers['authorization'] || req.headers['Authorization'];
   const jwt = typeof auth === 'string' && auth.startsWith('Bearer ') ? auth.slice(7) : null;
   if (!jwt) return res.status(401).json({ error: 'Missing bearer token' });
-  let userId = null;
+  let userId = null, userEmail = null;
   try {
     const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
       headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${jwt}` },
@@ -94,6 +95,7 @@ export default async function handler(req, res) {
     if (!userRes.ok) return res.status(401).json({ error: 'Invalid token' });
     const user = await userRes.json();
     userId = user?.id;
+    userEmail = user?.email || null;
     if (!userId) return res.status(401).json({ error: 'Invalid token' });
   } catch (_) {
     return res.status(401).json({ error: 'Auth check failed' });
@@ -109,16 +111,26 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'action must be invite | resend | revoke | generate_link' });
   }
 
+  // Round 67 Phase 5 — recorded before (must succeed) and after. The
+  // invited address is stored only as a keyed hash.
+  const audit = { actorId: userId, actorEmail: userEmail, action: AUDIT_ACTIONS[action], targetTable: 'pilot_invites', targetId: email, req, route: 'admin-invite-host' };
+  if (!(await auditFirst(audit))) return res.status(AUDIT_UNAVAILABLE.status).json(AUDIT_UNAVAILABLE.body);
   try {
-    if (action === 'invite')        return res.status(200).json(await doInvite(email, userId, notes || null));
-    if (action === 'resend')        return res.status(200).json(await doResend(email, userId));
-    if (action === 'revoke')        return res.status(200).json(await doRevoke(email));
-    if (action === 'generate_link') return res.status(200).json(await doGenerateLink(email));
+    let out;
+    if (action === 'invite')        out = await doInvite(email, userId, notes || null);
+    if (action === 'resend')        out = await doResend(email, userId);
+    if (action === 'revoke')        out = await doRevoke(email);
+    if (action === 'generate_link') out = await doGenerateLink(email);
+    await auditAfter({ ...audit, outcome: out && out.ok === false ? 'refused' : 'ok', metadata: { email_sent: Boolean(out && out.email_id) } });
+    return res.status(200).json(out);
   } catch (e) {
-    console.error('[admin-invite-host]', action, email, e);
+    console.error('[admin-invite-host]', action, String(e && e.message || e).slice(0, 200));
+    await auditAfter({ ...audit, outcome: 'error' });
     return res.status(500).json({ error: String(e && e.message || e) });
   }
 }
+
+const AUDIT_ACTIONS = { invite: 'invite_send', resend: 'invite_resend', revoke: 'invite_revoke', generate_link: 'invite_link' };
 
 // ── Actions ─────────────────────────────────────────────────────────────
 async function doInvite(email, actorId, notes) {

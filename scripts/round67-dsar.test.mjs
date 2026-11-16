@@ -113,6 +113,7 @@ const fakeGet = async path => {
   const off = Number(p.get('offset') || 0); return list.slice(off, off + Number(p.get('limit') || 1000));
 };
 let rpcCalls = [], audits = [], signed = [];
+const journal = []; const journalDeps = { first: async e => { journal.push({ ...e, outcome: 'requested' }); return true; }, after: async e => { journal.push(e); } };
 const rateStore = new Map();
 const fakeRateFetch = async (url, init) => { const b = JSON.parse(init.body); const k = b.p_scope + '|' + b.p_key; const n = (rateStore.get(k) || 0) + 1; rateStore.set(k, n); return new Response(JSON.stringify({ allowed: n <= b.p_limit, hits: n, limit: b.p_limit, retry_after: 600 }), { status: 200 }); };
 const dsar = { get: fakeGet, rpc: async (n, a) => { rpcCalls.push([n, a]); return { dry_run: a.p_dry_run, checkins_erased: 0, checkins_retained: [{ id: 'c1', reason: 'filed_alloggiati_legal_retention' }], photos_queued: 1, consents_withdrawn: 1, reservations_redacted: 1, chat_messages_erased: 2 }; },
@@ -126,7 +127,7 @@ const authFetch = role => async url => {
 };
 const call = async (body, { role = 'admin', auth = 'Bearer jwt' } = {}) => {
   const res = { code: 0, body: null, headers: {}, setHeader(k, v) { this.headers[k] = v; }, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; }, end() { return this; } };
-  await handler({ method: 'POST', headers: { origin: 'https://app.welcomebnb.it', ...(auth ? { authorization: auth } : {}) }, body }, res, { fetch: authFetch(role), dsar });
+  await handler({ method: 'POST', headers: { origin: 'https://app.welcomebnb.it', ...(auth ? { authorization: auth } : {}) }, body }, res, { fetch: authFetch(role), dsar, audit: journalDeps });
   return res;
 };
 reads.length = 0;
@@ -143,8 +144,11 @@ assert.deepEqual(o.body.reservations.map(r => r.id), ['r1']); assert.deepEqual(o
 assert.deepEqual(o.body.chat_messages.map(m => m.message), ['ciao', '[access code removed]'], 'access codes never exported');
 assert.deepEqual(o.body.documents, [{ checkin_id: 'c1', kind: 'id_document', stored: true }], 'no link unless asked'); assert.equal(signed.length, 0);
 assert.ok(o.body.information.recipients.length && o.body.information.retention.checkins && o.body.information.legal_basis.checkins, 'Art. 15 information');
-assert.deepEqual(audits.at(-1), { actor: 'admin@example.invalid', action: 'dsar_export', identifier_kind: 'email', outcome: 'exported', counts: o.body.counts, document_links: false });
-assert.ok(!JSON.stringify(audits).includes('guest@'), 'the identifier value is never audited');
+const [jb, ja] = journal.slice(-2);
+assert.deepEqual([jb.action, jb.outcome, ja.action, ja.outcome], ['dsar_export', 'requested', 'dsar_export', 'ok'], 'journalled before and after');
+assert.deepEqual(ja.metadata, { status: 200, identifier_kind: 'email', counts: o.body.counts, document_links: false });
+assert.equal(ja.actorEmail, 'admin@example.invalid'); assert.equal(ja.actorId, 'admin-1');
+assert.ok(!JSON.stringify(journal.map(({ req, ...e }) => e)).includes('guest@'), 'the identifier value is never journalled');
 o = await call({ action: 'dsar_export', phone: '+39 333 123 4567', document_links: true });
 assert.deepEqual([o.body.reservations.map(r => r.id), o.body.marketing_consents.map(r => r.id)], [['r1'], ['m1']], 'phone through spaces and prefixes');
 rows.checkins.push({ id: 'c3', property_id: P, booking_code: 'B4', document_number: 'XAB123456' });
@@ -160,7 +164,9 @@ assert.deepEqual(o.body.found, { checkins: 1, reservations: 1, marketing_consent
 const n = rpcCalls.length;
 o = await call({ action: 'dsar_erase', email: 'guest@example.invalid', dry_run: false }); assert.equal(o.code, 400); assert.equal(o.body.error, 'confirm_required'); assert.equal(rpcCalls.length, n, 'no erase without CANCELLA');
 o = await call({ action: 'dsar_erase', email: 'guest@example.invalid', dry_run: false, confirm: 'CANCELLA' }); assert.equal(o.code, 200); assert.equal(rpcCalls.at(-1)[1].p_dry_run, false);
-assert.equal(audits.at(-1).outcome, 'erased'); assert.equal(audits.at(-1).counts.checkins_retained, 1);
+assert.deepEqual([journal.at(-1).action, journal.at(-1).outcome, journal.at(-1).metadata.counts.checkins_retained], ['dsar_erase', 'ok', 1]);
+assert.ok(journal.some(e => e.action === 'dsar_erase_preview'), 'preview journalled as such');
+assert.ok(journal.some(e => e.action === 'dsar_erase' && e.outcome === 'refused' && e.metadata.status === 400), 'refused erase (no CANCELLA) journalled');
 // The 11th request in the hour is refused (counted per admin, all DSAR actions).
 const used = rateStore.get('dsar_admin|admin-1');
 for (let i = used; i < 10; i++) assert.equal((await call({ action: 'dsar_export', email: 'guest@example.invalid' })).code, 200);
@@ -174,7 +180,7 @@ const mig = read(MIG);
 assert.match(mig, /revoke all on function public\.dsar_erase\(uuid\[\], uuid\[\], uuid\[\], jsonb, boolean\) from public, anon, authenticated;/);
 assert.match(mig, /grant execute on function public\.dsar_erase\(uuid\[\], uuid\[\], uuid\[\], jsonb, boolean\) to service_role;/);
 const admin = read('admin.html');
-assert.match(admin, /data-tab="privacy"/); assert.match(admin, /<script src="\/admin-dsar\.js\?v=67\.4"><\/script>/); assert.match(admin, /activeTab === 'privacy'/);
+assert.match(admin, /data-tab="privacy"/); assert.match(admin, /<script src="\/admin-dsar\.js\?v=67\.5"><\/script>/); assert.match(admin, /activeTab === 'privacy'/);
 const runbook = read('docs/compliance/DSAR_RUNBOOK.md');
 for (const must of [/conservati per legge[\s\S]*TULPS art\. 109/, /type \*\*CANCELLA\*\*/, /one month/, /never its value/]) assert.match(runbook, must);
 console.log('PASS round67 DSAR (Phase 4): dsar_erase is service_role only, dry run changes nothing and the real run matches it, unfiled check-ins soft-deleted with photos queued, filed ones kept by law with photos removed, test rows erased, companions untouched, consents withdrawn and blanked, reservation contacts cleared (booking kept), chat of the given bookings only, idempotent, capped; endpoint: anon/expired 401, non-admin 403 before any read, exact lookups (wildcards refused, near-misses re-checked, phones through spaces and prefixes), export with every section and Art. 15 information, access codes removed, 7-day document links only when asked, erase dry-run by default and only with CANCELLA, 11th request in an hour → 429, closed when the counter is down, audited without the identifier value');

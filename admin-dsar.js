@@ -1,5 +1,5 @@
 // Round 67 Phase 4 — «Privacy» tab: data-subject requests (GDPR Art. 15,
-// 17, 20). Calls /api/admin-host-health with action dsar_export / dsar_erase
+// 17, 20); Phase 5 adds the admin audit log view. Calls /api/admin-host-health with action dsar_export / dsar_erase
 // (server checks admin, rate limit, legal retention). Runbook:
 // docs/compliance/DSAR_RUNBOOK.md. Uses the admin page's sb, escapeHtml and
 // adminToast.
@@ -145,8 +145,43 @@
         ${last && last.export ? `<div style="margin-top:12px;">${summaryHtml(last.export)}
           <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"><button type="button" data-dsar-download onclick="DsarAdmin.download()" style="${btn}">Scarica JSON</button><button type="button" data-dsar-print onclick="DsarAdmin.printSummary()" style="${btn}">Stampa / PDF riepilogo</button></div></div>` : ''}
         ${last && last.preview ? eraseHtml(last.preview, last.erased) : ''}
-      </div>`;
+      </div>
+      ${auditHtml()}`;
   }
 
-  root.DsarAdmin = { render, exportData: dsarExport, preview: dsarPreview, erase: dsarErase, download, printSummary, _reset: () => { last = null; } };
+  // Round 67 Phase 5 — admin audit log (admin_access_events), newest first.
+  let audit = null; // { events, chain, filter }
+  const ACTION_LABELS = { host_health_read: 'Salute host (lettura)', audit_read: 'Registro (lettura)', dsar_export: 'Privacy: esportazione', dsar_erase_preview: 'Privacy: anteprima cancellazione', dsar_erase: 'Privacy: cancellazione',
+    invite_send: 'Invito', invite_resend: 'Invito reinviato', invite_revoke: 'Invito revocato', invite_link: 'Link invito', alloggiati_support_read: 'Alloggiati: panoramica', alloggiati_admin_status: 'Alloggiati: stato host', impersonation_view: 'Vista come host' };
+  const OUTCOME = { requested: 'richiesto', ok: 'ok', refused: 'rifiutato', error: 'errore' };
+  async function loadAudit() {
+    const filter = (document.getElementById('auditFilter') || {}).value || '';
+    const j = await call('audit_list', { action_prefix: filter, limit: 200 });
+    if (!j) return;
+    audit = { ...j, filter };
+    render();
+  }
+  function auditHtml() {
+    const opt = (v, t) => `<option value="${v}"${audit && audit.filter === v ? ' selected' : ''}>${t}</option>`;
+    const btn = 'padding:6px 12px;border:1px solid var(--border);background:var(--white);border-radius:6px;cursor:pointer;font:inherit;font-size:0.8rem;';
+    let body = '';
+    if (audit) {
+      const ch = audit.chain;
+      const chain = !ch ? '<span data-audit-chain="unknown">Verifica integrità non disponibile</span>'
+        : ch.ok ? `<span data-audit-chain="ok" style="color:#027A48;">Integrità verificata (${ch.checked} voci)</span>`
+        : `<span data-audit-chain="broken" style="color:#B42318;font-weight:600;">Registro alterato alla voce ${esc(ch.broken_at)} — avvisa subito (procedura violazioni)</span>`;
+      const rows = audit.events.map(e => `<tr data-audit-row="${esc(e.action)}"><td>${esc(new Date(e.occurred_at).toLocaleString('it-IT', { timeZone: 'Europe/Rome' }))}</td><td style="overflow-wrap:anywhere;">${esc(e.actor_email || '—')}</td><td>${esc(ACTION_LABELS[e.action] || (e.action.startsWith('billing_') ? 'Abbonamento: ' + e.action.slice(8) : e.action))}</td><td>${esc(OUTCOME[e.outcome] || e.outcome)}</td><td style="overflow-wrap:anywhere;">${esc(e.target_table || '')}${e.target_id ? ' · ' + esc(String(e.target_id).slice(0, 12)) : ''}</td></tr>`).join('');
+      body = `<div style="margin:8px 0;font-size:0.78rem;">${chain}</div>
+        <div style="overflow-x:auto;" tabindex="0" role="region" aria-label="Registro accessi"><table class="data-table" style="width:100%;font-size:0.74rem;"><thead><tr><th scope="col">Quando</th><th scope="col">Admin</th><th scope="col">Azione</th><th scope="col">Esito</th><th scope="col">Oggetto</th></tr></thead><tbody>${rows || '<tr><td colspan="5">Nessuna voce.</td></tr>'}</tbody></table></div>`;
+    }
+    return `<div data-audit-panel style="background:var(--white);border:1px solid var(--border);border-radius:10px;padding:14px;max-width:820px;margin-top:14px;">
+      <div style="font-weight:600;margin-bottom:6px;">Registro accessi admin</div>
+      <p style="margin:0 0 8px;font-size:0.78rem;color:var(--ink-soft);">Ogni azione admin (letture, inviti, abbonamenti, richieste privacy, vista come host) con esito. Non modificabile; conservato 2 anni. Nessun dato degli ospiti.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;"><label for="auditFilter" style="position:absolute;left:-9999px;">Filtro</label>
+        <select id="auditFilter" style="padding:6px;border:1px solid var(--border);border-radius:4px;font:inherit;">${opt('', 'Tutte le azioni')}${opt('dsar_', 'Privacy')}${opt('invite_', 'Inviti')}${opt('billing_', 'Abbonamenti')}${opt('impersonation_', 'Vista come host')}${opt('alloggiati_', 'Alloggiati')}</select>
+        <button type="button" data-audit-load onclick="DsarAdmin.loadAudit()" style="${btn}">Mostra registro</button></div>
+      ${body}</div>`;
+  }
+
+  root.DsarAdmin = { render, exportData: dsarExport, preview: dsarPreview, erase: dsarErase, download, printSummary, loadAudit, _reset: () => { last = null; audit = null; } };
 })(typeof window !== 'undefined' ? window : globalThis);

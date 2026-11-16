@@ -7,6 +7,17 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Round 75 — Audit follow-ups: function hardening (confirmed 2026-11-16)
+
+Daniele confirmed the plain-language recap on 16 November 2026 («go ahead»). Specification: `PLAN_round75_audit_followups.md`. Hardening flagged by the 16 Nov audit and the Supabase security advisor; nothing visible for hosts or guests. Left out on purpose: inline-handler removal (own Round later) and the Postgres minor upgrade (owner action in Supabase → Infrastructure).
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 1 — search_path | in-progress — Claude Opus 5.5 | |
+| 2 — SECURITY DEFINER review | pending | |
+| 3 — pg_net | pending | |
+| 4 — Regression + close | pending | |
+
 ### Round 74 — Security fixes from the 16 Nov 2026 audit (confirmed 2026-11-16)
 
 Daniele confirmed the plain-language recap on 16 November 2026 («Go ahead with your recommendations for D1–D3»). Specification: `PLAN_round74_audit_security_fixes.md`. Fixes the weekly audit's RED findings WBNB-R001 (booking recovery wildcard), R002 (unbound token edits), R003 (old links reveal the fixed door code) and YELLOW Y001 (anonymous uploads), Y002 (client-reset limits), Y003 (party date edit inconsistency), Y004 (report-only resource policy). Decisions: D1 recovery needs surname + arrival date + last 4 characters of the document number, exactly one match; D2 door codes until checkout + 2 h; D3 enforce the resource policy only after the synthetic flow run passes (inline scripts still allowed). Round 73 (Stripe + e-invoicing) stays reserved and blocked on the SRLS. Round 72 is closed (history below).

@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { rejectInvalidEnvironment, SUPABASE_URL } from './_environment.js';
 import handleCspReport from './_csp-report.js';
@@ -173,6 +173,7 @@ export default async function handler(req, res) {
     if (action === 'checkin_insert')   return await doCheckinInsert(res, propertyId, bookingCode, sessionId, body, isTest);
     if (action === 'checkin_update')   return await doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, isTest, v.payload.exp);
     if (action === 'checkin_lookup')   return await doCheckinLookup(res, propertyId, sessionId, body, isTest, req);
+    if (action === 'upload_url')       return await doUploadUrl(res, propertyId, sessionId, body, isTest, req);
     if (action === 'consent_withdraw') return await doConsentWithdraw(res, propertyId, body);
     if (action === 'consent_save')     return await doConsentSave(res, propertyId, bookingCode, body, isTest);
     if (action === 'track_event')      return await doTrackEvent(res, propertyId, bookingCode, sessionId, body, isTest);
@@ -675,6 +676,11 @@ async function doCheckinInsert(res, propertyId, incomingBookingCode, sessionId, 
   errors.push(...validateResidence(inRecord, rules.region));
   errors.push(...validateInvoiceRequired(inRecord, rules.invoiceRequired));
   if (errors.length) return res.status(400).json({ error: 'validation_failed', fields: errors });
+  // Round 74 (audit WBNB-Y001): a document photo must sit in this property's
+  // folder and really be an image/PDF (checked from its first bytes).
+  if (inRecord.id_photo_path && !(await verifyIdPhoto(propertyId, inRecord.id_photo_path))) {
+    return res.status(400).json({ error: 'validation_failed', fields: ['id_photo_path'] });
+  }
 
   // Walk-in mint when the token has no booking code. Round 72: a walk-in is
   // a new booking, refused for a read-only account (trial/subscription
@@ -809,12 +815,15 @@ async function doCheckinUpdate(res, propertyId, bookingCode, sessionId, body, is
     `&is_test=eq.${isTest === true ? 'true' : 'false'}&deleted_at=is.null` +
     `&booking_code=eq.${encodeURIComponent(bookingCode)}`;
   const [currentRes, rules] = await Promise.all([
-    pgrestGET(`checkins?${scopeFilter}&select=guest_type,residence_country,residence_place,residence_postcode,residence_address,residence_province,fiscal_code,invoice_email&limit=1`),
+    pgrestGET(`checkins?${scopeFilter}&select=guest_type,id_photo_path,residence_country,residence_place,residence_postcode,residence_address,residence_province,fiscal_code,invoice_email&limit=1`),
     readPropertyRules(propertyId),
   ]);
   if (!currentRes.ok || rules === undefined) return res.status(503).json({ error: 'checkin_unavailable' });
   const [current] = await currentRes.json();
   if (!current) return res.status(404).json({ error: 'not_found' }); // not in this booking
+  if (fields.id_photo_path && fields.id_photo_path !== current.id_photo_path && !(await verifyIdPhoto(propertyId, fields.id_photo_path))) {
+    return res.status(400).json({ error: 'validation_failed', fields: ['id_photo_path'] });
+  }
   const merged = { ...current, ...fields, guest_type: current.guest_type };
   const residenceErrors = [...validateResidence(merged, rules.region), ...validateInvoiceRequired(merged, rules.invoiceRequired)];
   if (residenceErrors.length) return res.status(400).json({ error: 'validation_failed', fields: residenceErrors });
@@ -927,6 +936,80 @@ async function doCheckinLookup(res, propertyId, sessionId, body, isTest, req) {
   const out = await r.json().catch(() => null);
   if (!out || out.found !== true || !out.booking_code) return notFound();
   return res.status(200).json({ found: true, property_id: propertyId, booking_code: out.booking_code, guests: out.guests || 1 });
+}
+
+// ── Round 74 Phase 4 (audit WBNB-Y001): document uploads ──────────────
+// The browser no longer writes to storage on its own: it asks for a
+// short-lived signed upload URL for ONE fixed path inside this property's
+// folder and this submission (id-photos/<property>/<submission>/<random>.<ext>),
+// for an allowed type only. The bucket caps size and MIME types; when the
+// check-in is saved the server reads the file's first bytes and refuses
+// anything that is not really a JPEG/PNG/WebP/HEIC image or a PDF.
+export const UPLOAD_TYPES = Object.freeze({ 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif', 'application/pdf': 'pdf' });
+export const UPLOAD_LIMIT_PER_CLIENT_HOUR = 20;
+export const UPLOAD_LIMIT_PER_PROPERTY_HOUR = 150;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+async function doUploadUrl(res, propertyId, sessionId, body, isTest, req) {
+  const submissionId = String(body.submission_id || '');
+  const type = String(body.content_type || '').toLowerCase();
+  if (!UUID_RE.test(submissionId)) return res.status(400).json({ error: 'submission_id required' });
+  const ext = UPLOAD_TYPES[type];
+  if (!ext) return res.status(415).json({ error: 'unsupported_type' });
+  const who = clientKey(req);
+  const gate = await uploadRateLimit(who, propertyId);
+  if (!gate.ok) { res.setHeader('Retry-After', '600'); return res.status(429).json({ error: 'rate_limited' }); }
+  try { await recordUsage({ property_id: propertyId, session_id: who || ('session:' + sessionId), endpoint: 'upload_sign', input_tokens: 0, output_tokens: 0 }); } catch (_) {}
+  const path = `id-photos/${propertyId}/${submissionId.toLowerCase()}/${Date.now()}_${randomBytes(8).toString('hex')}.${ext}`;
+  const r = await fetch(`${SUPABASE_URL}/storage/v1/object/upload/sign/documents/${path}`, {
+    method: 'POST', headers: { ...supabaseAuthHeaders(SERVICE_KEY), 'Content-Type': 'application/json' }, body: '{}',
+  });
+  if (!r.ok) return res.status(503).json({ error: 'upload_unavailable' });
+  const j = await r.json().catch(() => ({}));
+  const token = j.token || (/[?&]token=([^&]+)/.exec(String(j.url || '')) || [])[1];
+  if (!token) return res.status(503).json({ error: 'upload_unavailable' });
+  return res.status(200).json({ path, token: decodeURIComponent(token) });
+}
+async function uploadRateLimit(who, propertyId) {
+  if (!who) return { ok: false };
+  const hourAgoISO = new Date(Date.now() - 3600 * 1000).toISOString();
+  const count = async filter => {
+    const r = await pgrestGET(`api_usage?${filter}&endpoint=eq.upload_sign&created_at=gte.${encodeURIComponent(hourAgoISO)}&select=id`, { headers: { Prefer: 'count=exact' } });
+    if (!r.ok) throw new Error('limiter');
+    return readCount(r.headers.get('content-range'), await r.json());
+  };
+  try {
+    if (await count(`session_id=eq.${encodeURIComponent(who)}`) >= UPLOAD_LIMIT_PER_CLIENT_HOUR) return { ok: false };
+    if (await count(`property_id=eq.${encodeURIComponent(propertyId)}`) >= UPLOAD_LIMIT_PER_PROPERTY_HOUR) return { ok: false };
+    return { ok: true };
+  } catch (_) { return { ok: true }; } // limiter down: the bucket's size/type caps still bound the cost; check-in is never blocked
+}
+// First bytes → real file kind.
+export function sniffDocument(bytes) {
+  const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+  const at = (i, ...v) => v.every((x, k) => b[i + k] === x);
+  if (at(0, 0xff, 0xd8, 0xff)) return 'jpg';
+  if (at(0, 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)) return 'png';
+  if (at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50)) return 'webp';
+  if (at(0, 0x25, 0x50, 0x44, 0x46, 0x2d)) return 'pdf';
+  if (at(4, 0x66, 0x74, 0x79, 0x70)) { const brand = String.fromCharCode(...b.slice(8, 12)); if (/^(heic|heix|hevc|heim|heis|mif1|msf1)$/.test(brand)) return 'heic'; }
+  return null;
+}
+export async function verifyIdPhoto(propertyId, path, deps = {}) {
+  const f = deps.fetch || fetch;
+  const re = new RegExp(`^id-photos/${String(propertyId).toLowerCase()}/[0-9a-f-]{36}/[A-Za-z0-9_.-]{1,80}$`);
+  if (!re.test(String(path || '').toLowerCase()) || String(path).includes('..')) return false;
+  try {
+    const r = await f(`${SUPABASE_URL}/storage/v1/object/documents/${path}`, { headers: { ...supabaseAuthHeaders(SERVICE_KEY), Range: 'bytes=0-15' } });
+    if (!r.ok) return false;
+    const kind = sniffDocument(new Uint8Array(await r.arrayBuffer()).slice(0, 16));
+    const ext = String(path).split('.').pop().toLowerCase();
+    const ok = !!kind && (kind === ext || (kind === 'jpg' && ext === 'jpeg') || (kind === 'heic' && ext === 'heif'));
+    if (!ok) {
+      // Not what it claims to be: remove it so it never sits in the documents bucket.
+      await f(`${SUPABASE_URL}/storage/v1/object/documents/${path}`, { method: 'DELETE', headers: { ...supabaseAuthHeaders(SERVICE_KEY) } }).catch(() => {});
+    }
+    return ok;
+  } catch (_) { return false; }
 }
 
 async function checkLookupRateLimit(who, propertyId) {

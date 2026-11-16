@@ -47,6 +47,8 @@ jobs:
           TAX_SMOKE_ORIGIN: https://app.welcomebnb.it
           TAX_SMOKE_REQUIRE_MATCH: '1'
           SECURITY_SMOKE_ORIGIN: https://app.welcomebnb.it
+          # Post-deploy: served headers must equal lib/security-headers.mjs.
+          SECURITY_SMOKE_REQUIRE_MATCH: '1'
           CHAT_SMOKE_ORIGIN: https://app.welcomebnb.it
         run: |
           test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo "Protected production credential is missing"; exit 1; }

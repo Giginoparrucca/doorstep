@@ -31,7 +31,11 @@ const ctx = vm.createContext({
   mintWalkinCode: () => 'WB-TEST',
   recordUsage: async () => {},
   submitEntryCheckin: async () => ({ enabled: false }),
-  callRPC: async () => ({ ok: true, json: async () => null }),
+  // Round 74: edits go through the atomic guest_update_checkin function.
+  callRPC: async (name, args) => {
+    if (name === 'guest_update_checkin') { patched.push(args.p_patch); return { ok: true, json: async () => ({ ...currentRow, ...args.p_patch, guest_type: 'member', id: args.p_id }) }; }
+    return { ok: true, json: async () => null };
+  },
   entryReleaseAllows: async () => true,
   pgrestGET: async (path) => {
     if (path.startsWith('properties?')) {
@@ -72,7 +76,7 @@ async function insert(record) {
 async function update(fields) {
   let status, body;
   const res = { status(s) { status = s; return this; }, json(b) { body = b; return b; } };
-  await ctx.doCheckinUpdate(res, 'property', 'BOOK', 'session', { id: 'row-1', fields }, false, Math.floor(Date.now() / 1000) + 3600);
+  await ctx.doCheckinUpdate(res, 'property', 'BOOK', 'session', { id: '11111111-1111-4111-8111-111111111111', fields }, false, Math.floor(Date.now() / 1000) + 3600);
   return { status, body };
 }
 
@@ -151,7 +155,7 @@ assert.deepEqual([...out.body.fields], ['residence_address']);
 
 // ── Residence on update (older rows) ───────────────────────────────────
 region = 'Puglia';
-currentRow = { id: 'row-1', residence_country: null, residence_place: null, residence_postcode: null };
+currentRow = { id: '11111111-1111-4111-8111-111111111111', residence_country: null, residence_place: null, residence_postcode: null };
 out = await update({ surname: 'Corretto' });
 assert.equal(out.status, 400, 'editing an old row without residence asks for it');
 assert.deepEqual([...out.body.fields], ['residence_country']);
@@ -163,7 +167,7 @@ assert.equal(patched.at(-1).residence_place, 'Lecce');
 out = await update({ guest_type: 'single', surname: 'Corretto', residence_country: 'Italia', residence_place: 'Lecce' });
 assert.equal(out.status, 200); assert.ok(!('guest_type' in patched.at(-1)), 'guest_type is not editable');
 
-currentRow = { id: 'row-1', residence_country: 'France', residence_place: null, residence_postcode: null };
+currentRow = { id: '11111111-1111-4111-8111-111111111111', residence_country: 'France', residence_place: null, residence_postcode: null };
 out = await update({ surname: 'Corretto' });
 assert.equal(out.status, 200, 'row that already has residence edits freely');
 out = await update({ invoice_email: 'bad', residence_country: 'Italia', residence_place: 'Lecce' });

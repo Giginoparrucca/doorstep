@@ -17,11 +17,13 @@ global.fetch=async(url,opts={})=>{
   if(table==='properties')return {ok:!scenario.propertyError,json:async()=>scenario.deleted?[]:[{id:property,
     rotating_lockbox_enabled:!scenario.disabled,show_rotating_lockbox_to_guest:!scenario.hidden}]};
   assert.equal(u.searchParams.get('is_test'),'eq.'+(scenario.test?'true':'false'));
-  if(table==='checkins')return {ok:!scenario.checkinError,json:async()=>scenario.incomplete?[]:[{id:'synthetic-checkin'}]};
+  if(table==='checkins')return {ok:!scenario.checkinError,json:async()=>scenario.incomplete?[]:[{id:'synthetic-checkin',departure_date:'2099-01-02'}]};
+  // Round 74: the revocation lookup (any status, ids only) runs when no active reservation exists.
+  if(table==='ota_reservations'&&u.searchParams.get('select')==='id,status,deleted_at')return {ok:true,json:async()=>scenario.cancelled?[{id:'x',status:'cancelled',deleted_at:null}]:[]};
   assert.equal(table,'ota_reservations');assert.equal(u.searchParams.get('status'),'eq.active');
   assert.equal(u.searchParams.get('entry_type'),'eq.reservation');assert.equal(u.searchParams.get('deleted_at'),'is.null');
   return {ok:!scenario.reservationError,json:async()=>scenario.ambiguous?[{keybox_code:'NEVER-A'},{keybox_code:'NEVER-B'}]
-    :scenario.cancelled?[]:[{keybox_code:'FICTIONAL-CODE'}]};
+    :scenario.cancelled?[]:[{keybox_code:'FICTIONAL-CODE',checkout_date:'2099-01-02'}]};
 };
 async function run(extra={},auth=true,b=booking){
   scenario=extra;requests=[];

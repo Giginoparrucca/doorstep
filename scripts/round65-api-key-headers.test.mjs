@@ -39,7 +39,7 @@ for(const key of [legacy,secret]) {
   if(table==='properties')return {ok:true,json:async()=>[{id:property,rotating_lockbox_enabled:true,show_rotating_lockbox_to_guest:true}]};
   assert.equal(u.searchParams.get('property_id'),'eq.'+property);
   assert.equal(u.searchParams.get('booking_code'),'eq.SYNTHETIC');
-  return {ok:true,json:async()=>table==='checkins'?[{id:'synthetic-checkin'}]:[{keybox_code:'SYNTHETIC-CODE'}]};
+  return {ok:true,json:async()=>table==='checkins'?[{id:'synthetic-checkin',departure_date:'2099-01-02'}]:[{keybox_code:'SYNTHETIC-CODE',checkout_date:'2099-01-02'}]};
  };
  const token=signGuestToken({p:property,s:'synthetic',b:'SYNTHETIC',t:false}).token;
  const req={method:'POST',headers:{origin:'https://app.welcomebnb.it',authorization:'Bearer '+token},body:{action:'keybox',property_id:'FORGED',booking_code:'FORGED'}};

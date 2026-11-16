@@ -7,6 +7,44 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Hotfix — invite links valid 24 hours; clear messages for expired links (Claude, 16 November 2026)
+
+**Daniele reported** that a newly invited host could not register; he then asked for links valid 24 hours. **Auth logs (16 Nov, UTC):**
+- 08:19 invite sent;
+- 10:42 link opened → «email link has expired» (Supabase invite/recovery links last 1 hour);
+- 10:42–10:50 two «forgot password» requests, each cancelling the previous link; she opened older links («expired» / «One-time token not found»), then hit Supabase's email rate limit (429 «after N seconds»).
+
+She is still invited, unconfirmed, with no password. No data issue.
+
+**Fix (PR #321):**
+- **24-hour links.** Invite and resend emails now carry a signed WelcomeBnB link (`/api/admin-invite-host?open=…`, HMAC with the service key, email + expiry). It no longer depends on the Supabase OTP-expiry setting.
+  - Opening the link shows a page with no side effects, so email scanners are harmless.
+  - Its «Crea la mia password» button gets a fresh Supabase link at click time.
+  - Expired → sign-in page with the email prefilled. Revoked or no invite → contact message. Already registered → sign-in.
+  - Rate limited at 10 per email per hour.
+  - The email text says «valido 24 ore».
+- **Host console** explains expired or replaced links in IT/EN (Supabase `otp_expired` hash and our `?invite=`): ask once with «Password dimenticata?» and open only the newest email. It also prefills the email and cleans the address bar, and Supabase's «after N seconds» error becomes plain guidance.
+
+**Tests:** new `scripts/invite-links-browser.test.mjs` covers:
+- the token (24 h; tampered, copied or garbage refused);
+- the page (GET has no side effects; 200/410);
+- every opening outcome (with injected dependencies);
+- the emails carrying our link;
+- the console notice in Chromium, IT/EN.
+
+Local `npm run test:all` with `CHROMIUM_EXECUTABLE_PATH` set: **PASS 157 / FAIL 0 / SKIP 3** (standing skips).
+
+A first run without that variable failed 3 offline-group tests that launch Chromium (`round72-admin-billing`, `round72-launch`, `round74-booking-recovery`): the Playwright executable was not found. All three passed once re-run with it set; this was an environment issue, not a code failure. PR `regression` green.
+
+**Gate:** merged as `66dea2a`. Production verified:
+- a forged link → 410 «Link non più valido»;
+- `POST {action:'open'}` with a forged token → `invalid_link`;
+- the live host console serves `showAuthLinkNotice`.
+
+A real invite email was not sent by the agent.
+
+**Next step:** press «Reinvia» for the host in admin, so the new email carries the 24-hour link.
+
 ### Round 75 — Audit follow-ups: function hardening (confirmed 2026-11-16)
 
 Daniele confirmed the plain-language recap on 16 November 2026 («go ahead»). Specification: `PLAN_round75_audit_followups.md`. Hardening flagged by the 16 Nov audit and the Supabase security advisor; nothing visible for hosts or guests. Left out on purpose: inline-handler removal (own Round later) and the Postgres minor upgrade (owner action in Supabase → Infrastructure).

@@ -1,3 +1,4 @@
+import '../lib/log-scrub.mjs'; // Round 67 Phase 6 — every log line is scrubbed (load first)
 import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { rejectInvalidEnvironment, SUPABASE_URL, rejectDemoIntegration } from './_environment.js';
 // api/scan-document.js — WelcomeBnB ID / passport scan endpoint.

@@ -23,10 +23,16 @@ assert.equal(G.sniffDocument(new Uint8Array(PNG)), 'png'); assert.equal(G.sniffD
 assert.equal(G.sniffDocument(new Uint8Array(HEIC)), 'heic'); assert.equal(G.sniffDocument(new Uint8Array(HTML)), null); assert.equal(G.sniffDocument(new Uint8Array(ZIP)), null);
 
 // ── Mocked transport ──
-const usage = [], deleted = [], signed = []; let objects = {}, limiterDown = false;
-const originalFetch = global.fetch;
+const usage = [], deleted = [], signed = []; let objects = {}, limiterDown = false; let limiterFails = false;
+const originalFetch = global.fetch; const rateHits = new Map();
 global.fetch = async (url, init = {}) => {
   url = String(url);
+  // Round 74 Phase 5: atomic counter (rpc rate_take) emulated per scope/key.
+  if (url.includes('/rpc/rate_take')) {
+    if (limiterFails ?? false) return new Response('down', { status: 503 });
+    const a = JSON.parse(init.body); const k = a.p_scope + '|' + a.p_key; rateHits.set(k, (rateHits.get(k) || 0) + 1);
+    return Response.json({ allowed: rateHits.get(k) <= a.p_limit, hits: rateHits.get(k), limit: a.p_limit, retry_after: 600 });
+  }
   if (url.includes('/storage/v1/object/upload/sign/documents/')) { const path = url.split('/upload/sign/documents/')[1]; signed.push(path); return Response.json({ url: `/object/upload/sign/documents/${path}?token=fictional%2Etoken` }); }
   if (url.includes('/storage/v1/object/documents/')) {
     const path = url.split('/object/documents/')[1];
@@ -62,12 +68,12 @@ try {
   assert.equal((await call({ action: 'upload_url', submission_id: SUB, content_type: 'image/jpeg' }, { ip: null })).status, 429, 'no trusted address');
   assert.equal((await call({ action: 'upload_url', submission_id: SUB, content_type: 'image/jpeg' }, { token: 'forged' })).status, 401, 'guest token required');
   // Per-address limit (20/hour), not reset by changing the session.
-  usage.length = 0;
+  usage.length = 0; rateHits.clear();
   for (let i = 0; i < 20; i++) assert.equal((await call({ action: 'upload_url', submission_id: SUB, content_type: 'image/jpeg' }, { ip: '198.51.100.77' })).status, 200);
   assert.equal((await call({ action: 'upload_url', submission_id: SUB, content_type: 'image/jpeg' }, { ip: '198.51.100.77', token: signGuestToken({ p: P, s: 'other-session', exp: Math.floor(Date.now() / 1000) + 3600 }).token })).status, 429);
-  limiterDown = true; usage.length = 0;
+  limiterDown = true; limiterFails = true; usage.length = 0; rateHits.clear();
   assert.equal((await call({ action: 'upload_url', submission_id: SUB, content_type: 'image/jpeg' })).status, 200, 'limiter down: uploads continue (bucket caps still apply)');
-  limiterDown = false;
+  limiterDown = false; limiterFails = false;
 
   // Saving a check-in: the photo must be in this property's folder and really be what it says.
   const good = `id-photos/${P}/${SUB}/1_a.jpg`; objects[good] = JPEG;

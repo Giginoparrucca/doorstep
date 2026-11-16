@@ -22,6 +22,7 @@ import { buildServerChatContext, selectChatMessages } from './_chat-context.js';
 
 import { verifyFromAuthHeader } from './_guest-token.js';
 import { applyCors } from './_cors.js';
+import { take, addressKey, LIMITS } from './_rate-limit.js';
 
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -81,7 +82,7 @@ export default async function handler(req, res) {
   // so the guest UI routes the conversation to host chat instead of
   // rendering a broken bubble.
   if (SERVICE_KEY) {
-    const gate = await checkChatLimits(propertyId, sessionId);
+    const gate = await checkChatLimits(propertyId, sessionId, req);
     if (!gate.ok) {
       console.warn('[chat] gated:', gate.reason, 'property:', propertyId, 'session:', sessionId);
       return degradeReply(res, useStream, isIT, gate.retry_after_seconds);
@@ -474,7 +475,12 @@ ${propertyContext || 'No property data available.'}${stayCtx}${weatherCtx}${serv
 
 // Check session hourly + property daily limits + monthly budget. Returns
 // { ok: true } or { ok: false, reason, retry_after_seconds }.
-async function checkChatLimits(propertyId, sessionId) {
+async function checkChatLimits(propertyId, sessionId, req) {
+  // Round 74 (audit WBNB-Y002): an hourly cap on the caller's network address
+  // (atomic; the client-chosen session ID below can no longer be reset to
+  // escape it). Counter store down → bounded per instance.
+  const addr = await take('chat_address', addressKey(req), { limit: LIMITS.chat_address });
+  if (!addr.ok) return { ok: false, reason: 'address_hourly', retry_after_seconds: addr.retry_after || 900 };
   const now = new Date();
   const hourAgoISO  = new Date(now.getTime() - 3600 * 1000).toISOString();
   const dayAgoISO   = new Date(now.getTime() - 86400 * 1000).toISOString();
@@ -516,14 +522,15 @@ async function checkChatLimits(propertyId, sessionId) {
       `&select=ai_monthly_token_cap`,
     );
     const cap = Number(capRes.data?.[0]?.ai_monthly_token_cap ?? 2_000_000);
-    const monthRes = await pgrestGET(
-      `api_usage?property_id=eq.${encodeURIComponent(propertyId)}` +
-      `&created_at=gte.${encodeURIComponent(monthStart)}` +
-      `&select=input_tokens,output_tokens`,
-    );
-    const spent = (monthRes.data || []).reduce(
-      (sum, r) => sum + (r.input_tokens || 0) + (r.output_tokens || 0), 0,
-    );
+    // Round 74: the month's total is summed in the database (no unpaginated
+    // fetch of every usage row, which stopped at 1000 rows).
+    const monthRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/ai_month_tokens`, {
+      method: 'POST', headers: { ...supabaseAuthHeaders(SERVICE_KEY), 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ p_property: propertyId }),
+    });
+    if (!monthRes.ok) throw new Error('ai_month_tokens ' + monthRes.status);
+    const spent = Number(await monthRes.json()) || 0;
+    void monthStart;
     if (spent >= cap) {
       return { ok: false, reason: 'monthly_budget', retry_after_seconds: 86400 };
     }

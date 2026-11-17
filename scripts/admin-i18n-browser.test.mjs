@@ -162,7 +162,9 @@ async function tour(page) {
   await grab();
   await click(`[data-users-billing-toggle="${O1}"]`); await grab();
   await click('[data-users-sort="activity"]'); await grab();
-  await page.evaluate(() => typeof billingLaunchPrepare === 'function' && billingLaunchPrepare()); await page.waitForTimeout(300); await grab();
+  try { await click('[data-launch-prepare]'); await page.waitForSelector('[data-launch-plan]', { timeout: 5000 }); }
+  catch (e) { console.error('[prepare-launch]', String(e).slice(0, 300), page.url(), await page.evaluate(() => document.readyState).catch(x => 'eval failed: ' + String(x).slice(0, 120))); throw e; }
+  await grab();
   for (const tab of ['pilot', 'deepdive', 'ops', 'privacy']) {
     await click(`[data-tab="${tab}"]`); await grab();
     if (tab === 'deepdive') { await page.selectOption('#userFilter', { label: 'anna' }).catch(() => {}); await page.evaluate(() => typeof renderView === 'function' && renderView()); await page.waitForTimeout(300); await grab(); await page.selectOption('#userFilter', 'all').catch(() => {}); await page.evaluate(() => renderView()); }

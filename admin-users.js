@@ -4,6 +4,10 @@
 // Uses the admin page's sb, escapeHtml, setActiveTab and #userFilter.
 (function (root) {
   'use strict';
+  // admin.html declares its Supabase client with a top-level `const sb`,
+  // which other scripts reach by name but which is not a window property.
+  // eslint-disable-next-line no-undef
+  const adminClient = () => (typeof sb !== 'undefined' ? sb : root.sb);
   const DAY = 86400000;
   let data = null, loading = false, error = null;
   let view = { sort: 'registered', dir: 'desc', search: '', showTest: false };
@@ -37,7 +41,7 @@
   async function load() {
     loading = true; error = null; render();
     try {
-      const { data: s } = await root.sb.auth.getSession();
+      const { data: s } = await adminClient().auth.getSession();
       const token = s && s.session && s.session.access_token;
       if (!token) throw new Error('Non hai effettuato l’accesso');
       const r = await root.fetch('/api/admin-host-health', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ action: 'users_overview' }), signal: AbortSignal.timeout(60000) });

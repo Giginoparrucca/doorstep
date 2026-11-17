@@ -34,7 +34,7 @@ try {
       return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>:root{--border:#ddd;--white:#fff;--ink-soft:#555}body{margin:0;font-family:sans-serif}.container{padding:16px}</style></head><body><div class="container"><select id="userFilter"><option value="all">All</option></select><div id="content"></div></div></body></html>` });
     });
     await page.goto('https://app.welcomebnb.it/admin.html');
-    await page.addScriptTag({ content: `window.sb={auth:{getSession:async()=>({data:{session:{access_token:'fictional-admin-jwt'}}})}};window.__tabs=[];window.setActiveTab=t=>__tabs.push(t);` });
+    await page.addScriptTag({ content: `const sb={auth:{getSession:async()=>({data:{session:{access_token:'fictional-admin-jwt'}}})}};window.__tabs=[];window.setActiveTab=t=>__tabs.push(t);` });
     await page.addScriptTag({ content: ui });
     await page.evaluate(() => UsersAdmin.render());
     await page.waitForSelector('[data-users-table]');

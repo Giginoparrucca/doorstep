@@ -27,7 +27,7 @@ try {
       return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>:root{--border:#ddd;--white:#fff;--ink-soft:#555}body{margin:0;font-family:sans-serif}.container{padding:16px}</style></head><body><div class="container"><div id="content"></div></div></body></html>` });
     });
     await page.goto('https://app.welcomebnb.it/admin.html');
-    await page.addScriptTag({ content: `window.sb={auth:{getSession:async()=>({data:{session:{access_token:'fictional-admin-jwt'}}})}};window.adminToast=()=>{};` });
+    await page.addScriptTag({ content: `const sb={auth:{getSession:async()=>({data:{session:{access_token:'fictional-admin-jwt'}}})}};window.adminToast=()=>{};` });
     await page.addScriptTag({ content: ui });
     await page.evaluate(() => DsarAdmin.render());
     assert.equal(await page.locator('[data-audit-panel]').count(), 1);

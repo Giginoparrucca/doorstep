@@ -67,5 +67,5 @@ assert.equal(r2.body.plan_error, 'plan_unavailable'); assert.equal(r2.body.rows.
 // Wiring: the home tab.
 const html = fs.readFileSync(new URL('../admin.html', import.meta.url), 'utf8');
 assert.match(html, /let activeTab   = 'users';/); assert.match(html, /<button data-tab="users"[^>]*>Utenti<\/button>\s*<button data-tab="pilot"/);
-assert.match(html, /if \(activeTab === 'users'\)    return window\.UsersAdmin/); assert.match(html, /<script src="\/admin-users\.js\?v=1"><\/script>/);
+assert.match(html, /if \(activeTab === 'users'\)    return window\.UsersAdmin/); assert.match(html, /<script src="\/admin-users\.js\?v=2"><\/script>/);
 console.log('PASS admin users home: one row per account (newest first, invited-only addresses, revoked left out), registration and password state, trial/plan, last activity from console events and sign-in, active days 7/30, check-ins 30 days, activity levels (active ≤7 d, slowing 8–30, inactive >30, never), test/admin flagged and left out of the counts, summary; endpoint admin-gated before any read, journalled, plan failures shown; «Utenti» is the first and default tab');

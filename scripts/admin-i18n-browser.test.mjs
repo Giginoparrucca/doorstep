@@ -86,7 +86,7 @@ async function boot(browser, width, lang) {
   if (process.env.I18N_SLOW) { const cdp = await context.newCDPSession(page); await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.I18N_SLOW) }); }
   // Any navigation after the first load is a bug: record where it went.
   const navigations = []; let booted = false;
-  page.on('framenavigated', f => { if (f === page.mainFrame()) { if (booted) navigations.push(f.url()); console.error('[nav]', booted ? 'after boot' : 'boot', f.url()); } });
+  page.on('framenavigated', f => { if (f === page.mainFrame()) { if (booted) { navigations.push(f.url()); console.error('[nav] after boot', f.url()); } } });
   page.on('crash', () => console.error('[crash] page crashed'));
   page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') console.error('[console]', m.type(), m.text().slice(0, 200)); });
   const exp = Math.floor(T0 / 1000) + 3600;
@@ -159,6 +159,8 @@ async function tour(page) {
     items.forEach(x => seen.add(x));
   };
   const click = async sel => { const el = page.locator(sel).first(); if (await el.count()) { await el.click(); await page.waitForTimeout(250); } };
+  // Every tour starts on the home tab (the previous one ended on Privacy).
+  await click('[data-tab="users"]'); await page.waitForSelector('[data-users-table]');
   await grab();
   await click(`[data-users-billing-toggle="${O1}"]`); await grab();
   await click('[data-users-sort="activity"]'); await grab();

@@ -40,7 +40,7 @@ assert.deepEqual([by['carla@example.invalid'].registered_at, by['carla@example.i
 assert.equal(a.registered_at, iso(NOW - 10 * D), 'registered = password created');
 assert.deepEqual([by['dora@example.invalid'].user_id, by['dora@example.invalid'].registered_at, by['dora@example.invalid'].status], [null, null, 'invited']);
 assert.equal(by['test@example.invalid'].is_test, true); assert.equal(by['admin@example.invalid'].is_admin, true);
-assert.deepEqual(U.summarize(rows, NOW), { hosts: 4, registered_30: 1, not_registered: 2, active_7: 1, inactive: 0, trial_ending_7: 1, in_trial: 1, paying: 1, prelaunch: 1 }, 'test and admin accounts not counted');
+assert.deepEqual(U.summarize(rows, NOW), { hosts: 4, registered_30: 1, not_registered: 2, active_7: 1, inactive: 0, trial_ending_7: 1, in_trial: 1, trial_ended: 0, paying: 1, prelaunch: 1 }, 'test and admin accounts not counted');
 
 // Endpoint: admin gate before any read; journalled.
 const { default: handler } = await import('../api/admin-host-health.js');
@@ -81,5 +81,5 @@ assert.match(html, /document\.getElementById\('content'\)\.innerHTML = zoneA \+ 
 const overview = html.slice(html.indexOf('function renderHealthOverview('), html.indexOf('function hhTile('));
 assert.ok(!overview.includes('renderBillingSettings'), 'billing settings not in the overview');
 assert.match(html, /html \+= renderHealthOverview\(\);/, 'Deep dive keeps the overview');
-assert.match(fs.readFileSync(new URL('../admin-users.js', import.meta.url), 'utf8'), /root\.renderBillingSettings\(\)/); assert.match(html, /<script src="\/admin-users\.js\?v=3"><\/script>/);
+assert.match(fs.readFileSync(new URL('../admin-users.js', import.meta.url), 'utf8'), /root\.renderBillingSettings\(\)/); assert.match(html, /<script src="\/admin-users\.js\?v=4"><\/script>/);
 console.log('PASS admin users home: one row per account (newest first, invited-only addresses, revoked left out), registration and password state, trial/plan, last activity from console events and sign-in, active days 7/30, check-ins 30 days, activity levels (active ≤7 d, slowing 8–30, inactive >30, never), test/admin flagged and left out of the counts, summary; endpoint admin-gated before any read, journalled, plan failures shown; «Utenti» is the first and default tab');

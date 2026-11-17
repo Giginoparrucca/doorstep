@@ -90,7 +90,9 @@ export function buildRows({ users, invites, admins, properties, events, checkins
 export function summarize(rows, now = Date.now()) {
   const hosts = rows.filter(r => !r.is_admin && !r.is_test);
   const count = f => hosts.filter(f).length;
-  const soon = r => r.plan && r.plan.state === 'trial' && r.plan.trial_ends_at && new Date(r.plan.trial_ends_at).getTime() - now <= 7 * DAY;
+  const end = r => r.trial_ends_at || (r.plan && r.plan.state === 'trial' ? r.plan.trial_ends_at : null);
+  const left = r => end(r) ? new Date(end(r)).getTime() - now : null;
+  const soon = r => left(r) !== null && left(r) > 0 && left(r) <= 7 * DAY;
   return {
     hosts: hosts.length,
     registered_30: count(r => r.registered_at && now - new Date(r.registered_at).getTime() <= 30 * DAY),
@@ -98,7 +100,8 @@ export function summarize(rows, now = Date.now()) {
     active_7: count(r => r.activity === 'active'),
     inactive: count(r => r.activity === 'inactive' || (r.activity === 'never' && r.status !== 'invited')),
     trial_ending_7: count(soon),
-    in_trial: count(r => r.plan && r.plan.state === 'trial'),
+    in_trial: count(r => left(r) !== null && left(r) > 0),
+    trial_ended: count(r => left(r) !== null && left(r) <= 0),
     paying: count(r => r.plan && r.plan.state === 'active'),
     prelaunch: count(r => r.plan && r.plan.state === 'prelaunch'),
   };
@@ -136,5 +139,11 @@ export async function buildUsersOverview(deps) {
   }
   const rows = buildRows({ users, invites, admins, properties, events, checkins, plans, now });
   if (billingBy) for (const r of rows) r.billing = r.user_id ? billingBy[r.user_id] || null : null;
+  // Trial dates are stored from registration (17 Nov 2026), also before the
+  // launch, when billing_access_state still answers «prelaunch».
+  for (const r of rows) {
+    const sub = r.billing && r.billing.subscription;
+    r.trial_ends_at = (r.plan && r.plan.trial_ends_at) || (sub && sub.status === 'trialing' ? sub.trial_ends_at || null : null);
+  }
   return { generated_at: new Date(now).toISOString(), summary: summarize(rows, now), rows, plan_error: planError };
 }

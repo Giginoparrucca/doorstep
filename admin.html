@@ -365,7 +365,7 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
 <script src="/admin-ops-table.js?v=64.2"></script>
 <script src="/admin-alloggiati-support.js?v=70.1"></script>
 <script src="/admin-dsar.js?v=67.6"></script>
-<script src="/admin-users.js?v=3"></script>
+<script src="/admin-users.js?v=4"></script>
 <script src="/admin-i18n-dict.js?v=1"></script>
 <script src="/admin-i18n.js?v=1"></script>
 <script src="/vendor/supabase-2.118.0.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
@@ -1191,7 +1191,7 @@ function renderBillingBox(b, uid) {
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;"><strong>Abbonamento</strong> ${billingChipHtml(b)} <span style="color:var(--ink-soft);">${escapeHtml(details)}</span></div>
     ${events ? `<ul data-billing-events style="margin:6px 0 4px;padding-left:18px;color:var(--ink-soft);font-size:0.74rem;">${events}</ul>` : '<div style="color:var(--ink-soft);font-size:0.74rem;margin:4px 0;">Nessun evento.</div>'}
     ${row('Estendi prova', `<button type="button" style="${btn}" data-billing-extend="7" onclick="billingExtend('${u}',7)">+7</button><button type="button" style="${btn}" onclick="billingExtend('${u}',14)">+14</button><button type="button" style="${btn}" onclick="billingExtend('${u}',30)">+30</button>
-      <label>o fino al <input type="date" id="bx-until-${u}" min="${billingYmd()}" style="${inp}"></label><button type="button" style="${btn}" onclick="billingExtend('${u}')">Estendi</button>
+      <label>o fino al <input type="date" id="bx-until-${u}" ${typeof hostHealth !== "undefined" && hostHealth && hostHealth.billing_settings && hostHealth.billing_settings.launch_at ? `min="${billingYmd()}"` : ""} value="${sub.trial_ends_at ? escapeHtml(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome' }).format(new Date(new Date(sub.trial_ends_at).getTime() - 1))) : ""}" style="${inp}"></label><button type="button" style="${btn}" onclick="billingExtend('${u}')">Estendi</button>
       <input type="text" id="bx-reason-${u}" placeholder="Motivo (obbligatorio)" style="${inp}flex:1 1 180px;">`)}
     ${row('Passa a pagamento', `<label>pagamento dal <input type="date" id="bs-date-${u}" min="${billingYmd(7)}" value="${billingYmd(7)}" style="${inp}"></label>
       <label style="display:flex;gap:4px;align-items:center;"><input type="checkbox" id="bs-asked-${u}" onchange="document.getElementById('bs-date-${u}').min=this.checked?'${billingYmd()}':'${billingYmd(7)}'"> L’host ha chiesto di abbonarsi ora</label>
@@ -1256,7 +1256,15 @@ function renderLaunchControls(s) {
   if (!launchPlan) return `<div style="margin-top:8px;"><button type="button" style="${btn}" data-launch-prepare onclick="billingLaunchPrepare()">Prepara lancio</button> <span style="font-size:0.72rem;color:var(--ink-soft);">Solo il giorno della SRLS (vedi docs/legal/LAUNCH_RUNBOOK.md).</span></div>`;
   const rows = launchPlan.hosts.map(hh => {
     const u = escapeHtml(hh.user_id);
-    if (hh.has_row) return `<tr><td>${escapeHtml(hh.email)}</td><td colspan="2" style="color:var(--ink-soft);">ha già un abbonamento: non cambia</td></tr>`;
+    if (hh.has_row) {
+      // 17 Nov 2026: trials run from registration, so most hosts already
+      // have a row. A trial ending before launch + 7 days means read-only
+      // right after the launch: warn and point to «Gestisci».
+      const endsBy = hh.trial_ends_at ? new Date(hh.trial_ends_at).getTime() : null;
+      const early = hh.subscription_status === 'trialing' && endsBy !== null && endsBy < new Date(launchPlan.launch_at).getTime() + 7 * 86400000;
+      const note = hh.subscription_status === 'free_forever' ? 'gratis a vita' : hh.trial_ends_at ? `prova fino al ${billingLastDay(hh.trial_ends_at)}` : 'ha già un abbonamento';
+      return `<tr data-launch-existing="${u}"${early ? ' data-launch-early' : ''}><td style="overflow-wrap:anywhere;">${escapeHtml(hh.email)}</td><td colspan="2" style="color:${early ? 'var(--red)' : 'var(--ink-soft)'};">${escapeHtml(note)}${early ? ' · ⚠ scade prima di lancio + 7 giorni: al lancio sarà in sola lettura. Cambia la data con «Gestisci» in Utenti.' : ' · non cambia'}</td></tr>`;
+    }
     return `<tr data-launch-host="${u}"><td style="overflow-wrap:anywhere;">${escapeHtml(hh.email)} <span style="color:var(--ink-soft);">(${hh.properties} strutt.${hh.all_test ? ', solo test' : ''})</span></td>
       <td><input type="date" id="launch-date-${u}" value="${escapeHtml(hh.suggested_last_free_day)}" min="${escapeHtml(hh.earliest_last_free_day)}" style="${inp}"></td>
       <td><label style="display:flex;gap:4px;align-items:center;"><input type="checkbox" id="launch-free-${u}" ${hh.all_test ? 'checked' : ''}> Gratis a vita</label><input type="text" id="launch-reason-${u}" placeholder="Motivo" value="${hh.all_test ? 'account di test' : ''}" style="${inp}width:140px;"></td></tr>`;

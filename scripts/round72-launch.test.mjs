@@ -149,7 +149,7 @@ try {
     await page.click('[data-launch-prepare]'); await page.waitForSelector('[data-launch-plan]');
     assert.equal(await page.inputValue(`#launch-date-${H1}`), '2026-12-30'); assert.equal(await page.getAttribute(`#launch-date-${H1}`, 'min'), '2026-12-07');
     assert.equal(await page.isChecked(`#launch-free-${TEST}`), true, 'test-only accounts suggested free for life');
-    assert.match(await page.locator('[data-launch-plan]').textContent(), /ha già un abbonamento: non cambia/);
+    assert.match(await page.locator('[data-launch-plan]').textContent(), /ha già un abbonamento · non cambia/);
     await page.fill('#launch-all-date', '2027-01-10'); await page.click('text=Applica a tutti');
     assert.equal(await page.inputValue(`#launch-date-${H2}`), '2027-01-10'); assert.equal(await page.inputValue(`#launch-date-${TEST}`), '2026-12-30', 'free-for-life rows not changed by «Applica a tutti»');
     await page.fill(`#launch-date-${H1}`, '2026-12-20');

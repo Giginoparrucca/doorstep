@@ -39,6 +39,13 @@ Newest entries at the top of each section.
 - **Fix:** both modules now use `sb` by name. The three browser tests declare `const sb` the way the real page does; all three fail with the old code and pass with the fix. Script versions are bumped (`admin-users` v=2, `admin-dsar` v=67.6).
 - **Checks:** local `npm run test:all` **PASS 164 / FAIL 0 / SKIP 3**; PR `regression` green; merged as `89b1c91`. Production serves both fixed scripts.
 
+**Follow-up (PR #328, same day).** Daniele reported two problems: Pilot and Deep dive showed the same block at the top, and the trial-extension controls were hard to find (only in Deep dive, after choosing a host).
+- **Utenti, new «Abbonamento» column.** «Gestisci» opens the existing per-host box under the row: extend the trial (+7/+14/+30 or a date), switch to paid, free for life, mark paid, and the last events. After a change the list reloads and the box stays open.
+- **Settings moved.** Billing settings (price, IBAN, holder) and «Prepara lancio» / «Lancia» now sit under the Utenti table.
+- **Server.** `users_overview` carries the full billing data per account.
+- **Pilot.** It no longer repeats the health overview; Action needed and Hosts by health stay in Deep dive, without the billing settings.
+- **Tests:** the browser test runs the real billing code from `admin.html` and extends a trial from a row at 390 and 1440. Local `npm run test:all` **PASS 164 / FAIL 0 / SKIP 3**; PR `regression` green; merged as `0a53d71`. Production serves `admin-users.js?v=3`.
+
 ### Hotfix — invite links valid 24 hours; clear messages for expired links (Claude, 16 November 2026)
 
 **Daniele reported** that a newly invited host could not register; he then asked for links valid 24 hours. **Auth logs (16 Nov, UTC):**

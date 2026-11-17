@@ -345,7 +345,8 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
 <div class="container">
   <!-- Round 35: three-tab shell. Buttons wired via inline onclick to setActiveTab. -->
   <div id="tabsBar" style="display:flex;gap:6px;margin:0 0 14px;flex-wrap:wrap;">
-    <button data-tab="pilot"   onclick="setActiveTab('pilot')"   style="padding:8px 16px;border:1px solid var(--warm);background:var(--warm);color:#fff;border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Pilot</button>
+    <button data-tab="users"   onclick="setActiveTab('users')"   style="padding:8px 16px;border:1px solid var(--warm);background:var(--warm);color:#fff;border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Utenti</button>
+    <button data-tab="pilot"   onclick="setActiveTab('pilot')"   style="padding:8px 16px;border:1px solid var(--border);background:var(--white);color:var(--ink-soft);border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Pilot</button>
     <button data-tab="deepdive" onclick="setActiveTab('deepdive')" style="padding:8px 16px;border:1px solid var(--border);background:var(--white);color:var(--ink-soft);border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Deep dive</button>
     <button data-tab="ops"     onclick="setActiveTab('ops')"     style="padding:8px 16px;border:1px solid var(--border);background:var(--white);color:var(--ink-soft);border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Ops</button>
     <button data-tab="privacy" onclick="setActiveTab('privacy')" style="padding:8px 16px;border:1px solid var(--border);background:var(--white);color:var(--ink-soft);border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Privacy</button>
@@ -360,6 +361,7 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
 <script src="/admin-ops-table.js?v=64.2"></script>
 <script src="/admin-alloggiati-support.js?v=70.1"></script>
 <script src="/admin-dsar.js?v=67.5"></script>
+<script src="/admin-users.js?v=1"></script>
 <script src="/vendor/supabase-2.118.0.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
@@ -384,7 +386,7 @@ let apiUsageByProp = {};
 // ─── Round 35: pilot admin rebuild ────────────────────────────────────
 // The console now runs as three tabs — Pilot (default), Deep dive, Ops.
 // Presentation-only; loadData() and every Supabase query below stay put.
-let activeTab   = 'pilot';                 // 'pilot' | 'deepdive' | 'ops'
+let activeTab   = 'users';                 // 'users' (home, 17 Nov 2026) | 'pilot' | 'deepdive' | 'ops' | 'privacy'
 let showTestData = false;                  // top-bar toggle; default off
 // Round 69 — host terms acceptances (admins read all via RLS is_admin()).
 // null = not loaded/unavailable; otherwise host_id → rows (newest first).
@@ -2093,6 +2095,7 @@ function _r14BuildEngagement(events, checkins, properties, propToEmail) {
 //   stay put — this is presentation only.
 // ══════════════════════════════════════
 function renderView() {
+  if (activeTab === 'users')    return window.UsersAdmin ? window.UsersAdmin.render() : null;
   if (activeTab === 'pilot')    return renderPilotTab();
   if (activeTab === 'ops')      return renderOpsTab();
   if (activeTab === 'privacy')  return window.DsarAdmin ? window.DsarAdmin.render() : null;

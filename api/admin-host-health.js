@@ -15,6 +15,7 @@ import { applyCors } from './_cors.js';
 import { regionComplianceFor } from './_onboarding-nudges.js';
 import { handleBillingAction, billingChip } from './_admin-billing.js';
 import { handleDsarAction } from './_admin-dsar.js';
+import { buildUsersOverview } from './_admin-users.js';
 import { take } from './_rate-limit.js';
 import { auditFirst, auditAfter, recordAdminEvent, AUDIT_UNAVAILABLE } from './_admin-audit.js';
 import { sendHostEmail, hostAccountEmail } from './_notify-host.js';
@@ -215,7 +216,8 @@ async function listUsers(deps = {}) {
     if (!r.ok) throw new Error(`auth users ${r.status}`);
     const j = await r.json();
     const users = Array.isArray(j?.users) ? j.users : [];
-    out.push(...users.map(u => ({ id: u.id, email: u.email || null, last_sign_in_at: u.last_sign_in_at || null })));
+    out.push(...users.map(u => ({ id: u.id, email: u.email || null, last_sign_in_at: u.last_sign_in_at || null,
+      created_at: u.created_at || null, email_confirmed_at: u.email_confirmed_at || u.confirmed_at || null, invited_at: u.invited_at || null })));
     if (users.length < 200) return out;
   }
   return out;
@@ -260,6 +262,11 @@ export default async function handler(req, res, deps = {}) {
       catch (e) { await audit.after({ ...ev, outcome: 'error' }); throw e; }
       await audit.after({ ...ev, outcome: outcomeOf(out.status), metadata: { status: out.status, ...detail } });
       return res.status(out.status).json(out.body);
+    }
+    if (action === 'users_overview') {
+      const out = await buildUsersOverview(deps.users || { get: path => sbGet(path, deps), getAll: path => sbGetAll(path, deps), listUsers: () => listUsers(deps), rpc: billingDeps(deps).rpc });
+      await audit.after({ ...who, action: 'host_health_read', targetTable: 'auth_users', metadata: { view: 'users', rows: out.rows.length } });
+      return res.status(200).json(out);
     }
     if (action === 'audit_list') {
       const out = await listAuditEvents(req.body || {}, deps);

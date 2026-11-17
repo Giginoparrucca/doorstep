@@ -361,7 +361,7 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
 <script src="/admin-ops-table.js?v=64.2"></script>
 <script src="/admin-alloggiati-support.js?v=70.1"></script>
 <script src="/admin-dsar.js?v=67.6"></script>
-<script src="/admin-users.js?v=2"></script>
+<script src="/admin-users.js?v=3"></script>
 <script src="/vendor/supabase-2.118.0.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
@@ -1085,7 +1085,6 @@ function renderHealthOverview() {
       </button>`).join('')}
     </div>
     <p style="font-size:0.68rem;color:var(--ink-soft);margin-top:8px;">Computed ${escapeHtml(new Date(hostHealth.generated_at).toLocaleString('en-GB'))}. Guests are shown as surname initial and arrival date only.</p>
-    ${typeof renderBillingSettings === 'function' ? renderBillingSettings() : ''}
   </section>`;
 }
 function hhTile(label, value, target, status, hint, extra = '') {
@@ -1157,7 +1156,7 @@ async function adminBilling(action, body) {
     if (!r.ok) return adminToast('Billing: ' + (BILLING_ERRORS[j.error] || j.error || ('HTTP ' + r.status)), 'error');
     adminToast(j.unchanged ? 'Nessuna modifica (già così)' : ('Fatto' + (j.email_sent === true ? ' · email inviata all’host' : j.email_sent === false ? ' · email NON inviata' : '')), 'success');
     hostHealth = await loadHostHealth();
-    renderView();
+    if (window.UsersAdmin && activeTab === 'users') { window.UsersAdmin.reload(); } else renderView();
     return j;
   } catch (e) { adminToast('Billing: request failed', 'error'); }
 }
@@ -1222,7 +1221,7 @@ async function billingLaunch(dry) {
   const j = await adminBillingRaw('billing_launch', { launch_at: launchPlan.launch_at, hosts: billingLaunchPayload(), dry });
   if (!j) return;
   launchPlan.result = j;
-  if (!dry) { launchPlan = null; hostHealth = await loadHostHealth(); }
+  if (!dry) { launchPlan = null; hostHealth = await loadHostHealth(); if (window.UsersAdmin) window.UsersAdmin.invalidate(); }
   adminToast(dry ? `Anteprima: ${j.hosts.filter(x => x.outcome === 'would_create').length} prove, ${j.hosts.filter(x => x.outcome === 'would_set_free').length} gratis a vita, ${j.skipped_existing} già presenti` : `Lanciato: ${j.created} prove, ${j.free_forever} gratis a vita`, 'success');
   renderView();
 }
@@ -3222,7 +3221,9 @@ function renderPilotTab() {
   // ── ZONE C: recent activity feed ────────────────────────────────────
   const zoneC = renderPilotActivityFeed(propToEmail);
 
-  document.getElementById('content').innerHTML = renderHealthOverview() + zoneA + zoneB + zoneC;
+  // 17 Nov 2026: the health overview (Action needed, Hosts by health) lives
+  // in Deep dive only; billing settings and «Lancia» moved to «Utenti».
+  document.getElementById('content').innerHTML = zoneA + zoneB + zoneC;
 }
 
 // Zone B — one card per host. Classifier picks the status label, sparkline

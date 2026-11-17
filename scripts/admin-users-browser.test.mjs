@@ -8,6 +8,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { chromium } from 'playwright';
 const ui = fs.readFileSync(new URL('../admin-users.js', import.meta.url), 'utf8');
+const adminHtml = fs.readFileSync(new URL('../admin.html', import.meta.url), 'utf8');
+const billingStart = adminHtml.indexOf('// Round 72 Phase 4 — billing per host account');
+const billingBlock = adminHtml.slice(billingStart, adminHtml.indexOf('// Round 51 Phase 6 — onboarding readiness', billingStart));
+const escStart = adminHtml.indexOf('function escapeHtml(s) {');
+const escapeFn = adminHtml.slice(escStart, adminHtml.indexOf('\n}\n', escStart) + 2);
+assert.ok(billingStart > 0 && billingBlock.includes('function renderBillingBox(') && billingBlock.includes('function renderBillingSettings(') && escapeFn.includes('function escapeHtml'));
 const U = await import('../api/_admin-users.js');
 const NOW = Date.parse('2026-11-17T10:00:00Z'), D = 86400000, iso = ms => new Date(ms).toISOString();
 const A = '00000000-0000-4000-8000-00000000000a', B = '00000000-0000-4000-8000-00000000000b', C = '00000000-0000-4000-8000-00000000000c', ADM = '00000000-0000-4000-8000-00000000000e';
@@ -47,8 +53,8 @@ try {
     assert.match(t[0].cells[0], /carla@example\.invalid\s*Invitato · non ancora registrato/); assert.match(t[0].cells[1], /^invitato il 16\/11\/2026\s*password non creata$/);
     assert.match(t[1].cells[0], /anna@example\.invalid\s*Casa Anna/); assert.equal(t[1].cells[1], '07/11/2026');
     assert.equal(t[1].cells[2], 'Prova non iniziata · parte al lancio');
-    assert.deepEqual(t[1].cells.slice(3), ['ieri', '1 / 7 · 1 / 30', '2', 'Attivo']);
-    assert.deepEqual(t[2].cells.slice(3), ['40 gg fa', '0 / 7 · 0 / 30', '0', 'Inattivo']);
+    assert.deepEqual(t[1].cells.slice(3, 7), ['ieri', '1 / 7 · 1 / 30', '2', 'Attivo']);
+    assert.deepEqual(t[2].cells.slice(3, 7), ['40 gg fa', '0 / 7 · 0 / 30', '0', 'Inattivo']);
     assert.equal(t[0].cells[6], 'Mai usato');
     // Sort by activity; search; show test/admin.
     await page.click('[data-users-sort="activity"]'); t = await table(); assert.deepEqual(t.map(x => x.id), [C, B, A], 'activity sort (desc: never, inactive, active)');
@@ -76,5 +82,55 @@ try {
     assert.deepEqual(errors, []);
     await context.close();
   }
+  // «Gestisci» on a row: the real per-host subscription box from admin.html,
+  // extend the trial from the Utenti table, the list reloads, box stays open;
+  // billing settings and «Prepara lancio» sit under the table.
+  for (const width of [390, 1440]) {
+    const context = await browser.newContext({ viewport: { width, height: 900 } });
+    const page = await context.newPage(); const errors = []; const calls = [];
+    page.on('pageerror', e => errors.push(String(e)));
+    const withBilling = JSON.parse(JSON.stringify(launched));
+    for (const r of withBilling.rows) if (r.user_id) r.billing = { state: r.plan, chip: r.plan && r.plan.state === 'trial' ? 'Prova' : null, subscription: r.plan && r.plan.trial_ends_at ? { trial_ends_at: r.plan.trial_ends_at } : {}, events: [] };
+    await page.route('**/*', async route => {
+      const req = route.request(), u = new URL(req.url());
+      if (u.pathname === '/api/admin-host-health') {
+        const b = JSON.parse(req.postData()); calls.push(b);
+        if (b.action === 'users_overview') return route.fulfill({ contentType: 'application/json', body: JSON.stringify(withBilling) });
+        return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true }) });
+      }
+      return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>:root{--border:#ddd;--white:#fff;--ink-soft:#555}body{margin:0;font-family:sans-serif}.container{padding:16px}</style></head><body><div class="container"><select id="userFilter"><option value="all">All</option></select><div id="content"></div></div></body></html>` });
+    });
+    await page.goto('https://app.welcomebnb.it/admin.html');
+    await page.addScriptTag({ content: `const sb={auth:{getSession:async()=>({data:{session:{access_token:'fictional-admin-jwt'}}})}};
+      let activeTab='users'; let hostHealth={ billing_settings: { launch_at: null, annual_price_cents: 6000, bank_transfer_iban: '', bank_transfer_holder: '' } };
+      window.__toasts=[]; function adminToast(m,k){ window.__toasts.push([m,k||'ok']); }
+      async function loadHostHealth(){ return hostHealth; } function renderView(){ UsersAdmin.render(); }
+      ${escapeFn}
+      ${billingBlock}` });
+    await page.addScriptTag({ content: ui });
+    await page.evaluate(() => UsersAdmin.render());
+    await page.waitForSelector('[data-users-table]');
+    assert.equal(await page.locator('[data-billing-settings]').count(), 1, 'billing settings under the table');
+    assert.match(await page.textContent('[data-billing-settings]'), /Lancio: non ancora[\s\S]*Prepara lancio/);
+    assert.equal(await page.locator('[data-billing-box]').count(), 0, 'boxes closed by default');
+    await page.click(`[data-users-billing-toggle="${A}"]`);
+    await page.waitForSelector(`[data-users-billing="${A}"] [data-billing-box="${A}"]`);
+    assert.equal(await page.getAttribute(`[data-users-billing-toggle="${A}"]`, 'aria-expanded'), 'true');
+    assert.match(await page.textContent(`[data-billing-box="${A}"]`), /Estendi prova[\s\S]*Passa a pagamento[\s\S]*Gratis a vita[\s\S]*Segna pagato/);
+    await page.fill(`#bx-reason-${A}`, 'Fiera di novembre');
+    const before = calls.filter(c => c.action === 'users_overview').length;
+    await page.click(`[data-billing-box="${A}"] button:has-text("+14")`);
+    await page.waitForFunction(n => window.__toasts.length > 0, before);
+    assert.deepEqual(calls.find(c => c.action === 'billing_extend'), { action: 'billing_extend', user_id: A, days: 14, reason: 'Fiera di novembre' });
+    assert.deepEqual(await page.evaluate(() => window.__toasts[0]), ['Fatto', 'success']);
+    await page.waitForFunction(() => document.querySelector('[data-users-table]'));
+    await page.waitForSelector(`[data-users-billing="${A}"] [data-billing-box="${A}"]`);
+    assert.equal(calls.filter(c => c.action === 'users_overview').length, before + 1, 'list reloaded after the change');
+    await page.click(`[data-users-billing-toggle="${A}"]`);
+    assert.equal(await page.locator('[data-billing-box]').count(), 0, 'closed again');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, width + ': no horizontal page scroll');
+    assert.deepEqual(errors, []);
+    await context.close();
+  }
 } finally { await browser.close(); }
-console.log('PASS admin users home (browser): tiles (hosts, active, inactive, trial — «parte al lancio» before launch, ending/in trial/paying after), table with registration and missing password, trial end date and colour (red ≤ 7 days), paid-until, last activity, active days 7/30, check-ins, activity chip; sort by activity and plan, search by e-mail/property, test/admin on request, row opens the host deep dive, server error shown, no horizontal scroll at 390/1440');
+console.log('PASS admin users home (browser): «Gestisci» opens the real per-host subscription box under the row, +14 days with a reason extends the trial and reloads the list with the box still open, billing settings and «Prepara lancio» under the table; tiles (hosts, active, inactive, trial — «parte al lancio» before launch, ending/in trial/paying after), table with registration and missing password, trial end date and colour (red ≤ 7 days), paid-until, last activity, active days 7/30, check-ins, activity chip; sort by activity and plan, search by e-mail/property, test/admin on request, row opens the host deep dive, server error shown, no horizontal scroll at 390/1440');

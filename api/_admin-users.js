@@ -122,11 +122,19 @@ export async function buildUsersOverview(deps) {
     propIds.length ? deps.getAll(`checkins?property_id=in.${encodeURIComponent(inList(propIds))}&is_test=is.false&deleted_at=is.null&submitted_at=gte.${since}&select=property_id&order=id.asc`) : [],
   ]);
   const plans = {};
-  let planError = null;
-  await Promise.all(ids.map(async id => {
-    try { plans[id] = await deps.rpc('billing_access_state', { p_user: id, p_now: new Date(now).toISOString() }); }
+  let planError = null, billingBy = null;
+  if (deps.billing) {
+    // Full billing per account (state, chip, subscription, last 5 events):
+    // the same data the per-host «Abbonamento» box uses.
+    try { billingBy = (await deps.billing(ids, new Date(now))).byOwner || {}; for (const id of ids) plans[id] = billingBy[id] ? billingBy[id].state : null; }
     catch (e) { planError = 'plan_unavailable'; }
-  }));
+  } else {
+    await Promise.all(ids.map(async id => {
+      try { plans[id] = await deps.rpc('billing_access_state', { p_user: id, p_now: new Date(now).toISOString() }); }
+      catch (e) { planError = 'plan_unavailable'; }
+    }));
+  }
   const rows = buildRows({ users, invites, admins, properties, events, checkins, plans, now });
+  if (billingBy) for (const r of rows) r.billing = r.user_id ? billingBy[r.user_id] || null : null;
   return { generated_at: new Date(now).toISOString(), summary: summarize(rows, now), rows, plan_error: planError };
 }

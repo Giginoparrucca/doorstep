@@ -7,6 +7,41 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Admin console bilingual — Italian by default, English on the toggle (Claude, 17 November 2026)
+
+**Daniele reported** that the admin console mixed English and Italian. He asked for a bilingual console with a toggle and Italian as the default.
+
+**Built (PR #329, merged as `d909e73`).**
+
+**Translation layer — `admin-i18n.js`.** The console has about 5,000 lines of templates written in both languages. Rather than rewrite every string, a layer translates what is on screen, in both directions, from one dictionary.
+- **What it covers:** text, placeholder/title/aria-label, button values, `confirm`/`alert`/`prompt`, and the page title.
+- **How it matches:**
+  - exact phrases;
+  - patterns with values, most specific first, never spanning «·» or «—»;
+  - composite «a · b» texts, translated part by part;
+  - month names in dates.
+- **How it behaves:**
+  - each node's original text is remembered, so switching back and forth is lossless;
+  - content drawn later is translated as it appears;
+  - data is never translated (names, emails, numbers, guest messages);
+  - the brand is excluded.
+
+**Dictionary — `admin-i18n-dict.js`.** About 750 entries covering every tab, the Alloggiati support dialog, host-health reasons and hints, toasts and errors.
+
+**Toggle.** An **IT | EN** switch in the top bar; Italian is the default and the choice is kept per browser. The «Bloccati (n)» heading is now fully English at source («Stuck (n)»).
+
+**Tests:**
+- `admin-i18n.test.mjs` covers the engine and dictionary consistency.
+- `admin-i18n-browser.test.mjs` loads the **real** `admin.html` signed in as a fictional admin with fictional data, and opens every tab and the panels opened from them, at 390 and 1440. It checks: no English left in Italian mode, no Italian left in English mode, the choice is remembered, the brand and data are untouched, and the console never navigates away.
+- During development the test surfaced about 300 untranslated phrases and fixed bugs: the brand being translated, over-matching patterns, and English-to-English rewrites.
+
+**CI failures before merge:**
+- **Runs 1–3 failed** on this new test: «Execution context was destroyed» at the «Prepara lancio» step. It could not be reproduced locally, even at 6× CPU throttling.
+- **Cause:** the English pass started where the Italian pass ended (Privacy), so its Utenti steps ran against the wrong tab. Each pass now opens «Utenti» first, which also means the English check covers the home tab.
+- **Run 4 green.** Local `npm run test:all` **PASS 166 / FAIL 0 / SKIP 3** (standing skips).
+
+**Production:** serves `admin-i18n.js`, `admin-i18n-dict.js` and the toggle.
+
 ### Admin home «Utenti» — users, registration, trial, activity (Claude, 17 November 2026)
 
 **Daniele asked** for a clear table of users as the admin's main screen: who, when they registered, when the free trial ends, how active they are.

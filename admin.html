@@ -308,7 +308,7 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
 
 <div class="top-bar">
   <div>
-    <span class="top-bar-brand">Welcome<em>BnB</em></span>
+    <span class="top-bar-brand" data-i18n-skip>Welcome<em>BnB</em></span>
     <span class="top-bar-badge">Admin Analytics</span>
   </div>
   <div class="top-bar-right">
@@ -339,6 +339,10 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
       <span class="top-bar-user-dot"></span><span id="topBarUserEmail">—</span>
     </span>
     <button class="top-bar-signout" id="topBarSignOut" onclick="adminSignOut()" style="display:none;">Sign out</button>
+    <span id="adminLangToggle" role="group" aria-label="Lingua / Language" style="display:inline-flex;border:1px solid rgba(255,255,255,0.5);border-radius:6px;overflow:hidden;margin-left:8px;" data-i18n-skip>
+      <button type="button" data-lang="it" onclick="AdminI18n.setLang('it')" style="border:0;padding:6px 10px;font:inherit;font-size:0.78rem;font-weight:600;cursor:pointer;">IT</button>
+      <button type="button" data-lang="en" onclick="AdminI18n.setLang('en')" style="border:0;padding:6px 10px;font:inherit;font-size:0.78rem;font-weight:600;cursor:pointer;">EN</button>
+    </span>
   </div>
 </div>
 
@@ -362,6 +366,8 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
 <script src="/admin-alloggiati-support.js?v=70.1"></script>
 <script src="/admin-dsar.js?v=67.6"></script>
 <script src="/admin-users.js?v=3"></script>
+<script src="/admin-i18n-dict.js?v=1"></script>
+<script src="/admin-i18n.js?v=1"></script>
 <script src="/vendor/supabase-2.118.0.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
@@ -3450,7 +3456,7 @@ function renderOnboardingSection(userIdToEmail, now = Date.now()) {
       ${funnel.map(f => `<tr data-step="${f.id}"><td>${escapeHtml(f.label)}</td><td><strong>${f.done}</strong> / ${total}<div style="height:6px;background:var(--cream-2);border-radius:3px;margin-top:4px;max-width:180px;"><div style="height:6px;width:${total ? Math.round(f.done / total * 100) : 0}%;background:var(--green);border-radius:3px;"></div></div></td><td style="${maxHelp && f.h.opened + f.h.clicked === maxHelp ? 'color:var(--red);font-weight:600;' : ''}">${f.h.opened} · ${f.h.clicked}${maxHelp && f.h.opened + f.h.clicked === maxHelp ? ' — most help asked' : ''}</td></tr>`).join('')}
       <tr><td style="color:var(--ink-soft);">Outside a step</td><td>—</td><td>${general.opened} · ${general.clicked}</td></tr>
     </tbody></table></div>
-    <div class="section-title" style="font-size:0.95rem;">Bloccati (${stuck.length}) — not ready 48 h after first seeing the checklist</div>
+    <div class="section-title" style="font-size:0.95rem;">Stuck (${stuck.length}) — not ready 48 h after first seeing the checklist</div>
     <div style="overflow-x:auto;" tabindex="0" role="region" aria-label="Stuck hosts">
     <table class="data-table" data-onb-stuck style="width:100%;"><thead><tr><th scope="col">Property</th><th scope="col">Host</th>${th('days', 'Started')}${th('done', 'Readiness')}<th scope="col">Stuck on</th><th scope="col">Reminders</th>${th('clicks', 'Help')}<th scope="col">Actions</th></tr></thead><tbody>
       ${stuck.map(({ p, rd, days, clicks }) => { const step = rd.steps.find(st => st.id === rd.first_incomplete) || { missing: [] }; const email = userIdToEmail[p.owner_id] || ''; return `<tr data-onb-row="${escapeHtml(p.id)}"><td><strong>${escapeHtml(p.name || 'Unnamed')}</strong></td><td>${escapeHtml(email ? email.split('@')[0] : (p.host_names || '—'))}${email ? `<br><span style="font-size:0.65rem;color:var(--ink-soft)">${escapeHtml(email)}</span>` : ''}</td><td>${days} days ago</td><td><strong>${rd.done}/${rd.total}</strong></td><td>${escapeHtml(onboardingStepLabel(rd.first_incomplete))}${step.missing.length ? `<br><span style="font-size:0.65rem;color:var(--ink-soft)">Missing: ${escapeHtml(step.missing.map(m => ONBOARDING_MISSING[m] || m).join(', '))}</span>` : ''}</td><td style="font-size:0.72rem;">${escapeHtml(reminders(rd))}</td><td>${clicks.opened + clicks.clicked ? `${clicks.opened} opened · ${clicks.clicked} clicked${Object.keys(clicks.channels || {}).length ? `<br><span style="font-size:0.65rem;color:var(--ink-soft)">${escapeHtml(Object.entries(clicks.channels).map(([c, n]) => c + ' ' + n).join(', '))}</span>` : ''}` : '0'}</td><td><button type="button" onclick="viewAsHost('${escapeHtml(p.id)}')" style="padding:4px 8px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.65rem;cursor:pointer;">Console</button></td></tr>`; }).join('') || '<tr><td colspan="8" style="text-align:center;padding:16px;color:var(--ink-soft);">No host is stuck right now.</td></tr>'}

@@ -7,6 +7,32 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Admin home «Utenti» — users, registration, trial, activity (Claude, 17 November 2026)
+
+**Daniele asked** for a clear table of users as the admin's main screen: who, when they registered, when the free trial ends, how active they are.
+
+**Built (PR #326):** a new first and default tab, «Utenti» (`admin-users.js`).
+- **Tiles:**
+  - hosts, plus new in the last 30 days;
+  - active in the last 7 days;
+  - inactive;
+  - not registered;
+  - trial: ending within 7 days, in trial, paying. Before the launch this tile says «parte al lancio».
+- **Table** (sortable, searchable):
+  - host and properties;
+  - **Registrato:** the date the password was created, or «invitato il … · password non creata»;
+  - **Prova / piano:** trial end date with days left (red at 7 or fewer), paid-until, grace, read-only, free, or «non iniziata · parte al lancio»;
+  - last activity, taken from the latest console event or sign-in;
+  - active days, 7/30;
+  - guest check-ins in the last 30 days;
+  - activity chip: active (7 days or less), slowing (8–30), inactive (over 30), never.
+- Test and admin accounts are hidden unless asked; a row opens the host's deep dive.
+- **Server:** `api/_admin-users.js`, as action `users_overview` on `/api/admin-host-health`. The admin check runs first, reads use the service role, and every read is journalled as `host_health_read {view: users}`.
+
+**Production picture (SQL, 17 Nov):** 25 host accounts, 14 registered in the last 30 days, 10 active in the last 7 days, 4 invited without a password. Every account is «prelaunch»: the 30-day trial starts at the Round 72 launch, so no trial end date exists yet.
+
+**Tests:** `admin-users.test.mjs` and `admin-users-browser.test.mjs` (390/1440). Local `npm run test:all` **PASS 164 / FAIL 0 / SKIP 3** (standing skips). PR `regression` green; merged as `8e9c2ad`. Production serves the tab, and `users_overview` without a session returns 401.
+
 ### Hotfix — invite links valid 24 hours; clear messages for expired links (Claude, 16 November 2026)
 
 **Daniele reported** that a newly invited host could not register; he then asked for links valid 24 hours. **Auth logs (16 Nov, UTC):**

@@ -180,7 +180,7 @@ const mig = read(MIG);
 assert.match(mig, /revoke all on function public\.dsar_erase\(uuid\[\], uuid\[\], uuid\[\], jsonb, boolean\) from public, anon, authenticated;/);
 assert.match(mig, /grant execute on function public\.dsar_erase\(uuid\[\], uuid\[\], uuid\[\], jsonb, boolean\) to service_role;/);
 const admin = read('admin.html');
-assert.match(admin, /data-tab="privacy"/); assert.match(admin, /<script src="\/admin-dsar\.js\?v=67\.5"><\/script>/); assert.match(admin, /activeTab === 'privacy'/);
+assert.match(admin, /data-tab="privacy"/); assert.match(admin, /<script src="\/admin-dsar\.js\?v=67\.6"><\/script>/); assert.match(admin, /activeTab === 'privacy'/);
 const runbook = read('docs/compliance/DSAR_RUNBOOK.md');
 for (const must of [/conservati per legge[\s\S]*TULPS art\. 109/, /type \*\*CANCELLA\*\*/, /one month/, /never its value/]) assert.match(runbook, must);
 console.log('PASS round67 DSAR (Phase 4): dsar_erase is service_role only, dry run changes nothing and the real run matches it, unfiled check-ins soft-deleted with photos queued, filed ones kept by law with photos removed, test rows erased, companions untouched, consents withdrawn and blanked, reservation contacts cleared (booking kept), chat of the given bookings only, idempotent, capped; endpoint: anon/expired 401, non-admin 403 before any read, exact lookups (wildcards refused, near-misses re-checked, phones through spaces and prefixes), export with every section and Art. 15 information, access codes removed, 7-day document links only when asked, erase dry-run by default and only with CANCELLA, 11th request in an hour → 429, closed when the counter is down, audited without the identifier value');

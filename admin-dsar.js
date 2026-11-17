@@ -5,6 +5,10 @@
 // adminToast.
 (function (root) {
   'use strict';
+  // admin.html declares its Supabase client with a top-level `const sb`,
+  // which other scripts reach by name but which is not a window property.
+  // eslint-disable-next-line no-undef
+  const adminClient = () => (typeof sb !== 'undefined' ? sb : root.sb);
   const ERRORS = {
     one_identifier: 'Inserisci un solo dato: email, telefono oppure numero di documento.',
     invalid_identifier: 'Il dato inserito non è valido (email completa, telefono con almeno 8 cifre, documento di 5–20 lettere/cifre).',
@@ -21,7 +25,7 @@
     return { [kind]: value };
   }
   async function call(action, body) {
-    const { data } = await root.sb.auth.getSession();
+    const { data } = await adminClient().auth.getSession();
     const token = data && data.session && data.session.access_token;
     if (!token) { toast('Non hai effettuato l’accesso', 'error'); return null; }
     const r = await root.fetch('/api/admin-host-health', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ action, ...body }), signal: AbortSignal.timeout(60000) });

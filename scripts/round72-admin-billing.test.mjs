@@ -58,6 +58,11 @@ assert.equal(B.lastDay('2026-12-31T23:00:00.000Z'), '2026-12-31');
   db = store({ ...trialing('2026-11-20'), status: 'expired', read_only_since: '2026-11-28T23:00:00Z' });
   r = await act(db, 'billing_extend', { days: 14, reason: 'reactivate' }); assert.equal(r.body.last_free_day, '2026-12-23'); assert.equal(db.sub.status, 'trialing'); assert.equal(db.sub.read_only_since, null);
   r = await act(db, 'billing_extend', { until: '2027-02-15', reason: 'chosen date' }); assert.equal(db.sub.trial_ends_at, B.romeMidnight('2027-02-16'));
+  // 17 Nov 2026: before the launch any real expiry can be recorded (also past); after it, past dates are refused.
+  db.settings.launch_at = null;
+  assert.equal((await act(db, 'billing_extend', { until: '2026-12-01', reason: 'real expiry' })).status, 200, 'before launch: past date recorded');
+  assert.equal(db.events.at(-1).action, 'trial_shortened');
+  db.settings.launch_at = '2026-11-01T09:00:00Z';
   assert.equal((await act(db, 'billing_extend', { until: '2026-12-01', reason: 'x past' })).body.error, 'date_invalid');
   assert.equal((await act(db, 'billing_extend', { days: 9, reason: 'odd days' })).body.error, 'days_invalid');
   assert.equal((await act(store({ ...trialing(), status: 'free_forever', free_forever_reason: 'p' }), 'billing_extend', { days: 7, reason: 'abc' })).status, 409); }

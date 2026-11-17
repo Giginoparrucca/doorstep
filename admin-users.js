@@ -21,10 +21,21 @@
     return n <= 0 ? 'oggi' : n === 1 ? 'ieri' : n + ' gg fa';
   }
   // Plan / trial cell: [text, tone, sort key (days until it matters)].
-  function planCell(p, now) {
-    if (!p || !p.state) return ['—', 'grey', 1e6];
+  // Before the launch the server answers «prelaunch» for everyone; the trial
+  // itself is stored from registration (17 Nov 2026), so show that date.
+  function planCell(p, now, r) {
+    if (!p || !p.state) return r && r.status === 'invited' ? ['Prova dalla registrazione', 'grey', 1e6] : ['—', 'grey', 1e6];
+    const sub = r && r.billing && r.billing.subscription;
+    if (p.state === 'prelaunch' && sub) {
+      if (sub.status === 'free_forever') return ['Gratis a vita', 'grey', 2e5];
+      if (sub.status === 'active' && sub.paid_until) return [`Pagato fino al ${fmt(sub.paid_until)}`, 'green', 5e4 + daysFrom(sub.paid_until, now)];
+      if (sub.trial_ends_at) {
+        const d = daysFrom(sub.trial_ends_at, now);
+        return d <= 0 ? [`Prova scaduta il ${fmt(sub.trial_ends_at)}`, 'red', d] : [`Prova · scade il ${fmt(sub.trial_ends_at)} (${d} gg)`, d <= 7 ? 'red' : d <= 14 ? 'amber' : 'green', d];
+      }
+    }
     switch (p.state) {
-      case 'prelaunch': return ['Prova non iniziata · parte al lancio', 'grey', 1e5];
+      case 'prelaunch': return [r && r.status === 'invited' ? 'Prova dalla registrazione' : 'Prova non ancora creata', 'grey', 1e5];
       case 'trial': { const d = daysFrom(p.trial_ends_at, now); return [`Prova · scade il ${fmt(p.trial_ends_at)} (${d <= 0 ? 'oggi' : d + ' gg'})`, d <= 7 ? 'red' : d <= 14 ? 'amber' : 'green', d]; }
       case 'grace': return [`Prova scaduta · periodo di grazia fino al ${fmt(p.grace_ends_at)}`, 'red', daysFrom(p.grace_ends_at, now)];
       case 'read_only': return [`Sola lettura dal ${fmt(p.since)}`, 'red', -1];
@@ -60,7 +71,7 @@
       && (!q || String(r.email || '').toLowerCase().includes(q) || r.properties.some(p => String(p.name).toLowerCase().includes(q))));
     const key = {
       host: r => String(r.email || ''), registered: r => String(r.registered_at || r.invited_at || ''),
-      plan: r => planCell(r.plan, now)[2], last: r => String(r.last_active_at || ''), days: r => r.active_days_30,
+      plan: r => planCell(r.plan, now, r)[2], last: r => String(r.last_active_at || ''), days: r => r.active_days_30,
       checkins: r => r.checkins_30, activity: r => ACTIVITY[r.activity][2],
     }[view.sort] || (r => '');
     const sign = view.dir === 'asc' ? 1 : -1;
@@ -85,8 +96,9 @@
           ${tile('Attivi (7 gg)', s.active_7, 'hanno usato la console', 'data-tile="active"')}
           ${tile('Inattivi', s.inactive, 'oltre 30 gg o mai usato', 'data-tile="inactive"')}
           ${tile('Non registrati', s.not_registered, 'invito non completato', 'data-tile="invited"')}
-          ${s.prelaunch && !s.in_trial && !s.paying ? tile('Prova', '—', 'non ancora iniziata: parte al lancio', 'data-tile="trial"') : tile('Prova in scadenza', s.trial_ending_7, `entro 7 gg · ${s.in_trial} in prova · ${s.paying} paganti`, 'data-tile="trial"')}
+          ${tile('Prova in scadenza', s.trial_ending_7, `entro 7 gg · ${s.in_trial} in prova · ${s.trial_ended || 0} scadute · ${s.paying} paganti`, 'data-tile="trial"')}
         </div>
+        ${s.prelaunch ? '<p role="status" data-users-prelaunch style="font-size:0.78rem;color:var(--ink-soft);margin:0 0 8px;">La prova parte dalla registrazione. Prima del lancio le date sono solo indicative: nessun host vede avvisi o blocchi finché non premi «Lancia». Correggi la data di ognuno con «Gestisci».</p>' : ''}
         ${data.plan_error ? '<p role="status" style="font-size:0.78rem;color:#B54708;">Stato della prova non disponibile per alcuni utenti.</p>' : ''}
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">
           <label for="usersSearch" style="position:absolute;left:-9999px;">Cerca</label>
@@ -99,7 +111,7 @@
           <table class="data-table" data-users-table style="width:100%;font-size:0.8rem;border-collapse:collapse;">
             <thead><tr>${th('host', 'Host')}${th('registered', 'Registrato')}${th('plan', 'Prova / piano')}${th('last', 'Ultima attività')}${th('days', 'Giorni attivi')}${th('checkins', 'Check-in 30 gg')}${th('activity', 'Attività')}<th scope="col">Abbonamento</th></tr></thead>
             <tbody>${rows.map(r => {
-              const [planText, planTone] = planCell(r.plan, now);
+              const [planText, planTone] = planCell(r.plan, now, r);
               const [actText, actTone] = ACTIVITY[r.activity];
               const props = r.properties.length ? r.properties.map(p => esc(p.name) + (p.test ? ' (test)' : '')).join(', ') : '';
               const open = r.email && r.user_id ? `<button type="button" data-users-open onclick="UsersAdmin.openHost('${esc(r.email)}')" style="border:0;background:none;padding:0;font:inherit;font-weight:600;color:var(--warm, #1849A9);cursor:pointer;text-align:left;overflow-wrap:anywhere;">${esc(r.email)}</button>` : `<span style="font-weight:600;overflow-wrap:anywhere;">${esc(r.email || '—')}</span>`;

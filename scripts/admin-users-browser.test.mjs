@@ -46,13 +46,14 @@ try {
     await page.waitForSelector('[data-users-table]');
     const tile = k => page.textContent(`[data-tile="${k}"]`);
     assert.match(await tile('hosts'), /Host3/); assert.match(await tile('active'), /1/); assert.match(await tile('inactive'), /1/);
-    assert.match(await tile('trial'), /non ancora iniziata: parte al lancio/, 'before launch the trial tile says so');
+    assert.match(await tile('trial'), /Prova in scadenza0entro 7 gg · 0 in prova · 0 scadute · 0 paganti/);
+    assert.match(await page.textContent('[data-users-prelaunch]'), /La prova parte dalla registrazione\. Prima del lancio le date sono solo indicative/, 'before launch: dates indicative, nothing enforced');
     const table = async () => page.$$eval('[data-users-row]', trs => trs.map(tr => ({ id: tr.dataset.usersRow, cells: [...tr.cells].map(td => td.textContent.replace(/\s+/g, ' ').trim()) })));
     let t = await table();
     assert.deepEqual(t.map(x => x.id), [C, A, B], 'newest registration first; admin hidden');
     assert.match(t[0].cells[0], /carla@example\.invalid\s*Invitato · non ancora registrato/); assert.match(t[0].cells[1], /^invitato il 16\/11\/2026\s*password non creata$/);
     assert.match(t[1].cells[0], /anna@example\.invalid\s*Casa Anna/); assert.equal(t[1].cells[1], '07/11/2026');
-    assert.equal(t[1].cells[2], 'Prova non iniziata · parte al lancio');
+    assert.equal(t[1].cells[2], 'Prova non ancora creata', 'registered, no stored trial in this fixture');
     assert.deepEqual(t[1].cells.slice(3, 7), ['ieri', '1 / 7 · 1 / 30', '2', 'Attivo']);
     assert.deepEqual(t[2].cells.slice(3, 7), ['40 gg fa', '0 / 7 · 0 / 30', '0', 'Inattivo']);
     assert.equal(t[0].cells[6], 'Mai usato');
@@ -72,7 +73,7 @@ try {
     assert.equal(anna, 'Prova · scade il 22/11/2026 (5 gg)'); assert.equal(carla, 'Prova · scade il 16/12/2026 (29 gg)'); assert.equal(bruno, 'Pagato fino al 05/06/2027');
     const colour = id => page.$eval(`[data-users-row="${id}"] [data-plan]`, el => getComputedStyle(el).color);
     assert.equal(await colour(A), 'rgb(180, 35, 24)', 'ending within 7 days is red'); assert.equal(await colour(C), 'rgb(2, 122, 72)');
-    assert.match(await tile('trial'), /Prova in scadenza1entro 7 gg · 2 in prova · 1 paganti/);
+    assert.match(await tile('trial'), /Prova in scadenza1entro 7 gg · 2 in prova · 0 scadute · 1 paganti/);
     await page.click('[data-users-sort="plan"]'); await page.click('[data-users-sort="plan"]'); t = await table();
     assert.equal(t[0].id, A, 'plan sort ascending puts the trial ending first');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, width + ': no horizontal page scroll');

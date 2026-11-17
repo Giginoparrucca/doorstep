@@ -170,7 +170,12 @@ export async function handleBillingAction(action, body, { actor, deps, now = new
     if (sub && sub.status === 'free_forever') return bad('free_forever', 409);
     let newLast;
     if (body.until) {
-      if (!YMD.test(body.until) || body.until < today) return bad('date_invalid');
+      // Before the launch the date is only recorded (nothing is enforced), so
+      // any real expiry can be set, also one already past; after the launch a
+      // past date would lock the host out at once.
+      const [bs] = await deps.get('billing_settings?id=eq.1&select=launch_at&limit=1');
+      const launched = !!(bs && bs.launch_at && new Date(bs.launch_at) <= now);
+      if (!YMD.test(body.until) || (launched && body.until < today)) return bad('date_invalid');
       newLast = body.until;
     } else {
       const days = Number(body.days);
@@ -180,7 +185,8 @@ export async function handleBillingAction(action, body, { actor, deps, now = new
       newLast = addDays(base, days);
     }
     const end = romeMidnight(addDays(newLast, 1));
-    const saved = await write({ trial_ends_at: end, status: 'trialing', read_only_since: null }, 'trial_extended', old, { trial_ends_at: end, last_free_day: newLast }, reason);
+    const shorter = sub && sub.trial_ends_at && new Date(end) < new Date(sub.trial_ends_at);
+    const saved = await write({ trial_ends_at: end, status: 'trialing', read_only_since: null }, shorter ? 'trial_shortened' : 'trial_extended', old, { trial_ends_at: end, last_free_day: newLast }, reason);
     return { status: 200, body: { ok: true, subscription: saved, last_free_day: newLast } };
   }
 

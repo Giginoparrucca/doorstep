@@ -33,6 +33,12 @@ Newest entries at the top of each section.
 
 **Tests:** `admin-users.test.mjs` and `admin-users-browser.test.mjs` (390/1440). Local `npm run test:all` **PASS 164 / FAIL 0 / SKIP 3** (standing skips). PR `regression` green; merged as `8e9c2ad`. Production serves the tab, and `users_overview` without a session returns 401.
 
+**Hotfix (PR #327, same day).** In production the tab showed «Utenti non disponibili: Cannot read properties of undefined (reading 'auth')».
+- **Cause:** `admin.html` declares `const sb` at the top level. Other scripts reach it by name, but it is not `window.sb`. `admin-users.js`, and `admin-dsar.js` (the Round 67 Privacy tab: data requests and the admin log), read `window.sb`, so **both tabs failed in production**.
+- **Why the tests missed it:** the browser tests stubbed `window.sb`.
+- **Fix:** both modules now use `sb` by name. The three browser tests declare `const sb` the way the real page does; all three fail with the old code and pass with the fix. Script versions are bumped (`admin-users` v=2, `admin-dsar` v=67.6).
+- **Checks:** local `npm run test:all` **PASS 164 / FAIL 0 / SKIP 3**; PR `regression` green; merged as `89b1c91`. Production serves both fixed scripts.
+
 ### Hotfix — invite links valid 24 hours; clear messages for expired links (Claude, 16 November 2026)
 
 **Daniele reported** that a newly invited host could not register; he then asked for links valid 24 hours. **Auth logs (16 Nov, UTC):**

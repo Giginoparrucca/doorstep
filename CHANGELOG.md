@@ -7,6 +7,33 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Free trial starts at registration (Claude, 17 November 2026)
+
+**Daniele:** «the trial starts with the registration date … assume they all started at registration. I will then manually update each user with their actual expiry.»
+
+**PR #330 (merged as `0fe3193`). Migration `20261117090000_trial_from_registration.sql`**, applied to production in one transaction before the merge and recorded (`trial_from_registration`).
+- **Registration date:** e-mail confirmed, else accepted invite, else account creation.
+- **Backfill:** every registered, non-admin host without a row got a trial running from registration + 30 days (Rome day), with event «registration (assumed, 17 Nov 2026)».
+  - Production: **20 created**, plus the 1 row that already existed (left untouched), so 21 in total.
+  - **10 have already ended**, because those hosts registered more than 30 days ago (the earliest on 19 Mar 2026); 11 are still running.
+- **New hosts:** `host_access_state` and `accept_my_invite` now start the trial at registration, before the launch too.
+- **Launch candidates:** `billing_launch_candidates` returns each host's trial end and status.
+- **Still nothing for hosts:** with `launch_at` empty, everyone stays «prelaunch», so no banner, reminder or block fires.
+- **Permissions unchanged.** Checked: `billing_registration_at` is service_role only.
+
+**Admin:**
+- **«Gestisci → o fino al»:** prefilled with the current end. Before the launch it accepts any date, including past ones, and records an earlier date as «trial_shortened». After the launch, past dates are refused.
+- **Utenti:** shows the stored dates (ended / days left) and a note that they are indicative until «Lancia». The tile counts ending soon, in trial, ended and paying.
+- **«Lancia»:** warns about any trial ending before launch + 7 days. Those hosts would otherwise be read-only right after the launch.
+
+**Tests:**
+- New `trial-from-registration.test.mjs`: PGlite with the real Round 72 migrations plus the new one, run twice. It covers the backfill rules, the order of registration sources, the Rome day across DST, prelaunch staying unchanged, trials created at first load and at invite acceptance, launch candidates, read-only after launch for a trial that already ended, and the admin date rules.
+- `admin-users`, `admin-users-browser`, `round72-admin-billing` and `round72-launch` were updated to the new rules.
+- Local `npm run test:all` **PASS 167 / FAIL 0 / SKIP 3**; PR `regression` green.
+- Production serves `admin-users.js?v=4` and the launch warning.
+
+**Next:** Daniele sets each host's real expiry with «Gestisci» in Utenti before pressing «Lancia».
+
 ### Admin console bilingual — Italian by default, English on the toggle (Claude, 17 November 2026)
 
 **Daniele reported** that the admin console mixed English and Italian. He asked for a bilingual console with a toggle and Italian as the default.

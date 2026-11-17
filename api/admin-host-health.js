@@ -264,7 +264,7 @@ export default async function handler(req, res, deps = {}) {
       return res.status(out.status).json(out.body);
     }
     if (action === 'users_overview') {
-      const out = await buildUsersOverview(deps.users || { get: path => sbGet(path, deps), getAll: path => sbGetAll(path, deps), listUsers: () => listUsers(deps), rpc: billingDeps(deps).rpc });
+      const out = await buildUsersOverview(deps.users || { get: path => sbGet(path, deps), getAll: path => sbGetAll(path, deps), listUsers: () => listUsers(deps), rpc: billingDeps(deps).rpc, billing: (ids, at) => readBilling(ids, at, deps) });
       await audit.after({ ...who, action: 'host_health_read', targetTable: 'auth_users', metadata: { view: 'users', rows: out.rows.length } });
       return res.status(200).json(out);
     }

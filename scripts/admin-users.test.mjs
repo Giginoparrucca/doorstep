@@ -64,8 +64,22 @@ assert.deepEqual([journal.at(-1).action, journal.at(-1).metadata], ['host_health
 const r2 = await (async () => { const res = { code: 0, body: null, headers: {}, setHeader() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; }, end() { return this; } };
   await handler({ method: 'POST', headers: { origin: 'https://app.welcomebnb.it', authorization: 'Bearer jwt' }, body: { action: 'users_overview' } }, res, { fetch: authFetch('admin'), users: { ...usersDeps, rpc: async (n, a) => { if (a.p_user === B) throw new Error('down'); return plans[a.p_user]; } }, audit: { first: async () => true, after: async () => {} } }); return res; })();
 assert.equal(r2.body.plan_error, 'plan_unavailable'); assert.equal(r2.body.rows.find(x => x.user_id === B).plan, null);
+// Full billing per row when the billing reader is available.
+const r3 = await (async () => { const res = { code: 0, body: null, headers: {}, setHeader() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; }, end() { return this; } };
+  await handler({ method: 'POST', headers: { origin: 'https://app.welcomebnb.it', authorization: 'Bearer jwt' }, body: { action: 'users_overview' } }, res, { fetch: authFetch('admin'), users: { ...usersDeps, rpc: async () => { throw new Error('rpc not used'); },
+    billing: async ids => ({ byOwner: Object.fromEntries(ids.map(id => [id, { state: plans[id], chip: 'x', subscription: { user_id: id }, events: [] }])) }) }, audit: { first: async () => true, after: async () => {} } }); return res; })();
+assert.equal(r3.code, 200); assert.equal(r3.body.plan_error, null);
+const ra = r3.body.rows.find(x => x.user_id === A);
+assert.deepEqual([ra.plan.state, ra.billing.subscription.user_id], ['trial', A], 'row carries plan and the subscription box data');
+assert.equal(r3.body.rows.find(x => x.email === 'dora@example.invalid').billing, null, 'invited-only address: no box');
 // Wiring: the home tab.
 const html = fs.readFileSync(new URL('../admin.html', import.meta.url), 'utf8');
 assert.match(html, /let activeTab   = 'users';/); assert.match(html, /<button data-tab="users"[^>]*>Utenti<\/button>\s*<button data-tab="pilot"/);
-assert.match(html, /if \(activeTab === 'users'\)    return window\.UsersAdmin/); assert.match(html, /<script src="\/admin-users\.js\?v=2"><\/script>/);
+assert.match(html, /if \(activeTab === 'users'\)    return window\.UsersAdmin/);
+// Pilot no longer repeats the health overview; billing settings left the overview (now in Utenti).
+assert.match(html, /document\.getElementById\('content'\)\.innerHTML = zoneA \+ zoneB \+ zoneC;/);
+const overview = html.slice(html.indexOf('function renderHealthOverview('), html.indexOf('function hhTile('));
+assert.ok(!overview.includes('renderBillingSettings'), 'billing settings not in the overview');
+assert.match(html, /html \+= renderHealthOverview\(\);/, 'Deep dive keeps the overview');
+assert.match(fs.readFileSync(new URL('../admin-users.js', import.meta.url), 'utf8'), /root\.renderBillingSettings\(\)/); assert.match(html, /<script src="\/admin-users\.js\?v=3"><\/script>/);
 console.log('PASS admin users home: one row per account (newest first, invited-only addresses, revoked left out), registration and password state, trial/plan, last activity from console events and sign-in, active days 7/30, check-ins 30 days, activity levels (active ≤7 d, slowing 8–30, inactive >30, never), test/admin flagged and left out of the counts, summary; endpoint admin-gated before any read, journalled, plan failures shown; «Utenti» is the first and default tab');

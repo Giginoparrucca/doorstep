@@ -11,6 +11,7 @@
   const DAY = 86400000;
   let data = null, loading = false, error = null;
   let view = { sort: 'registered', dir: 'desc', search: '', showTest: false };
+  const openBilling = new Set(); // user ids whose «Abbonamento» box is open
   const esc = s => (root.escapeHtml ? root.escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s).replace(/[<>&"']/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c])));
   const fmt = d => d ? new Date(d).toLocaleDateString('it-IT', { timeZone: 'Europe/Rome', day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
   const daysFrom = (d, now) => Math.round((new Date(d).getTime() - now) / DAY);
@@ -96,7 +97,7 @@
         </div>
         <div style="overflow-x:auto;background:var(--white);border:1px solid var(--border);border-radius:10px;" tabindex="0" role="region" aria-label="Utenti">
           <table class="data-table" data-users-table style="width:100%;font-size:0.8rem;border-collapse:collapse;">
-            <thead><tr>${th('host', 'Host')}${th('registered', 'Registrato')}${th('plan', 'Prova / piano')}${th('last', 'Ultima attività')}${th('days', 'Giorni attivi')}${th('checkins', 'Check-in 30 gg')}${th('activity', 'Attività')}</tr></thead>
+            <thead><tr>${th('host', 'Host')}${th('registered', 'Registrato')}${th('plan', 'Prova / piano')}${th('last', 'Ultima attività')}${th('days', 'Giorni attivi')}${th('checkins', 'Check-in 30 gg')}${th('activity', 'Attività')}<th scope="col">Abbonamento</th></tr></thead>
             <tbody>${rows.map(r => {
               const [planText, planTone] = planCell(r.plan, now);
               const [actText, actTone] = ACTIVITY[r.activity];
@@ -109,10 +110,13 @@
                 <td style="white-space:nowrap;" data-last>${esc(ago(r.last_active_at, now))}</td>
                 <td style="white-space:nowrap;" data-days>${r.active_days_7} / 7 · ${r.active_days_30} / 30</td>
                 <td data-checkins>${r.checkins_30}</td>
-                <td>${chip(actText, actTone, 'data-activity-chip')}</td></tr>`;
-            }).join('') || '<tr><td colspan="7">Nessun utente.</td></tr>'}</tbody>
+                <td>${chip(actText, actTone, 'data-activity-chip')}</td>
+                <td>${r.user_id ? `<button type="button" data-users-billing-toggle="${esc(r.user_id)}" aria-expanded="${openBilling.has(r.user_id)}" onclick="UsersAdmin.toggleBilling('${esc(r.user_id)}')" style="padding:4px 10px;border:1px solid var(--border);background:var(--white);border-radius:6px;cursor:pointer;font:inherit;font-size:0.76rem;white-space:nowrap;">${openBilling.has(r.user_id) ? 'Chiudi ▴' : 'Gestisci ▾'}</button>` : ''}</td></tr>
+                ${r.user_id && openBilling.has(r.user_id) ? `<tr data-users-billing="${esc(r.user_id)}"><td colspan="8" style="background:#F9FAFB;">${r.billing && typeof root.renderBillingBox === 'function' ? root.renderBillingBox(r.billing, r.user_id) : '<p style="font-size:0.78rem;color:#B54708;margin:0;">Abbonamento non disponibile: aggiorna la pagina.</p>'}</td></tr>` : ''}`;
+            }).join('') || '<tr><td colspan="8">Nessun utente.</td></tr>'}</tbody>
           </table></div>
-        <p style="font-size:0.72rem;color:var(--ink-soft);margin-top:6px;">Attivo = ha usato la console negli ultimi 7 giorni · In calo = 8–30 giorni · Inattivo = oltre 30 giorni. Giorni attivi = giorni distinti con attività in console. Tocca un host per il dettaglio.</p>`;
+        <p style="font-size:0.72rem;color:var(--ink-soft);margin-top:6px;">Attivo = ha usato la console negli ultimi 7 giorni · In calo = 8–30 giorni · Inattivo = oltre 30 giorni. Giorni attivi = giorni distinti con attività in console. Tocca un host per il dettaglio · «Gestisci» per prova, pagamento e gratis a vita.</p>
+        ${typeof root.renderBillingSettings === 'function' ? root.renderBillingSettings() : ''}`;
     }
     host.innerHTML = `<div class="section-title">Utenti</div>${body}`;
   }
@@ -128,5 +132,6 @@
     view = { ...view, search: v }; render();
     const el = document.getElementById('usersSearch'); if (el) { el.focus(); el.setSelectionRange(v.length, v.length); }
   }
-  root.UsersAdmin = { render, reload: () => { data = null; error = null; load(); }, sort: sortBy, search, toggleTest: on => { view = { ...view, showTest: !!on }; render(); }, openHost, _reset: () => { data = null; error = null; loading = false; view = { sort: 'registered', dir: 'desc', search: '', showTest: false }; } };
+  function toggleBilling(uid) { if (openBilling.has(uid)) openBilling.delete(uid); else openBilling.add(uid); render(); }
+  root.UsersAdmin = { render, toggleBilling, invalidate: () => { data = null; error = null; }, reload: () => { data = null; error = null; load(); }, sort: sortBy, search, toggleTest: on => { view = { ...view, showTest: !!on }; render(); }, openHost, _reset: () => { data = null; error = null; loading = false; openBilling.clear(); view = { sort: 'registered', dir: 'desc', search: '', showTest: false }; } };
 })(typeof window !== 'undefined' ? window : globalThis);

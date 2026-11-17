@@ -86,7 +86,9 @@ async function boot(browser, width, lang) {
   if (process.env.I18N_SLOW) { const cdp = await context.newCDPSession(page); await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.I18N_SLOW) }); }
   // Any navigation after the first load is a bug: record where it went.
   const navigations = []; let booted = false;
-  page.on('framenavigated', f => { if (f === page.mainFrame() && booted) navigations.push(f.url()); });
+  page.on('framenavigated', f => { if (f === page.mainFrame()) { if (booted) navigations.push(f.url()); console.error('[nav]', booted ? 'after boot' : 'boot', f.url()); } });
+  page.on('crash', () => console.error('[crash] page crashed'));
+  page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') console.error('[console]', m.type(), m.text().slice(0, 200)); });
   const exp = Math.floor(T0 / 1000) + 3600;
   const jwt = Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url') + '.' + Buffer.from(JSON.stringify({ sub: ADMIN.id, email: ADMIN.email, exp, role: 'authenticated', aud: 'authenticated' })).toString('base64url') + '.c2ln';
   const user = { id: ADMIN.id, email: ADMIN.email, aud: 'authenticated', role: 'authenticated', app_metadata: { provider: 'email' }, user_metadata: {}, created_at: iso(T0 - 300 * D) };

@@ -83,6 +83,10 @@ async function boot(browser, width, lang) {
   const page = await context.newPage(); const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   page.on('dialog', d => d.dismiss());
+  if (process.env.I18N_SLOW) { const cdp = await context.newCDPSession(page); await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.I18N_SLOW) }); }
+  // Any navigation after the first load is a bug: record where it went.
+  const navigations = []; let booted = false;
+  page.on('framenavigated', f => { if (f === page.mainFrame() && booted) navigations.push(f.url()); });
   const exp = Math.floor(T0 / 1000) + 3600;
   const jwt = Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url') + '.' + Buffer.from(JSON.stringify({ sub: ADMIN.id, email: ADMIN.email, exp, role: 'authenticated', aud: 'authenticated' })).toString('base64url') + '.c2ln';
   const user = { id: ADMIN.id, email: ADMIN.email, aud: 'authenticated', role: 'authenticated', app_metadata: { provider: 'email' }, user_metadata: {}, created_at: iso(T0 - 300 * D) };
@@ -123,7 +127,11 @@ async function boot(browser, width, lang) {
   });
   await page.goto(APP + '/admin.html');
   await page.waitForSelector('[data-users-table]', { timeout: 20000 });
-  return { context, page, errors };
+  // Let the initial data load and the login overlay fade finish first.
+  await page.waitForLoadState('networkidle');
+  await page.waitForFunction(() => { const o = document.getElementById('loginOverlay'); return !o || getComputedStyle(o).opacity === '0'; });
+  booted = true;
+  return { context, page, errors, navigations };
 }
 
 // Walk every tab and the panels opened from it; return visible strings.
@@ -173,7 +181,7 @@ const missing = { it: new Set(), en: new Set() };
 try {
   for (const width of COLLECT ? [1440] : [390, 1440]) {
     // Italian is the default (nothing stored).
-    let { context, page, errors } = await boot(browser, width, null);
+    let { context, page, errors, navigations } = await boot(browser, width, null);
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'it', 'Italian by default');
     assert.equal((await page.textContent('.top-bar-brand')).trim(), 'WelcomeBnB', 'brand never translated');
     assert.equal(await page.title(), 'WelcomeBnB · Analisi admin');
@@ -196,9 +204,10 @@ try {
     const back = await tour(page);
     if (!COLLECT) assert.deepEqual(new Set(back.filter(s => !/\d{1,2}:\d{2}|gg fa|oggi|ieri|ore fa|min fa/.test(s))).size > 0, true);
     assert.deepEqual(errors, [], 'no page errors');
+    assert.deepEqual(navigations, [], 'the console never navigates away during the tour');
     await context.close();
     // A fresh load remembers English.
-    ({ context, page, errors } = await boot(browser, width, 'en'));
+    ({ context, page, errors, navigations } = await boot(browser, width, 'en'));
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
     if (!COLLECT) assert.match(await page.textContent('[data-tab="users"]'), /Users/);
     await context.close();

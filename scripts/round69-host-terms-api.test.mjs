@@ -96,7 +96,7 @@ const deps = (over = {}) => ({ fetch: fakeFetch, now: () => clock, randomCode: (
 async function call(body, { token = 'host-session-token-fictional', headers = {}, d = deps() } = {}) {
   let status, payload; const set = {};
   const res = { setHeader: (k, v) => { set[k] = v; }, status(s) { status = s; return this; }, json(b) { payload = b; return this; } };
-  await handleHostTerms({ body, headers: { ...(token ? { authorization: 'Bearer ' + token } : {}), ...headers } }, res, d);
+  await handleHostTerms({ body: body && typeof body === 'object' && !('client' in body) ? { client: 2, ...body } : body, headers: { ...(token ? { authorization: 'Bearer ' + token } : {}), ...headers } }, res, d);
   assert.equal(set['Cache-Control'], 'private, no-store');
   return { status, body: payload };
 }
@@ -106,6 +106,12 @@ const good = (extra = {}) => ({ action: 'accept', version: 1, sha256: sha(termsB
 assert.equal((await call({ action: 'status' }, { token: null })).status, 401, 'no JWT');
 assert.equal((await call({ action: 'status' }, { token: 'forged-session-token-x' })).status, 401, 'bad JWT');
 assert.equal((await call({ action: 'nope' })).status, 400);
+// Round 76: a console page older than the provider fill must reload first.
+for (const action of ['status', 'request_code', 'accept']) {
+  const old = await call({ action, client: undefined });
+  assert.equal(old.status, 409, action + ': old page refused'); assert.equal(old.body.error, 'reload'); assert.match(old.body.message, /Ricarica la pagina/);
+}
+assert.equal((await call({ action: 'status', client: undefined }, { d: deps({ enforce: false }) })).status, 200, 'flag off: old pages are not disturbed');
 let r = await call({ action: 'status' }, { d: deps({ enforce: false }) });
 assert.deepEqual([r.status, r.body.enforce, r.body.accepted], [200, false, true], 'flag off → accepted');
 r = await call({ action: 'status' });

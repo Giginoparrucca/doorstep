@@ -49,7 +49,7 @@ const deps = (provider, enforce) => ({
     throw new Error('unexpected ' + url);
   }, now: () => Date.parse('2026-11-18T10:00:00Z'), randomCode: () => '123456', supabaseUrl: 'https://db.example.invalid', anonKey: 'anon', serviceKey: 'svc', resendKey: null, from: 'x', pepper: 'p'.repeat(32), enforce, appBaseUrl: 'https://app.example.invalid',
 });
-const call = async (body, d, auth = 'Bearer host-session-token-fictional') => { const res = { code: 0, body: null, setHeader() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } }; await handleHostTerms({ body, headers: auth ? { authorization: auth } : {} }, res, d); return res; };
+const call = async (body, d, auth = 'Bearer host-session-token-fictional') => { const res = { code: 0, body: null, setHeader() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } }; await handleHostTerms({ body: body && !('client' in body) ? { client: 2, ...body } : body, headers: auth ? { authorization: auth } : {} }, res, d); return res; };
 let r = await call({ action: 'status' }, deps(PROVIDER, true));
 assert.equal(r.code, 200); assert.deepEqual(r.body.provider, PROVIDER, 'signed-in host gets the provider data');
 r = await call({ action: 'status' }, deps(PROVIDER, true), null); assert.equal(r.code, 401); assert.equal(r.body.provider, undefined, 'never without a session');

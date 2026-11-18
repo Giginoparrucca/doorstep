@@ -47,10 +47,12 @@ try {
         const req = route.request(), b = req.postDataJSON();
         assert.equal(req.headers().authorization, 'Bearer fictional-access-token');
         assert.equal(b.lang, lang);
+        assert.equal(b.client, 2, 'the console declares it fills the provider data (Round 76)');
         if (server.statusFail && b.action === 'status') return route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
         if (b.action === 'status') return route.fulfill({ contentType: 'application/json', body: JSON.stringify({
           enforce: server.enforce, accepted: server.enforce ? server.accepted : true, current,
-          accepted_version: server.accepted ? 1 : null, accepted_at: server.accepted ? '2026-11-01T10:00:00Z' : null }) });
+          accepted_version: server.accepted ? 1 : null, accepted_at: server.accepted ? '2026-11-01T10:00:00Z' : null,
+          provider: { name: 'Fictional Provider', address: 'Via Finta 1, 00000 Nessuno', tax_code: 'XXXXXX00X00X000X', vat: null, pec: null } }) });
         if (b.action === 'request_code') { server.codes++; return route.fulfill({ contentType: 'application/json', body: '{"sent":true,"expires_in":600}' }); }
         if (b.action === 'accept') {
           server.accepts.push(b);
@@ -97,6 +99,9 @@ try {
     await overlay().waitFor();
     await page.waitForFunction(() => document.querySelectorAll('#hostTermsText h4').length >= 10);
     assert.match(await page.locator('#hostTermsText').textContent(), /Art\. 16 — Approvazione specifica/);
+    // Round 76: provider placeholders are filled from the status reply; no raw {{…}} reaches the host.
+    assert.match(await page.locator('#hostTermsText').textContent(), /domicilio Via Finta 1, 00000 Nessuno, C\.F\. XXXXXX00X00X000X/);
+    assert.doesNotMatch(await page.locator('#hostTermsText').textContent(), /\{\{|\}\}/, 'no raw placeholders');
     assert.match(await page.locator('#hostTermsText').textContent(), /Allegato A — Accordo sul trattamento dei dati|Annex A — Data Processing Agreement/);
     assert.match(await page.locator('#hostTermsTitle').textContent(), lang === 'it' ? /^Condizioni Generali di Servizio$/ : /Terms of Service/);
     if (lang === 'en') assert.match(await overlay().textContent(), /The Italian text is the binding version\./);

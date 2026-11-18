@@ -16293,6 +16293,30 @@ async function _termsFetchVerified(path, sha) {
   if (digest !== sha) throw Error('text hash mismatch');
   return new TextDecoder('utf-8').decode(bytes);
 }
+// Round 76: «Apri / stampa» and the Settings link show the hash-checked text
+// with the provider data filled (the public files keep the placeholders).
+// The window is opened synchronously on the click so it is not blocked.
+function _termsOpenPrint(ev, cur, provider) {
+  if (ev) ev.preventDefault();
+  const w = window.open('', '_blank');
+  if (!w) return;
+  try { w.opener = null; } catch (_) {}
+  const d = w.document;
+  d.title = h('terms_title');
+  const body = d.body || d.appendChild(d.createElement('body'));
+  body.style.cssText = 'font-family:system-ui,sans-serif;max-width:760px;margin:24px auto;padding:0 16px;line-height:1.5;color:#061A3D;';
+  body.textContent = '…';
+  Promise.all([
+    _termsFetchVerified(cur.file_path, cur.sha256),
+    cur.annex_file_path && cur.annex_sha256 ? _termsFetchVerified(cur.annex_file_path, cur.annex_sha256) : Promise.resolve(null),
+  ]).then(([t, a]) => {
+    body.textContent = '';
+    _termsRenderMarkdown(body, _termsFillProvider(t, provider));
+    if (a) { body.appendChild(d.createElement('hr')); _termsRenderMarkdown(body, _termsFillProvider(a, provider)); }
+    const btn = d.createElement('button'); btn.textContent = h('terms_open'); btn.style.cssText = 'margin:24px 0;padding:8px 16px;';
+    btn.onclick = () => w.print(); body.appendChild(btn);
+  }).catch(() => { body.textContent = h('terms_text_error'); });
+}
 function renderHostTermsSettings() {
   const card = document.getElementById('hostTermsSettingsCard');
   const s = _hostTermsStatus;
@@ -16305,7 +16329,8 @@ function renderHostTermsSettings() {
     : h('terms_settings_none');
   const link = card.querySelector('[data-terms-link]');
   link.textContent = h('terms_settings_read');
-  link.href = '/' + s.current.file_path;
+  link.href = '#'; link.removeAttribute('target');
+  link.onclick = ev => _termsOpenPrint(ev, s.current, s.provider);
 }
 // Resolves only when the console may load. Returns false if the window
 // cannot even be shown (no session), so init() stops.
@@ -16366,7 +16391,8 @@ function _showHostTermsWindow(status) {
     title.id = 'hostTermsTitle';
     const meta = _termsEl('div', 'font-size:0.8rem;color:var(--ink-soft,#6B7A90);display:flex;flex-wrap:wrap;gap:10px;align-items:center;');
     meta.appendChild(_termsEl('span', '', h('terms_version').replace('{v}', cur.version).replace('{date}', _termsFmtDate(cur.published_at))));
-    const open = _termsEl('a', 'color:var(--warm,#005BFF);', h('terms_open')); open.href = '/' + cur.file_path; open.target = '_blank'; open.rel = 'noopener';
+    const open = _termsEl('a', 'color:var(--warm,#005BFF);', h('terms_open')); open.href = '#';
+    open.onclick = ev => _termsOpenPrint(ev, cur, status.provider);
     meta.appendChild(open);
     wrap.append(title, meta);
     if (!it) wrap.appendChild(_termsEl('div', 'font-size:0.8rem;font-weight:600;margin-top:6px;', h('terms_binding')));

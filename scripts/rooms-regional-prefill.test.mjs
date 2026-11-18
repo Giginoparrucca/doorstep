@@ -61,8 +61,8 @@ assert.match(src, /regional-unassigned-flag/,
   'unassigned flag CSS class present');
 
 // The checkins SELECT pulls room_id.
-assert.match(src, /\.select\('id,property_id,is_test,deleted_at,submitted_at,booking_code,guest_type,name,surname,sex,date_of_birth,citizenship,birth_country,birth_province,place_of_birth,residence_country,residence_place,arrival_date,departure_date,nights,document_type,document_number,doc_issue_place,room_id'\)/,
-  'checkins SELECT now includes room_id');
+assert.match(src, /\.select\('id,property_id,is_test,deleted_at,submitted_at,booking_code,guest_type,name,surname,sex,date_of_birth,citizenship,birth_country,birth_province,place_of_birth,residence_country,residence_place,arrival_date,departure_date,nights,document_type,document_number,doc_issue_place,room_id,birth_year,age_at_arrival,identity_erased_at,statistics_erased_at'\)/,
+  'checkins SELECT now includes room_id (and, Round 76, the erasure markers and stored age)');
 
 // applyDaily uses the same room-aware defaults.
 assert.match(src, /if\(d\.rooms===''\|\|Number\(d\.rooms\)===0\)d\.rooms=roomsDefault;/,

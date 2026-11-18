@@ -5,6 +5,8 @@
 **Scope:** verify that the 2 CRITICAL + 11 technical HIGH findings in [`SECURITY_ASSESSMENT_2026-10.md`](SECURITY_ASSESSMENT_2026-10.md) that Round 65 said it closed are actually closed — by reading the shipped code on `main`, cross-checking live production state via read-only Supabase SQL and `curl -I` against `https://app.welcomebnb.it/`, and attempting to bypass each fix.
 **Not in scope:** the 3 GDPR HIGHs (breach SOP, ROPA, minor-consent gate) are explicitly deferred to the audit's 90-day paper trail; they were not Round 65 phases.
 
+**Update 18 Nov 2026:** all three are closed by Round 67 (see `docs/SECURITY_ASSESSMENT_2026-10.md`, section 7, «Status after Round 67»). The ROPA cites this report under the security measures of check-in, door codes, marketing consent and chat. The double opt-in residual below is still open.
+
 Each finding below carries one of four verdicts:
 
 - **CONFIRMED CLOSED** — fix is in place in source and prod, every bypass tried was blocked, no new risk introduced.

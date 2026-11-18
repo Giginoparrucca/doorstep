@@ -243,6 +243,43 @@ The product is **not** a security-poor codebase. Buyers and auditors should see 
 34. SBOM attached to each release (`cyclonedx-npm`)
 35. Public status page + bug-bounty with Intigriti or similar
 
+### Status after Round 67 (closed 18 November 2026)
+
+The three GDPR HIGHs of section 3 are closed:
+- **Breach-notification SOP and DPO contact:** `docs/compliance/BREACH_SOP.md` (Round 67 Phase 1, PR #221).
+- **ROPA:** `docs/compliance/ROPA.md` (Phase 2, PR #243). Retention lines and owner decisions closed by Round 76 (PR #337).
+- **Minor-consent gate:** closed by design. The Alloggiati lead guest is 18+, the consent card is shown to the main guest only, and the evidence is in the ROPA (HIGH-GDPR-3 subsection). There is no code change.
+
+90-day program, item by item:
+
+| # | Item | Status |
+|---|---|---|
+| 13 | ROPA | done (PR #243; retention PR #337) |
+| 14 | Breach SOP | done (PR #221) |
+| 15 | Security runbook | done as `docs/SECURITY_OPERATIONS.md` and `docs/SECURITY_KEY_ROTATION.md` (Round 65) |
+| 16 | DPA template + click-wrap | done. Template PR #245; online acceptance with e-mail code (Round 69); provider data, Annex B and acceptance required at sign-in since 18 Nov 2026 (Round 76, PR #332, `HOST_TERMS_ENFORCE=true`) |
+| 17 | DSAR tooling with the Alloggiati legal hold | done (PR #322, admin «Privacy» tab) |
+| 18 | Processor registry | done (ROPA sub-processor table; DPA section 6). Vercel functions pinned to `dub1` |
+| 19 | Minor-consent gate | closed by design (see above) |
+| 20 | Admin audit log, 2 years | done (PR #323, append-only, hash chain, daily purge) |
+| 21 | Encrypt `door_code` / `keybox_code` | **open**. Codes are protected by RLS and the owner-checked delivery rule (CRIT-2 fix), not encrypted at rest |
+| 22 | Log scrubbing | done (PRs #324, #325) |
+| 23 | Rate limits at the Vercel Firewall | done (Phase 6b, rules live 18 Nov 2026). Live probe 18 Nov: `/api/guest-token` refused with 429 at call 121, `Retry-After` 3374 s; new session IDs did not reset it |
+| 24 | Key-rotation drill | procedure documented (`docs/SECURITY_KEY_ROTATION.md`); **no drill recorded yet** |
+| 25 | Backup / PITR restore drill | **open** (needs a scratch project; deferred) |
+| 26 | CodeQL + gitleaks | **open**. Dependabot is on |
+| 27 | Signed commits on `main` | **open** |
+| 28 | Third-party penetration test | **open** (≈ €3–8k, after incorporation) |
+
+**Also done beyond the plan.** Data retention by law (Round 76): photos and police identity data erased after filing; every Annex B limit enforced daily; `docs/compliance/RETENTION_POLICY.md`.
+
+**Residual.** Marketing-consent double opt-in is still not implemented: a guest can record consent for an e-mail they do not own. It is capped at one consent per booking and 5 per hour, and is tracked in `docs/SECURITY_ROUND65_VERIFICATION.md`.
+
+**Production evidence, 18 Nov 2026** (`curl -I https://app.welcomebnb.it/`):
+- `content-security-policy` present; `strict-transport-security: max-age=63072000; includeSubDomains; preload`; `x-frame-options: DENY`; `x-content-type-options: nosniff`; `referrer-policy: strict-origin-when-cross-origin`; `permissions-policy: camera=(self), microphone=(), geolocation=(self), payment=()`.
+- API responses carry `x-vercel-id: …::dub1::…`.
+- The firewall adds no headers on ordinary responses, only a 429 with `Retry-After` past the limit.
+
 ---
 
 ## 8. Compliance posture snapshot (GDPR + Italian hospitality)

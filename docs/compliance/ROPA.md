@@ -65,6 +65,7 @@ retention:
   - Late filing method, PEC date and PEC delivery receipt - same as the check-in row and its police receipt
   - Soft-deleted check-ins are purged after 30 days; test rows after 30 days (daily job welcomebnb_daily_purge)
 security_measures:
+  - Independently verified after Round 65 (guest gateway, file access and filed-row locks): docs/SECURITY_ROUND65_VERIFICATION.md
   - Row-level security on every table; guests reach data only through the signed guest gateway (api/guest.js)
   - Private storage buckets; signed URLs for host viewing
   - Host Alloggiati credentials encrypted with AES-256-GCM, key outside the database (api/_alloggiati-crypto.js)
@@ -133,6 +134,7 @@ international_transfers:
 retention:
   - Entry bookings with their append-only audit - 12 months after the stay (Annex B; retention_purge, migration 20261118110000_round76_retention_purges.sql); removed earlier with the property (cascade)
 security_measures:
+  - Independently verified after Round 65 (keybox owner check (CRIT-2 closed)): docs/SECURITY_ROUND65_VERIFICATION.md
   - Single server-side release policy, fail-closed (api/_entry-release-policy.js)
   - entry_access schema not exposed through the public API; append-only audit
   - Codes cleared from the guest screen when hidden, offline or out of scope
@@ -164,6 +166,7 @@ retention:
   - Withdrawal records withdrawn_at and keeps the row as proof of the withdrawal (api/guest.js doConsentWithdraw)
   - Consents - 24 months from the stay; withdrawals 24 months from the withdrawal (Annex B; retention_purge, migration 20261118110000_round76_retention_purges.sql)
 security_measures:
+  - Independently verified after Round 65 (marketing_consents lock-down (HIGH-DB-3; double opt-in residual)): docs/SECURITY_ROUND65_VERIFICATION.md
   - Optional, unticked, separate from check-in; versioned consent text
   - Row-level security; host sees only their own property's contacts
 legal_basis:
@@ -211,6 +214,7 @@ retention:
   - Chat messages - 12 months from the stay, unless the conversation is still active (Annex B; retention_purge, migration 20261118110000_round76_retention_purges.sql); soft-deleted messages after 30 days (welcomebnb_daily_purge, resolved-thread rule now 365 days)
   - Anonymised Q&A pairs and the quarantine archive - no limit (no personal data after anonymisation; Annex B)
 security_measures:
+  - Independently verified after Round 65 (chat escaping (CRIT-1 closed)): docs/SECURITY_ROUND65_VERIFICATION.md
   - Server builds the property and stay context; entry codes follow the release policy
   - Entry-sensitive history protected and excluded from reusable Q&A
   - Per-session and monthly token caps

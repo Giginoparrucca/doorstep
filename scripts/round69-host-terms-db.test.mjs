@@ -19,8 +19,14 @@ const annex = read('legal/ALLEGATO_A_DPA_v1.md');
 
 // The served Annex A is the DPA template, byte for byte.
 assert.equal(sha(annex), sha(read('docs/compliance/DPA_TEMPLATE.md')), 'legal/ALLEGATO_A_DPA_v1.md must equal docs/compliance/DPA_TEMPLATE.md');
-// The draft text keeps its banner until the lawyer-approved text replaces it.
-assert.match(terms.toString(), /BOZZA — non pubblicare/);
+// Round 76: version 1 is published (no draft banner, effective date set); the
+// provider's address and tax code are placeholders filled from the database.
+assert.doesNotMatch(terms.toString(), /BOZZA/); assert.match(terms.toString(), /In vigore dal 18 novembre 2026\./);
+for (const t of [terms.toString(), annex.toString()]) {
+  assert.match(t, /Daniele Petrilli, che opera con il marchio WelcomeBnB, domicilio \{\{fornitore_indirizzo\}\}, C\.F\. \{\{fornitore_cf\}\}/);
+  assert.doesNotMatch(t, /`\[[^\]]+\]`|\[(ragione sociale|sede legale|foro|data|firma|indirizzo|CIN)/, 'no blank fields left');
+  assert.doesNotMatch(t, /\b[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]\b/, 'no real tax code in the public text');
+}
 
 // Art. 16 bullets, parsed independently of the migration's generator.
 const art16 = terms.toString().split('## Art. 16')[1].split('## Allegato A')[0];
@@ -29,7 +35,7 @@ const bullets = art16.split('\n').filter(l => l.startsWith('- ')).map(l => {
   const cut = body.indexOf(' — ');
   return { ref: body.slice(0, cut), label: body.slice(cut + 3) };
 });
-assert.equal(bullets.length, 13, 'Art. 16 lists thirteen clause groups (Round 72 adds 4.4, 4.5, 4.6, 13.2)');
+assert.equal(bullets.length, 14, 'Art. 16 lists fourteen clause groups (Round 72 adds 4.4, 4.5, 4.6, 13.2; Round 76 adds 1.4)');
 
 const db = new PGlite();
 const host = randomUUID(), other = randomUUID(), adminId = randomUUID();

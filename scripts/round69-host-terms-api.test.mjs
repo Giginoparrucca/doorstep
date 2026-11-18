@@ -27,7 +27,9 @@ let clock = Date.parse('2026-11-01T10:00:00Z');
 const docs = [{ id: randomUUID(), kind: 'host_terms', version: 1, file_path: 'legal/CONDIZIONI_GENERALI_v1.md',
   text_sha256: sha(termsBytes), annex_file_path: 'legal/ALLEGATO_A_DPA_v1.md', annex_sha256: sha(annexBytes),
   specific_clauses: [{ ref: '10.2 e 10.3', label: 'limitazioni' }], requires_reacceptance: true, published_at: '2026-11-01T00:00:00Z' }];
-const tables = { legal_documents: docs, host_terms_acceptances: [], host_terms_codes: [] };
+// Round 76: fictional provider identity (the real one lives only in the database).
+const PROVIDER = { id: 1, name: 'Fornitore Fittizio', address: 'Via Inventata 1, 00000 Nessuna Città', tax_code: 'FCTFNT00A01H501X', vat: null, pec: null };
+const tables = { legal_documents: docs, host_terms_acceptances: [], host_terms_codes: [], legal_provider: [PROVIDER] };
 const emails = [];
 let codes = ['111111', '222222', '333333', '444444', '555555', '666666', '777777', '888888', '999999', '123123', '321321', '456456'];
 let resendDown = false, sentCodes = [];
@@ -181,7 +183,12 @@ assert.match(receipt.text, /art\. 10\.2 e 10\.3 — limitazioni/);
 assert.match(receipt.text, /uso con partita IVA/);
 assert.match(receipt.text, new RegExp(sha(termsBytes)));
 assert.deepEqual(receipt.attachments.map(a => a.filename), ['CONDIZIONI_GENERALI_v1.md', 'ALLEGATO_A_DPA_v1.md'], 'exact texts attached');
-assert.equal(Buffer.from(receipt.attachments[0].content, 'base64').equals(termsBytes), true);
+// Round 76: the attached copy is the text the host saw — placeholders filled with the provider data.
+const attached = Buffer.from(receipt.attachments[0].content, 'base64').toString('utf8');
+assert.equal(attached, termsBytes.toString('utf8').replace('{{fornitore_indirizzo}}', PROVIDER.address).replace('{{fornitore_cf}}', PROVIDER.tax_code));
+assert.doesNotMatch(attached, /\{\{fornitore_/);
+assert.match(receipt.text, /Fornitore: Fornitore Fittizio, che opera con il marchio WelcomeBnB, domicilio Via Inventata 1, 00000 Nessuna Città, C\.F\. FCTFNT00A01H501X\./);
+assert.deepEqual(tables.host_terms_acceptances.at(-1).provider_snapshot, { name: PROVIDER.name, address: PROVIDER.address, tax_code: PROVIDER.tax_code, vat: null, pec: null }, 'evidence keeps the provider data shown');
 assert.ok(!/check-in|schedin|documento|passaporto/i.test(receipt.text), 'no guest data in the receipt');
 r = await call(good({ code: ok }));
 assert.deepEqual([r.status, r.body.already], [200, true], 'retry after success is idempotent');

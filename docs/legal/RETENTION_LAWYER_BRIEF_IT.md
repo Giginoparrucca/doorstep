@@ -15,7 +15,7 @@ Il servizio è oggi gestito da **Daniele Petrilli**, persona fisica residente fu
 | Dati | Conservazione | Base |
 |---|---|---|
 | Ricevuta Alloggiati e registro degli invii | 5 anni dall'invio | DM Interno 7/1/2013, come modificato dal DM 16/9/2021, art. 4-bis c. 2 |
-| Dati d'identità trasmessi (tipo, numero e luogo di rilascio del documento; luogo e data di nascita completa) | Cancellati appena c'è la ricevuta, o appena l'host segna l'ospite come inviato | DM 2013/2021, art. 4-bis c. 2; Garante, nota e comunicato del 29/4/2026 |
+| Dati d'identità trasmessi (tipo, numero e luogo di rilascio del documento; luogo e data di nascita completa) | Cancellati appena c'è la ricevuta, o appena l'host segna l'ospite come inviato. Dove la struttura deve inviare con gli stessi dati anche le statistiche regionali (per la Puglia il tracciato «PS» di SPOT Easy), alla fine del mese successivo alla partenza | DM 2013/2021, art. 4-bis c. 2; Garante, 29/4/2026; obblighi statistici regionali |
 | Foto del documento e selfie | Cancellate appena c'è la ricevuta | Garante, 29/4/2026 |
 | Dati per le statistiche regionali (sesso, anno di nascita, cittadinanza, residenza) | Fino alla fine del 12° mese dopo il soggiorno, per eventuali rettifiche; poi solo dati aggregati | Obblighi statistici regionali e ISTAT; art. 5 par. 1 lett. e) GDPR |
 | Dati per l'imposta di soggiorno (nome del capogruppo, date, numero di ospiti e notti, categoria e dichiarazione di esenzione) | 5 anni dopo la fine dell'anno d'imposta | Regolamenti comunali (es. Bologna, Napoli, Torino) |

@@ -2,12 +2,12 @@
 
 **Data Processing Agreement template (GDPR Art. 28).** Round 67 Phase 3a, 29 ottobre 2026.
 
-> **Stato:** prima versione, scritta sul testo del Regolamento (UE) 2016/679. Prima di farlo firmare a host reali è consigliata la revisione di un avvocato esperto di privacy (vedi `PLAN_round67_gdpr_paper_trail.md`, Phase 3). I campi tra `[parentesi quadre]` si compilano per ogni host. Il registro dei trattamenti (`docs/compliance/ROPA.md`) è l'allegato tecnico di riferimento: se i due documenti divergono, va aggiornato questo accordo.
+Versione 1, in vigore dal 18 novembre 2026. È l'Allegato A delle Condizioni Generali di Servizio WelcomeBnB per gli Host e si accetta insieme a esse.
 
 ## Parti (Parties)
 
-- **Titolare del trattamento (Controller):** `[ragione sociale o nome dell'host]`, `[indirizzo]`, `[codice fiscale / P. IVA]`, gestore della struttura `[nome struttura]`, CIN `[CIN]` (di seguito "Host").
-- **Responsabile del trattamento (Processor):** WelcomeBnB, gestito da Daniele Petrilli, contatto privacy `info@welcomebnb.it` (di seguito "WelcomeBnB").
+- **Titolare del trattamento (Controller):** l'Host che accetta questo accordo nel Servizio, identificato dal proprio account (nome, email e dichiarazione di agire come impresa o come privato) e dalle strutture registrate nel Servizio, con il relativo CIN (di seguito "Host").
+- **Responsabile del trattamento (Processor):** Daniele Petrilli, che opera con il marchio WelcomeBnB, domicilio {{fornitore_indirizzo}}, C.F. {{fornitore_cf}}, contatto privacy `info@welcomebnb.it` (di seguito "WelcomeBnB"). In caso di cessione alla società del Fornitore (art. 1.4 delle Condizioni) questo accordo prosegue con la società, alle stesse condizioni.
 
 L'Host usa WelcomeBnB per gestire il check-in online dei propri ospiti e i relativi adempimenti. Per questi dati l'Host è titolare e WelcomeBnB è responsabile ai sensi dell'art. 28 GDPR. Per i dati dell'account dell'Host (accesso, notifiche, fatturazione) WelcomeBnB è titolare autonomo e il presente accordo non si applica.
 
@@ -103,6 +103,8 @@ WelcomeBnB assiste l'Host, tenendo conto della natura del trattamento e delle in
 
 5.8.3 Restano esclusi solo i dati che il diritto dell'Unione o italiano impone di conservare; in tal caso WelcomeBnB ne informa l'Host e li tratta solo per quell'obbligo.
 
+5.8.4 Durante il servizio WelcomeBnB conserva e cancella i dati secondo i tempi dell'Allegato B. L'Host può chiedere una cancellazione anticipata, salvo i dati che la legge impone di conservare.
+
 ### 5.9 Informazioni e verifiche (Information and audit rights)
 
 WelcomeBnB mette a disposizione dell'Host tutte le informazioni necessarie a dimostrare il rispetto dell'art. 28 (tra cui il registro dei trattamenti e questo accordo) e consente e contribuisce alle verifiche, comprese le ispezioni, condotte dall'Host o da un revisore da lui incaricato, con preavviso di almeno 30 giorni, in orario lavorativo e con obbligo di riservatezza. In via preferenziale le verifiche si svolgono su base documentale.
@@ -118,7 +120,7 @@ Elenco allineato alla tabella "Sub-processors and external services" di `docs/co
 | Sub-responsabile | Attività | Luogo / base del trasferimento |
 |---|---|---|
 | Supabase | Database, autenticazione, archiviazione file | UE (Irlanda, `eu-west-1`) |
-| Vercel | Hosting e funzioni server | `[da confermare: regione UE]` |
+| Vercel | Hosting e funzioni server | UE (Irlanda, `dub1`) |
 | Anthropic | Assistente di chat; lettura documenti | USA — SCC / accordo del fornitore |
 | Resend | Email di notifica e promemoria | USA — SCC / accordo del fornitore |
 | Telegram | Notifiche all'Host, solo se l'Host lo collega | Fuori UE — scelta dell'Host |
@@ -132,18 +134,32 @@ Non sono sub-responsabili: la Polizia di Stato (Alloggiati Web), i portali comun
 - Accesso ai dati per riga (row-level security) su tutte le tabelle; ogni Host vede solo le proprie strutture.
 - Gli ospiti accedono solo tramite un collegamento firmato limitato alla propria prenotazione.
 - Credenziali Alloggiati Web dell'Host cifrate con AES-256-GCM, con chiave conservata fuori dal database.
-- Archivi privati per documenti e ricevute; foto dei documenti cancellate automaticamente 7 giorni dopo l'arrivo.
+- Archivi privati per documenti e ricevute; foto dei documenti cancellate appena l'invio ad Alloggiati Web è registrato; dati d'identità cancellati secondo l'Allegato B.
 - Codici d'accesso consegnati da un'unica regola lato server che, in caso di dubbio, non li mostra.
-- Pulizia automatica giornaliera: chat risolte dopo 90 giorni, dati cancellati dopo 30 giorni, statistiche d'uso aggregate dopo 180 giorni.
+- Pulizia automatica giornaliera secondo i tempi dell'Allegato B; dati spostati nel cestino cancellati definitivamente dopo 30 giorni; statistiche d'uso aggregate dopo 180 giorni.
 - Accessi amministrativi registrati; procedura scritta per le violazioni dei dati (`BREACH_SOP.md`).
 - Test automatici dell'intero prodotto prima di ogni rilascio.
 
-## 8. Firma (Signature)
+## 8. Accettazione (Acceptance)
 
-| | Host (Titolare) | WelcomeBnB (Responsabile) |
+L'accordo si accetta online insieme alle Condizioni Generali, senza firma autografa. Il Servizio registra data e ora, indirizzo IP, versione e impronta digitale (SHA-256) dei testi accettati e i dati del Fornitore mostrati. Conferma l'accettazione con un codice monouso inviato all'email dell'account e invia all'Host una copia dei testi.
+
+## 9. Allegato B — Tempi di conservazione dei dati (Annex B — Retention periods)
+
+WelcomeBnB conserva i dati per i tempi seguenti e li cancella automaticamente alla scadenza. I dati necessari per un obbligo di legge si conservano solo per quell'obbligo.
+
+| Dati | Conservazione | Base |
 |---|---|---|
-| Nome | `[nome e cognome]` | Daniele Petrilli |
-| Data | `[data]` | `[data]` |
-| Firma | `[firma]` | `[firma]` |
-
-In alternativa alla firma autografa, l'accettazione tramite la schermata "Firma l'accordo" della console host, con registrazione di data, ora e indirizzo IP, vale come accettazione dell'accordo (in arrivo con la Phase 3b).
+| Ricevuta Alloggiati Web e registro degli invii | 5 anni dall'invio | DM Interno 7/1/2013, come modificato dal DM 16/9/2021, art. 4-bis |
+| Dati d'identità comunicati alla Questura (tipo, numero e luogo di rilascio del documento; luogo e data di nascita completa) | Cancellati appena l'invio è registrato (ricevuta o conferma dell'Host). Se la struttura deve inviare con gli stessi dati anche le statistiche regionali, alla fine del mese successivo alla partenza | DM 7/1/2013 art. 4-bis; Garante, 29/4/2026; obblighi statistici regionali |
+| Foto del documento e selfie | Cancellate appena l'invio è registrato | Garante, 29/4/2026 |
+| Dati per le statistiche regionali e ISTAT (sesso, anno di nascita, cittadinanza, residenza) | Fino alla fine del 12° mese dopo il soggiorno; poi solo dati aggregati | Obblighi statistici; art. 5 GDPR |
+| Dati per l'imposta di soggiorno (nome del capogruppo, date, numero di ospiti e notti, esenzioni e relative dichiarazioni) | 5 anni dopo la fine dell'anno d'imposta | Regolamenti comunali sull'imposta di soggiorno |
+| Dati di fatturazione dell'ospite (solo se chiede la fattura) | 10 anni | Art. 2220 c.c. |
+| Prenotazioni (date, portale, nome dell'ospite) | 10 anni dal check-out | Artt. 2220 e 2946 c.c. |
+| Email e telefono delle prenotazioni | 12 mesi dal check-out | Art. 5 GDPR |
+| Consensi marketing degli ospiti | 24 mesi dal soggiorno; le revoche 24 mesi come prova | Indicazioni del Garante |
+| Chat con gli ospiti | 12 mesi dal soggiorno (domande e risposte anonimizzate senza limite) | Art. 5 GDPR |
+| Registro accessi alle porte; notifiche all'Host | 12 mesi | Art. 5 GDPR |
+| Account dell'Host, accettazioni, abbonamento e pagamenti | 10 anni dalla chiusura dell'account | Artt. 2220 e 2946 c.c. |
+| Registro delle azioni degli amministratori | 2 anni | Art. 5 par. 2 GDPR |

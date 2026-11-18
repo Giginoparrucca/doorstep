@@ -55,30 +55,26 @@ Code: `api/_rate-limit.js` (`LIMITS`), plus the per-feature limits listed below.
 | **Booking-recovery guessing** | 10 per hour per address and 30 per hour per property, refused when the counter store is down. A literal match on the booking code is required, plus the last 4 characters of the document (Round 74 R001). |
 | **CSP report flooding** | Only 60 reports per minute per instance are logged; the rest get 204 and are dropped. |
 
-## 3. Vercel Firewall rules (proposed, not active)
+## 3. Vercel Firewall rules (active since 18 Nov 2026)
 
-The plan's edge limits are below. They would stop volumetric traffic before it starts a function, which saves cost; the limits above already stop abuse inside the functions.
+These rules stop floods at Vercel's network edge, before a function starts. The application limits above still apply inside the functions. All three rules are published on project `welcomebnb` (config `waf_VEPAR5tx8JNA`, version 1). Daniele created them in the dashboard, because the agent's connection can read the firewall but is refused when it tries to change it.
 
-| Rule | Proposal |
-|---|---|
-| `/api/guest*` | 60 requests/minute/IP and 500/day/IP → 429 |
-| `/api/host*` | 300 requests/minute per session (IP as fallback) → 429 |
-| `/api/admin*` | 60 requests/minute/IP → 429, with an alert on bursts |
-| `/api/csp-report` | Unchanged: already limited in code |
+| Rule | Condition | Limit | When exceeded |
+|---|---|---|---|
+| `API ospiti` | path starts with `/api/guest` | 300 requests / 60 s per IP (fixed window) | 429, no persistent block |
+| `API host` | path starts with `/api/host` | 300 / 60 s per IP | 429, no persistent block |
+| `API admin` | path starts with `/api/admin` | 60 / 60 s per IP | 429, no persistent block |
 
-**Status:** not applied. Three things block it:
+**Why the guest limit is 300, not the plan's 60.** The guest chat checks for replies every 5 seconds, which is 12 requests a minute per open phone. A family on one wifi, or many customers behind one mobile operator's IP (CGNAT), would have hit 60.
 
-1. The agent's Vercel connection has no firewall access: reading the configuration returned «Vercel denied access to this project's firewall configuration».
-2. Vercel's rate-limit rules may be billed per request on the Pro plan, which needs the owner's approval.
-3. The owner should confirm the thresholds above.
+**Why there is no persistent block.** One IP can be shared by many guests (hotel wifi, mobile networks), so a longer block would lock out innocent people too. Without it, the block ends by itself after the minute.
 
-**Owner steps.** Either reconnect the Vercel integration with firewall access so the agent can apply and test the rules, or apply them yourself:
+**Cost.** $0.50 per million allowed requests; blocked requests are free. That is a few cents a month at current traffic.
 
-1. In the Vercel dashboard, open the project, then **Firewall**, then **Add rule**.
-2. Set the condition to Request path starts with `/api/guest`.
-3. Set the action to **Rate limit**, Fixed window, 60 requests per 60 seconds, key IP, response 429.
-4. Repeat for the other rows of the table.
-5. Afterwards, run `RATE_LIMIT_LIVE_PROBE=1 npm run test:live`.
+**Production check, 18 Nov 2026:**
+- 260 requests to `/api/admin-invite-host?open=…` (an invalid link, so no data was touched) got 120 normal answers (410), then 429 from request 121 onwards: 60 per address on the test network's 2 outgoing addresses.
+- The block lifted within a minute.
+- `npm run test:live` afterwards: PASS 4 / FAIL 0.
 
 ## 4. Logs
 

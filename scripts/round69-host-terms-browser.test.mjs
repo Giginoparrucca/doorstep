@@ -102,6 +102,13 @@ try {
     // Round 76: provider placeholders are filled from the status reply; no raw {{…}} reaches the host.
     assert.match(await page.locator('#hostTermsText').textContent(), /domicilio Via Finta 1, 00000 Nessuno, C\.F\. XXXXXX00X00X000X/);
     assert.doesNotMatch(await page.locator('#hostTermsText').textContent(), /\{\{|\}\}/, 'no raw placeholders');
+    // «Apri / stampa» opens the filled, hash-checked text (the public file keeps the placeholders).
+    const [popup] = await Promise.all([page.waitForEvent('popup'), page.locator('#hostTermsOverlay a', { hasText: lang === 'it' ? 'Apri / stampa' : 'Open / print' }).click()]);
+    await popup.waitForFunction(() => document.querySelectorAll('h4').length >= 10);
+    const printed = await popup.evaluate(() => document.body.textContent);
+    assert.match(printed, /domicilio Via Finta 1, 00000 Nessuno, C\.F\. XXXXXX00X00X000X/); assert.doesNotMatch(printed, /\{\{|\}\}/, 'print view filled');
+    assert.match(printed, /Allegato B/, 'print view includes Annex A with Annex B');
+    await popup.close();
     assert.match(await page.locator('#hostTermsText').textContent(), /Allegato A — Accordo sul trattamento dei dati|Annex A — Data Processing Agreement/);
     assert.match(await page.locator('#hostTermsTitle').textContent(), lang === 'it' ? /^Condizioni Generali di Servizio$/ : /Terms of Service/);
     if (lang === 'en') assert.match(await overlay().textContent(), /The Italian text is the binding version\./);
@@ -149,7 +156,13 @@ try {
     // Settings row shows the accepted version.
     await page.evaluate(() => renderHostTermsSettings());
     assert.match(await page.locator('#hostTermsSettingsCard').textContent(), lang === 'it' ? /Versione 1 accettata il 01\/11\/2026/ : /Version 1 accepted on 01\/11\/2026/);
-    assert.equal(await page.locator('#hostTermsSettingsCard a').getAttribute('href'), '/legal/CONDIZIONI_GENERALI_v1.md');
+    {
+      const [pop] = await Promise.all([page.waitForEvent('popup'), page.locator('#hostTermsSettingsCard a').click()]);
+      await pop.waitForFunction(() => document.querySelectorAll('h4').length >= 10);
+      const txt = await pop.evaluate(() => document.body.textContent);
+      assert.match(txt, /C\.F\. XXXXXX00X00X000X/, 'Settings link opens the filled text'); assert.doesNotMatch(txt, /\{\{|\}\}/);
+      await pop.close();
+    }
 
     // 2. Accepted host: no window on reload.
     await boot(); await page.evaluate(() => window.__init);

@@ -88,6 +88,7 @@ const R = require('../lib/regional-exports.js');
 const src = read('lib/regional-exports.js');
 assert.match(src, /if\(r\.identity_erased_at&&\['ross','ps','spot'\]\.includes\(format\)\)\{errors\.push\(issue\(r\.id,'identity','erased'\)\);continue;\}/);
 assert.match(src, /function spotAge\(row\)\{if\(!row\.date_of_birth&&Number\.isInteger\(row\.age_at_arrival\)\)return row\.age_at_arrival;/);
-assert.match(read('host-regional-exports.js'), /erased:text\('dati di identità già cancellati per legge/);
+assert.match(read('host-regional-exports.js'), /erased:text\('dati già cancellati per legge/);
+assert.match(read('host-regional-exports.js'), /room_id,birth_year,age_at_arrival,identity_erased_at,statistics_erased_at'\)/, 'the export query fetches the erasure markers and the stored age');
 assert.ok(R, 'regional module loads');
 console.log('PASS round76 police minimisation: service_role only; dry run changes nothing; photos queued and cleared at filing; identity erased 24 h after filing or, with regional statistics, at the end of the month after departure; unfiled untouched; birth year and age at arrival kept; stay record kept and still locked; filed rows not deletable; idempotent; console keeps erased guests documented, explains the erasure, skips them in exports and uses the stored age; regional exports report erased rows clearly');

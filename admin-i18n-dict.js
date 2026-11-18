@@ -21,6 +21,7 @@ window.ADMIN_I18N_DICT = [
   ['Users', 'Utenti'], ['Pilot', 'Pilota'], ['Deep dive', 'Approfondimento'], ['Ops', 'Gestione'], ['Privacy', 'Privacy'],
   ['Overview', 'Panoramica'], ['Search', 'Cerca'], ['Cancel', 'Annulla'], ['Close', 'Chiudi'], ['Save', 'Salva'], ['Saved', 'Salvato'], ['Delete', 'Elimina'],
   ['Reset', 'Reimposta'], ['Show', 'Mostra'], ['Actions', 'Azioni'], ['Status', 'Stato'], ['Status:', 'Stato:'], ['Error', 'Errore'], ['Error:', 'Errore:'],
+  ['Legal retention limits (Annex B)', 'Limiti di conservazione per legge (Allegato B)'], ['Receipts (5 y)', 'Ricevute (5 anni)'], ['Filing log (5 y)', 'Registro invii (5 anni)'], ['Statistics fields (12 m)', 'Dati statistici (12 mesi)'], ['Tourist-tax rows (5 y)', 'Righe imposta di soggiorno (5 anni)'], ['Invoice rows (10 y)', 'Righe con fattura (10 anni)'], ['Booking contacts (12 m)', 'Contatti prenotazioni (12 mesi)'], ['Reservations (10 y)', 'Prenotazioni (10 anni)'], ['Dismissed bookings (10 y)', 'Prenotazioni ignorate (10 anni)'], ['Marketing consents (24 m)', 'Consensi marketing (24 mesi)'], ['Chat messages (12 m)', 'Messaggi chat (12 mesi)'], ['Entry bookings (12 m)', 'Accessi porta (12 mesi)'], ['Host notifications (12 m)', 'Notifiche host (12 mesi)'], ['Closed accounts (10 y)', 'Account chiusi (10 anni)'],
   ['Preview', 'Anteprima'], ['None.', 'Nessuno.'], ['Only', 'Solo'], ['ok', 'ok'], ['Copy link', 'Copia link'], ['Copy failed — select and Cmd/Ctrl+C', 'Copia non riuscita — seleziona e premi Cmd/Ctrl+C'],
 
   // ── Users tab (written in Italian; English for the toggle) ──

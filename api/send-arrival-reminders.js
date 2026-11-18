@@ -448,9 +448,10 @@ function pgrestDELETE(path) {
 //   - Must NEVER throw out of its body. A thrown error here would
 //     short-circuit the handler's response to passes A/B that already
 //     succeeded. Every network call is wrapped.
-//   - The queue table enforces bucket='documents' via CHECK; we also
-//     filter in JS as belt-and-braces so a hypothetical schema regression
-//     cannot send 'receipts' paths to the Storage API.
+//   - The queue table allows bucket 'documents', and bucket 'receipts' only
+//     with reason 'receipt_5y' (Round 76: Alloggiati receipts deleted 5
+//     years after filing, Annex B). The same rule is applied again in JS
+//     (purgeQueueRowAllowed) so no other receipt can reach the Storage API.
 //   - On HTTP 2xx, the queue rows for those paths are deleted. A path
 //     that no longer exists in storage counts as done — the Storage API
 //     accepts missing prefixes without erroring.
@@ -458,72 +459,68 @@ function pgrestDELETE(path) {
 //     char cap). After 5 attempts the row is left in place for manual
 //     inspection; it will no longer be picked up (attempts<5 filter).
 // ══════════════════════════════════════════════════════════════════════
-export async function runStoragePurgePass(dry, onlyPaths = null) {
+export function purgeQueueRowAllowed(r) {
+  return !!r && typeof r.path === 'string' && !!r.path &&
+    (r.bucket === 'documents' || (r.bucket === 'receipts' && r.reason === 'receipt_5y'));
+}
+
+export async function runStoragePurgePass(dry, onlyPaths = null, deps = {}) {
+  const get = deps.get || pgrestGET, del = deps.del || pgrestDELETE, doFetch = deps.fetch || fetch;
+  const bump = deps.bump || _bumpQueueAttempts;
   const out = { queued: 0, deleted: 0, failed: 0, dry: !!dry };
   let queueRows;
   try {
-    queueRows = await pgrestGET(
-      'storage_purge_queue?bucket=eq.documents' +
+    queueRows = await get(
+      'storage_purge_queue?bucket=in.(documents,receipts)' +
       '&attempts=lt.5' +
       (onlyPaths ? '&path=in.(' + encodeURIComponent(onlyPaths.map(p => JSON.stringify(p)).join(',')) + ')' : '') +
-      '&select=id,bucket,path,attempts' +
+      '&select=id,bucket,path,reason,attempts' +
       '&order=queued_at.asc&limit=1000'
     );
   } catch (e) {
     out.error = 'queue read failed: ' + String(e).slice(0, 300);
     return out;
   }
-  // JS-level guard: drop any row whose bucket isn't exactly 'documents'.
-  // The DB CHECK already enforces this; the second filter here protects
-  // against a hypothetical future schema regression + makes the invariant
-  // visible in code to any reviewer.
-  const safeRows = (queueRows || []).filter(
-    r => r && r.bucket === 'documents' && typeof r.path === 'string' && r.path
-  );
+  const safeRows = (queueRows || []).filter(purgeQueueRowAllowed);
   out.queued = safeRows.length;
   if (safeRows.length === 0) return out;
   if (dry) return out;
 
-  const paths = safeRows.map(r => r.path);
-  // Supabase bulk-remove — DELETE /storage/v1/object/<bucket> with body
-  // { prefixes: [...] }. One request handles the whole batch.
-  let httpRes;
-  try {
-    httpRes = await fetch(`${SUPABASE_URL}/storage/v1/object/documents`, {
-      method: 'DELETE',
-      headers: {
-        ...supabaseAuthHeaders(SERVICE_KEY),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ prefixes: paths }),
-    });
-  } catch (e) {
-    out.failed = safeRows.length;
-    out.error = 'storage DELETE fetch failed: ' + String(e).slice(0, 300);
-    await _bumpQueueAttempts(safeRows, 'fetch failed: ' + String(e)).catch(() => {});
-    return out;
-  }
-
-  if (!httpRes.ok) {
-    const bodyText = await httpRes.text().catch(() => '');
-    out.failed = safeRows.length;
-    out.error = `storage DELETE http ${httpRes.status}: ${bodyText.slice(0, 200)}`;
-    await _bumpQueueAttempts(safeRows, `http ${httpRes.status}: ${bodyText}`).catch(() => {});
-    return out;
-  }
-
-  // 2xx: drop the queue rows. If this cleanup fails, the files are
-  // still gone from storage; the next pass will retry the same paths
-  // but the Storage API treats a missing-prefix delete as success,
-  // so it'll just drain again next cycle. Log but don't fail.
-  try {
-    const ids = safeRows.map(x => `"${x.id}"`).join(',');
-    await pgrestDELETE(`storage_purge_queue?id=in.(${ids})`);
-    out.deleted = safeRows.length;
-  } catch (e) {
-    console.warn('[storage-purge] queue cleanup failed (files were deleted):', String(e).slice(0, 300));
-    out.deleted = safeRows.length;
-    out.cleanup_warning = 'queue rows not removed';
+  for (const bucket of ['documents', 'receipts']) {
+    const rows = safeRows.filter(r => r.bucket === bucket);
+    if (!rows.length) continue;
+    // Supabase bulk-remove — DELETE /storage/v1/object/<bucket> with body
+    // { prefixes: [...] }. One request handles the whole batch.
+    let httpRes;
+    try {
+      httpRes = await doFetch(`${SUPABASE_URL}/storage/v1/object/${bucket}`, {
+        method: 'DELETE',
+        headers: { ...supabaseAuthHeaders(SERVICE_KEY), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prefixes: rows.map(r => r.path) }),
+      });
+    } catch (e) {
+      out.failed += rows.length;
+      out.error = 'storage DELETE fetch failed: ' + String(e).slice(0, 300);
+      await bump(rows, 'fetch failed: ' + String(e)).catch(() => {});
+      continue;
+    }
+    if (!httpRes.ok) {
+      const bodyText = await httpRes.text().catch(() => '');
+      out.failed += rows.length;
+      out.error = `storage DELETE http ${httpRes.status}: ${bodyText.slice(0, 200)}`;
+      await bump(rows, `http ${httpRes.status}: ${bodyText}`).catch(() => {});
+      continue;
+    }
+    // 2xx: drop the queue rows. If this cleanup fails, the files are
+    // still gone from storage; the next pass retries the same paths and
+    // the Storage API treats a missing-prefix delete as success.
+    try {
+      await del(`storage_purge_queue?id=in.(${rows.map(x => `"${x.id}"`).join(',')})`);
+    } catch (e) {
+      console.warn('[storage-purge] queue cleanup failed (files were deleted):', String(e).slice(0, 300));
+      out.cleanup_warning = 'queue rows not removed';
+    }
+    out.deleted += rows.length;
   }
   return out;
 }

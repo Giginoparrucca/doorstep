@@ -726,6 +726,22 @@ async function runRetentionPreview() {
             </div>
           `).join('')}
         </div>
+        ${r.legal ? (() => {
+          // Round 76 Phase 3 — legal retention limits (Annex B of the host agreement).
+          const L = r.legal, legal = [
+            ['Receipts (5 y)', L.receipts], ['Filing log (5 y)', L.filing_log], ['Statistics fields (12 m)', L.statistics],
+            ['Tourist-tax rows (5 y)', L.tax_records], ['Invoice rows (10 y)', L.invoice_records], ['Booking contacts (12 m)', L.contacts],
+            ['Reservations (10 y)', L.reservations], ['Dismissed bookings (10 y)', L.dismissed], ['Marketing consents (24 m)', L.marketing],
+            ['Chat messages (12 m)', L.chat], ['Entry bookings (12 m)', L.entry], ['Host notifications (12 m)', L.notifications], ['Closed accounts (10 y)', L.closed_accounts]];
+          return `<div style="font-size:0.78rem;color:var(--ink-soft);margin:14px 0 8px;"><strong>Legal retention limits (Annex B)</strong></div>
+            <div data-legal-retention style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;">
+              ${legal.map(([label, n]) => `
+                <div style="background:var(--white);border:1px solid var(--border);border-radius:6px;padding:8px 10px;">
+                  <div style="font-family:'Playfair Display',serif;font-size:1.4rem;color:#2f7a44;font-weight:600;line-height:1;">${(n|0).toLocaleString()}</div>
+                  <div style="font-size:0.65rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-2);font-weight:600;margin-top:4px;">${label}</div>
+                </div>`).join('')}
+            </div>`;
+        })() : ''}
       </div>`;
     // Also refresh the log so the new dry-run row appears
     loadRetentionLog();

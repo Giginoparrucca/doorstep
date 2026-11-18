@@ -18,6 +18,7 @@ Newest entries at the top of each section.
 - **Ops:** the per-property «Terms» column is removed.
 - **Deep dive:** each property header has **«👁 Apri console»**. It uses the existing `viewAsHost`: logged in the access log, read-only console.
 - **Tests:** `admin-users` (latest acceptance per account, counts), `admin-users-browser` (column, tile, download with the legal document), `admin-ops-metrics-browser` (13 columns, no terms), `round71-host-health-browser` (one console button per property, opens that property). The IT/EN dictionary gained the new labels.
+- **Shipped:** PR #339 merged as `5a4b1a0` (local `npm run test:all` **PASS 171 / FAIL 0 / SKIP 3**, CI green); live.
 
 ### Round 76 — Data retention by law + host terms acceptance (confirmed 2026-11-18)
 

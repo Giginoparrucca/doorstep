@@ -134,7 +134,7 @@ Non sono sub-responsabili: la Polizia di Stato (Alloggiati Web), i portali comun
 - Accesso ai dati per riga (row-level security) su tutte le tabelle; ogni Host vede solo le proprie strutture.
 - Gli ospiti accedono solo tramite un collegamento firmato limitato alla propria prenotazione.
 - Credenziali Alloggiati Web dell'Host cifrate con AES-256-GCM, con chiave conservata fuori dal database.
-- Archivi privati per documenti e ricevute; dati d'identità e foto dei documenti cancellati appena l'invio ad Alloggiati Web è registrato (Allegato B).
+- Archivi privati per documenti e ricevute; foto dei documenti cancellate appena l'invio ad Alloggiati Web è registrato; dati d'identità cancellati secondo l'Allegato B.
 - Codici d'accesso consegnati da un'unica regola lato server che, in caso di dubbio, non li mostra.
 - Pulizia automatica giornaliera secondo i tempi dell'Allegato B; dati spostati nel cestino cancellati definitivamente dopo 30 giorni; statistiche d'uso aggregate dopo 180 giorni.
 - Accessi amministrativi registrati; procedura scritta per le violazioni dei dati (`BREACH_SOP.md`).
@@ -151,7 +151,7 @@ WelcomeBnB conserva i dati per i tempi seguenti e li cancella automaticamente al
 | Dati | Conservazione | Base |
 |---|---|---|
 | Ricevuta Alloggiati Web e registro degli invii | 5 anni dall'invio | DM Interno 7/1/2013, come modificato dal DM 16/9/2021, art. 4-bis |
-| Dati d'identità comunicati alla Questura (tipo, numero e luogo di rilascio del documento; luogo e data di nascita completa) | Cancellati appena l'invio è registrato (ricevuta o conferma dell'Host) | DM 7/1/2013 art. 4-bis; Garante, 29/4/2026 |
+| Dati d'identità comunicati alla Questura (tipo, numero e luogo di rilascio del documento; luogo e data di nascita completa) | Cancellati appena l'invio è registrato (ricevuta o conferma dell'Host). Se la struttura deve inviare con gli stessi dati anche le statistiche regionali, alla fine del mese successivo alla partenza | DM 7/1/2013 art. 4-bis; Garante, 29/4/2026; obblighi statistici regionali |
 | Foto del documento e selfie | Cancellate appena l'invio è registrato | Garante, 29/4/2026 |
 | Dati per le statistiche regionali e ISTAT (sesso, anno di nascita, cittadinanza, residenza) | Fino alla fine del 12° mese dopo il soggiorno; poi solo dati aggregati | Obblighi statistici; art. 5 GDPR |
 | Dati per l'imposta di soggiorno (nome del capogruppo, date, numero di ospiti e notti, esenzioni e relative dichiarazioni) | 5 anni dopo la fine dell'anno d'imposta | Regolamenti comunali sull'imposta di soggiorno |

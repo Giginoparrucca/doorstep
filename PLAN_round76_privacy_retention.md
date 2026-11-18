@@ -14,7 +14,7 @@ Requested by Daniele, 18 Nov 2026: «abide by the law and keep data as long as p
 | Data | Kept | Then | Legal basis |
 |---|---|---|---|
 | Alloggiati receipt (PDF) and filing log | 5 years from transmission | deleted | DM 2013/2021 art. 4-bis |
-| Identity data sent to the police: document type, number and issuing place; place of birth; full date of birth | until the receipt exists, or until the host marks the guest as sent | erased automatically | DM 2013/2021 art. 4-bis; Garante 29 Apr 2026 |
+| Identity data sent to the police: document type, number and issuing place; place of birth; full date of birth | until the receipt exists, or until the host marks the guest as sent; for properties with a regional statistics service (the Puglia SPOT Easy «PS» record carries the same fields), until the end of the month after departure | erased automatically | DM 2013/2021 art. 4-bis; Garante 29 Apr 2026; regional statistics obligations |
 | Document photos and selfie | until the receipt exists, or until the host marks the guest as sent | deleted | Garante 29 Apr 2026 |
 | Fields the regional statistics need (sex, birth year, citizenship, residence) | until the end of the 12th month after the stay (regional/ISTAT corrections) | erased; aggregate counts kept | Regional statistics obligations; GDPR art. 5(1)(e) |
 | Stay record for the tourist tax: lead guest's name, dates, number of guests and nights, exemption category and the exemption declaration | 5 years after the end of the tax year | deleted | Municipal tourist-tax regulations (e.g. Bologna, Napoli, Torino) |

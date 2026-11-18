@@ -52,13 +52,12 @@ AdminOpsMetrics.load(sb,{since:'${since}',until:'${until}'}).then(data=>{opsMetr
 </script></body></html>`}));
   await page.goto('https://ops.invalid/');await page.waitForFunction(()=>window.fixtureReady);
   const row=page.locator('tbody tr').first();const cells=await row.locator('td').allTextContents();
-  assert.equal(cells.length,14);assert.match(cells[12],/v1 · 01\/11\/2026/);assert.match(cells[12],/Scarica prova/);assert.match(cells[6],/✓ Connected/);assert.match(cells[6],/Auto: live · 01\/11\/2026/);
-  {const fullCells=await page.locator('tbody tr').filter({hasText:'Villa 12'}).locator('td').allTextContents();assert.equal(fullCells[12].trim(),'Non accettate');assert.match(fullCells[6],/⚠ Error/);assert.match(fullCells[6],/Auto: off/);}
+  assert.equal(cells.length,13,'terms moved to Utenti (per account)');assert.ok(!cells.some(c=>/Non accettate|Scarica prova/.test(c)),'no terms column in Ops');assert.match(cells[6],/✓ Connected/);assert.match(cells[6],/Auto: live · 01\/11\/2026/);
+  {const fullCells=await page.locator('tbody tr').filter({hasText:'Villa 12'}).locator('td').allTextContents();assert.match(fullCells[6],/⚠ Error/);assert.match(fullCells[6],/Auto: off/);}
   {const zeroCells=await page.locator('tbody tr').filter({hasText:'Zero usage'}).locator('td').allTextContents();assert.match(zeroCells[6],/Saved · not verified/);
    const emptyCells=await page.locator('tbody tr').filter({hasText:'Empty property'}).locator('td').allTextContents();assert.match(emptyCells[6],/Not connected/);assert.match(emptyCells[6],/Manual filing only/);assert.ok(!/Auto:/.test(emptyCells[6]),'no automatic mode shown without credentials');
    await page.locator('tbody tr').filter({hasText:'Villa 12'}).getByRole('button',{name:/Error/}).click();assert.equal(await page.evaluate(()=>window.supportOpened),'full');}
-  {const [dl]=await Promise.all([page.waitForEvent('download'),row.getByRole('button',{name:'Scarica prova'}).click()]);assert.equal(dl.suggestedFilename(),'welcomebnb-terms-evidence-owner.json');
-   const ev=JSON.parse(fs.readFileSync(await dl.path(),'utf8'));assert.equal(ev.host_id,'owner');assert.equal(ev.acceptances[0].id,'acc-1');assert.equal(ev.documents[0].specific_clauses[0].ref,'15.2');}assert.equal(cells[4],'2');assert.equal(cells[5],'1');assert.equal(cells[7],'1');assert.match(cells[8],/50%.*1 \/ 2 bookings/s);
+  assert.equal(cells[4],'2');assert.equal(cells[5],'1');assert.equal(cells[7],'1');assert.match(cells[8],/50%.*1 \/ 2 bookings/s);
   assert.equal(requests.length,3);await row.getByRole('button',{name:'Console'}).click();assert.equal(await page.evaluate(()=>window.clickedProperty),'p');
   await page.locator('[aria-label="Hosts and properties metrics"]').evaluate(el=>el.scrollLeft=0);
   await page.screenshot({path:path.join(out,`ops-${width}.png`),fullPage:true});
@@ -99,5 +98,5 @@ AdminOpsMetrics.load(sb,{since:'${since}',until:'${until}'}).then(data=>{opsMetr
   await page.evaluate(()=>{allogConnections=null;fixtureRender();});assert.equal((await page.locator('tbody tr').first().locator('td').nth(6).textContent()).trim(),'—','unreadable status is a dash, never "not connected"');
   await page.evaluate(()=>{opsMetricsData.checkins=null;fixtureRender();});assert.equal(await page.locator('tbody tr').first().locator('td').nth(4).textContent(),'—');assert.deepEqual(errors,[]);await page.close();
  }
- console.log('PASS actual SDK paginated reads and Ops table: 390/1440px, 14 columns incl. Alloggiati connection (connected/error/not verified/not connected, mode, opens diagnostics, problems filter), «N not confirmed» for unconnected properties (opens the console, own filter, not counted as failures) and Terms (version · date, Non accettate, evidence JSON download), keyboard/numeric sorting, compound filters, null/zero, empty/reset/state persistence, viewport fit, no extra reads, failed reads and Console action');
+ console.log('PASS actual SDK paginated reads and Ops table: 390/1440px, 13 columns (terms moved to Utenti) incl. Alloggiati connection (connected/error/not verified/not connected, mode, opens diagnostics, problems filter), «N not confirmed» for unconnected properties (opens the console, own filter, not counted as failures) and Terms (version · date, Non accettate, evidence JSON download), keyboard/numeric sorting, compound filters, null/zero, empty/reset/state persistence, viewport fit, no extra reads, failed reads and Console action');
 }finally{await browser.close();}

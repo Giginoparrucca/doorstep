@@ -104,6 +104,8 @@ export function summarize(rows, now = Date.now()) {
     trial_ended: count(r => left(r) !== null && left(r) <= 0),
     paying: count(r => r.plan && r.plan.state === 'active'),
     prelaunch: count(r => r.plan && r.plan.state === 'prelaunch'),
+    terms_accepted: count(r => !!r.terms),
+    terms_pending: count(r => r.confirmed && !r.terms),
   };
 }
 
@@ -111,11 +113,13 @@ export function summarize(rows, now = Date.now()) {
 export async function buildUsersOverview(deps) {
   const now = deps.now ? deps.now() : Date.now();
   const since = new Date(now - 31 * DAY).toISOString();
-  const [users, invites, admins, properties] = await Promise.all([
+  const [users, invites, admins, properties, terms] = await Promise.all([
     deps.listUsers(),
     deps.getAll('pilot_invites?select=email,status,invited_at,accepted_at&order=invited_at.desc'),
     deps.get('admin_users?select=email'),
     deps.getAll('properties?deleted_at=is.null&select=id,name,owner_id,is_test&order=created_at.asc'),
+    // Terms are accepted per account (Round 69/76), not per property.
+    deps.getAll('host_terms_acceptances?select=host_id,version,created_at,host_kind&order=created_at.desc').catch(() => null),
   ]);
   const ids = users.map(u => u.id).filter(Boolean);
   const propIds = properties.filter(p => !p.is_test).map(p => p.id);
@@ -139,11 +143,15 @@ export async function buildUsersOverview(deps) {
   }
   const rows = buildRows({ users, invites, admins, properties, events, checkins, plans, now });
   if (billingBy) for (const r of rows) r.billing = r.user_id ? billingBy[r.user_id] || null : null;
+  // Latest acceptance per account; null = not accepted; terms_error when unreadable.
+  const lastTerms = new Map();
+  for (const t of terms || []) if (t.host_id && !lastTerms.has(t.host_id)) lastTerms.set(t.host_id, { version: t.version, accepted_at: t.created_at, host_kind: t.host_kind || null });
+  for (const r of rows) r.terms = r.user_id ? lastTerms.get(r.user_id) || null : null;
   // Trial dates are stored from registration (17 Nov 2026), also before the
   // launch, when billing_access_state still answers «prelaunch».
   for (const r of rows) {
     const sub = r.billing && r.billing.subscription;
     r.trial_ends_at = (r.plan && r.plan.trial_ends_at) || (sub && sub.status === 'trialing' ? sub.trial_ends_at || null : null);
   }
-  return { generated_at: new Date(now).toISOString(), summary: summarize(rows, now), rows, plan_error: planError };
+  return { generated_at: new Date(now).toISOString(), summary: summarize(rows, now), rows, plan_error: planError, terms_error: terms ? null : 'terms_unavailable' };
 }

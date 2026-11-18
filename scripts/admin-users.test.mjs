@@ -40,13 +40,14 @@ assert.deepEqual([by['carla@example.invalid'].registered_at, by['carla@example.i
 assert.equal(a.registered_at, iso(NOW - 10 * D), 'registered = password created');
 assert.deepEqual([by['dora@example.invalid'].user_id, by['dora@example.invalid'].registered_at, by['dora@example.invalid'].status], [null, null, 'invited']);
 assert.equal(by['test@example.invalid'].is_test, true); assert.equal(by['admin@example.invalid'].is_admin, true);
-assert.deepEqual(U.summarize(rows, NOW), { hosts: 4, registered_30: 1, not_registered: 2, active_7: 1, inactive: 0, trial_ending_7: 1, in_trial: 1, trial_ended: 0, paying: 1, prelaunch: 1 }, 'test and admin accounts not counted');
+assert.deepEqual(U.summarize(rows, NOW), { hosts: 4, registered_30: 1, not_registered: 2, active_7: 1, inactive: 0, trial_ending_7: 1, in_trial: 1, trial_ended: 0, paying: 1, prelaunch: 1, terms_accepted: 0, terms_pending: 2 }, 'test and admin accounts not counted');
 
 // Endpoint: admin gate before any read; journalled.
 const { default: handler } = await import('../api/admin-host-health.js');
 let reads = 0; const journal = [];
+const termsRows = [{ host_id: A, version: 1, created_at: iso(NOW - 1 * D), host_kind: 'business' }, { host_id: A, version: 1, created_at: iso(NOW - 5 * D), host_kind: 'private' }];
 const usersDeps = { listUsers: async () => { reads++; return users; }, get: async p => { reads++; return p.startsWith('admin_users') ? [{ email: 'admin@example.invalid' }] : []; },
-  getAll: async p => { reads++; return p.startsWith('pilot_invites') ? invites : p.startsWith('properties') ? properties : p.startsWith('analytics_events') ? events : p.startsWith('checkins') ? checkins : []; },
+  getAll: async p => { reads++; return p.startsWith('pilot_invites') ? invites : p.startsWith('properties') ? properties : p.startsWith('analytics_events') ? events : p.startsWith('checkins') ? checkins : p.startsWith('host_terms_acceptances') ? termsRows : []; },
   rpc: async (n, args) => { assert.equal(n, 'billing_access_state'); return plans[args.p_user] || { state: 'none' }; }, now: () => NOW };
 const authFetch = role => async url => {
   if (String(url).endsWith('/auth/v1/user')) return new Response(JSON.stringify({ id: ADM, email: 'admin@example.invalid' }));
@@ -60,6 +61,10 @@ const r = await post('admin');
 assert.equal(r.code, 200); assert.equal(r.headers['Cache-Control'], 'no-store');
 assert.equal(r.body.rows.length, 6); assert.equal(r.body.summary.hosts, 4); assert.equal(r.body.plan_error, null); assert.equal(r.body.generated_at, iso(NOW));
 assert.deepEqual([journal.at(-1).action, journal.at(-1).metadata], ['host_health_read', { view: 'users', rows: 6 }]);
+// Terms are per account: latest acceptance wins; registered without one = pending; invited-only = none.
+assert.deepEqual(r.body.rows.find(x => x.user_id === A).terms, { version: 1, accepted_at: iso(NOW - 1 * D), host_kind: 'business' });
+assert.equal(r.body.rows.find(x => x.user_id === B).terms, null); assert.equal(r.body.rows.find(x => x.email === 'dora@example.invalid').terms, null);
+assert.deepEqual([r.body.summary.terms_accepted, r.body.summary.terms_pending, r.body.terms_error], [1, 1, null]);
 // Plan read failing for one account is shown, not hidden.
 const r2 = await (async () => { const res = { code: 0, body: null, headers: {}, setHeader() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; }, end() { return this; } };
   await handler({ method: 'POST', headers: { origin: 'https://app.welcomebnb.it', authorization: 'Bearer jwt' }, body: { action: 'users_overview' } }, res, { fetch: authFetch('admin'), users: { ...usersDeps, rpc: async (n, a) => { if (a.p_user === B) throw new Error('down'); return plans[a.p_user]; } }, audit: { first: async () => true, after: async () => {} } }); return res; })();
@@ -81,5 +86,5 @@ assert.match(html, /document\.getElementById\('content'\)\.innerHTML = zoneA \+ 
 const overview = html.slice(html.indexOf('function renderHealthOverview('), html.indexOf('function hhTile('));
 assert.ok(!overview.includes('renderBillingSettings'), 'billing settings not in the overview');
 assert.match(html, /html \+= renderHealthOverview\(\);/, 'Deep dive keeps the overview');
-assert.match(fs.readFileSync(new URL('../admin-users.js', import.meta.url), 'utf8'), /root\.renderBillingSettings\(\)/); assert.match(html, /<script src="\/admin-users\.js\?v=4"><\/script>/);
+assert.match(fs.readFileSync(new URL('../admin-users.js', import.meta.url), 'utf8'), /root\.renderBillingSettings\(\)/); assert.match(html, /<script src="\/admin-users\.js\?v=5"><\/script>/);
 console.log('PASS admin users home: one row per account (newest first, invited-only addresses, revoked left out), registration and password state, trial/plan, last activity from console events and sign-in, active days 7/30, check-ins 30 days, activity levels (active ≤7 d, slowing 8–30, inactive >30, never), test/admin flagged and left out of the counts, summary; endpoint admin-gated before any read, journalled, plan failures shown; «Utenti» is the first and default tab');

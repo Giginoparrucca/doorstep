@@ -36,6 +36,7 @@ const MESSAGES = {
     code_expired: 'Il codice è scaduto. Richiedine uno nuovo.',
     code_missing: 'Richiedi prima un codice.',
     attempts: 'Troppi tentativi con questo codice. Richiedine uno nuovo.',
+    reload: 'È disponibile una versione aggiornata di WelcomeBnB. Ricarica la pagina per continuare.',
   },
   en: {
     auth: 'Please sign in again to continue.',
@@ -51,6 +52,7 @@ const MESSAGES = {
     code_expired: 'The code has expired. Request a new one.',
     code_missing: 'Request a code first.',
     attempts: 'Too many attempts with this code. Request a new one.',
+    reload: 'A newer version of WelcomeBnB is available. Reload the page to continue.',
   },
 };
 
@@ -91,6 +93,10 @@ export async function handleHostTerms(req, res, deps = defaultHostTermsDeps()) {
   const fail = (status, key) => res.status(status).json({ error: key, message: MESSAGES[lang][key] });
   const action = body.action;
   if (!['status', 'request_code', 'accept'].includes(action)) return fail(400, 'bad_request');
+  // Round 76: a console loaded before the provider data existed shows the raw
+  // {{fornitore_*}} placeholders. Such a page (no client >= 2) must reload
+  // before it can show or accept the terms.
+  const clientFillsProvider = Number(body.client) >= 2;
   if (!deps.serviceKey || !deps.supabaseUrl) return fail(503, 'unavailable');
 
   // 1. Who is calling: Supabase validates the session token.
@@ -135,6 +141,7 @@ export async function handleHostTerms(req, res, deps = defaultHostTermsDeps()) {
 
     if (action === 'status') {
       if (!current && deps.enforce) return fail(503, 'unavailable'); // fail closed when enforced
+      if (deps.enforce && !accepted && !clientFillsProvider) return fail(409, 'reload');
       if (deps.enforce && !provider) return fail(503, 'unavailable'); // never ask to accept a text with blank provider data
       const last = mine[0] || null;
       return res.status(200).json({
@@ -149,6 +156,7 @@ export async function handleHostTerms(req, res, deps = defaultHostTermsDeps()) {
     if (!current) return fail(503, 'unavailable');
     if (!provider) return fail(503, 'unavailable');
     if (!deps.pepper) return fail(503, 'unavailable');
+    if (!clientFillsProvider) return fail(409, 'reload');
 
     if (action === 'request_code') {
       if (acceptedCurrent) return fail(409, 'already');

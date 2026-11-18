@@ -16243,7 +16243,8 @@ async function hostTermsCall(action, extra = {}) {
   if (!token) return { ok: false, status: 401, data: {} };
   const r = await fetch('/api/host-terms', { method: 'POST', cache: 'no-store',
     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-    body: JSON.stringify({ action, lang: hostLang === 'en' ? 'en' : 'it', ...extra }) });
+    // client 2: this page fills the provider placeholders (Round 76).
+    body: JSON.stringify({ action, lang: hostLang === 'en' ? 'en' : 'it', client: 2, ...extra }) });
   let body = {}; try { body = await r.json(); } catch (_) {}
   return { ok: r.ok, status: r.status, data: body };
 }
@@ -16280,7 +16281,9 @@ function _termsRenderMarkdown(target, md) {
 function _termsFillProvider(text, provider) {
   if (text == null) return text;
   const p = provider || {};
-  return String(text).replace(/\{\{fornitore_indirizzo\}\}/g, p.address || '—').replace(/\{\{fornitore_cf\}\}/g, p.tax_code || '—');
+  const out = String(text).replace(/\{\{fornitore_indirizzo\}\}/g, p.address || '—').replace(/\{\{fornitore_cf\}\}/g, p.tax_code || '—');
+  if (/\{\{\s*fornitore_/.test(out)) throw Error('unfilled provider placeholder'); // never show a blank to accept
+  return out;
 }
 async function _termsFetchVerified(path, sha) {
   const r = await fetch('/' + path, { cache: 'no-store' });

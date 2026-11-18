@@ -67,6 +67,10 @@ try {
     assert.match(t[1], /Filed on time.*target 100%/s);
     assert.match(t[2], /Overdue now\s*2\s*target 0/); assert.match(t[2], /must file today or send a PEC/);
     const detail = await page.locator('[data-hh-property="red"]').textContent();
+    // Each property in the deep dive has its own console button (logged view-as-host).
+    await page.locator('[data-hh-property="red"] [data-hh-console]').click();
+    assert.equal(await page.evaluate(() => window.console_), 'red', 'Open console opens that property');
+    assert.equal(await page.locator('[data-hh-property] [data-hh-console]').count(), await page.locator('[data-hh-property]').count(), 'one console button per property');
     // The original transmission failure, crisp, on the Overdue tile and per guest.
     assert.equal((await page.locator('[data-hh-property="red"] [data-hh-why] strong').textContent()).trim(), 'Group head missing');
     assert.match(await page.locator('[data-hh-property="red"] [data-hh-why-original]').textContent(), /Portal: SCHEDINA_CAMPO_NON_CORRETTO — Ospite con Capo Gruppo o Capo Famiglia Mancante/);

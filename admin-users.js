@@ -50,6 +50,28 @@
   const TONE = { green: ['#ECFDF3', '#027A48'], amber: ['#FFFAEB', '#B54708'], red: ['#FEF3F2', '#B42318'], grey: ['#F2F4F7', '#475467'] };
   const chip = (text, tone, attr = '') => `<span ${attr} style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:0.72rem;font-weight:600;background:${TONE[tone][0]};color:${TONE[tone][1]};white-space:nowrap;">${esc(text)}</span>`;
 
+  // Terms are accepted per account (Round 69/76): version and date, and the
+  // signed evidence (IP, user agent, hashes, provider data shown) as JSON.
+  function termsCell(r) {
+    if (!r.user_id) return '<span style="color:var(--ink-soft);">—</span>';
+    if (data && data.terms_error) return '<span title="Non disponibile">—</span>';
+    if (!r.terms) return r.confirmed ? chip('Non accettate', 'amber', 'data-terms-chip') : '<span style="color:var(--ink-soft);">—</span>';
+    return `${chip('v' + Number(r.terms.version) + ' · ' + fmt(r.terms.accepted_at), 'green', 'data-terms-chip')} <button type="button" data-terms-evidence="${esc(r.user_id)}" onclick="UsersAdmin.termsEvidence('${esc(r.user_id)}')" style="border:0;background:none;padding:0;font:inherit;font-size:0.72rem;color:var(--warm, #1849A9);cursor:pointer;text-decoration:underline;">Scarica prova</button>`;
+  }
+  async function termsEvidence(uid) {
+    try {
+      const { data: rowsEv, error: e } = await adminClient().from('host_terms_acceptances').select('*').eq('host_id', uid).order('created_at', { ascending: true });
+      if (e) throw e;
+      // The legal text each acceptance refers to (version, hashes, specific clauses).
+      const ids = [...new Set((rowsEv || []).map(x => x.document_id).filter(Boolean))];
+      let docs = [];
+      if (ids.length) { const d = await adminClient().from('legal_documents').select('*').in('id', ids); if (d.error) throw d.error; docs = d.data || []; }
+      const blob = new Blob([JSON.stringify({ host_id: uid, exported_at: new Date().toISOString(), acceptances: rowsEv || [], documents: docs }, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `welcomebnb-terms-evidence-${uid}.json`;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    } catch (err) { if (root.adminToast) root.adminToast('Prova non disponibile: ' + String(err && err.message || err), 'error'); }
+  }
+
   async function load() {
     loading = true; error = null; render();
     try {
@@ -73,6 +95,7 @@
       host: r => String(r.email || ''), registered: r => String(r.registered_at || r.invited_at || ''),
       plan: r => planCell(r.plan, now, r)[2], last: r => String(r.last_active_at || ''), days: r => r.active_days_30,
       checkins: r => r.checkins_30, activity: r => ACTIVITY[r.activity][2],
+      terms: r => r.terms ? String(r.terms.accepted_at) : '',
     }[view.sort] || (r => '');
     const sign = view.dir === 'asc' ? 1 : -1;
     return list.map((r, i) => ({ r, i })).sort((a, b) => { const x = key(a.r), y = key(b.r); return (x < y ? -1 : x > y ? 1 : a.i - b.i) * sign; }).map(x => x.r);
@@ -96,6 +119,7 @@
           ${tile('Attivi (7 gg)', s.active_7, 'hanno usato la console', 'data-tile="active"')}
           ${tile('Inattivi', s.inactive, 'oltre 30 gg o mai usato', 'data-tile="inactive"')}
           ${tile('Non registrati', s.not_registered, 'invito non completato', 'data-tile="invited"')}
+          ${tile('Condizioni accettate', s.terms_accepted, `${s.terms_pending} registrati devono ancora accettare`, 'data-tile="terms"')}
           ${tile('Prova in scadenza', s.trial_ending_7, `entro 7 gg · ${s.in_trial} in prova · ${s.trial_ended || 0} scadute · ${s.paying} paganti`, 'data-tile="trial"')}
         </div>
         ${s.prelaunch ? '<p role="status" data-users-prelaunch style="font-size:0.78rem;color:var(--ink-soft);margin:0 0 8px;">La prova parte dalla registrazione. Prima del lancio le date sono solo indicative: nessun host vede avvisi o blocchi finché non premi «Lancia». Correggi la data di ognuno con «Gestisci».</p>' : ''}
@@ -109,7 +133,7 @@
         </div>
         <div style="overflow-x:auto;background:var(--white);border:1px solid var(--border);border-radius:10px;" tabindex="0" role="region" aria-label="Utenti">
           <table class="data-table" data-users-table style="width:100%;font-size:0.8rem;border-collapse:collapse;">
-            <thead><tr>${th('host', 'Host')}${th('registered', 'Registrato')}${th('plan', 'Prova / piano')}${th('last', 'Ultima attività')}${th('days', 'Giorni attivi')}${th('checkins', 'Check-in 30 gg')}${th('activity', 'Attività')}<th scope="col">Abbonamento</th></tr></thead>
+            <thead><tr>${th('host', 'Host')}${th('registered', 'Registrato')}${th('plan', 'Prova / piano')}${th('last', 'Ultima attività')}${th('days', 'Giorni attivi')}${th('checkins', 'Check-in 30 gg')}${th('activity', 'Attività')}${th('terms', 'Condizioni')}<th scope="col">Abbonamento</th></tr></thead>
             <tbody>${rows.map(r => {
               const [planText, planTone] = planCell(r.plan, now, r);
               const [actText, actTone] = ACTIVITY[r.activity];
@@ -123,11 +147,12 @@
                 <td style="white-space:nowrap;" data-days>${r.active_days_7} / 7 · ${r.active_days_30} / 30</td>
                 <td data-checkins>${r.checkins_30}</td>
                 <td>${chip(actText, actTone, 'data-activity-chip')}</td>
+                <td data-terms style="white-space:nowrap;">${termsCell(r)}</td>
                 <td>${r.user_id ? `<button type="button" data-users-billing-toggle="${esc(r.user_id)}" aria-expanded="${openBilling.has(r.user_id)}" onclick="UsersAdmin.toggleBilling('${esc(r.user_id)}')" style="padding:4px 10px;border:1px solid var(--border);background:var(--white);border-radius:6px;cursor:pointer;font:inherit;font-size:0.76rem;white-space:nowrap;">${openBilling.has(r.user_id) ? 'Chiudi ▴' : 'Gestisci ▾'}</button>` : ''}</td></tr>
-                ${r.user_id && openBilling.has(r.user_id) ? `<tr data-users-billing="${esc(r.user_id)}"><td colspan="8" style="background:#F9FAFB;">${r.billing && typeof root.renderBillingBox === 'function' ? root.renderBillingBox(r.billing, r.user_id) : '<p style="font-size:0.78rem;color:#B54708;margin:0;">Abbonamento non disponibile: aggiorna la pagina.</p>'}</td></tr>` : ''}`;
-            }).join('') || '<tr><td colspan="8">Nessun utente.</td></tr>'}</tbody>
+                ${r.user_id && openBilling.has(r.user_id) ? `<tr data-users-billing="${esc(r.user_id)}"><td colspan="9" style="background:#F9FAFB;">${r.billing && typeof root.renderBillingBox === 'function' ? root.renderBillingBox(r.billing, r.user_id) : '<p style="font-size:0.78rem;color:#B54708;margin:0;">Abbonamento non disponibile: aggiorna la pagina.</p>'}</td></tr>` : ''}`;
+            }).join('') || '<tr><td colspan="9">Nessun utente.</td></tr>'}</tbody>
           </table></div>
-        <p style="font-size:0.72rem;color:var(--ink-soft);margin-top:6px;">Attivo = ha usato la console negli ultimi 7 giorni · In calo = 8–30 giorni · Inattivo = oltre 30 giorni. Giorni attivi = giorni distinti con attività in console. Tocca un host per il dettaglio · «Gestisci» per prova, pagamento e gratis a vita.</p>
+        <p style="font-size:0.72rem;color:var(--ink-soft);margin-top:6px;">Attivo = ha usato la console negli ultimi 7 giorni · In calo = 8–30 giorni · Inattivo = oltre 30 giorni. Giorni attivi = giorni distinti con attività in console. Tocca un host per il dettaglio e per aprire la console di ogni struttura · «Condizioni» = versione accettata dall’account e data, «Scarica prova» scarica le prove dell’accettazione · «Gestisci» per prova, pagamento e gratis a vita.</p>
         ${typeof root.renderBillingSettings === 'function' ? root.renderBillingSettings() : ''}`;
     }
     host.innerHTML = `<div class="section-title">Utenti</div>${body}`;
@@ -145,5 +170,5 @@
     const el = document.getElementById('usersSearch'); if (el) { el.focus(); el.setSelectionRange(v.length, v.length); }
   }
   function toggleBilling(uid) { if (openBilling.has(uid)) openBilling.delete(uid); else openBilling.add(uid); render(); }
-  root.UsersAdmin = { render, toggleBilling, invalidate: () => { data = null; error = null; }, reload: () => { data = null; error = null; load(); }, sort: sortBy, search, toggleTest: on => { view = { ...view, showTest: !!on }; render(); }, openHost, _reset: () => { data = null; error = null; loading = false; openBilling.clear(); view = { sort: 'registered', dir: 'desc', search: '', showTest: false }; } };
+  root.UsersAdmin = { render, toggleBilling, termsEvidence, invalidate: () => { data = null; error = null; }, reload: () => { data = null; error = null; load(); }, sort: sortBy, search, toggleTest: on => { view = { ...view, showTest: !!on }; render(); }, openHost, _reset: () => { data = null; error = null; loading = false; openBilling.clear(); view = { sort: 'registered', dir: 'desc', search: '', showTest: false }; } };
 })(typeof window !== 'undefined' ? window : globalThis);

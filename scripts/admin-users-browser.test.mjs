@@ -25,7 +25,7 @@ const users = [
 ];
 const properties = [{ id: 'p1', name: 'Casa Anna', owner_id: A, is_test: false }, { id: 'p3', name: 'Bruno B&B', owner_id: B, is_test: false }];
 const rows = (plans) => U.buildRows({ users, invites: [], admins: [{ email: 'admin@example.invalid' }], properties, events: [{ user_id: A, created_at: iso(NOW - D) }, { user_id: B, created_at: iso(NOW - 45 * D) }], checkins: [{ property_id: 'p1' }, { property_id: 'p1' }], plans, now: NOW });
-const payload = plans => { const r = rows(plans); return { generated_at: iso(NOW), summary: U.summarize(r, NOW), rows: r, plan_error: null }; };
+const payload = plans => { const r = rows(plans); for (const x of r) x.terms = x.user_id === A ? { version: 1, accepted_at: iso(NOW - D), host_kind: 'business' } : null; return { generated_at: iso(NOW), summary: U.summarize(r, NOW), rows: r, plan_error: null, terms_error: null }; };
 const prelaunch = payload({ [A]: { state: 'prelaunch' }, [B]: { state: 'prelaunch' }, [C]: { state: 'prelaunch' }, [ADM]: { state: 'prelaunch' } });
 const launched = payload({ [A]: { state: 'trial', trial_ends_at: iso(NOW + 5 * D) }, [B]: { state: 'active', paid_until: iso(NOW + 200 * D) }, [C]: { state: 'trial', trial_ends_at: iso(NOW + 29 * D) }, [ADM]: { state: 'free', reason: 'admin' } });
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined, args: ['--no-sandbox'] });
@@ -40,7 +40,10 @@ try {
       return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>:root{--border:#ddd;--white:#fff;--ink-soft:#555}body{margin:0;font-family:sans-serif}.container{padding:16px}</style></head><body><div class="container"><select id="userFilter"><option value="all">All</option></select><div id="content"></div></div></body></html>` });
     });
     await page.goto('https://app.welcomebnb.it/admin.html');
-    await page.addScriptTag({ content: `const sb={auth:{getSession:async()=>({data:{session:{access_token:'fictional-admin-jwt'}}})}};window.__tabs=[];window.setActiveTab=t=>__tabs.push(t);` });
+    await page.addScriptTag({ content: `const sb={auth:{getSession:async()=>({data:{session:{access_token:'fictional-admin-jwt'}}})},
+      from:t=>{const q={_t:t,select:()=>q,eq:(k,v)=>(q._eq=[k,v],q),in:(k,v)=>(q._in=[k,v],Promise.resolve({data:[{id:'doc-1',kind:'host_terms',version:1,specific_clauses:[{ref:'15.2'}]}],error:null})),
+        order:()=>Promise.resolve({data:q._eq&&q._eq[1]===${JSON.stringify(A)}?[{id:'acc-1',host_id:${JSON.stringify(A)},document_id:'doc-1',version:1,ip:'192.0.2.1'}]:[],error:null})};return q;}};
+      window.__tabs=[];window.setActiveTab=t=>__tabs.push(t);` });
     await page.addScriptTag({ content: ui });
     await page.evaluate(() => UsersAdmin.render());
     await page.waitForSelector('[data-users-table]');
@@ -57,6 +60,13 @@ try {
     assert.deepEqual(t[1].cells.slice(3, 7), ['ieri', '1 / 7 · 1 / 30', '2', 'Attivo']);
     assert.deepEqual(t[2].cells.slice(3, 7), ['40 gg fa', '0 / 7 · 0 / 30', '0', 'Inattivo']);
     assert.equal(t[0].cells[6], 'Mai usato');
+    // Terms per account: Anna accepted v1 yesterday (evidence downloadable), Bruno not yet, Carla not registered.
+    assert.match(await tile('terms'), /Condizioni accettate1/); assert.match(await tile('terms'), /1 registrati devono ancora accettare/);
+    const termsCell = id => page.textContent(`[data-users-row="${id}"] [data-terms]`).then(x => x.replace(/\s+/g, ' ').trim());
+    assert.equal(await termsCell(A), 'v1 · 16/11/2026 Scarica prova'); assert.equal(await termsCell(B), 'Non accettate'); assert.equal(await termsCell(C), '—');
+    {const [dl] = await Promise.all([page.waitForEvent('download'), page.click(`[data-users-row="${A}"] [data-terms-evidence]`)]);
+     assert.equal(dl.suggestedFilename(), `welcomebnb-terms-evidence-${A}.json`);
+     const ev = JSON.parse(fs.readFileSync(await dl.path(), 'utf8')); assert.equal(ev.acceptances[0].id, 'acc-1'); assert.equal(ev.documents[0].specific_clauses[0].ref, '15.2');}
     // Sort by activity; search; show test/admin.
     await page.click('[data-users-sort="activity"]'); t = await table(); assert.deepEqual(t.map(x => x.id), [C, B, A], 'activity sort (desc: never, inactive, active)');
     await page.click('[data-users-sort="activity"]'); t = await table(); assert.deepEqual(t.map(x => x.id), [A, B, C]);

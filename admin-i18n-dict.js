@@ -49,8 +49,8 @@ window.ADMIN_I18N_DICT = [
   ['Users unavailable: {e}', 'Utenti non disponibili: {e}'], ['Retry', 'Riprova'], ['invalid response', 'risposta non valida'],
   ['Trial status unavailable for some users.', 'Stato della prova non disponibile per alcuni utenti.'],
   ['Subscription unavailable: refresh the page.', 'Abbonamento non disponibile: aggiorna la pagina.'],
-  ['Active = used the console in the last 7 days · Slowing = 8–30 days · Inactive = over 30 days. Active days = distinct days with console activity. Tap a host for details · «Manage» for trial, payment and free for life.',
-   'Attivo = ha usato la console negli ultimi 7 giorni · In calo = 8–30 giorni · Inattivo = oltre 30 giorni. Giorni attivi = giorni distinti con attività in console. Tocca un host per il dettaglio · «Gestisci» per prova, pagamento e gratis a vita.'],
+  ['Active = used the console in the last 7 days · Slowing = 8–30 days · Inactive = over 30 days. Active days = distinct days with console activity. Tap a host for details and to open each property’s console · «Terms» = version accepted by the account and date, «Download evidence» downloads the acceptance evidence · «Manage» for trial, payment and free for life.',
+   'Attivo = ha usato la console negli ultimi 7 giorni · In calo = 8–30 giorni · Inattivo = oltre 30 giorni. Giorni attivi = giorni distinti con attività in console. Tocca un host per il dettaglio e per aprire la console di ogni struttura · «Condizioni» = versione accettata dall’account e data, «Scarica prova» scarica le prove dell’accettazione · «Gestisci» per prova, pagamento e gratis a vita.'],
 
   // ── Subscription box, settings, launch (Italian source) ──
   ['Extend trial', 'Estendi prova'], ['Extend', 'Estendi'], ['or until', 'o fino al'], ['Reason (required)', 'Motivo (obbligatorio)'], ['Reason', 'Motivo'],
@@ -217,7 +217,7 @@ window.ADMIN_I18N_DICT = [
   ['Email to invite', 'Email da invitare'], ['Contact email (optional)', 'Email di contatto (facoltativa)'], ['Send invitation', 'Invia invito'], ['Resend', 'Reinvia'], ['Revoke', 'Revoca'],
   ['invited', 'invitato'], ['accepted', 'accettato'], ['revoked', 'revocato'], ['invited {d}', 'invitato il {d}'], ['No invites yet. Send one below.', 'Ancora nessun invito. Inviane uno qui sotto.'],
   ['Enter an email first', 'Inserisci prima un’email'], ['Copy the link and send it from your personal e-mail', 'Copia il link e inviaglielo dalla tua email personale'],
-  ['Not accepted', 'Non accettate'], ['(pilot access control)', '(controllo accessi del pilota)'], ['Admin accounts must be added via the', 'Gli account admin vanno aggiunti nella tabella'],
+  ['Open console', 'Apri console'], ['Terms accepted', 'Condizioni accettate'], ['Download evidence', 'Scarica prova'], ['{n} registered still to accept', '{n} registrati devono ancora accettare'], ['Not accepted', 'Non accettate'], ['(pilot access control)', '(controllo accessi del pilota)'], ['Admin accounts must be added via the', 'Gli account admin vanno aggiunti nella tabella'],
   ['table in Supabase.', 'di Supabase.'], ['the invite-only gate is enforced by the Supabase project setting Authentication → Sign In / Providers → Email → “Allow new users to sign up” OFF. Without that toggle, sb.auth.signUp() still works from any anon-key caller.',
    'l’accesso solo su invito dipende dall’impostazione del progetto Supabase Authentication → Sign In / Providers → Email → «Allow new users to sign up» disattivata. Senza, sb.auth.signUp() funziona per chiunque abbia la chiave pubblica.'],
   ['Reminder:', 'Promemoria:'], ['⚠ Accounts with no pilot_invites row ({n})', '⚠ Account senza riga in pilot_invites ({n})'], ['⚠ Accounts with zero properties ({n})', '⚠ Account senza strutture ({n})'],

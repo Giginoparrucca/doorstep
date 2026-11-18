@@ -1,6 +1,6 @@
 # Register of Processing Activities (GDPR Art. 30)
 
-**Status:** first version, 29 October 2026 (Round 67 Phase 2). Written against the code on `main` at that date; every fact cites the file it comes from. Retention periods marked `OWNER DECISION` and the controller/processor framing need Daniele's confirmation before this register is relied on externally. A GDPR lawyer should review before any sale or audit (see `PLAN_round67_gdpr_paper_trail.md`, "Risks and limits").
+**Status:** first version, 29 October 2026 (Round 67 Phase 2); retention lines updated 18 November 2026 (Round 76, Annex B of the host agreement). Written against the code on `main` at that date; every fact cites the file it comes from. Retention periods marked `OWNER DECISION` and the controller/processor framing need Daniele's confirmation before this register is relied on externally. A GDPR lawyer should review before any sale or audit (see `PLAN_round67_gdpr_paper_trail.md`, "Risks and limits").
 
 ## Who is who
 
@@ -15,7 +15,7 @@ Register maintenance: update this file in the same PR as any change that adds a 
 | Service | Used for | Location / transfer | Evidence |
 |---|---|---|---|
 | Supabase | Database, auth, file storage, scheduled jobs | EU — `eu-west-1` (Ireland) | Supabase project `jcjwaqqabgwqhhzhfbts` |
-| Vercel | Hosting, serverless API | **Function region not pinned in the repo (no `vercel.json`) — OWNER DECISION: verify the project region in the Vercel dashboard or pin an EU region** | `vercel.mjs` |
+| Vercel | Hosting, serverless API | EU — functions pinned to `dub1` (Dublin) in the Vercel project settings (Round 76 Phase 1; no `vercel.json`) | `vercel.mjs` |
 | Anthropic | Guest AI chat; ID document reading | USA — transfer under Anthropic's Data Processing Addendum / SCCs (**OWNER: confirm the DPA is accepted on the account**) | `api/chat.js`, `api/scan-document.js` |
 | Resend | Host notification and arrival-reminder emails | USA — transfer under Resend's DPA / SCCs (**OWNER: confirm**) | `api/_notify-host.js`, `api/send-arrival-reminders.js` |
 | Telegram | Optional host notifications (host opts in) | Outside the EU | `api/_notify-host.js`, `api/telegram-webhook.js` |
@@ -57,11 +57,13 @@ recipients:
 international_transfers:
   - None for storage (Supabase EU). Vercel function region to be confirmed (see sub-processor table)
 retention:
-  - Document and selfie photos are deleted automatically 7 days after arrival (purge_old_id_photos, migration 20261019140000_round60c_photo_retention_7days.sql)
-  - Soft-deleted check-ins are purged after 30 days; test rows after 30 days (daily job welcomebnb_daily_purge)
-  - Residence and invoice details - same as the check-in row (no separate rule)
+  - Document and selfie photos - deleted as soon as the filing is recorded (minimise_filed_checkins, hourly job welcomebnb_police_minimise, migration 20261118100000_round76_police_data_minimisation.sql), and in any case 7 days after arrival (purge_old_id_photos, migration 20261019140000_round60c_photo_retention_7days.sql)
+  - Identity fields sent to the police (document type, number and issuing place; place, province and state of birth; full date of birth) - erased 24 h after filing, or at the end of the month after departure where regional statistics need the same record; birth year and age at arrival kept (DM 7/1/2013 art. 4-bis; Garante 29/4/2026)
+  - Police receipts and alloggiati_filing_log - 5 years from filing (Annex B; retention_purge, migration 20261118110000_round76_retention_purges.sql)
+  - Statistics fields (sex, birth year, citizenship, residence) and any identity left - end of the 12th month after the stay (Annex B; retention_purge, migration 20261118110000_round76_retention_purges.sql)
+  - Check-in row (tourist-tax record) - deleted 5 years after the end of the tax year; rows with invoice details 10 years from the stay (Annex B; retention_purge, migration 20261118110000_round76_retention_purges.sql)
   - Late filing method, PEC date and PEC delivery receipt - same as the check-in row and its police receipt
-  - OWNER DECISION - live check-in rows have no time limit today; police receipts and alloggiati_filing_log have no purge (comments mention 5 years, nothing enforces it)
+  - Soft-deleted check-ins are purged after 30 days; test rows after 30 days (daily job welcomebnb_daily_purge)
 security_measures:
   - Row-level security on every table; guests reach data only through the signed guest gateway (api/guest.js)
   - Private storage buckets; signed URLs for host viewing
@@ -96,6 +98,7 @@ international_transfers:
   - None
 retention:
   - Same rows as activity 1; no separate copy is kept (exports are downloaded files)
+  - Statistics fields - end of the 12th month after the stay; tourist-tax fields - 5 years after the end of the tax year (Annex B; retention_purge, migration 20261118110000_round76_retention_purges.sql)
 security_measures:
   - Generated client-side from data the host is already authorised to read (row-level security)
   - Byte-exact golden-file tests for every export format
@@ -128,8 +131,7 @@ recipients:
 international_transfers:
   - None for storage; codes may appear in AI chat answers to the guest (see activity 5)
 retention:
-  - Kept while the property exists; removed with the property (cascade)
-  - OWNER DECISION - no time limit on entry_access audit rows
+  - Entry bookings with their append-only audit - 12 months after the stay (Annex B; retention_purge, migration 20261118110000_round76_retention_purges.sql); removed earlier with the property (cascade)
 security_measures:
   - Single server-side release policy, fail-closed (api/_entry-release-policy.js)
   - entry_access schema not exposed through the public API; append-only audit
@@ -160,7 +162,7 @@ international_transfers:
   - None
 retention:
   - Withdrawal records withdrawn_at and keeps the row as proof of the withdrawal (api/guest.js doConsentWithdraw)
-  - OWNER DECISION - no time limit on active or withdrawn consents
+  - Consents - 24 months from the stay; withdrawals 24 months from the withdrawal (Annex B; retention_purge, migration 20261118110000_round76_retention_purges.sql)
 security_measures:
   - Optional, unticked, separate from check-in; versioned consent text
   - Row-level security; host sees only their own property's contacts
@@ -206,8 +208,8 @@ recipients:
 international_transfers:
   - USA - Anthropic, under its DPA / SCCs (OWNER - confirm accepted)
 retention:
-  - Resolved chat threads deleted 90 days after resolution; soft-deleted messages after 30 days (welcomebnb_daily_purge)
-  - OWNER DECISION - chat_qa_pairs and the quarantine archive have no purge
+  - Chat messages - 12 months from the stay, unless the conversation is still active (Annex B; retention_purge, migration 20261118110000_round76_retention_purges.sql); soft-deleted messages after 30 days (welcomebnb_daily_purge, resolved-thread rule now 365 days)
+  - Anonymised Q&A pairs and the quarantine archive - no limit (no personal data after anonymisation; Annex B)
 security_measures:
   - Server builds the property and stay context; entry codes follow the release policy
   - Entry-sensitive history protected and excluded from reusable Q&A
@@ -238,8 +240,7 @@ recipients:
 international_transfers:
   - None for storage
 retention:
-  - Kept while the property exists; removed with the property
-  - OWNER DECISION - no time limit on past reservations
+  - Reservations (dates, platform, guest name) - 10 years from check-out; contact e-mail, phone and iCal description - 12 months from check-out (Annex B; retention_purge, migration 20261118110000_round76_retention_purges.sql); removed earlier with the property
 security_measures:
   - Only allowlisted portal hosts fetched; private and internal addresses refused (SSRF protection)
   - Row-level security
@@ -297,7 +298,7 @@ recipients:
 international_transfers:
   - None for storage
 retention:
-  - OWNER DECISION - no time limit; Round 67 Phase 5 proposes 2 years with an append-only log
+  - Admin access log - 2 years, append-only (admin_audit_purge, daily job welcomebnb_admin_audit_purge, migration 20261116170000_round67_admin_audit_log.sql)
 security_measures:
   - Admins listed in admin_users; every impersonation is logged
   - Gap - the current log is written partly from the browser and is not append-only (closed by Round 67 Phase 5)
@@ -332,7 +333,8 @@ international_transfers:
   - USA - Resend (OWNER - confirm DPA)
   - Outside EU - Telegram (host's choice)
 retention:
-  - OWNER DECISION - no purge for notification_log or closed accounts
+  - Host notification log - 12 months (Annex B; retention_purge, migration 20261118110000_round76_retention_purges.sql)
+  - Closed host accounts (subscription, billing events, terms acceptances) - 10 years after the last record of an account that no longer exists (Annex B; retention_purge, migration 20261118110000_round76_retention_purges.sql)
 security_measures:
   - Supabase Auth; row-level security; invite-only sign-up
 legal_basis:
@@ -389,7 +391,7 @@ recipients:
 international_transfers:
   - USA - Anthropic, under its DPA / SCCs (OWNER - confirm accepted)
 retention:
-  - The scan endpoint stores no image; only token usage is logged. The photo saved with the check-in follows activity 1 (deleted 7 days after arrival)
+  - The scan endpoint stores no image; only token usage is logged. The photo saved with the check-in follows activity 1 (deleted at filing, at the latest 7 days after arrival)
 security_measures:
   - Size limit about 10 MB; signed guest session required
 legal_basis:
@@ -477,8 +479,8 @@ evidence:
 
 ## Owner decisions collected from this register
 
-1. **Retention periods** where none is enforced today: live check-ins, police receipts and filing log, marketing consents, past calendar reservations, chat Q&A archive, entry-release audit, admin log, notification log and closed host accounts.
-2. **Vercel region:** confirm in the dashboard or pin an EU region.
+1. ~~**Retention periods**~~ — decided 18 Nov 2026 (Round 76): Annex B of the host agreement, `docs/compliance/RETENTION_POLICY.md`, enforced by the jobs cited above. Only the iReservation comparison reports (activity 7) remain without a limit while that integration is owner-only.
+2. ~~**Vercel region**~~ — pinned to `dub1` (Dublin), Round 76 Phase 1.
 3. **DPAs accepted** with Anthropic and Resend.
 4. **HIGH-GDPR-3:** accept the residual risk or add an 18+ confirmation to the consent card.
 5. **Controller/processor framing** above, and the legitimate-interest balancing for Q&A reuse and analytics.

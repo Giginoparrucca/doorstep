@@ -7,6 +7,25 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Round 76 — Data retention by law + host terms acceptance (confirmed 2026-11-18)
+
+Daniele confirmed the plain-language recap on 18 November 2026 («Confermo round»). Specification: `PLAN_round76_privacy_retention.md`.
+- **Why.** The DM Interno of 7 Jan 2013 (amended 16 Sep 2021, art. 4-bis c.2) requires deleting the data transmitted to Alloggiati as soon as the receipt exists, and keeping only the receipt for 5 years. The Garante's note of 29 Apr 2026 adds that document copies must not be kept.
+- **The gap today.** Filed check-ins are kept in full with no limit (279 rows), and 13 of them still have document photos.
+- **The 14 Nov hotfix** (filed check-ins cannot be deleted) is revisited in Phase 2: the decree requires keeping the **receipt**, not the data.
+- **Also in scope:** the retention schedule goes into the host agreement (DPA Annex B), and hosts accept the terms at their next login.
+- **Provider and parties.** The provider is Daniele Petrilli, operating as WelcomeBnB. His address and tax code are kept out of the public repository. A new art. 1.4 consents in advance to transferring the contract to the future company (art. 1407 c.c.). The court is Bari. The Vercel region is pinned to Dublin.
+
+**Reminder for Daniele:** when the company is incorporated, make the GitHub repository private. This is also in `docs/legal/LAUNCH_RUNBOOK.md`.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 0 — Plan and lawyer brief | in-progress — Claude Opus 5.5 | `PLAN_round76_privacy_retention.md`; `docs/legal/RETENTION_LAWYER_BRIEF_IT.md` (retention table with sources, 6 questions incl. GDPR art. 27 and the transfer clause); runbook reminder. Documentation only. |
+| 1 — Agreement + acceptance at next login | pending | Terms filled from `legal_provider` (not committed), art. 1.4, Annex B retention, v1 hashes refreshed (0 acceptances), Vercel `dub1`, `HOST_TERMS_ENFORCE=true`. |
+| 2 — Police data minimised | pending | Identity fields and photos erased once filed; guards adjusted; backfill with preview. |
+| 3 — Other retention purges | pending | Statistics fields, tourist tax, receipts, reservations, marketing, chat, entry audit, notifications, closed accounts. |
+| 4 — Close | pending | Full regression, live smoke, schema drift, ROPA, CHANGELOG. |
+
 ### Free trial starts at registration (Claude, 17 November 2026)
 
 **Daniele:** «the trial starts with the registration date … assume they all started at registration. I will then manually update each user with their actual expiry.»

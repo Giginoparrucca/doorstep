@@ -1,16 +1,16 @@
 # Condizioni Generali di Servizio WelcomeBnB per gli Host — versione 1
 
-> **BOZZA — non pubblicare.** Testo da far rivedere a un avvocato. I campi tra `[parentesi quadre]` vanno compilati. Il testo approvato sostituisce questo file con lo stesso nome; ogni modifica crea una nuova versione (`_v2`, …).
-
-In vigore dal [data di entrata in vigore].
+In vigore dal 18 novembre 2026.
 
 ## Art. 1 — Parti
 
-1.1 Il servizio WelcomeBnB è fornito da `[ragione sociale]` S.r.l.s., sede legale `[sede legale]`, P. IVA e C.F. `[P. IVA / C.F.]`, REA `[REA]`, PEC `[PEC]`, email info@welcomebnb.it ("Fornitore").
+1.1 Il servizio WelcomeBnB è fornito da Daniele Petrilli, che opera con il marchio WelcomeBnB, domicilio {{fornitore_indirizzo}}, C.F. {{fornitore_cf}}, email info@welcomebnb.it ("Fornitore").
 
 1.2 "Host" è la persona fisica o giuridica che accede al Servizio con un account e gestisce una o più strutture ricettive o locazioni brevi. Chi accetta per conto di una società dichiara di averne il potere.
 
 1.3 Al momento dell'accettazione l'Host indica se agisce nell'ambito di un'attività imprenditoriale o professionale (con partita IVA) oppure come privato. Il Fornitore conserva questa dichiarazione.
+
+1.4 Il Fornitore intende costituire una società per gestire WelcomeBnB. L'Host acconsente fin d'ora, ai sensi dell'art. 1407 c.c., alla cessione di queste Condizioni, compreso l'Accordo sul trattamento dei dati (Allegato A), a tale società. La cessione ha effetto dalla comunicazione inviata via email all'Host, che indica i dati della società. Restano invariati condizioni, prezzi e tutele dell'Host. L'Host che non è d'accordo può recedere senza costi entro 30 giorni dalla comunicazione; gli importi pagati per il periodo non goduto sono rimborsati.
 
 ## Art. 2 — Definizioni
 
@@ -113,6 +113,8 @@ L'Host tiene indenne il Fornitore da richieste di terzi, compresi Ospiti e autor
 
 12.3 Per i dati dell'account dell'Host (accesso, notifiche, assistenza) il Fornitore è titolare autonomo, come descritto nell'informativa per gli Host.
 
+12.4 I tempi per cui il Fornitore conserva i dati, per conto dell'Host e per sé, sono indicati nell'Allegato B dell'Accordo sul trattamento dei dati. Il Fornitore cancella i dati alle scadenze ivi indicate, salvo diversa istruzione dell'Host compatibile con la legge.
+
 ## Art. 13 — Durata e recesso
 
 13.1 Il contratto è a tempo indeterminato.
@@ -133,12 +135,13 @@ L'Host tiene indenne il Fornitore da richieste di terzi, compresi Ospiti e autor
 
 15.1 Queste Condizioni sono regolate dalla legge italiana.
 
-15.2 Per ogni controversia è competente in via esclusiva il Foro di `[foro]`. Se l'Host è un consumatore, è competente il foro del luogo in cui l'Host risiede o ha domicilio.
+15.2 Per ogni controversia è competente in via esclusiva il Foro di Bari. Se l'Host è un consumatore, è competente il foro del luogo in cui l'Host risiede o ha domicilio.
 
 ## Art. 16 — Approvazione specifica (artt. 1341 e 1342 c.c.)
 
 L'Host dichiara di aver letto queste Condizioni e di approvare specificamente, ai sensi degli artt. 1341 e 1342 c.c., i seguenti articoli:
 
+- 1.4 — cessione del contratto alla società del Fornitore con consenso dato fin d'ora;
 - 3.3 — modifica o rimozione di funzioni del Servizio;
 - 4.4 — rinnovo automatico annuale;
 - 4.5 — passaggio dell'account in sola lettura in caso di mancato pagamento;
@@ -157,4 +160,4 @@ Questa approvazione è un'azione separata dall'accettazione delle Condizioni. Il
 
 ## Allegato A
 
-Accordo sul trattamento dei dati ai sensi dell'art. 28 GDPR (`docs/compliance/DPA_TEMPLATE.md`, versione [n.]).
+Accordo sul trattamento dei dati ai sensi dell'art. 28 GDPR (`legal/ALLEGATO_A_DPA_v1.md`, versione 1), comprensivo dell'Allegato B «Tempi di conservazione dei dati».

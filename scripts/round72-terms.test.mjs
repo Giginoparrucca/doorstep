@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import { createHash } from 'node:crypto';
 const read = p => fs.readFileSync(new URL('../' + p, import.meta.url), 'utf8');
 const terms = read('legal/CONDIZIONI_GENERALI_v1.md');
-assert.match(terms, /BOZZA — non pubblicare/, 'still a draft for the lawyer');
+assert.doesNotMatch(terms, /BOZZA/, 'Round 76: version 1 published for acceptance at the next login');
 const art4 = terms.split('## Art. 4')[1].split('## Art. 5')[0];
 for (const n of ['4.1', '4.2', '4.3', '4.4', '4.5', '4.6', '4.7', '4.8']) assert.match(art4, new RegExp('^' + n.replace('.', '\\.') + ' ', 'm'), n);
 assert.match(art4, /60 euro all'anno, IVA inclusa, per ogni account Host, indipendentemente dal numero di Strutture/);
@@ -19,7 +19,7 @@ assert.match(art4, /recedere entro 14 giorni dal primo pagamento, senza motivazi
 assert.match(terms, /13\.2 L'Host può recedere in qualsiasi momento con una richiesta a info@welcomebnb\.it\. Il recesso ha effetto alla scadenza dell'anno già pagato; gli importi già pagati non sono rimborsati, salvo l'art\. 4\.8\./);
 const art16 = terms.split('## Art. 16')[1].split('## Allegato A')[0];
 const refs = art16.split('\n').filter(l => l.startsWith('- ')).map(l => l.slice(2).split(' — ')[0]);
-assert.deepEqual(refs, ['3.3', '4.4', '4.5', '4.6', '5.2 e 5.3', '6.4', '9.1 e 9.2', '10.2 e 10.3', '11', '13.2', '13.3', '14', '15.2']);
+assert.deepEqual(refs, ['1.4', '3.3', '4.4', '4.5', '4.6', '5.2 e 5.3', '6.4', '9.1 e 9.2', '10.2 e 10.3', '11', '13.2', '13.3', '14', '15.2']);
 // Seed (Round 69 migration) carries the new hash and list.
 const seed = read('supabase/migrations/20261101090000_round69_host_terms.sql');
 assert.ok(seed.includes(createHash('sha256').update(fs.readFileSync(new URL('../legal/CONDIZIONI_GENERALI_v1.md', import.meta.url))).digest('hex')), 'seed hash = file');

@@ -16246,6 +16246,13 @@ function _termsRenderMarkdown(target, md) {
     target.appendChild(el);
   }
 }
+// Round 76: provider address and tax code come from /api/host-terms (they
+// are not in the public text file); fill the placeholders after the hash check.
+function _termsFillProvider(text, provider) {
+  if (text == null) return text;
+  const p = provider || {};
+  return String(text).replace(/\{\{fornitore_indirizzo\}\}/g, p.address || '—').replace(/\{\{fornitore_cf\}\}/g, p.tax_code || '—');
+}
 async function _termsFetchVerified(path, sha) {
   const r = await fetch('/' + path, { cache: 'no-store' });
   if (!r.ok) throw Error('text unavailable');
@@ -16434,11 +16441,11 @@ function _showHostTermsWindow(status) {
           cur.annex_file_path && cur.annex_sha256 ? _termsFetchVerified(cur.annex_file_path, cur.annex_sha256) : Promise.resolve(null),
         ]);
         panel.textContent = '';
-        _termsRenderMarkdown(panel, termsText);
+        _termsRenderMarkdown(panel, _termsFillProvider(termsText, status.provider));
         if (annexText) {
           panel.appendChild(_termsEl('hr', 'margin:18px 0;border:none;border-top:1px solid var(--border,#d9e1ee);'));
           panel.appendChild(_termsEl('h3', '', h('terms_annex_heading')));
-          _termsRenderMarkdown(panel, annexText);
+          _termsRenderMarkdown(panel, _termsFillProvider(annexText, status.provider));
         }
         textReady = true; sync();
       } catch (_) {

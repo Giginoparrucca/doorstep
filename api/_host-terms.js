@@ -72,6 +72,17 @@ export function defaultHostTermsDeps() {
 
 export const hashCode = (code, pepper) => createHmac('sha256', pepper).update(String(code)).digest('hex');
 
+// Round 76: the provider's address and tax code are not in the public
+// repository; the terms carry {{fornitore_*}} placeholders that are filled
+// from the service-role table legal_provider for signed-in hosts only.
+export function fillProvider(text, provider) {
+  if (text == null) return text;
+  const p = provider || {};
+  return String(text)
+    .replace(/\{\{fornitore_indirizzo\}\}/g, p.address || '[indirizzo non disponibile]')
+    .replace(/\{\{fornitore_cf\}\}/g, p.tax_code || '[C.F. non disponibile]');
+}
+
 export async function handleHostTerms(req, res, deps = defaultHostTermsDeps()) {
   res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader('Vary', 'Authorization, Origin');
@@ -111,6 +122,9 @@ export async function handleHostTerms(req, res, deps = defaultHostTermsDeps()) {
     const [current] = await rows(`legal_documents?kind=eq.host_terms&published_at=lte.${enc(nowIso)}` +
       '&select=id,version,file_path,text_sha256,annex_file_path,annex_sha256,specific_clauses,requires_reacceptance,published_at&order=version.desc&limit=1');
     const mine = await rows(`host_terms_acceptances?host_id=eq.${enc(user.id)}&select=id,version,document_id,created_at&order=version.desc`);
+    const [providerRow] = await rows('legal_provider?id=eq.1&select=name,address,tax_code,vat,pec&limit=1').catch(() => []);
+    const provider = providerRow && providerRow.address && providerRow.tax_code
+      ? { name: providerRow.name, address: providerRow.address, tax_code: providerRow.tax_code, vat: providerRow.vat || null, pec: providerRow.pec || null } : null;
     const acceptedCurrent = !!current && mine.some(a => a.document_id === current.id);
     const accepted = acceptedCurrent || (!!current && current.requires_reacceptance === false && mine.length > 0);
     const publicCurrent = current ? {
@@ -121,16 +135,19 @@ export async function handleHostTerms(req, res, deps = defaultHostTermsDeps()) {
 
     if (action === 'status') {
       if (!current && deps.enforce) return fail(503, 'unavailable'); // fail closed when enforced
+      if (deps.enforce && !provider) return fail(503, 'unavailable'); // never ask to accept a text with blank provider data
       const last = mine[0] || null;
       return res.status(200).json({
         enforce: deps.enforce, accepted: deps.enforce ? accepted : true, current: publicCurrent,
         accepted_version: last ? last.version : null, accepted_at: last ? last.created_at : null,
+        provider, // address and tax code shown in the terms (signed-in hosts only)
         // Round 72: support contact for the console's subscription window.
         support_whatsapp: (SUPPORT_CONTACTS && SUPPORT_CONTACTS.whatsapp) || null,
         support_whatsapp_url: (SUPPORT_CONTACTS && SUPPORT_CONTACTS.whatsapp) ? whatsappLink(SUPPORT_CONTACTS.whatsapp, lang === 'en' ? 'en' : 'it') : null,
       });
     }
     if (!current) return fail(503, 'unavailable');
+    if (!provider) return fail(503, 'unavailable');
     if (!deps.pepper) return fail(503, 'unavailable');
 
     if (action === 'request_code') {
@@ -192,6 +209,7 @@ export async function handleHostTerms(req, res, deps = defaultHostTermsDeps()) {
       host_kind: body.host_kind, method: METHOD, account_email: user.email,
       ip: /^[0-9a-fA-F:.]{3,45}$/.test(forwarded) ? forwarded : null,
       user_agent: String(req.headers?.['user-agent'] || '').slice(0, 512) || null,
+      provider_snapshot: provider, // the provider data shown in the accepted text
     };
     const ins = await rest('host_terms_acceptances', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(evidence) });
     if (ins.status === 409) return res.status(200).json({ accepted: true, already: true, version: current.version });
@@ -199,7 +217,7 @@ export async function handleHostTerms(req, res, deps = defaultHostTermsDeps()) {
     const [row] = await ins.json();
 
     // 3. Receipt: what was accepted, when, and the text itself.
-    const receipt = await sendReceipt(deps, user.email, current, row, body.host_kind).catch(() => ({ ok: false }));
+    const receipt = await sendReceipt(deps, user.email, current, row, body.host_kind, provider).catch(() => ({ ok: false }));
     if (receipt.ok && receipt.id && row?.id) {
       await rest(`host_terms_acceptances?id=eq.${enc(row.id)}&receipt_email_id=is.null`, {
         method: 'PATCH', body: JSON.stringify({ receipt_email_id: String(receipt.id).slice(0, 200) }) }).catch(() => {});
@@ -225,7 +243,7 @@ async function sendEmail(deps, { to, subject, text, attachments }) {
 
 // Attach the exact accepted texts when the served bytes still match the
 // recorded hashes; otherwise send the link and the hashes only.
-async function sendReceipt(deps, to, doc, row, hostKind) {
+async function sendReceipt(deps, to, doc, row, hostKind, provider) {
   const when = new Date(row?.created_at || deps.now()).toLocaleString('it-IT', { timeZone: 'Europe/Rome',
     day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   const base = deps.appBaseUrl.replace(/\/$/, '');
@@ -236,7 +254,8 @@ async function sendReceipt(deps, to, doc, row, hostKind) {
       const r = await deps.fetch(`${base}/${path}`);
       const bytes = r.ok ? Buffer.from(await r.arrayBuffer()) : null;
       if (bytes && createHash('sha256').update(bytes).digest('hex') === sha) {
-        attachments.push({ filename: path.split('/').pop(), content: bytes.toString('base64') });
+        // The copy carries the provider data the host saw (filled placeholders).
+        attachments.push({ filename: path.split('/').pop(), content: Buffer.from(fillProvider(bytes.toString('utf8'), provider), 'utf8').toString('base64') });
       }
     } catch (_) { /* link and hash below still identify the text */ }
   }
@@ -253,8 +272,10 @@ async function sendReceipt(deps, to, doc, row, hostKind) {
     'Hai approvato specificamente, ai sensi degli artt. 1341 e 1342 c.c., queste clausole:',
     clauses,
     '',
+    provider ? `Fornitore: ${provider.name}, che opera con il marchio WelcomeBnB, domicilio ${provider.address}, C.F. ${provider.tax_code}.` : '',
+    '',
     'Conferma con codice monouso inviato a questo indirizzo email.',
-    `Testo: ${base}/${doc.file_path} (SHA-256 ${doc.text_sha256})`,
+    `Testo: ${base}/${doc.file_path} (SHA-256 ${doc.text_sha256}; i segnaposto {{fornitore_*}} riportano i dati del Fornitore indicati sopra)`,
     doc.annex_file_path ? `Allegato A: ${base}/${doc.annex_file_path} (SHA-256 ${doc.annex_sha256})` : '',
     attachments.length ? 'I testi accettati sono allegati a questa email.' : '',
     '',

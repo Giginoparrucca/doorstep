@@ -20,8 +20,8 @@ Daniele confirmed the plain-language recap on 18 November 2026 («Confermo round
 
 | Phase | Status | Where / test gate |
 |---|---|---|
-| 0 — Plan and lawyer brief | in-progress — Claude Opus 5.5 | `PLAN_round76_privacy_retention.md`; `docs/legal/RETENTION_LAWYER_BRIEF_IT.md` (retention table with sources, 6 questions incl. GDPR art. 27 and the transfer clause); runbook reminder. Documentation only. |
-| 1 — Agreement + acceptance at next login | pending | Terms filled from `legal_provider` (not committed), art. 1.4, Annex B retention, v1 hashes refreshed (0 acceptances), Vercel `dub1`, `HOST_TERMS_ENFORCE=true`. |
+| 0 — Plan and lawyer brief | shipped — PR #331 (`716a217`) — Claude Opus 5.5 | `PLAN_round76_privacy_retention.md`; `docs/legal/RETENTION_LAWYER_BRIEF_IT.md` (retention table with sources, 6 questions incl. GDPR art. 27 and the transfer clause); runbook reminder. Documentation only. |
+| 1 — Agreement + acceptance at next login | in-progress — Claude Opus 5.5 (text, provider data and API in this PR; `HOST_TERMS_ENFORCE=true` after Phase 2, so the Annex A promise «photos deleted at filing» is already true when hosts accept) | Terms filled from `legal_provider` (not committed), art. 1.4, Annex B retention, v1 hashes refreshed (0 acceptances), Vercel `dub1`, `HOST_TERMS_ENFORCE=true`. |
 | 2 — Police data minimised | pending | Identity fields and photos erased once filed; guards adjusted; backfill with preview. |
 | 3 — Other retention purges | pending | Statistics fields, tourist tax, receipts, reservations, marketing, chat, entry audit, notifications, closed accounts. |
 | 4 — Close | pending | Full regression, live smoke, schema drift, ROPA, CHANGELOG. |

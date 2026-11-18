@@ -3108,7 +3108,7 @@ async function loadGuestSummariesByCode(codes) {
   if (!codes || codes.length === 0) return {};
   try {
     const { data } = await sb.from('checkins')
-      .select('booking_code, surname, name, guest_type, submitted_at, arrival_date, departure_date, nights, document_number')
+      .select('booking_code, surname, name, guest_type, submitted_at, arrival_date, departure_date, nights, document_number, identity_erased_at')
       .in('booking_code', codes)
       .eq('property_id', propertyId)
       .eq('is_test', false)
@@ -3125,7 +3125,7 @@ async function loadGuestSummariesByCode(codes) {
             arrival_date: row.arrival_date || null,
             departure_date: row.departure_date || null,
             nights: row.nights || null,
-            hasDocs: !!row.document_number,
+            hasDocs: !!row.document_number || !!row.identity_erased_at,
             capofamigliaSubmittedAt: row.submitted_at || null,
           };
         }
@@ -3135,14 +3135,14 @@ async function loadGuestSummariesByCode(codes) {
           if (row.arrival_date)   map[bc].arrival_date   = row.arrival_date;
           if (row.departure_date) map[bc].departure_date = row.departure_date;
           if (row.nights)         map[bc].nights         = row.nights;
-          if (row.document_number) map[bc].hasDocs       = true;
+          if (row.document_number || row.identity_erased_at) map[bc].hasDocs = true;
           map[bc].capofamigliaSubmittedAt = row.submitted_at || map[bc].capofamigliaSubmittedAt;
         } else {
           // Fill missing fields from companions if head row had blanks.
           if (!map[bc].arrival_date && row.arrival_date)     map[bc].arrival_date = row.arrival_date;
           if (!map[bc].departure_date && row.departure_date) map[bc].departure_date = row.departure_date;
           if (!map[bc].nights && row.nights)                 map[bc].nights = row.nights;
-          if (!map[bc].hasDocs && row.document_number)       map[bc].hasDocs = true;
+          if (!map[bc].hasDocs && (row.document_number || row.identity_erased_at)) map[bc].hasDocs = true;
         }
       }
     }
@@ -8274,6 +8274,17 @@ if (typeof window !== 'undefined') {
 // and by that point the host has no useful error to act on. We surface
 // it here (chip on the row) and again in exportAlloggiati (block +
 // list).
+// Round 76 — identity fields of a filed guest are erased by law after the
+// filing (DM 7/1/2013 art. 4-bis; Annex B of the host agreement).
+function _identityErased(c) { return !!(c && c.identity_erased_at); }
+function _identityErasedText() { return hostLang === 'it' ? 'Dati di identità cancellati per legge dopo l\'invio ad Alloggiati' : 'Identity data erased by law after the Alloggiati filing'; }
+function _skipErasedForExport(list) {
+  const erased = list.filter(_identityErased);
+  if (erased.length) toast(hostLang === 'it'
+    ? `${erased.length} ospiti già inviati esclusi: i loro dati di identità sono stati cancellati per legge.`
+    : `${erased.length} guests already filed left out: their identity data was erased by law.`);
+  return list.filter(c => !!!(c && c.identity_erased_at));
+}
 function _isValidPastDOB(s) {
   if (!s) return false;
   const str = String(s).slice(0, 10);
@@ -8571,7 +8582,7 @@ function renderCheckins() {
           <td data-label="${h('th_type')}">${typeLabel}</td>
           <td data-label="${h('th_arrival')}">${fmtDate(c.arrival_date)}</td>
           <td data-label="${h('th_departure')}">${fmtDate(c.departure_date)}</td>
-          <td data-label="${h('th_birth')}">${_isValidPastDOB(c.date_of_birth)
+          <td data-label="${h('th_birth')}">${!!(c && c.identity_erased_at) ? `<span data-identity-erased style="font-size:0.72rem;color:var(--ink-soft);">${(typeof _identityErasedText === 'function' ? _identityErasedText() : '')}</span>` : _isValidPastDOB(c.date_of_birth)
               ? `${fmtDate(c.date_of_birth)} <span style="font-size:0.72rem;color:var(--ink-soft)">${c.place_of_birth || ''}${c.birth_province && c.birth_province!=='EE' ? ' ('+c.birth_province+')' : ''}</span>`
               : `<span title="${h('dob_invalid_chip')}" style="display:inline-flex;align-items:center;gap:5px;font-size:0.72rem;color:#b03939;background:rgba(224,69,94,0.10);border:1px solid rgba(224,69,94,0.25);padding:2px 8px;border-radius:6px;font-weight:600;">⚠ ${h('dob_invalid_chip')}</span>`
             }</td>
@@ -11294,6 +11305,10 @@ function _prepareAlloggiatiExport(opts = {}) {
     toast(h('late_export_excluded').replace('{n}', lateExcluded.length));
   }
 
+  // Round 76: guests whose identity data was erased after filing are never re-exported.
+  toExport = typeof _skipErasedForExport === 'function' ? _skipErasedForExport(toExport) : toExport;
+  if (toExport.length === 0) { alert(hostLang === 'it' ? 'Nessun ospite da esportare: quelli selezionati sono già stati inviati.' : 'No guests to export: the selected ones were already filed.'); return null; }
+
   // Round 40 T2 — block generation if any guest in the selected set has
   // an invalid / missing DOB. Alloggiati would reject the whole batch
   // with an opaque error and the host wouldn't know which row to fix.
@@ -11801,6 +11816,9 @@ function exportRoss1000() {
 // or per night. Verona and Chieti both pin the age assessment to the
 // stay's first day.
 function _ageAtArrival(c) {
+  // Round 76: after the identity data is erased by law the exact age at
+  // arrival is kept (tourist-tax exemptions).
+  if (!c.date_of_birth && Number.isInteger(c.age_at_arrival)) return c.age_at_arrival;
   if (!c.date_of_birth || !c.arrival_date) return null;
   const dob = new Date(String(c.date_of_birth).split('T')[0]);
   const arr = new Date(String(c.arrival_date).split('T')[0]);
@@ -13543,6 +13561,9 @@ function exportPayTourist() {
     toExport = exportCheckins;
   }
 
+  toExport = typeof _skipErasedForExport === 'function' ? _skipErasedForExport(toExport) : toExport;
+  if (toExport.length === 0) { toast(hostLang === 'it' ? 'Nessun ospite da esportare.' : 'No guests to export.'); return; }
+
   // Group by stay (booking_code or arrival_date)
   const groups = {};
   toExport.forEach(c => {
@@ -14738,10 +14759,14 @@ function viewGuest(id) {
     ${field(it ? 'Cognome' : 'Surname', `<strong>${safe(c.surname)}</strong>`)}
     ${field(it ? 'Nome' : 'Name', `<strong>${safe(c.name)}</strong>`)}
     ${field(it ? 'Sesso' : 'Sex', safe(sexLabel))}
+    ${!!(c && c.identity_erased_at) ? `
+    ${field(it ? 'Anno di nascita' : 'Year of birth', safe(c.birth_year != null ? String(c.birth_year) : '—'))}
+    ${field(it ? 'Età all\'arrivo' : 'Age at arrival', safe(c.age_at_arrival != null ? String(c.age_at_arrival) : '—'))}
+    <div data-identity-erased-notice style="font-size:0.78rem;color:var(--ink-soft);background:rgba(250,246,240,0.6);border-radius:6px;padding:8px 10px;margin:4px 0;line-height:1.45;">${safe((typeof _identityErasedText === 'function' ? _identityErasedText() : ''))} (${safe(fmtDate(c.identity_erased_at))}). ${it ? 'La ricevuta resta valida come prova dell\'invio.' : 'The receipt remains the proof of filing.'}</div>` : `
     ${field(it ? 'Data di nascita' : 'Date of birth', safe(fmtDate(c.date_of_birth)))}
     ${field(it ? 'Luogo di nascita' : 'Place of birth',
         safe(c.place_of_birth) + (c.birth_province && c.birth_province !== 'EE' ? ` <span style="color:var(--ink-soft);font-size:0.78rem;">(${safe(c.birth_province)})</span>` : ''))}
-    ${field(it ? 'Paese di nascita' : 'Country of birth', safe(c.birth_country))}
+    ${field(it ? 'Paese di nascita' : 'Country of birth', safe(c.birth_country))}`}
     ${field(it ? 'Cittadinanza' : 'Citizenship', safe(c.citizenship))}
   `;
 
@@ -14764,7 +14789,10 @@ function viewGuest(id) {
   `;
 
   const isGroupMember = c.guest_type === 'group_member' || c.guest_type === 'member';
-  const docSection = (c.document_type || c.document_number || c.doc_issue_place) ? `
+  const docSection = !!(c && c.identity_erased_at) ? `
+    ${sectionTitle(it ? 'Documento' : 'Document')}
+    <div data-identity-erased-doc style="font-size:0.82rem;color:var(--ink-soft);font-style:italic;padding:10px;background:rgba(250,246,240,0.6);border-radius:6px;line-height:1.5;">${safe((typeof _identityErasedText === 'function' ? _identityErasedText() : ''))}.</div>
+  ` : (c.document_type || c.document_number || c.doc_issue_place) ? `
     ${sectionTitle(it ? 'Documento' : 'Document')}
     ${field(it ? 'Tipo documento' : 'Document type', safe(c.document_type))}
     ${field(it ? 'Numero documento' : 'Document number', safe(c.document_number), { mono: true })}
@@ -15148,6 +15176,7 @@ function editGuest(id) {
         <option value="M"${c.sex === 'M' ? ' selected' : ''}>${safeAttr(h('sex_m'))}</option>
         <option value="F"${c.sex === 'F' ? ' selected' : ''}>${safeAttr(h('sex_f'))}</option>
       </select>`)}
+    ${!!(c && c.identity_erased_at) ? `<div data-identity-erased-edit style="font-size:0.78rem;color:#7a5b00;background:#FFF8E1;border:1px solid #F0D58C;border-radius:6px;padding:8px 10px;margin:6px 0;line-height:1.45;">${safeAttr((typeof _identityErasedText === 'function' ? _identityErasedText() : ''))}. ${hostLang === 'it' ? 'Per correggere l\'invio reinserisci data e luogo di nascita e i dati del documento.' : 'To correct the filing, enter the date and place of birth and the document details again.'}</div>` : ''}
     ${field('field_dob',
       `<input id="edit_dob" type="date" value="${safeAttr(isoDate(c.date_of_birth))}" style="${inputStyle}"${roAttr}>`)}
     ${field('field_place_of_birth',

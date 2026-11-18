@@ -21,6 +21,11 @@ Existing hosts: free until the date Daniele sets for each of them on the launch 
 | 5 | Agent | Sends the one-off launch email with each host's own date: «Nuove condizioni WelcomeBnB: accedi per firmarle. Puoi continuare a usare WelcomeBnB gratis fino al <data>; poi costa 60 € l'anno, IVA inclusa.» (free-for-life hosts: «Per te WelcomeBnB resta gratuito.»). Admin button «Invia email di lancio»: preview first (lists recipients), then send. Each host at most once (`reminders_sent.launch`). | Every host row shows the launch email in its last events. |
 | 6 | Agent | Verifies with a test host: login → terms window → code by email → console → no trial banner until 7 days left; Settings → Abbonamento shows the date and bank details. Records the result in the CHANGELOG. | Test host walked through end to end. |
 
+## When the company is incorporated (Daniele, 18 Nov 2026)
+
+1. **Make the GitHub repository private.** Subscribe to GitHub Pro (~$4/month), then Settings → General → Danger Zone → Change visibility → Private. The agent then checks branch protection, trims CI minutes and switches its check polling to authenticated calls.
+2. **Move the contract to the company.** Update the provider identity in `legal_provider` (company name, registered office, VAT/REA, PEC) and e-mail every host about the transfer under art. 1.4 of the terms (art. 1407 c.c.). No new signature is needed; hosts may withdraw at no cost within 30 days.
+
 ## What happens after launch, automatically
 
 - Reminder emails 7, 3 and 1 days before each host's date, on the day after it ends, and when the 7-day grace period ends (09:00 Rome, from the hourly reminders job; once per date).

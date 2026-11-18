@@ -1,6 +1,6 @@
 # Round 76 — Data retention by law (privacy)
 
-Requested by Daniele, 18 Nov 2026: «abide by the law and keep data as long as possible and as much as possible» → keep each kind of data exactly as long as a law requires or allows, and no longer; then «make sure the data retention policy is in the signed agreement with a host».
+Requested by Daniele, 18 Nov 2026: «abide by the law and keep data as long as possible and as much as possible» → keep each kind of data exactly as long as a law requires or allows, and no longer; then «make sure the data retention policy is in the signed agreement with a host» and «prompt them the terms and conditions at their next login … under WelcomeBnB with my name for now and change to the company later». Confirmed by Daniele on 18 Nov 2026 («Confermo round»).
 
 ## Why
 
@@ -33,13 +33,18 @@ Research, not legal advice: the lawyer checks the table (Phase 0).
 
 ## Phases
 
-0. **Plan and lawyer brief.** This file, plus `docs/legal/RETENTION_LAWYER_BRIEF_IT.md`: the table in Italian, its sources and three questions for the lawyer:
+0. **Plan and lawyer brief** (also: art. 27 GDPR EU representative and transfers while the provider is an individual resident outside the EU; the art. 1.4 transfer clause). This file, plus `docs/legal/RETENTION_LAWYER_BRIEF_IT.md`: the table in Italian, its sources and three questions for the lawyer:
    - may a third-party software keep the statistics and tourist-tax fields after the receipt?
    - are 24 months right for marketing?
    - are 10 years right for reservations?
 
    Documentation only.
-1. **Policy into the signed agreement.**
+1. **Policy into the signed agreement, and acceptance at the next login.**
+   - **Provider identity.** Art. 1.1 names «Daniele Petrilli, che opera con il marchio WelcomeBnB». His address, tax code (no VAT, no PEC) and the court for business hosts (Bari) are **not committed** (the repository is public): they live in a single-row, service-role-only table `legal_provider` and fill placeholders (`{{fornitore_*}}`, `{{foro}}`) in the static terms. Signed-in hosts see them through `/api/host-terms`. Each acceptance stores the identity snapshot it showed, and the receipt e-mail attaches the filled text.
+   - **New art. 1.4: transfer to the company.** Under art. 1407 c.c. the host consents in advance to the contract, DPA included, being transferred to the company Daniele will set up. The transfer takes effect on e-mail notice. Conditions, prices and protections stay the same, and the host can withdraw at no cost within 30 days (Codice del Consumo art. 33 c.2 lett. s). The clause is added to the art. 16 specific approvals.
+   - **Text clean-up.** Remove the «BOZZA» banner and set the effective date. The DPA's Vercel region becomes the EU (Dublin, `dub1`), pinned in the deployment config.
+   - **Enforcement.** Set `HOST_TERMS_ENFORCE=true` in production: every host accepts at their next sign-in, with the e-mail code (Round 69 flow).
+
    - New `docs/compliance/RETENTION_POLICY.md`.
    - DPA section 5.8 and a new Annex B «Tempi di conservazione», in both `docs/compliance/DPA_TEMPLATE.md` and `legal/ALLEGATO_A_DPA_v1.md` (kept byte-identical). The general terms point to Annex B.
    - The v1 hashes and clauses in `legal_documents` are refreshed; the version has no acceptances, so it is still editable.
@@ -58,6 +63,10 @@ Research, not legal advice: the lawyer checks the table (Phase 0).
 ## Not touched
 
 The guest check-in flow and the Alloggiati sending itself; billing; the admin console outside the Ops purge preview and the privacy pages.
+
+## Reminder (Daniele, 18 Nov 2026)
+
+When the company is incorporated, remind Daniele to make the GitHub repository private: GitHub Pro (~$4/month), visibility → Private, then the agent adapts CI and the unauthenticated check polling. This is also recorded in the CHANGELOG open items and in `docs/legal/LAUNCH_RUNBOOK.md`.
 
 ## Owner actions
 

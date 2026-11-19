@@ -44,6 +44,8 @@ Newest entries at the top of each section.
 
 **Not the same as a hand-over to another person** (business sold): the new owner creates their own account and accepts the terms; the admin moves the properties.
 
+**Shipped:** PR #341 merged as `52946ab`. Local `npm run test:all` **PASS 173 / FAIL 0 / SKIP 3** after one fix: the bilingual test caught an untranslated placeholder. CI green; live.
+
 ### Terms receipt e-mail: accepted texts attached as PDF (Claude, 19 November 2026)
 
 **Daniele:** «the terms received via email are in .md format. they should be in pdf».

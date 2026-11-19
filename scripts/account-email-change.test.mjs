@@ -152,8 +152,9 @@ try {
       await page.goto('https://console.example.invalid/host-console.html' + query + hash);
       await page.addScriptTag({ content: `var hostLang=${JSON.stringify(lang)};window.__wbnbInitialHash=${JSON.stringify(hash)};const HT=${JSON.stringify(dict(lang))};function h(k){return HT[k]||k;}
         window.updates=[];let U=${JSON.stringify(user)};const sb={auth:{getUser:async()=>({data:{user:U}}),updateUser:async(a,o)=>{window.updates.push([a,o]);if(a.email==='taken@example.invalid')return{error:{message:'A user with this email address has already been registered'}};U={...U,new_email:a.email};return{error:null};}}};
-        const APP_CONFIG={support:{whatsapp:'+39 350 000 0000',email:'info@example.invalid'}};
+        window.WELCOME_BNB_CONFIG={support:{whatsapp:'+39 350 000 0000',email:'info@example.invalid'}};
         ${fn('_isAdminView')}${fn('toggleLostEmailHelp')}${fn('renderAccountEmailCard')}${fn('requestEmailChange')}${fn('showEmailChangeNotice')}` });
+      await page.addScriptTag({ content: read('host-onboarding.js') });
     };
     await boot();
     await page.evaluate(() => renderAccountEmailCard());

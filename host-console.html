@@ -16383,15 +16383,15 @@ function toggleLostEmailHelp(targetId) {
   const box = document.getElementById(targetId);
   if (!box) return;
   if (box.style.display !== 'none') { box.style.display = 'none'; return; }
-  const sup = (typeof APP_CONFIG !== 'undefined' && APP_CONFIG && APP_CONFIG.support) || {};
-  const mail = sup.email || 'info@welcomebnb.it';
   const prefill = h('lost_email_prefill');
+  const links = (window.HostOnboarding && typeof window.HostOnboarding.supportLinks === 'function')
+    ? window.HostOnboarding.supportLinks(prefill, 'WelcomeBnB · email di accesso') : { whatsapp: null, email: null };
   box.textContent = '';
   const p = document.createElement('p'); p.style.margin = '0 0 8px'; p.textContent = h('lost_email_text'); box.appendChild(p);
   const row = document.createElement('div'); row.style.cssText = 'display:flex;flex-wrap:wrap;gap:12px;';
   const link = (href, text, kind) => { const a = document.createElement('a'); a.href = href; a.textContent = text; a.dataset.lostEmailChannel = kind; a.style.cssText = 'color:var(--warm);font-weight:600;'; if (kind === 'whatsapp') { a.target = '_blank'; a.rel = 'noopener'; } row.appendChild(a); };
-  if (sup.whatsapp) link('https://wa.me/' + String(sup.whatsapp).replace(/[^0-9]/g, '') + '?text=' + encodeURIComponent(prefill), '💬 ' + h('lost_email_wa'), 'whatsapp');
-  link('mailto:' + mail + '?subject=' + encodeURIComponent('WelcomeBnB · email di accesso') + '&body=' + encodeURIComponent(prefill), '✉️ ' + h('lost_email_mail'), 'email');
+  if (links.whatsapp) link(links.whatsapp, '💬 ' + h('lost_email_wa'), 'whatsapp');
+  link(links.email || 'mailto:info@welcomebnb.it', '✉️ ' + h('lost_email_mail'), 'email');
   box.appendChild(row);
   box.style.display = '';
 }

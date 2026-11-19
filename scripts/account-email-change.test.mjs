@@ -46,10 +46,38 @@ if (PGlite) {
   console.log('  db: trigger checked in PGlite');
 } else console.log('  db: SKIP — @electric-sql/pglite not installed');
 
+// 1b. The real admin log accepts what the endpoint writes (this is what failed in production on 19 Nov).
+if (PGlite) {
+  const db = new PGlite();
+  await db.exec(`create role anon; create role authenticated; create role service_role; create schema auth; create table auth.users(id uuid primary key, email text);
+    create table public.properties(id serial primary key, owner_id uuid, reminder_email text, host_email text);
+    create table public.host_notification_settings(host_id uuid primary key, notify_email text);
+    create table public.pilot_invites(id serial primary key, email text unique); create table public.pilot_hosts(id serial primary key, host_email text unique);
+    create table public.admin_users(email text primary key);
+    create table public.billing_events(id uuid primary key default gen_random_uuid(), user_id uuid, actor text, action text, old_value jsonb, new_value jsonb, reason text, created_at timestamptz default now());`);
+  await db.exec(read('supabase/migrations/20261116170000_round67_admin_audit_log.sql'));
+  await db.exec(read(MIG)); const fix = read('supabase/migrations/20261119100000_admin_audit_account_email.sql'); await db.exec(fix); await db.exec(fix);
+  const { cleanMetadata } = await import('../api/_admin-audit.js');
+  const { fingerprint: fp } = await import('../api/_admin-account.js');
+  const ins = (action, outcome, metadata) => db.query(`insert into public.admin_access_events(actor_id, actor_email, action, outcome, target_table, target_id, metadata) values ($1, 'admin@example.invalid', $2, $3, 'auth_users', $4, $5)`, [U2, action, outcome, U1, JSON.stringify(cleanMetadata(metadata) || {})]);
+  await ins('account_email_change', 'requested', {});
+  await ins('account_email_change', 'ok', { status: 200, old_email_sha: fp('a@b.it'), new_email_sha: fp('c@d.it'), reason: 'telefonata del 19/11', notices: { old: true, new: true } });
+  await ins('account_email_change_preview', 'ok', { status: 200 });
+  assert.equal((await db.query(`select count(*)::int n from public.admin_access_events where action like 'account_email_change%'`)).rows[0].n, 3, 'admin log accepts the actions and the metadata');
+  await assert.rejects(db.query(`insert into public.admin_access_events(action, metadata) values ('account_email_change', '{"x":"a@b.it"}')`), /check/, 'addresses still refused by the log');
+  await assert.rejects(db.query(`insert into public.admin_access_events(action) values ('account_email_whatever')`), /check/, 'other actions still refused');
+  // Every change leaves an account-history row (self-service included).
+  await db.query(`insert into auth.users values ($1, 'old@example.invalid')`, [U1]);
+  await db.query(`update auth.users set email = 'new@example.invalid' where id = $1`, [U1]);
+  assert.deepEqual((await db.query(`select action, old_value, new_value from public.billing_events`)).rows, [{ action: 'login_email_changed', old_value: { email: 'old@example.invalid' }, new_value: { email: 'new@example.invalid' } }]);
+  console.log('  db: admin log and account history checked in PGlite');
+}
+
 // 2. Server logic.
 const { handleAccountAction, noticeHtml } = await import('../api/_admin-account.js');
 const sent = []; let updated = null;
-const deps = (over = {}) => ({ getUser: async id => id === U1 ? { id: U1, email: 'Old@Example.invalid' } : null,
+const history = [];
+const deps = (over = {}) => ({ recordHistory: async e => { history.push(e); }, getUser: async id => id === U1 ? { id: U1, email: 'Old@Example.invalid' } : null,
   updateEmail: async (id, e) => { updated = [id, e]; return { ok: true, status: 200 }; }, sendEmail: async (to, subj, html) => { sent.push({ to, subj, html }); return { ok: true }; }, ...over });
 const act = (body, d = deps()) => handleAccountAction('account_email_change', body, { deps: d });
 assert.equal((await act({ user_id: 'x', new_email: 'a@b.it', reason: 'telefonata' })).status, 400);
@@ -66,7 +94,14 @@ assert.deepEqual(updated, [U1, 'new@example.invalid']);
 assert.deepEqual([done.status, done.body.changed, done.body.notices], [200, true, { old: true, new: true }]);
 assert.deepEqual(sent.map(x => x.to), ['old@example.invalid', 'new@example.invalid'], 'both addresses notified');
 assert.match(sent[0].html, /da <strong>old@example\.invalid<\/strong> a <strong>new@example\.invalid<\/strong>/); assert.match(sent[0].html, /Se non hai chiesto tu questo cambio/);
-assert.deepEqual(done.audit, { old_email: 'old@example.invalid', new_email: 'new@example.invalid', reason: 'telefonata del 19/11', notices: { old: true, new: true } });
+const { fingerprint, maskEmails } = await import('../api/_admin-account.js');
+assert.deepEqual(done.audit, { old_email_sha: fingerprint('old@example.invalid'), new_email_sha: fingerprint('new@example.invalid'), reason: 'telefonata del 19/11', notices: { old: true, new: true } }, 'log: fingerprints, never addresses');
+assert.match(fingerprint('a@b.it'), /^[0-9a-f]{16}$/); assert.equal(maskEmails('scritto da x.y@z.it ieri'), 'scritto da [email] ieri');
+assert.deepEqual(history.at(-1), { userId: U1, actor: 'admin', oldEmail: 'old@example.invalid', newEmail: 'new@example.invalid', reason: 'telefonata del 19/11' }, 'who/why in the account history');
+// No history record → no change.
+updated = null;
+const noHist = await act({ user_id: U1, new_email: 'new2@example.invalid', reason: 'telefonata', dry: false }, deps({ recordHistory: async () => { throw new Error('down'); } }));
+assert.equal(noHist.status, 503); assert.equal(updated, null, 'history first, or nothing changes');
 assert.doesNotMatch(noticeHtml({ which: 'new', oldEmail: '<x>@a.it', newEmail: 'b@a.it' }), /<x>/, 'escaped');
 
 // 3. Endpoint: admin gate before anything; journalled before the change and after.
@@ -88,7 +123,8 @@ assert.equal((await post('admin', body, false)).code, 503, 'no journal, no chang
 const ok = await post('admin', body);
 assert.equal(ok.code, 200); assert.equal(ok.headers['Cache-Control'], 'no-store');
 assert.deepEqual(journal.at(-2), ['first', 'account_email_change', U1]);
-assert.deepEqual(journal.at(-1).slice(0, 3), ['after', 'account_email_change', 'ok']); assert.equal(journal.at(-1)[3].new_email, 'new@example.invalid'); assert.equal(journal.at(-1)[3].reason, 'telefonata');
+assert.deepEqual(journal.at(-1).slice(0, 3), ['after', 'account_email_change', 'ok']); assert.equal(journal.at(-1)[3].new_email_sha, fingerprint('new@example.invalid')); assert.ok(!/@/.test(JSON.stringify(journal.at(-1)[3])), 'no address in the log');
+assert.equal(history.at(-1).actor, 'admin@example.invalid', 'history names the admin');
 
 // 4. Browser: host console card and return notices; admin «Utenti» box.
 const html = read('host-console.html');

@@ -14,6 +14,7 @@ import { createHash, createHmac, randomInt, timingSafeEqual } from 'node:crypto'
 import { SUPABASE_URL, SUPABASE_ANON_KEY, APP_BASE_URL, SUPPORT_CONTACTS } from './_environment.js';
 import { supabaseAuthHeaders } from './_supabase-auth.js';
 import { supportWhatsappText, whatsappLink } from './_support-contact.js';
+import { termsPdf } from '../lib/terms-pdf.mjs';
 
 const CODE_TTL_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
@@ -256,6 +257,7 @@ async function sendReceipt(deps, to, doc, row, hostKind, provider) {
     day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   const base = deps.appBaseUrl.replace(/\/$/, '');
   const attachments = [];
+  const titles = { [doc.file_path]: `Condizioni Generali di Servizio WelcomeBnB, versione ${doc.version}`, [doc.annex_file_path]: `Allegato A — Accordo sul trattamento dei dati, versione ${doc.version}` };
   for (const [path, sha] of [[doc.file_path, doc.text_sha256], [doc.annex_file_path, doc.annex_sha256]]) {
     if (!path || !sha) continue;
     try {
@@ -263,7 +265,17 @@ async function sendReceipt(deps, to, doc, row, hostKind, provider) {
       const bytes = r.ok ? Buffer.from(await r.arrayBuffer()) : null;
       if (bytes && createHash('sha256').update(bytes).digest('hex') === sha) {
         // The copy carries the provider data the host saw (filled placeholders).
-        attachments.push({ filename: path.split('/').pop(), content: Buffer.from(fillProvider(bytes.toString('utf8'), provider), 'utf8').toString('base64') });
+        const filled = fillProvider(bytes.toString('utf8'), provider);
+        const name = path.split('/').pop();
+        try {
+          // 19 Nov 2026: sent as PDF. Each page footer: document, version, acceptance, hash.
+          const pdf = await termsPdf({ markdown: filled, title: titles[path],
+            footer: `${titles[path]} · accettato il ${when} da ${to} · SHA-256 del testo pubblicato ${sha}`,
+            meta: { subject: 'Testo accettato dall\'Host', date: new Date(row?.created_at || deps.now()) } });
+          attachments.push({ filename: name.replace(/\.md$/, '.pdf'), content: Buffer.from(pdf).toString('base64') });
+        } catch (_) {
+          attachments.push({ filename: name, content: Buffer.from(filled, 'utf8').toString('base64') }); // never send nothing
+        }
       }
     } catch (_) { /* link and hash below still identify the text */ }
   }
@@ -285,7 +297,7 @@ async function sendReceipt(deps, to, doc, row, hostKind, provider) {
     'Conferma con codice monouso inviato a questo indirizzo email.',
     `Testo: ${base}/${doc.file_path} (SHA-256 ${doc.text_sha256}; i segnaposto {{fornitore_*}} riportano i dati del Fornitore indicati sopra)`,
     doc.annex_file_path ? `Allegato A: ${base}/${doc.annex_file_path} (SHA-256 ${doc.annex_sha256})` : '',
-    attachments.length ? 'I testi accettati sono allegati a questa email.' : '',
+    attachments.length ? (attachments.every(a => a.filename.endsWith('.pdf')) ? 'I testi accettati sono allegati a questa email in PDF.' : 'I testi accettati sono allegati a questa email.') : '',
     '',
     'You accepted the WelcomeBnB Terms of Service above; the Italian text is the binding version.',
     supportWhatsappText('it') ? '\n' + supportWhatsappText('it') : '',

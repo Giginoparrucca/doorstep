@@ -188,11 +188,23 @@ assert.match(receipt.subject, /Copia delle Condizioni WelcomeBnB accettate \(ver
 assert.match(receipt.text, /art\. 10\.2 e 10\.3 — limitazioni/);
 assert.match(receipt.text, /uso con partita IVA/);
 assert.match(receipt.text, new RegExp(sha(termsBytes)));
-assert.deepEqual(receipt.attachments.map(a => a.filename), ['CONDIZIONI_GENERALI_v1.md', 'ALLEGATO_A_DPA_v1.md'], 'exact texts attached');
+assert.deepEqual(receipt.attachments.map(a => a.filename), ['CONDIZIONI_GENERALI_v1.pdf', 'ALLEGATO_A_DPA_v1.pdf'], 'accepted texts attached as PDF (19 Nov 2026)');
+assert.match(receipt.text, /I testi accettati sono allegati a questa email in PDF\./);
 // Round 76: the attached copy is the text the host saw — placeholders filled with the provider data.
-const attached = Buffer.from(receipt.attachments[0].content, 'base64').toString('utf8');
-assert.equal(attached, termsBytes.toString('utf8').replace('{{fornitore_indirizzo}}', PROVIDER.address).replace('{{fornitore_cf}}', PROVIDER.tax_code));
-assert.doesNotMatch(attached, /\{\{fornitore_/);
+// Text of a PDF made by lib/terms-pdf.mjs: inflate each content stream, decode the <hex> Tj strings.
+const { inflateSync } = await import('node:zlib');
+const pdfText = b64 => { const raw = Buffer.from(b64, 'base64'); const s = raw.toString('latin1'); let out = '';
+  for (const m of s.matchAll(/stream\r?\n/g)) { const start = m.index + m[0].length, end = s.indexOf('endstream', start);
+    try { const t = inflateSync(raw.subarray(start, end)).toString('latin1'); for (const x of t.matchAll(/<([0-9A-Fa-f]+)> Tj/g)) out += Buffer.from(x[1], 'hex').toString('latin1'); } catch (_) {} }
+  return out; };
+const pdf0 = Buffer.from(receipt.attachments[0].content, 'base64');
+assert.equal(pdf0.subarray(0, 5).toString(), '%PDF-', 'a real PDF');
+const attached = pdfText(receipt.attachments[0].content).replace(/\s+/g, '');
+const squash = t => t.replace(/\s+/g, '');
+for (const s of ['Condizioni Generali di Servizio WelcomeBnB', 'Daniele Petrilli', PROVIDER.address, PROVIDER.tax_code, 'Art. 16', sha(termsBytes)]) assert.ok(attached.includes(squash(s)), 'PDF text has ' + s);
+assert.doesNotMatch(attached, /\{\{fornitore_/, 'placeholders filled');
+const annexText = pdfText(receipt.attachments[1].content).replace(/\s+/g, '');
+for (const s of ['Allegato B', 'Tempi di conservazione', '5 anni dall', sha(annexBytes)]) assert.ok(annexText.includes(squash(s)), 'annex PDF has ' + s);
 assert.match(receipt.text, /Fornitore: Fornitore Fittizio, che opera con il marchio WelcomeBnB, domicilio Via Inventata 1, 00000 Nessuna Città, C\.F\. FCTFNT00A01H501X\./);
 assert.deepEqual(tables.host_terms_acceptances.at(-1).provider_snapshot, { name: PROVIDER.name, address: PROVIDER.address, tax_code: PROVIDER.tax_code, vat: null, pec: null }, 'evidence keeps the provider data shown');
 assert.ok(!/check-in|schedin|documento|passaporto/i.test(receipt.text), 'no guest data in the receipt');

@@ -7,6 +7,20 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Terms receipt e-mail: accepted texts attached as PDF (Claude, 19 November 2026)
+
+**Daniele:** «the terms received via email are in .md format. they should be in pdf».
+
+- The receipt e-mail now attaches `CONDIZIONI_GENERALI_v1.pdf` and `ALLEGATO_A_DPA_v1.pdf` instead of the Markdown files.
+- **What the PDFs contain:** the same hash-checked text the host saw, with the provider data filled, A4, readable headings, lists and the Annex B table.
+- **Every page footer** names the document and version, the acceptance time and account e-mail, the SHA-256 of the published text, and the page number.
+- **Safety net:** if the PDF cannot be built, the filled `.md` is attached instead, so the e-mail never goes out without the text.
+- **New dependency `pdf-lib` 1.17.1** (exact pin, pure JS, 0 vulnerabilities in `npm install`), used with the standard Helvetica font; characters outside it are replaced, not dropped silently.
+- **Tests:**
+  - new `terms-pdf`: real PDF, multi-page footers, tables, accents, replaced characters;
+  - `round69-host-terms-api`: the receipt carries two PDFs whose text includes the provider data, both hashes and Annex B, and no placeholder.
+- Only new acceptances get PDFs; the e-mail already sent for the one existing acceptance stays as it was.
+
 ### Admin: terms in «Utenti», console buttons in the deep dive (Claude, 18 November 2026)
 
 **Daniele:** «the acceptance of the terms is by user, not by property so it should be displayed in the Users tab not the Ops. also, when deep diving on a user there should be a button to open the console next to each of their properties».

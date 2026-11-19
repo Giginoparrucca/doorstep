@@ -1783,6 +1783,20 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         <button type="button" id="settingsCancelBtn" class="btn btn-secondary btn-sm" onclick="cancelSettingsEdit()" style="display:none;"><span data-h="btn_cancel_edit">Cancel</span></button>
       </div>
 
+      <!-- 19 Nov 2026 — login e-mail change, self-service with confirmation links (renderAccountEmailCard). -->
+      <div class="form-card" id="hostAccountEmailCard" style="display:none;">
+        <div class="form-card-title" data-h="acct_email_title">Login email</div>
+        <div class="form-card-desc" data-acct-current></div>
+        <div data-acct-pending role="status" style="display:none;font-size:0.8rem;color:#7a5b00;background:#FFF8E1;border:1px solid #F0D58C;border-radius:6px;padding:8px 10px;margin:6px 0;"></div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px;">
+          <label for="acctNewEmail" style="position:absolute;left:-9999px;" data-h="acct_email_new">New email</label>
+          <input id="acctNewEmail" type="email" autocomplete="email" class="form-input" style="flex:1 1 220px;min-width:0;" placeholder="nuova@email.it">
+          <button type="button" id="acctEmailBtn" class="btn btn-secondary btn-sm" onclick="requestEmailChange()" data-h="acct_email_btn">Change email</button>
+        </div>
+        <div class="form-hint" data-h="acct_email_hint">We send a confirmation link to the new address and one to your current address: the change happens only when you have opened both. Your properties and data stay the same.</div>
+        <div data-acct-msg role="status" style="font-size:0.8rem;margin-top:6px;"></div>
+      </div>
+
       <!-- Round 69 — accepted Terms version (filled by renderHostTermsSettings). -->
       <div class="form-card" id="hostTermsSettingsCard" style="display:none;">
         <div class="form-card-title" data-terms-title>Terms of Service</div>
@@ -2582,6 +2596,7 @@ observePageToolbarHeader();
 // no password set" bug after a magic-link click.
 try {
   const _initialHash = (window.location && window.location.hash) || '';
+  window.__wbnbInitialHash = _initialHash; // read by showEmailChangeNotice (19 Nov 2026)
   const _m = _initialHash.match(/[#&]type=([a-z_]+)/i);
   if (_m && _m[1]) {
     const kind = _m[1].toLowerCase();
@@ -4836,6 +4851,16 @@ const HT = {
     reminder_desc: 'Every day at the time you choose (07:00 unless you change it), in the property\'s timezone, WelcomeBnB emails you a digest of guests arriving tomorrow with their unique booking links, so you can forward them by WhatsApp or email. Leave the email blank to turn reminders off.',
     reminder_email: 'Reminder email',
     reminder_email_hint: 'Where the daily digest arrives. Use your own address.',
+    acct_email_title: 'Login email',
+    acct_email_current: 'You sign in with {email}.',
+    acct_email_pending: 'Change waiting for confirmation: {email}. Open the links we sent to both addresses.',
+    acct_email_new: 'New email',
+    acct_email_btn: 'Change email',
+    acct_email_hint: 'We send a confirmation link to the new address and one to your current address: the change happens only when you have opened both. Your properties and data stay the same.',
+    acct_email_invalid: 'Enter a valid email address.',
+    acct_email_same: 'This is already your login email.',
+    acct_email_taken: 'This email is already used by another account. Write to info@welcomebnb.it.',
+    acct_email_sent: 'Done: we sent the confirmation links to {email} and to your current address. Open both to complete the change.',
     reminder_tz: 'Property timezone',
     reminder_tz_hint: 'Used to compute "tomorrow" and the send time below.',
     reminder_hour: 'Send time',
@@ -5434,6 +5459,16 @@ const HT = {
     reminder_desc: 'Ogni giorno all\'ora che scegli (07:00 se non la cambi), nel fuso orario della proprietà, WelcomeBnB ti invia via email un riepilogo degli ospiti in arrivo domani con i loro link di prenotazione unici, così puoi inoltrarli per WhatsApp o email. Lascia vuota l\'email per disattivare i promemoria.',
     reminder_email: 'Email promemoria',
     reminder_email_hint: 'Dove arriva il riepilogo giornaliero. Usa il tuo indirizzo.',
+    acct_email_title: 'Email di accesso',
+    acct_email_current: 'Accedi con {email}.',
+    acct_email_pending: 'Cambio in attesa di conferma: {email}. Apri i link che abbiamo inviato a entrambi gli indirizzi.',
+    acct_email_new: 'Nuova email',
+    acct_email_btn: 'Cambia email',
+    acct_email_hint: 'Inviamo un link di conferma al nuovo indirizzo e uno a quello attuale: il cambio avviene solo dopo che li hai aperti entrambi. Strutture e dati restano gli stessi.',
+    acct_email_invalid: 'Inserisci un indirizzo email valido.',
+    acct_email_same: 'È già la tua email di accesso.',
+    acct_email_taken: 'Questa email è già usata da un altro account. Scrivi a info@welcomebnb.it.',
+    acct_email_sent: 'Fatto: abbiamo inviato i link di conferma a {email} e al tuo indirizzo attuale. Aprili entrambi per completare il cambio.',
     reminder_tz: 'Fuso orario proprietà',
     reminder_tz_hint: 'Usato per calcolare "domani" e l\'ora di invio qui sotto.',
     reminder_hour: 'Ora di invio',
@@ -5825,6 +5860,7 @@ async function showPanel(id, btn) {
   if (id === 'contacts') loadMarketingContacts();
   if (id === 'settings' && typeof renderIreservationPanel === 'function') void renderIreservationPanel(true);
   if (id === 'settings' && typeof renderHostTermsSettings === 'function') renderHostTermsSettings();
+  if (id === 'settings' && typeof renderAccountEmailCard === 'function') renderAccountEmailCard();
   if (id === 'settings' && typeof renderHostBillingSettings === 'function') renderHostBillingSettings();
   if (id === 'calendar') renderCalendarPanel(); // Round 40 T5
   // Round 43 — "Come funziona" pill next to the panel title. Uses a
@@ -16317,6 +16353,81 @@ function _termsOpenPrint(ev, cur, provider) {
     btn.onclick = () => w.print(); body.appendChild(btn);
   }).catch(() => { body.textContent = h('terms_text_error'); });
 }
+// 19 Nov 2026 — change the login e-mail (self-service). Supabase sends a
+// confirmation link to the new address and, with «Secure email change» on, to
+// the current one too; nothing changes until they are opened. The database
+// trigger account_email_changed then moves notification/reminder copies of
+// the old address. Hidden in the admin view (?p=): there the session is the
+// admin's own account.
+async function renderAccountEmailCard() {
+  const card = document.getElementById('hostAccountEmailCard');
+  if (!card) return;
+  if (typeof _isAdminView === 'function' && _isAdminView()) { card.style.display = 'none'; return; }
+  let u = null;
+  try { const r = await sb.auth.getUser(); u = r && r.data && r.data.user || null; } catch (_) {}
+  if (!u) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  card.querySelector('[data-acct-current]').textContent = h('acct_email_current').replace('{email}', u.email || '');
+  const pend = card.querySelector('[data-acct-pending]');
+  pend.textContent = u.new_email ? h('acct_email_pending').replace('{email}', u.new_email) : '';
+  pend.style.display = u.new_email ? '' : 'none';
+}
+async function requestEmailChange() {
+  const card = document.getElementById('hostAccountEmailCard');
+  if (!card || (typeof _isAdminView === 'function' && _isAdminView())) return;
+  const input = document.getElementById('acctNewEmail'), btn = document.getElementById('acctEmailBtn'), msg = card.querySelector('[data-acct-msg]');
+  const say = (t, bad) => { msg.textContent = t; msg.style.color = bad ? '#b03939' : '#027A48'; };
+  const v = String(input.value || '').trim().toLowerCase();
+  if (!/^[^\s@<>()"',;:]+@[^\s@<>()"',;:]+\.[a-z]{2,}$/i.test(v)) return say(h('acct_email_invalid'), true);
+  let current = '';
+  try { const r = await sb.auth.getUser(); current = String(r && r.data && r.data.user && r.data.user.email || '').toLowerCase(); } catch (_) {}
+  if (v === current) return say(h('acct_email_same'), true);
+  btn.disabled = true;
+  try {
+    const { error } = await sb.auth.updateUser({ email: v }, { emailRedirectTo: `${window.location.origin}/host-console.html?email_change=1` });
+    if (error) {
+      const raw = String(error.message || error);
+      say(/already|registered|exists/i.test(raw) ? h('acct_email_taken') : (typeof _authEmailErrorText === 'function' ? _authEmailErrorText(error) : raw), true);
+    } else {
+      say(h('acct_email_sent').replace('{email}', v), false);
+      input.value = '';
+      await renderAccountEmailCard();
+    }
+  } catch (e) { say(String(e && e.message || e), true); }
+  btn.disabled = false;
+}
+// The confirmation links come back to ?email_change=1. With two links, the
+// first answers #message=…other email…; the last signs in with the new
+// e-mail (#…type=email_change, tokens left for the SDK). Errors come as
+// #error_code=…; this runs before the generic expired-link notice.
+function showEmailChangeNotice() {
+  let kind = null;
+  try {
+    const q = new URLSearchParams(location.search);
+    if (q.get('email_change') !== '1') return;
+    const hp = new URLSearchParams(String(window.__wbnbInitialHash || location.hash || '').replace(/^#/, ''));
+    if (hp.get('error_code') || hp.get('error')) kind = 'failed';
+    else if (/other email/i.test(hp.get('message') || '')) kind = 'half';
+    else kind = 'done';
+    const clean = new URL(location.href); clean.searchParams.delete('email_change');
+    if (kind !== 'done') clean.hash = ''; // a 'done' hash carries the session tokens for the SDK
+    history.replaceState(null, '', clean.toString());
+  } catch (_) { return; }
+  const it = hostLang === 'it';
+  const text = {
+    half: it ? 'Conferma ricevuta. Per completare il cambio dell\'email di accesso apri anche il link che ti abbiamo inviato all\'altro indirizzo.' : 'Confirmation received. To complete the login email change, also open the link we sent to the other address.',
+    done: it ? 'Email di accesso aggiornata: da ora accedi con il nuovo indirizzo.' : 'Login email updated: from now on, sign in with the new address.',
+    failed: it ? 'Il link di conferma non è più valido. Riprova da Impostazioni → Email di accesso.' : 'The confirmation link is no longer valid. Try again from Settings → Login email.',
+  }[kind];
+  const bar = document.createElement('div');
+  bar.setAttribute('role', 'status'); bar.dataset.emailChangeNotice = kind;
+  bar.style.cssText = 'position:fixed;left:12px;right:12px;top:12px;z-index:10050;background:' + (kind === 'failed' ? '#FEF3F2;color:#B42318' : '#ECFDF3;color:#027A48') + ';border:1px solid currentColor;border-radius:10px;padding:10px 40px 10px 14px;font-size:0.9rem;box-shadow:0 4px 18px rgba(0,0,0,0.12);';
+  bar.textContent = text;
+  const x = document.createElement('button'); x.type = 'button'; x.textContent = '×'; x.setAttribute('aria-label', it ? 'Chiudi' : 'Close');
+  x.style.cssText = 'position:absolute;right:8px;top:6px;border:0;background:none;font-size:1.3rem;cursor:pointer;color:inherit;';
+  x.onclick = () => bar.remove(); bar.appendChild(x);
+  document.body.appendChild(bar);
+}
 function renderHostTermsSettings() {
   const card = document.getElementById('hostTermsSettingsCard');
   const s = _hostTermsStatus;
@@ -17354,6 +17465,7 @@ function fillPropertyForm(data) {
   }
 }
 
+try { if (typeof showEmailChangeNotice === 'function') showEmailChangeNotice(); } catch (_) {}
 try { showAuthLinkNotice(); } catch (_) {}
 init();
 setTimeout(() => setHostLang('it'), 200);

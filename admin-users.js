@@ -72,6 +72,49 @@
     } catch (err) { if (root.adminToast) root.adminToast('Prova non disponibile: ' + String(err && err.message || err), 'error'); }
   }
 
+  // 19 Nov 2026 — assisted login e-mail change, for a host who can no longer
+  // use the old mailbox. Check the person first (phone/WhatsApp); recorded in
+  // the admin log with both addresses and the reason; both get a notice.
+  function emailBox(r) {
+    if (!r.user_id || !r.email) return '';
+    const id = esc(r.user_id), inp = 'padding:6px 8px;border:1px solid var(--border);border-radius:6px;font:inherit;font-size:0.8rem;min-width:0;';
+    return `<div data-account-email="${id}" style="margin-top:10px;padding:10px 12px;background:var(--white);border:1px solid var(--border);border-radius:8px;">
+      <div style="font-weight:600;font-size:0.82rem;">Email di accesso</div>
+      <div style="font-size:0.74rem;margin:2px 0 4px;"><span>Attuale:</span> <strong data-i18n-skip>${esc(r.email)}</strong></div>
+      <div style="font-size:0.74rem;color:var(--ink-soft);margin:0 0 8px;">Usa questo cambio solo se l’host non può confermarlo da sé in Impostazioni (per esempio non accede più alla vecchia casella). Verifica prima l’identità (telefono o WhatsApp). Le strutture e i dati restano; avvisi e promemoria passano al nuovo indirizzo; entrambi gli indirizzi ricevono un avviso.</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+        <label style="position:absolute;left:-9999px;" for="acctNew-${id}">Nuova email</label>
+        <input id="acctNew-${id}" type="email" autocomplete="off" placeholder="nuova@email.it" style="${inp}flex:1 1 180px;">
+        <label style="position:absolute;left:-9999px;" for="acctWhy-${id}">Motivo</label>
+        <input id="acctWhy-${id}" type="text" maxlength="500" placeholder="Motivo e verifica (es. telefonata del 19/11)" style="${inp}flex:2 1 220px;">
+        <button type="button" data-account-email-save onclick="UsersAdmin.changeEmail('${id}')" style="padding:6px 10px;border:1px solid #B54708;background:#FFFAEB;color:#B54708;border-radius:6px;cursor:pointer;font:inherit;font-size:0.78rem;font-weight:600;white-space:nowrap;">Cambia email</button>
+      </div>
+      <div data-account-email-msg role="status" style="font-size:0.74rem;margin-top:6px;"></div>
+    </div>`;
+  }
+  async function changeEmail(uid) {
+    const row = (data && data.rows || []).find(x => x.user_id === uid);
+    const box = document.querySelector(`[data-account-email="${uid}"]`);
+    if (!row || !box) return;
+    const say = (t, bad) => { const m = box.querySelector('[data-account-email-msg]'); if (m) { m.textContent = t; m.style.color = bad ? '#B42318' : '#027A48'; } };
+    const newEmail = String(document.getElementById('acctNew-' + uid).value || '').trim().toLowerCase();
+    const reason = String(document.getElementById('acctWhy-' + uid).value || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(newEmail)) return say('Scrivi una nuova email valida.', true);
+    if (reason.length < 5) return say('Scrivi il motivo e come hai verificato l’identità.', true);
+    if (!root.confirm(`Cambiare l’email di accesso da ${row.email} a ${newEmail}?\n\nL’host accederà solo con il nuovo indirizzo. Entrambi gli indirizzi ricevono un avviso.`)) return;
+    const btn = box.querySelector('[data-account-email-save]'); if (btn) btn.disabled = true;
+    try {
+      const { data: s } = await adminClient().auth.getSession();
+      const token = s && s.session && s.session.access_token;
+      const res = await root.fetch('/api/admin-host-health', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ action: 'account_email_change', user_id: uid, new_email: newEmail, reason, dry: false }), signal: AbortSignal.timeout(30000) });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { say(j.error || ('Errore ' + res.status), true); if (btn) btn.disabled = false; return; }
+      const n = j.notices || {};
+      if (root.adminToast) root.adminToast(`Email cambiata in ${j.new_email}` + (n.old && n.new ? ' · avvisi inviati' : ' · avvisi NON tutti inviati'), n.old && n.new ? 'success' : 'error');
+      data = null; error = null; load();
+    } catch (e) { say('Cambio non verificato: ricarica la lista prima di riprovare.', true); if (btn) btn.disabled = false; }
+  }
+
   async function load() {
     loading = true; error = null; render();
     try {
@@ -149,7 +192,7 @@
                 <td>${chip(actText, actTone, 'data-activity-chip')}</td>
                 <td data-terms style="white-space:nowrap;">${termsCell(r)}</td>
                 <td>${r.user_id ? `<button type="button" data-users-billing-toggle="${esc(r.user_id)}" aria-expanded="${openBilling.has(r.user_id)}" onclick="UsersAdmin.toggleBilling('${esc(r.user_id)}')" style="padding:4px 10px;border:1px solid var(--border);background:var(--white);border-radius:6px;cursor:pointer;font:inherit;font-size:0.76rem;white-space:nowrap;">${openBilling.has(r.user_id) ? 'Chiudi ▴' : 'Gestisci ▾'}</button>` : ''}</td></tr>
-                ${r.user_id && openBilling.has(r.user_id) ? `<tr data-users-billing="${esc(r.user_id)}"><td colspan="9" style="background:#F9FAFB;">${r.billing && typeof root.renderBillingBox === 'function' ? root.renderBillingBox(r.billing, r.user_id) : '<p style="font-size:0.78rem;color:#B54708;margin:0;">Abbonamento non disponibile: aggiorna la pagina.</p>'}</td></tr>` : ''}`;
+                ${r.user_id && openBilling.has(r.user_id) ? `<tr data-users-billing="${esc(r.user_id)}"><td colspan="9" style="background:#F9FAFB;">${r.billing && typeof root.renderBillingBox === 'function' ? root.renderBillingBox(r.billing, r.user_id) : '<p style="font-size:0.78rem;color:#B54708;margin:0;">Abbonamento non disponibile: aggiorna la pagina.</p>'}${emailBox(r)}</td></tr>` : ''}`;
             }).join('') || '<tr><td colspan="9">Nessun utente.</td></tr>'}</tbody>
           </table></div>
         <p style="font-size:0.72rem;color:var(--ink-soft);margin-top:6px;">Attivo = ha usato la console negli ultimi 7 giorni · In calo = 8–30 giorni · Inattivo = oltre 30 giorni. Giorni attivi = giorni distinti con attività in console. Tocca un host per il dettaglio e per aprire la console di ogni struttura · «Condizioni» = versione accettata dall’account e data, «Scarica prova» scarica le prove dell’accettazione · «Gestisci» per prova, pagamento e gratis a vita.</p>
@@ -170,5 +213,5 @@
     const el = document.getElementById('usersSearch'); if (el) { el.focus(); el.setSelectionRange(v.length, v.length); }
   }
   function toggleBilling(uid) { if (openBilling.has(uid)) openBilling.delete(uid); else openBilling.add(uid); render(); }
-  root.UsersAdmin = { render, toggleBilling, termsEvidence, invalidate: () => { data = null; error = null; }, reload: () => { data = null; error = null; load(); }, sort: sortBy, search, toggleTest: on => { view = { ...view, showTest: !!on }; render(); }, openHost, _reset: () => { data = null; error = null; loading = false; openBilling.clear(); view = { sort: 'registered', dir: 'desc', search: '', showTest: false }; } };
+  root.UsersAdmin = { render, toggleBilling, termsEvidence, changeEmail, invalidate: () => { data = null; error = null; }, reload: () => { data = null; error = null; load(); }, sort: sortBy, search, toggleTest: on => { view = { ...view, showTest: !!on }; render(); }, openHost, _reset: () => { data = null; error = null; loading = false; openBilling.clear(); view = { sort: 'registered', dir: 'desc', search: '', showTest: false }; } };
 })(typeof window !== 'undefined' ? window : globalThis);

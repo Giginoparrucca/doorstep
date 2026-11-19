@@ -156,6 +156,7 @@
   // Round 67 Phase 5 — admin audit log (admin_access_events), newest first.
   let audit = null; // { events, chain, filter }
   const ACTION_LABELS = { host_health_read: 'Salute host (lettura)', audit_read: 'Registro (lettura)', dsar_export: 'Privacy: esportazione', dsar_erase_preview: 'Privacy: anteprima cancellazione', dsar_erase: 'Privacy: cancellazione',
+    account_email_change: 'Email di accesso cambiata', account_email_change_preview: 'Email di accesso: anteprima',
     invite_send: 'Invito', invite_resend: 'Invito reinviato', invite_revoke: 'Invito revocato', invite_link: 'Link invito', alloggiati_support_read: 'Alloggiati: panoramica', alloggiati_admin_status: 'Alloggiati: stato host', impersonation_view: 'Vista come host' };
   const OUTCOME = { requested: 'richiesto', ok: 'ok', refused: 'rifiutato', error: 'errore' };
   async function loadAudit() {

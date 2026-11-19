@@ -180,6 +180,12 @@ function accountDeps(deps = {}) {
     updateEmail: async (id, email) => { const r = await f(url(id), { method: 'PUT', headers: { ...supabaseAuthHeaders(SERVICE_KEY), 'Content-Type': 'application/json' }, body: JSON.stringify({ email, email_confirm: true }), signal: AbortSignal.timeout(10000) });
       const b = await r.json().catch(() => ({})); return { ok: r.ok, status: r.status, error: b && (b.msg || b.message || b.error_description || b.error) || '' }; },
     sendEmail: (to, subject, html) => sendHostEmail(to, subject, html),
+    // Account history (billing_events, append-only): who asked, why, old → new.
+    recordHistory: async ({ userId, actor, oldEmail, newEmail, reason }) => {
+      const r = await f(`${SUPABASE_URL}/rest/v1/billing_events`, { method: 'POST', headers: { ...supabaseAuthHeaders(SERVICE_KEY), 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ user_id: userId, actor: String(actor || 'admin').slice(0, 320), action: 'login_email_change_admin', old_value: { email: oldEmail }, new_value: { email: newEmail }, reason }), signal: AbortSignal.timeout(10000) });
+      if (!r.ok) throw new Error('billing_events ' + r.status);
+    },
   };
 }
 
@@ -283,7 +289,7 @@ export default async function handler(req, res, deps = {}) {
       const ev = { ...who, action: real ? 'account_email_change' : 'account_email_change_preview', targetTable: 'auth_users', targetId: /^[0-9a-f-]{36}$/i.test(String(body.user_id || '')) ? body.user_id : null };
       if (real && !(await audit.first(ev))) return res.status(AUDIT_UNAVAILABLE.status).json(AUDIT_UNAVAILABLE.body);
       let out;
-      try { out = await handleAccountAction(action, body, { deps: accountDeps(deps) }); }
+      try { out = await handleAccountAction(action, body, { actor: gate.user.email || gate.user.id, deps: accountDeps(deps) }); }
       catch (e) { await audit.after({ ...ev, outcome: 'error' }); throw e; }
       await audit.after({ ...ev, outcome: outcomeOf(out.status), metadata: { status: out.status, ...(out.audit || {}) } });
       return res.status(out.status).json(out.body);

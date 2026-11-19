@@ -365,7 +365,7 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
 <script src="/admin-ops-table.js?v=64.2"></script>
 <script src="/admin-alloggiati-support.js?v=70.1"></script>
 <script src="/admin-dsar.js?v=67.6"></script>
-<script src="/admin-users.js?v=6"></script>
+<script src="/admin-users.js?v=7"></script>
 <script src="/admin-i18n-dict.js?v=1"></script>
 <script src="/admin-i18n.js?v=1"></script>
 <script src="/vendor/supabase-2.118.0.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
@@ -1159,7 +1159,8 @@ const HostHealthHints = { upcoming: 'Nudge guest / tell host.' };
 // action billing_*; admin verified on the server). The chip, row and last 5
 // events come with the host-health payload (p.billing).
 const BILLING_EVENT_LABEL = { trial_started: 'Prova iniziata', trial_extended: 'Prova estesa', trial_end_set: 'Data di pagamento fissata', trial_shortened: 'Prova accorciata',
-  free_forever_on: 'Gratis a vita: sì', free_forever_off: 'Gratis a vita: no', marked_paid: 'Segnato pagato', expired: 'Prova scaduta', read_only: 'Sola lettura', reminder_sent: 'Promemoria inviato' };
+  free_forever_on: 'Gratis a vita: sì', free_forever_off: 'Gratis a vita: no', marked_paid: 'Segnato pagato', expired: 'Prova scaduta', read_only: 'Sola lettura', reminder_sent: 'Promemoria inviato',
+  login_email_changed: 'Email di accesso cambiata', login_email_change_admin: 'Cambio email in assistenza' };
 function billingYmd(offsetDays = 0) { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome' }).format(new Date(Date.now() + offsetDays * 86400000)); }
 function billingLastDay(iso) { return iso ? new Date(new Date(iso).getTime() - 1).toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' }) : '—'; }
 function billingChipHtml(b) {

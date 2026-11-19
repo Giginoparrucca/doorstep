@@ -7,6 +7,30 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Hotfix — assisted e-mail change refused with «audit_unavailable» (Claude, 19 November 2026)
+
+**What happened.** Daniele's first assisted change (Utenti → Gestisci → Email di accesso) showed «audit_unavailable». **Nothing was changed:** the admin log could not record the action, and no record means no change. Checked afterwards: the account still has its old login, and no history row exists.
+
+**Causes:**
+1. The admin log only accepts known action names, and `account_email_change` was not in its list.
+2. The log refuses e-mail addresses and keeps no free text (by design, Round 67), yet the code tried to store both addresses and the reason. The reason would have been silently dropped.
+
+The PR #341 tests did not catch it because they replaced the log with a stand-in.
+
+**Fix:**
+- **Migration `admin_audit_account_email`** (applied to production and recorded):
+  - the log accepts `account_email_change` and `account_email_change_preview`;
+  - the trigger now also writes **every** login change (self-service or assisted) to the account history `billing_events` as `login_email_changed`, with the old and new address. It is guarded and never blocks.
+- **Admin log:** the action, the account, and short SHA-256 fingerprints of both addresses. Any address typed in the reason is masked.
+- **Account history:** the assisted change first writes `login_email_change_admin` with the admin, the reason, and old → new. If it cannot, nothing changes. It appears in the «Abbonamento» box as «Cambio email in assistenza» / «Email di accesso cambiata».
+- **Utenti box:** a log failure now reads «Registro amministratore non disponibile: nessuna modifica fatta», not the raw code.
+
+**Test:** `account-email-change` now also applies the real admin-log migration and the fix in PGlite, and inserts the exact events the endpoint writes:
+- accepted: both actions, with fingerprints;
+- refused: addresses, other actions;
+- every change leaves a history row;
+- no history record, no change.
+
 ### Login e-mail change: self-service and assisted (Claude, 19 November 2026)
 
 **Daniele:** «if someone wants to transfer their account to a new email address how do we facilitate that?» → «Yes, build both».

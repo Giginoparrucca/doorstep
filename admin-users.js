@@ -108,7 +108,7 @@
       const token = s && s.session && s.session.access_token;
       const res = await root.fetch('/api/admin-host-health', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ action: 'account_email_change', user_id: uid, new_email: newEmail, reason, dry: false }), signal: AbortSignal.timeout(30000) });
       const j = await res.json().catch(() => ({}));
-      if (!res.ok) { say(j.error || ('Errore ' + res.status), true); if (btn) btn.disabled = false; return; }
+      if (!res.ok) { say(j.error === 'audit_unavailable' ? 'Registro amministratore non disponibile: nessuna modifica fatta. Riprova tra poco.' : (j.error || ('Errore ' + res.status)), true); if (btn) btn.disabled = false; return; }
       const n = j.notices || {};
       if (root.adminToast) root.adminToast(`Email cambiata in ${j.new_email}` + (n.old && n.new ? ' · avvisi inviati' : ' · avvisi NON tutti inviati'), n.old && n.new ? 'success' : 'error');
       data = null; error = null; load();

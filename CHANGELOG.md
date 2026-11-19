@@ -31,6 +31,8 @@ The PR #341 tests did not catch it because they replaced the log with a stand-in
 - every change leaves a history row;
 - no history record, no change.
 
+**Shipped:** PR #342 merged as `a89e5c9`. Local `npm run test:all` **PASS 173 / FAIL 0 / SKIP 3**; CI green; live. Daniele can retry the change from Utenti.
+
 ### Login e-mail change: self-service and assisted (Claude, 19 November 2026)
 
 **Daniele:** «if someone wants to transfer their account to a new email address how do we facilitate that?» → «Yes, build both».

@@ -608,6 +608,15 @@
     openSupportSheet: openSupportSheet,
     closeSupportSheet: closeSupportSheet,
     buildSupportPrefill: buildSupportPrefill,
+    // 19 Nov 2026 — support links with a given message (lost-mailbox help in
+    // the console). The WhatsApp/e-mail URLs are built only here, from the config.
+    supportLinks: function (text, subject) {
+      var cfg = _supportCfg();
+      return {
+        whatsapp: cfg.whatsapp ? ('https://wa.me/' + String(cfg.whatsapp).replace(/[^0-9]/g, '') + '?text=' + encodeURIComponent(text || '')) : null,
+        email: cfg.email ? ('mailto:' + cfg.email + '?subject=' + encodeURIComponent(subject || 'WelcomeBnB') + '&body=' + encodeURIComponent(text || '')) : null,
+      };
+    },
     _init: function () { _ensureSupportWidget(); _ensureSidebarDot(); },
   };
   // Initialize once the DOM is ready. renderChecklist() has to be

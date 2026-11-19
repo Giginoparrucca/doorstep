@@ -43,8 +43,12 @@ export async function handleAccountAction(action, body = {}, { actor = 'admin', 
   const oldEmail = String(user.email || '').trim().toLowerCase();
   if (oldEmail === newEmail) return { status: 409, body: { error: 'È già l’email di questo account.', unchanged: true } };
   if (body.dry !== false) return { status: 200, body: { dry: true, user_id: userId, old_email: oldEmail, new_email: newEmail } };
+  // The identity check (docs/support/EMAIL_CHANGE.md): called back on a number
+  // already on file, and the person confirmed details of their property.
+  const checks = body.checks || {};
+  if (checks.callback !== true || checks.details !== true) return { status: 400, body: { error: 'Prima di cambiare l’email completa i due controlli d’identità.' } };
   // Who and why, in the account's history, before the change (no record, no change).
-  try { await deps.recordHistory({ userId, actor, oldEmail, newEmail, reason: reason.slice(0, 500) }); }
+  try { await deps.recordHistory({ userId, actor, oldEmail, newEmail, reason: ('[verifica: richiamato al numero in archivio; dettagli della struttura confermati] ' + reason).slice(0, 500) }); }
   catch (e) { return { status: 503, body: { error: 'Storico dell’account non disponibile: nessuna modifica fatta. Riprova tra poco.' } }; }
   const r = await deps.updateEmail(userId, newEmail);
   if (!r.ok) {

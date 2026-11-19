@@ -1262,7 +1262,10 @@ tr:hover td { background: rgba(250,246,240,0.6); }
              password-recovery link, you set the password, you can sign
              in with it on any future visit. -->
         <a onclick="firstTimeSetup()" style="font-size:0.72rem;color:var(--warm);cursor:pointer;text-decoration:underline;" data-h="login_first_time">First time? Set up my password</a>
+        <!-- 19 Nov 2026 — lost access to the account's mailbox: support changes it after a check. -->
+        <a onclick="toggleLostEmailHelp('lostEmailHelp')" data-lost-email-link style="font-size:0.72rem;color:var(--warm);cursor:pointer;text-decoration:underline;" data-h="login_lost_email">No longer have access to your email?</a>
       </div>
+      <div id="lostEmailHelp" data-lost-email-help role="region" style="display:none;margin-top:10px;font-size:0.78rem;line-height:1.5;background:var(--cream-2,#F5F1EA);border:1px solid var(--border);border-radius:8px;padding:10px 12px;text-align:left;"></div>
       <!-- Round 38 — invite-only. Sign-up removed here and gated at the
            Supabase project level (Authentication → Providers → Email
            → "Allow new users to sign up" OFF). -->
@@ -1795,6 +1798,8 @@ tr:hover td { background: rgba(250,246,240,0.6); }
         </div>
         <div class="form-hint" data-h="acct_email_hint">We send a confirmation link to the new address and one to your current address: the change happens only when you have opened both. Your properties and data stay the same.</div>
         <div data-acct-msg role="status" style="font-size:0.8rem;margin-top:6px;"></div>
+        <a onclick="toggleLostEmailHelp('acctLostEmailHelp')" data-acct-lost style="display:inline-block;margin-top:6px;font-size:0.78rem;color:var(--warm);cursor:pointer;text-decoration:underline;" data-h="acct_email_lost">Can no longer open your current address?</a>
+        <div id="acctLostEmailHelp" data-lost-email-help role="region" style="display:none;margin-top:8px;font-size:0.8rem;line-height:1.5;background:var(--cream-2,#F5F1EA);border:1px solid var(--border);border-radius:8px;padding:10px 12px;"></div>
       </div>
 
       <!-- Round 69 — accepted Terms version (filled by renderHostTermsSettings). -->
@@ -4851,6 +4856,12 @@ const HT = {
     reminder_desc: 'Every day at the time you choose (07:00 unless you change it), in the property\'s timezone, WelcomeBnB emails you a digest of guests arriving tomorrow with their unique booking links, so you can forward them by WhatsApp or email. Leave the email blank to turn reminders off.',
     reminder_email: 'Reminder email',
     reminder_email_hint: 'Where the daily digest arrives. Use your own address.',
+    acct_email_lost: 'Can no longer open your current address?',
+    login_lost_email: 'No longer have access to your email?',
+    lost_email_text: 'If you can no longer open the mailbox of your account, we can change it for you after a check: we call you back on a phone number already entered in your properties and ask you a few details about them. Write to us with the current email of the account and the new one.',
+    lost_email_wa: 'Write to us on WhatsApp',
+    lost_email_mail: 'Write to us by email',
+    lost_email_prefill: 'Hello, I no longer have access to the email of my WelcomeBnB account. Current email: … New email: …',
     acct_email_title: 'Login email',
     acct_email_current: 'You sign in with {email}.',
     acct_email_pending: 'Change waiting for confirmation: {email}. Open the links we sent to both addresses.',
@@ -5459,6 +5470,12 @@ const HT = {
     reminder_desc: 'Ogni giorno all\'ora che scegli (07:00 se non la cambi), nel fuso orario della proprietà, WelcomeBnB ti invia via email un riepilogo degli ospiti in arrivo domani con i loro link di prenotazione unici, così puoi inoltrarli per WhatsApp o email. Lascia vuota l\'email per disattivare i promemoria.',
     reminder_email: 'Email promemoria',
     reminder_email_hint: 'Dove arriva il riepilogo giornaliero. Usa il tuo indirizzo.',
+    acct_email_lost: 'Non riesci più ad aprire il tuo indirizzo attuale?',
+    login_lost_email: 'Non hai più accesso alla tua email?',
+    lost_email_text: 'Se non riesci più ad aprire la casella email del tuo account, possiamo cambiarla noi dopo una verifica: ti richiamiamo a un numero di telefono già indicato nelle tue strutture e ti chiediamo alcuni dettagli. Scrivici indicando l\'email attuale dell\'account e quella nuova.',
+    lost_email_wa: 'Scrivici su WhatsApp',
+    lost_email_mail: 'Scrivici una email',
+    lost_email_prefill: 'Ciao, non ho più accesso all\'email del mio account WelcomeBnB. Email attuale: … Nuova email: …',
     acct_email_title: 'Email di accesso',
     acct_email_current: 'Accedi con {email}.',
     acct_email_pending: 'Cambio in attesa di conferma: {email}. Apri i link che abbiamo inviato a entrambi gli indirizzi.',
@@ -16359,6 +16376,25 @@ function _termsOpenPrint(ev, cur, provider) {
 // trigger account_email_changed then moves notification/reminder copies of
 // the old address. Hidden in the admin view (?p=): there the session is the
 // admin's own account.
+// Lost access to the account's mailbox (login page and Settings): the change
+// is done by support after a check (docs/support/EMAIL_CHANGE.md). Contacts
+// from the public app config; the message asks for both addresses.
+function toggleLostEmailHelp(targetId) {
+  const box = document.getElementById(targetId);
+  if (!box) return;
+  if (box.style.display !== 'none') { box.style.display = 'none'; return; }
+  const sup = (typeof APP_CONFIG !== 'undefined' && APP_CONFIG && APP_CONFIG.support) || {};
+  const mail = sup.email || 'info@welcomebnb.it';
+  const prefill = h('lost_email_prefill');
+  box.textContent = '';
+  const p = document.createElement('p'); p.style.margin = '0 0 8px'; p.textContent = h('lost_email_text'); box.appendChild(p);
+  const row = document.createElement('div'); row.style.cssText = 'display:flex;flex-wrap:wrap;gap:12px;';
+  const link = (href, text, kind) => { const a = document.createElement('a'); a.href = href; a.textContent = text; a.dataset.lostEmailChannel = kind; a.style.cssText = 'color:var(--warm);font-weight:600;'; if (kind === 'whatsapp') { a.target = '_blank'; a.rel = 'noopener'; } row.appendChild(a); };
+  if (sup.whatsapp) link('https://wa.me/' + String(sup.whatsapp).replace(/[^0-9]/g, '') + '?text=' + encodeURIComponent(prefill), '💬 ' + h('lost_email_wa'), 'whatsapp');
+  link('mailto:' + mail + '?subject=' + encodeURIComponent('WelcomeBnB · email di accesso') + '&body=' + encodeURIComponent(prefill), '✉️ ' + h('lost_email_mail'), 'email');
+  box.appendChild(row);
+  box.style.display = '';
+}
 async function renderAccountEmailCard() {
   const card = document.getElementById('hostAccountEmailCard');
   if (!card) return;

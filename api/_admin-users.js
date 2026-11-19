@@ -55,7 +55,8 @@ export function buildRows({ users, invites, admins, properties, events, checkins
     const email = String(u.email || '').toLowerCase();
     seen.add(email);
     const inv = inviteBy.get(email) || null;
-    const props = (propsBy.get(u.id) || []).map(p => ({ id: p.id, name: p.name || '—', test: !!p.is_test }));
+    // host_phone: the number on file, used to call the host back before an assisted e-mail change.
+    const props = (propsBy.get(u.id) || []).map(p => ({ id: p.id, name: p.name || '—', test: !!p.is_test, phone: (p.host_phone || '').trim() || null }));
     const days = [...(daysBy.get(u.id) || new Map()).values()];
     const within = n => days.filter(d => now - new Date(d).getTime() <= n * DAY).length;
     const lastActive = [lastEventBy.get(u.id), u.last_sign_in_at].filter(Boolean).sort().at(-1) || null;
@@ -117,7 +118,7 @@ export async function buildUsersOverview(deps) {
     deps.listUsers(),
     deps.getAll('pilot_invites?select=email,status,invited_at,accepted_at&order=invited_at.desc'),
     deps.get('admin_users?select=email'),
-    deps.getAll('properties?deleted_at=is.null&select=id,name,owner_id,is_test&order=created_at.asc'),
+    deps.getAll('properties?deleted_at=is.null&select=id,name,owner_id,is_test,host_phone&order=created_at.asc'),
     // Terms are accepted per account (Round 69/76), not per property.
     deps.getAll('host_terms_acceptances?select=host_id,version,created_at,host_kind&order=created_at.desc').catch(() => null),
   ]);

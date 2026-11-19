@@ -7,6 +7,24 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Lost access to the account's mailbox: a clear path and a fixed identity check (Claude, 19 November 2026)
+
+**Daniele:** «our process should cover the general use case of somebody losing access to their email address and wanting to change it. does it do that?» → partly. The change itself worked, but there was no way in for the host and no written check. «go ahead».
+
+- **Login page:** «Non hai più accesso alla tua email?» opens a short explanation: support changes it after a check, calling back on a phone number already on file. It has WhatsApp and e-mail buttons whose prefilled message asks for the current and the new address. The contacts come from the public app config.
+- **Settings card:** the same help under «Email di accesso», for hosts still signed in who cannot open the old mailbox, where self-service cannot complete.
+- **Utenti box:**
+  - shows the phone numbers on file for the host's properties (tap to call). Without any, it warns to verify through a channel already known, or not to change;
+  - **two required checks**: «richiamato a un numero in archivio» and «dettagli della struttura confermati»;
+  - the server refuses the change without them, and records them in the account history with the reason.
+- **New procedure `docs/support/EMAIL_CHANGE.md`:** which path (self-service / assisted / hand-over to another person), the identity check, what happens, and what to do if a change was not genuine.
+- **Tests (`account-email-change`):**
+  - the checks required on the server and in the UI, nothing sent without them;
+  - the numbers on file shown;
+  - the help box IT/EN with WhatsApp/e-mail links and the prefill;
+  - the login link present;
+  - the procedure's key points.
+
 ### Hotfix — assisted e-mail change refused with «audit_unavailable» (Claude, 19 November 2026)
 
 **What happened.** Daniele's first assisted change (Utenti → Gestisci → Email di accesso) showed «audit_unavailable». **Nothing was changed:** the admin log could not record the action, and no record means no change. Checked afterwards: the account still has its old login, and no history row exists.

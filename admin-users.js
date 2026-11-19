@@ -82,6 +82,9 @@
       <div style="font-weight:600;font-size:0.82rem;">Email di accesso</div>
       <div style="font-size:0.74rem;margin:2px 0 4px;"><span>Attuale:</span> <strong data-i18n-skip>${esc(r.email)}</strong></div>
       <div style="font-size:0.74rem;color:var(--ink-soft);margin:0 0 8px;">Usa questo cambio solo se l’host non può confermarlo da sé in Impostazioni (per esempio non accede più alla vecchia casella). Verifica prima l’identità (telefono o WhatsApp). Le strutture e i dati restano; avvisi e promemoria passano al nuovo indirizzo; entrambi gli indirizzi ricevono un avviso.</div>
+      ${phonesOnFile(r)}
+      <label style="display:flex;gap:6px;align-items:flex-start;font-size:0.76rem;margin:4px 0;"><input type="checkbox" id="acctCall-${id}" data-account-check="callback"> <span>Ho richiamato l’host a un numero già in archivio (non a un numero indicato nella richiesta).</span></label>
+      <label style="display:flex;gap:6px;align-items:flex-start;font-size:0.76rem;margin:4px 0 8px;"><input type="checkbox" id="acctDetails-${id}" data-account-check="details"> <span>L’host ha confermato dettagli della sua struttura o di una prenotazione recente.</span></label>
       <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
         <label style="position:absolute;left:-9999px;" for="acctNew-${id}">Nuova email</label>
         <input id="acctNew-${id}" type="email" autocomplete="off" placeholder="nuova@email.it" style="${inp}flex:1 1 180px;">
@@ -92,6 +95,13 @@
       <div data-account-email-msg role="status" style="font-size:0.74rem;margin-top:6px;"></div>
     </div>`;
   }
+  // Numbers already on file for the host's properties: call back on these,
+  // never on a number given in the request (docs/support/EMAIL_CHANGE.md).
+  function phonesOnFile(r) {
+    const list = (r.properties || []).filter(p => p.phone);
+    if (!list.length) return '<div data-account-phones style="font-size:0.76rem;color:#B54708;margin:0 0 6px;">Nessun telefono in archivio per le sue strutture: verifica con un secondo canale già noto (per esempio una chat WhatsApp già esistente) e con dettagli che solo l’host conosce. Nel dubbio, non cambiare.</div>';
+    return `<div data-account-phones style="font-size:0.76rem;margin:0 0 6px;"><span>Telefoni in archivio:</span> ${list.map(p => `<span data-i18n-skip>${esc(p.name)}: <a href="tel:${esc(p.phone.replace(/[^+0-9]/g, ''))}">${esc(p.phone)}</a></span>`).join(' · ')}</div>`;
+  }
   async function changeEmail(uid) {
     const row = (data && data.rows || []).find(x => x.user_id === uid);
     const box = document.querySelector(`[data-account-email="${uid}"]`);
@@ -101,12 +111,14 @@
     const reason = String(document.getElementById('acctWhy-' + uid).value || '').trim();
     if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(newEmail)) return say('Scrivi una nuova email valida.', true);
     if (reason.length < 5) return say('Scrivi il motivo e come hai verificato l’identità.', true);
+    const checks = { callback: !!document.getElementById('acctCall-' + uid)?.checked, details: !!document.getElementById('acctDetails-' + uid)?.checked };
+    if (!checks.callback || !checks.details) return say('Completa i due controlli d’identità prima di cambiare l’email.', true);
     if (!root.confirm(`Cambiare l’email di accesso da ${row.email} a ${newEmail}?\n\nL’host accederà solo con il nuovo indirizzo. Entrambi gli indirizzi ricevono un avviso.`)) return;
     const btn = box.querySelector('[data-account-email-save]'); if (btn) btn.disabled = true;
     try {
       const { data: s } = await adminClient().auth.getSession();
       const token = s && s.session && s.session.access_token;
-      const res = await root.fetch('/api/admin-host-health', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ action: 'account_email_change', user_id: uid, new_email: newEmail, reason, dry: false }), signal: AbortSignal.timeout(30000) });
+      const res = await root.fetch('/api/admin-host-health', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ action: 'account_email_change', user_id: uid, new_email: newEmail, reason, checks, dry: false }), signal: AbortSignal.timeout(30000) });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) { say(j.error === 'audit_unavailable' ? 'Registro amministratore non disponibile: nessuna modifica fatta. Riprova tra poco.' : (j.error || ('Errore ' + res.status)), true); if (btn) btn.disabled = false; return; }
       const n = j.notices || {};

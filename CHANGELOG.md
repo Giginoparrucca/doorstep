@@ -24,6 +24,7 @@ Newest entries at the top of each section.
   - the help box IT/EN with WhatsApp/e-mail links and the prefill;
   - the login link present;
   - the procedure's key points.
+- **Shipped:** PR #343 merged as `18245dd`. The first run caught a hard-coded `wa.me` link in `host-console.html` (project rule): it is now built in `host-onboarding.js` (`HostOnboarding.supportLinks`). Local `npm run test:all` **PASS 173 / FAIL 0 / SKIP 3**; CI green; live.
 
 ### Hotfix — assisted e-mail change refused with «audit_unavailable» (Claude, 19 November 2026)
 

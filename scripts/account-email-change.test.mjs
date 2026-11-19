@@ -54,7 +54,13 @@ if (PGlite) {
     create table public.host_notification_settings(host_id uuid primary key, notify_email text);
     create table public.pilot_invites(id serial primary key, email text unique); create table public.pilot_hosts(id serial primary key, host_email text unique);
     create table public.admin_users(email text primary key);
-    create table public.billing_events(id uuid primary key default gen_random_uuid(), user_id uuid, actor text, action text, old_value jsonb, new_value jsonb, reason text, created_at timestamptz default now());`);
+`);
+  // The real account-history table (Round 72) and its action list, then the fix (19 Nov: the stand-in hid that the list refused these names).
+  { const r72 = read('supabase/migrations/20261115090000_round72_trial_billing.sql'); const i = r72.indexOf('create table if not exists public.billing_events ('); await db.exec(r72.slice(i, r72.indexOf(');', i) + 2)); }
+  await assert.rejects(db.query(`insert into public.billing_events(user_id, actor, action) values ('${U1}', 'admin', 'login_email_change_admin')`), /billing_events_action_check/, 'before the fix: refused (what failed in production)');
+  { const fix2 = read('supabase/migrations/20261119110000_billing_events_login_email.sql'); await db.exec(fix2); await db.exec(fix2); }
+  await db.query(`insert into public.billing_events(user_id, actor, action, old_value, new_value, reason) values ('${U1}', 'admin@example.invalid', 'login_email_change_admin', '{"email":"a"}', '{"email":"b"}', '[verifica] telefonata')`);
+  await assert.rejects(db.query(`insert into public.billing_events(user_id, actor, action) values ('${U1}', 'admin', 'something_else')`), /billing_events_action_check/, 'other names still refused');
   await db.exec(read('supabase/migrations/20261116170000_round67_admin_audit_log.sql'));
   await db.exec(read(MIG)); const fix = read('supabase/migrations/20261119100000_admin_audit_account_email.sql'); await db.exec(fix); await db.exec(fix);
   const { cleanMetadata } = await import('../api/_admin-audit.js');
@@ -69,7 +75,7 @@ if (PGlite) {
   // Every change leaves an account-history row (self-service included).
   await db.query(`insert into auth.users values ($1, 'old@example.invalid')`, [U1]);
   await db.query(`update auth.users set email = 'new@example.invalid' where id = $1`, [U1]);
-  assert.deepEqual((await db.query(`select action, old_value, new_value from public.billing_events`)).rows, [{ action: 'login_email_changed', old_value: { email: 'old@example.invalid' }, new_value: { email: 'new@example.invalid' } }]);
+  assert.deepEqual((await db.query(`select action, old_value, new_value from public.billing_events where action = 'login_email_changed'`)).rows, [{ action: 'login_email_changed', old_value: { email: 'old@example.invalid' }, new_value: { email: 'new@example.invalid' } }], 'automatic history row (accepted by the real action list)');
   console.log('  db: admin log and account history checked in PGlite');
 }
 

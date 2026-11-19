@@ -7,6 +7,17 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Hotfix — assisted e-mail change refused with «Storico dell'account non disponibile» (Claude, 19 November 2026)
+
+**What happened.** Daniele's second attempt (Simone → Rachele, both checks ticked) stopped at the account-history step. As designed, **nothing was changed.**
+
+**Cause.** `billing_events` accepts only a fixed list of action names (Round 72), and `login_email_change_admin` was not in it. The trigger's automatic `login_email_changed` row was refused too; that step is guarded, so it failed silently. The PGlite test used a simplified table without that list, so it passed. Same pattern as the «audit_unavailable» hotfix.
+
+**Fix:**
+- **Migration `billing_events_login_email`** adds both names to the list. It is applied to production and recorded.
+- **Production rehearsal** in a transaction that always rolls back: admin log entry, history row, e-mail change, trigger moves (invite) and the automatic history row all succeed.
+- **Test:** `account-email-change` now builds `billing_events` from the real Round 72 migration. It shows the refusal before the fix, acceptance after it, and that other names are still refused.
+
 ### Lost access to the account's mailbox: a clear path and a fixed identity check (Claude, 19 November 2026)
 
 **Daniele:** «our process should cover the general use case of somebody losing access to their email address and wanting to change it. does it do that?» → partly. The change itself worked, but there was no way in for the host and no written check. «go ahead».

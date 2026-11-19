@@ -16,6 +16,7 @@ import { regionComplianceFor } from './_onboarding-nudges.js';
 import { handleBillingAction, billingChip } from './_admin-billing.js';
 import { handleDsarAction } from './_admin-dsar.js';
 import { buildUsersOverview } from './_admin-users.js';
+import { handleAccountAction } from './_admin-account.js';
 import { take } from './_rate-limit.js';
 import { auditFirst, auditAfter, recordAdminEvent, AUDIT_UNAVAILABLE } from './_admin-audit.js';
 import { sendHostEmail, hostAccountEmail } from './_notify-host.js';
@@ -169,6 +170,19 @@ function billingDeps(deps = {}) {
 }
 
 // Round 67 Phase 5 — journal writer (injectable for tests).
+// 19 Nov 2026 — assisted login e-mail change (Supabase Auth admin API).
+function accountDeps(deps = {}) {
+  if (deps.account) return deps.account;
+  const f = deps.fetch || globalThis.fetch;
+  const url = id => `${SUPABASE_URL}/auth/v1/admin/users/${encodeURIComponent(id)}`;
+  return {
+    getUser: async id => { const r = await f(url(id), { headers: { ...supabaseAuthHeaders(SERVICE_KEY) }, signal: AbortSignal.timeout(10000) }); if (r.status === 404) return null; if (!r.ok) throw new Error('auth user read ' + r.status); return r.json(); },
+    updateEmail: async (id, email) => { const r = await f(url(id), { method: 'PUT', headers: { ...supabaseAuthHeaders(SERVICE_KEY), 'Content-Type': 'application/json' }, body: JSON.stringify({ email, email_confirm: true }), signal: AbortSignal.timeout(10000) });
+      const b = await r.json().catch(() => ({})); return { ok: r.ok, status: r.status, error: b && (b.msg || b.message || b.error_description || b.error) || '' }; },
+    sendEmail: (to, subject, html) => sendHostEmail(to, subject, html),
+  };
+}
+
 function auditDeps(deps = {}) {
   if (deps.audit) return deps.audit;
   const d = { fetch: deps.fetch };
@@ -263,6 +277,17 @@ export default async function handler(req, res, deps = {}) {
       await audit.after({ ...ev, outcome: outcomeOf(out.status), metadata: { status: out.status, ...detail } });
       return res.status(out.status).json(out.body);
     }
+    if (action === 'account_email_change') {
+      const body = req.body || {};
+      const real = body.dry === false;
+      const ev = { ...who, action: real ? 'account_email_change' : 'account_email_change_preview', targetTable: 'auth_users', targetId: /^[0-9a-f-]{36}$/i.test(String(body.user_id || '')) ? body.user_id : null };
+      if (real && !(await audit.first(ev))) return res.status(AUDIT_UNAVAILABLE.status).json(AUDIT_UNAVAILABLE.body);
+      let out;
+      try { out = await handleAccountAction(action, body, { deps: accountDeps(deps) }); }
+      catch (e) { await audit.after({ ...ev, outcome: 'error' }); throw e; }
+      await audit.after({ ...ev, outcome: outcomeOf(out.status), metadata: { status: out.status, ...(out.audit || {}) } });
+      return res.status(out.status).json(out.body);
+    }
     if (action === 'users_overview') {
       const out = await buildUsersOverview(deps.users || { get: path => sbGet(path, deps), getAll: path => sbGetAll(path, deps), listUsers: () => listUsers(deps), rpc: billingDeps(deps).rpc, billing: (ids, at) => readBilling(ids, at, deps) });
       await audit.after({ ...who, action: 'host_health_read', targetTable: 'auth_users', metadata: { view: 'users', rows: out.rows.length } });
@@ -279,7 +304,8 @@ export default async function handler(req, res, deps = {}) {
   } catch (e) {
     // Never a silent empty result: the admin sees that the read failed.
     console.warn('[admin-host-health] failed:', String(e && e.message || e).slice(0, 200));
-    const failed = String(req.body?.action || '').startsWith('dsar_') ? 'Privacy request failed: nothing was changed by the failed step. Retry in a moment.' : 'Host health unavailable. Retry in a moment.';
+    const act = String(req.body?.action || '');
+    const failed = act.startsWith('dsar_') ? 'Privacy request failed: nothing was changed by the failed step. Retry in a moment.' : act.startsWith('account_') ? 'Cambio email non riuscito: verifica nella lista se è cambiata prima di riprovare.' : 'Host health unavailable. Retry in a moment.';
     return res.status(503).json({ error: failed });
   }
 }

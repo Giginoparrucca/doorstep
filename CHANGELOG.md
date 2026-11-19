@@ -7,6 +7,43 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Login e-mail change: self-service and assisted (Claude, 19 November 2026)
+
+**Daniele:** «if someone wants to transfer their account to a new email address how do we facilitate that?» → «Yes, build both».
+
+**Same person, new address.** Everything a host owns is keyed by the account id, so the change keeps properties, check-ins, trial, subscription and terms.
+
+**1. Self-service:** host console → Impostazioni → «Email di accesso».
+- The host types the new address and Supabase sends the confirmation links (`updateUser`, return to `?email_change=1`).
+- With «Secure email change» on, links go to both the new and the current address, and nothing changes until both are opened.
+- The card shows the change waiting for confirmation. On return the console shows «conferma ricevuta, apri anche l'altro link», «email aggiornata» or «link non più valido».
+- **Hidden and inert in the admin view (`?p=`):** there the session is the admin's own account.
+
+**2. Assisted:** admin «Utenti» → «Gestisci» → «Email di accesso», for a host who no longer has the old mailbox.
+- Identity is checked outside the product first (phone/WhatsApp); a new address and a reason are required, then a confirmation dialog.
+- The server (`account_email_change` on `/api/admin-host-health`, admin-only) uses the Auth admin API. The admin log records it before and after, with both addresses and the reason.
+- An address already used by another account is refused; both addresses get a notice e-mail.
+
+**3. Migration `account_email_change`:** trigger on `auth.users`, so it covers both flows. When the login changes, copies of the *old* address move to the new one:
+- notification e-mail, property reminder and contact e-mails, invitation record (keeps the registration date), admin list;
+- addresses the host chose on purpose, and other accounts, are left alone;
+- each step is guarded, so a problem only warns and never blocks the login change; unique columns that already hold the new address are skipped.
+- The terms evidence keeps the e-mail it was given with.
+
+**Production:**
+- applied in one transaction and recorded; `authenticated` cannot execute the function;
+- check inside a transaction that always rolls back (changing Daniele's own login): invite and property fields moved; afterwards nothing persisted.
+
+**Tests:** new `account-email-change`:
+- the real trigger in PGlite;
+- server validation, preview, taken address, notices;
+- endpoint admin gate and log before/after;
+- browser IT/EN 390/1440: console card, admin view, the three return notices, Utenti box.
+
+**For Daniele (owner-only check):** Supabase dashboard → Authentication → Providers → Email: «Secure email change» should be **on** (double confirmation), and «URL Configuration → Redirect URLs» must allow `https://app.welcomebnb.it/host-console.html?email_change=1` (a `https://app.welcomebnb.it/**` entry covers it). The connected tools cannot read these settings.
+
+**Not the same as a hand-over to another person** (business sold): the new owner creates their own account and accepts the terms; the admin moves the properties.
+
 ### Terms receipt e-mail: accepted texts attached as PDF (Claude, 19 November 2026)
 
 **Daniele:** «the terms received via email are in .md format. they should be in pdf».

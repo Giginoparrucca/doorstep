@@ -20,6 +20,7 @@ Newest entries at the top of each section.
   - new `terms-pdf`: real PDF, multi-page footers, tables, accents, replaced characters;
   - `round69-host-terms-api`: the receipt carries two PDFs whose text includes the provider data, both hashes and Annex B, and no placeholder.
 - Only new acceptances get PDFs; the e-mail already sent for the one existing acceptance stays as it was.
+- **Shipped:** PR #340 merged as `49ec1e7`. Local `npm run test:all` **PASS 172 / FAIL 0 / SKIP 3**; CI green. Production deploy READY, and the endpoint (mounted on `/api/guest`) loads with the new dependency: `/api/host-terms` without a session → 401.
 
 ### Admin: terms in «Utenti», console buttons in the deep dive (Claude, 18 November 2026)
 

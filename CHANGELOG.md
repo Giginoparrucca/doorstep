@@ -17,6 +17,7 @@ Newest entries at the top of each section.
 - **Migration `billing_events_login_email`** adds both names to the list. It is applied to production and recorded.
 - **Production rehearsal** in a transaction that always rolls back: admin log entry, history row, e-mail change, trigger moves (invite) and the automatic history row all succeed.
 - **Test:** `account-email-change` now builds `billing_events` from the real Round 72 migration. It shows the refusal before the fix, acceptance after it, and that other names are still refused.
+- **Shipped:** PR #344 merged as `b0bff6a`. Local `npm run test:all` **PASS 173 / FAIL 0 / SKIP 3**; CI green. Daniele can retry the change from Utenti.
 
 ### Lost access to the account's mailbox: a clear path and a fixed identity check (Claude, 19 November 2026)
 

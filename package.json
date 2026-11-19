@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "pdf-lib": "1.17.1",
-    "web-push": "3.6.7"
+    "web-push": "4.0.0"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.3.14",

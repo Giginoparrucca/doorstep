@@ -21,6 +21,7 @@ Newest entries at the top of each section.
 - **Tests:**
   - `admin-users`: no Pilot tab; Utenti renders the activity;
   - `admin-i18n-browser`: the tour now includes **Contatti** (filters, detail, new contact; fictional contacts with every status) in place of Pilot, and checks that the feed is in Utenti. Contatti had not been in that tour before.
+- **Shipped:** PR #346 merged as `642cda5`. Local `npm run test:all` **PASS 174 / FAIL 0 / SKIP 3**; CI green; live (no Pilot tab, feed in Utenti).
 
 ### Round 77 — Host contacts: mini-CRM in admin (confirmed 2026-11-24)
 

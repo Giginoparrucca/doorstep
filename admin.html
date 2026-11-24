@@ -351,7 +351,6 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
   <div id="tabsBar" style="display:flex;gap:6px;margin:0 0 14px;flex-wrap:wrap;">
     <button data-tab="users"   onclick="setActiveTab('users')"   style="padding:8px 16px;border:1px solid var(--warm);background:var(--warm);color:#fff;border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Utenti</button>
     <button data-tab="contacts" onclick="setActiveTab('contacts')" style="padding:8px 16px;border:1px solid var(--border);background:var(--white);color:var(--ink-soft);border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;"><span>Contatti</span><span data-contacts-badge data-i18n-skip style="display:none;margin-left:6px;min-width:18px;padding:0 6px;border-radius:999px;background:#B42318;color:#fff;font-size:0.72rem;font-weight:700;line-height:18px;text-align:center;"></span></button>
-    <button data-tab="pilot"   onclick="setActiveTab('pilot')"   style="padding:8px 16px;border:1px solid var(--border);background:var(--white);color:var(--ink-soft);border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Pilot</button>
     <button data-tab="deepdive" onclick="setActiveTab('deepdive')" style="padding:8px 16px;border:1px solid var(--border);background:var(--white);color:var(--ink-soft);border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Deep dive</button>
     <button data-tab="ops"     onclick="setActiveTab('ops')"     style="padding:8px 16px;border:1px solid var(--border);background:var(--white);color:var(--ink-soft);border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Ops</button>
     <button data-tab="privacy" onclick="setActiveTab('privacy')" style="padding:8px 16px;border:1px solid var(--border);background:var(--white);color:var(--ink-soft);border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Privacy</button>
@@ -366,7 +365,7 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
 <script src="/admin-ops-table.js?v=64.2"></script>
 <script src="/admin-alloggiati-support.js?v=70.1"></script>
 <script src="/admin-dsar.js?v=67.6"></script>
-<script src="/admin-users.js?v=8"></script>
+<script src="/admin-users.js?v=9"></script>
 <script src="/admin-contacts.js?v=77.1"></script>
 <script src="/admin-i18n-dict.js?v=1"></script>
 <script src="/admin-i18n.js?v=1"></script>
@@ -394,7 +393,7 @@ let apiUsageByProp = {};
 // ─── Round 35: pilot admin rebuild ────────────────────────────────────
 // The console now runs as three tabs — Pilot (default), Deep dive, Ops.
 // Presentation-only; loadData() and every Supabase query below stay put.
-let activeTab   = 'users';                 // 'users' (home, 17 Nov 2026) | 'contacts' (Round 77) | 'pilot' | 'deepdive' | 'ops' | 'privacy'
+let activeTab   = 'users';                 // 'users' (home, 17 Nov 2026; recent activity at the bottom) | 'contacts' (Round 77) | 'deepdive' | 'ops' | 'privacy'
 let showTestData = false;                  // top-bar toggle; default off
 // Round 69 — host terms acceptances (admins read all via RLS is_admin()).
 // null = not loaded/unavailable; otherwise host_id → rows (newest first).
@@ -2131,7 +2130,6 @@ function renderView() {
   if (window.ContactsAdmin) window.ContactsAdmin.ensureBadge();
   if (activeTab === 'contacts') return window.ContactsAdmin ? window.ContactsAdmin.render() : null;
   if (activeTab === 'users')    return window.UsersAdmin ? window.UsersAdmin.render() : null;
-  if (activeTab === 'pilot')    return renderPilotTab();
   if (activeTab === 'ops')      return renderOpsTab();
   if (activeTab === 'privacy')  return window.DsarAdmin ? window.DsarAdmin.render() : null;
   return renderDeepDive();
@@ -3181,237 +3179,31 @@ function renderDeepDive() {
      into the ledger by the operator).
    - Sparklines are 14 stacked divs — no chart library, no npm dep.
 ══════════════════════════════════════ */
-function renderPilotTab() {
-  // ── Property → host-email map. Same shape as renderDeepDive uses so
-  // hostShort labels stay consistent between tabs.
+// 24 Nov 2026 — the Pilot tab is gone (Daniele: «Pilota is not really
+// useful, just remove it, and keep the recent activity in the user tab»).
+// Its activity feed now sits at the bottom of «Utenti» (admin-users.js calls
+// renderRecentActivity()). Host → e-mail map built as the Pilot tab did.
+function renderRecentActivity() {
   const userIdToEmail = { ...hostEmailById };
   allEvents.forEach(e => { if (e.user_id && e.user_email) userIdToEmail[e.user_id] = e.user_email; });
   const propToEmail = {};
-  allProperties.forEach(p => {
-    if (p.owner_id && userIdToEmail[p.owner_id]) propToEmail[p.id] = userIdToEmail[p.owner_id];
-  });
-  allEvents.forEach(e => {
-    if (e.property_id && e.user_email && !propToEmail[e.property_id]) {
-      propToEmail[e.property_id] = e.user_email;
-    }
-  });
-
-  // ── ZONE A: scoreboard ─────────────────────────────────────────────
-  const payingHosts = pilotHosts.filter(h => h.status === 'paid').length;
-  const pilotHostsInFlight = pilotHosts.filter(h => h.status === 'pilot' || h.status === 'paid');
-  const earliestStart = pilotHostsInFlight
-    .map(h => h.pilot_started_at).filter(Boolean).sort()[0];
-  const pilotDay = earliestStart
-    ? Math.max(0, Math.floor((Date.now() - new Date(earliestStart + 'T00:00:00Z').getTime()) / 86400000))
-    : null;
-
-  const linksGenerated  = allEvents.filter(e => e.event_type === 'generate_booking').length;
-  const checkinsDone    = allCheckins.length;
-  const chatSends       = (allChatMessages || []).filter(m => m.sender === 'guest').length;
-
-  // AI cost = sum of tokens × Sonnet 4.5 pricing, converted to EUR. Only
-  // input/output columns are used; token_mint rows are excluded upstream.
-  let totalInput = 0, totalOutput = 0;
-  Object.values(apiUsageByProp).forEach(a => { totalInput += a.input; totalOutput += a.output; });
-  const aiCostUsd = (totalInput  / 1e6) * SONNET_PRICE_USD_INPUT_PER_M
-                  + (totalOutput / 1e6) * SONNET_PRICE_USD_OUTPUT_PER_M;
-  const aiCostEur = aiCostUsd * USD_TO_EUR;
-
-  // Total revenue from the ledger (typed by the operator). If none, we
-  // print "—" rather than a fake €0.
-  const revenueEur = pilotHosts.reduce((s, h) => s + (Number(h.amount_paid) || 0), 0);
-
-  const scoreCards = [
-    { label: 'Paying hosts',      value: String(payingHosts),
-      sub: pilotHostsInFlight.length > 0 ? `${pilotHostsInFlight.length} in the pilot` : 'no active pilot yet' },
-    { label: 'Pilot day',         value: pilotDay !== null ? `Day ${pilotDay}` : '—',
-      sub: earliestStart ? `since ${earliestStart}` : 'no pilot start recorded' },
-    { label: 'Links generated',   value: String(linksGenerated),
-      sub: 'in the selected window' },
-    { label: 'Check-ins done',    value: String(checkinsDone),
-      sub: 'all time (excludes test)' },
-    { label: 'Guest chat sends',  value: String(chatSends),
-      sub: 'in the selected window' },
-    { label: 'AI cost this month',
-      value: aiCostUsd > 0 ? `€${aiCostEur.toFixed(2)}` : '€0.00',
-      sub: revenueEur > 0
-        ? `vs. €${revenueEur.toFixed(2)} paid` : 'no revenue recorded' },
-  ];
-
-  const zoneA = `
-    <div class="section-title">Pilot scoreboard</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:20px;">
-      ${scoreCards.map(c => `
-        <div style="background:var(--white);border:1px solid var(--border);border-radius:8px;padding:14px;">
-          <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-soft);margin-bottom:6px;">${escapeHtml(c.label)}</div>
-          <div style="font-size:1.5rem;font-weight:600;color:var(--ink);margin-bottom:4px;">${escapeHtml(c.value)}</div>
-          <div style="font-size:0.72rem;color:var(--ink-soft);">${escapeHtml(c.sub)}</div>
-        </div>
-      `).join('')}
-    </div>
-  `;
-
-  // ── ZONE B: per-host status cards ───────────────────────────────────
-  const zoneB = renderPilotHostCards(propToEmail);
-
-  // ── ZONE C: recent activity feed ────────────────────────────────────
-  const zoneC = renderPilotActivityFeed(propToEmail);
-
-  // 17 Nov 2026: the health overview (Action needed, Hosts by health) lives
-  // in Deep dive only; billing settings and «Lancia» moved to «Utenti».
-  document.getElementById('content').innerHTML = zoneA + zoneB + zoneC;
+  allProperties.forEach(p => { if (p.owner_id && userIdToEmail[p.owner_id]) propToEmail[p.id] = userIdToEmail[p.owner_id]; });
+  allEvents.forEach(e => { if (e.property_id && e.user_email && !propToEmail[e.property_id]) propToEmail[e.property_id] = e.user_email; });
+  return renderActivityFeed(propToEmail);
 }
 
-// Zone B — one card per host. Classifier picks the status label, sparkline
-// is 14 stacked divs (last 14 days of guest activity).
-function renderPilotHostCards(propToEmail) {
-  const today = new Date(); today.setHours(0,0,0,0);
-  const dayMs = 86400000;
-  const dayKey = (d) => d.toISOString().slice(0, 10);
-  const last14 = Array.from({length: 14}, (_, i) => dayKey(new Date(today.getTime() - (13 - i) * dayMs)));
-
-  const byHost = {}; // email → { properties, linksGenerated, guestEventsByDay, lastGuestEventAt, completed }
-  const ensure = (email) => {
-    if (!byHost[email]) byHost[email] = {
-      email, properties: new Set(), linksGenerated: 0, completed: 0,
-      guestEventsByDay: Object.fromEntries(last14.map(k => [k, 0])),
-      lastGuestEventAt: null,
-    };
-    return byHost[email];
-  };
-
-  // Register every host known to the ledger, even if they have no events
-  // yet — Zone B is where "hasn't started" surfaces.
-  pilotHosts.forEach(h => ensure(h.host_email));
-  // And every host that owns a property.
-  Object.values(propToEmail).forEach(e => ensure(e));
-
-  allProperties.forEach(p => {
-    const email = propToEmail[p.id];
-    if (email && byHost[email]) byHost[email].properties.add(p.id);
-  });
-
-  allEvents.forEach(e => {
-    const email = propToEmail[e.property_id] || (e.user_email || null);
-    if (!email || !byHost[email]) return;
-    if (e.event_type === 'generate_booking') byHost[email].linksGenerated++;
-    // Guest activity = anything starting with guest_
-    if (String(e.event_type || '').startsWith('guest_')) {
-      const dk = (e.created_at || '').slice(0, 10);
-      if (dk in byHost[email].guestEventsByDay) byHost[email].guestEventsByDay[dk]++;
-      if (!byHost[email].lastGuestEventAt || e.created_at > byHost[email].lastGuestEventAt) {
-        byHost[email].lastGuestEventAt = e.created_at;
-      }
-      if (e.event_type === 'guest_checkin_completed') byHost[email].completed++;
-    }
-  });
-
-  // Classifier — evaluate in order, first match wins.
-  const classify = (h) => {
-    const propCount   = h.properties.size;
-    const totalRecent = last14.reduce((s, k) => s + h.guestEventsByDay[k], 0);
-    const daysSince   = h.lastGuestEventAt
-      ? Math.floor((Date.now() - new Date(h.lastGuestEventAt).getTime()) / dayMs)
-      : Infinity;
-
-    if (propCount === 0 && h.linksGenerated === 0) {
-      return { key: 'not_started', label: 'Not started',
-        diagnosis: 'No property saved, no link generated yet.',
-        color: '#b03a3a', order: 0 };
-    }
-    if (h.linksGenerated >= CLASSIFY_THRESHOLDS.stuckMinLinks && h.completed === 0) {
-      return { key: 'stuck', label: 'Stuck',
-        diagnosis: `${h.linksGenerated} links generated, no check-in ever completed.`,
-        color: '#b03a3a', order: 1 };
-    }
-    if (daysSince > CLASSIFY_THRESHOLDS.idleGuestEventWindowDays) {
-      return { key: 'idle', label: 'Idle',
-        diagnosis: h.lastGuestEventAt
-          ? `Last guest activity ${daysSince}d ago.`
-          : 'No guest activity recorded.',
-        color: '#9a6b00', order: 2 };
-    }
-    return { key: 'healthy', label: 'Healthy',
-      diagnosis: totalRecent > 0
-        ? `${totalRecent} guest event${totalRecent === 1 ? '' : 's'} in the last 14 days.`
-        : 'Active property, quiet week.',
-      color: '#2f7d32', order: 3 };
-  };
-
-  const ledgerByEmail = {};
-  pilotHosts.forEach(h => { ledgerByEmail[h.host_email] = h; });
-
-  const cards = Object.values(byHost)
-    .filter(h => h.email && h.email !== '_unattributed')
-    .map(h => {
-      const state = classify(h);
-      const led   = ledgerByEmail[h.email] || null;
-      return { ...h, state, ledger: led };
-    })
-    .sort((a, b) => (a.state.order - b.state.order) || a.email.localeCompare(b.email));
-
-  if (cards.length === 0) {
-    return `<div class="section-title">Pilot hosts</div>
-      <div class="loading">No hosts yet. Add rows via the Ops tab's pilot_hosts editor to start tracking.</div>`;
-  }
-
-  const html = cards.map(c => {
-    const max = Math.max(1, ...last14.map(k => c.guestEventsByDay[k]));
-    const sparkline = last14.map(k => {
-      const v = c.guestEventsByDay[k];
-      const h = Math.max(2, Math.round((v / max) * 32));
-      const tint = v === 0 ? 'rgba(0,0,0,0.08)' : 'var(--warm)';
-      return `<div title="${k}: ${v}" style="width:6px;height:${h}px;background:${tint};border-radius:1px;"></div>`;
-    }).join('');
-
-    const ledger = c.ledger
-      ? `<div style="margin-top:6px;font-size:0.7rem;color:var(--ink-soft);">
-           Status: <strong style="color:var(--ink);">${escapeHtml(c.ledger.status)}</strong>
-           ${Number(c.ledger.amount_paid) > 0 ? ` · €${Number(c.ledger.amount_paid).toFixed(2)}` : ''}
-         </div>`
-      : `<div style="margin-top:6px;font-size:0.7rem;color:var(--ink-soft);">Not in ledger.</div>`;
-
-    const safeEmail = escapeHtml(c.email);
-    return `
-      <button
-        onclick="document.getElementById('userFilter').value='${safeEmail}';setActiveTab('deepdive');"
-        style="text-align:left;background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px;cursor:pointer;font-family:inherit;">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px;">
-          <div style="font-weight:600;color:var(--ink);font-size:0.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${safeEmail}</div>
-          <span style="font-size:0.66rem;padding:2px 8px;background:${c.state.color}22;color:${c.state.color};border-radius:3px;white-space:nowrap;">${escapeHtml(c.state.label)}</span>
-        </div>
-        <div style="display:flex;align-items:flex-end;gap:2px;height:34px;margin-bottom:6px;">${sparkline}</div>
-        <div style="font-size:0.72rem;color:var(--ink-soft);line-height:1.35;">${escapeHtml(c.state.diagnosis)}</div>
-        <div style="margin-top:4px;font-size:0.68rem;color:var(--ink-soft);">
-          ${c.properties.size} propert${c.properties.size === 1 ? 'y' : 'ies'} ·
-          ${c.linksGenerated} link${c.linksGenerated === 1 ? '' : 's'} ·
-          ${c.completed} check-in${c.completed === 1 ? '' : 's'}
-        </div>
-        ${ledger}
-      </button>
-    `;
-  }).join('');
-
-  return `
-    <div class="section-title">Pilot hosts (${cards.length})</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:24px;">
-      ${html}
-    </div>
-  `;
-}
-
-// Zone C — last 25 platform events, phrased through EVENT_PHRASES.
-function renderPilotActivityFeed(propToEmail) {
+// Last 25 platform events, phrased through EVENT_PHRASES.
+function renderActivityFeed(propToEmail) {
   const rows = allEvents
     .filter(e => EVENT_PHRASES[e.event_type])
     .slice(0, 25);
 
   if (rows.length === 0) {
-    return `<div class="section-title">Recent activity</div>
-      <div class="loading">Nothing recent to show.</div>`;
+    return `<section data-recent-activity><div class="section-title">Recent activity</div>
+      <div class="loading">Nothing recent to show.</div></section>`;
   }
 
-  return `
+  return `<section data-recent-activity style="margin-top:24px;">
     <div class="section-title">Recent activity</div>
     <div style="background:var(--white);border:1px solid var(--border);border-radius:8px;">
       ${rows.map((e, i) => {
@@ -3423,7 +3215,7 @@ function renderPilotActivityFeed(propToEmail) {
           <div style="font-size:0.68rem;color:var(--ink-soft);margin-top:2px;">${escapeHtml(when)}</div>
         </div>`;
       }).join('')}
-    </div>
+    </div></section>
   `;
 }
 

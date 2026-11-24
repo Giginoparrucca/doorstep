@@ -70,8 +70,21 @@ const authUsers = [
   { id: O2, email: 'bruno@example.invalid', created_at: iso(T0 - 20 * D), email_confirmed_at: iso(T0 - 20 * D), last_sign_in_at: iso(T0 - 30 * 3600e3) },
   { id: '00000000-0000-4000-8000-0000000000a3', email: 'carla@example.invalid', created_at: iso(T0 - 2 * D), email_confirmed_at: null, last_sign_in_at: null },
 ];
+// Round 77 «Contatti»: fictional contacts covering every status, a note and a due date.
+const contactsPayload = { generated_at: iso(T0), today: day(T0), billing_error: null, contacts: [
+  { id: 'c-1', user_id: O1, account: true, full_name: 'Anna Fittizia', email: 'anna@example.invalid', login_email: 'anna@example.invalid', phone: '+393331234567', source: 'whatsapp', lead_stage: 'lead', next_action: 'Chiamare', next_action_due: day(T0 - D), status: { kind: 'trial', days_left: 5 }, properties: [{ id: 'p-1', name: 'Casa Anna' }], last_login_at: iso(T0 - D), last_note_at: iso(T0 - D), notes: [{ id: 'n-1', contact_id: 'c-1', body: 'Nota fittizia', created_at: iso(T0 - D), created_by: ADMIN.email }] },
+  { id: 'c-2', user_id: 'u-2', account: true, full_name: 'Bruno', email: 'bruno@example.invalid', login_email: 'bruno@example.invalid', phone: null, lead_stage: 'lead', status: { kind: 'paying' }, properties: [], notes: [] },
+  { id: 'c-3', user_id: 'u-3', account: true, full_name: 'Elena', email: 'elena@example.invalid', login_email: 'elena@example.invalid', phone: null, lead_stage: 'lead', status: { kind: 'free' }, properties: [{ id: 'p-3', name: 'Villa' }, { id: 'p-4', name: 'Loft' }], notes: [] },
+  { id: 'c-4', user_id: 'u-4', account: true, full_name: 'Franco', email: 'franco@example.invalid', login_email: 'franco@example.invalid', phone: null, lead_stage: 'lead', status: { kind: 'expired' }, properties: [], notes: [] },
+  { id: 'c-5', user_id: 'u-5', account: true, full_name: 'Gina', email: 'gina@example.invalid', login_email: 'gina@example.invalid', phone: null, lead_stage: 'lead', status: { kind: 'read_only' }, properties: [], notes: [] },
+  { id: 'c-6', user_id: null, account: false, full_name: null, email: 'dora@example.invalid', phone: '+447700900123', lead_stage: 'invited', next_action_due: day(T0), status: { kind: 'lead', stage: 'invited' }, properties: [], notes: [] },
+  { id: 'c-7', user_id: null, account: false, full_name: 'Zeno', email: null, phone: null, lead_stage: 'contacted', status: { kind: 'lead', stage: 'contacted' }, properties: [], notes: [] },
+  { id: 'c-8', user_id: null, account: false, full_name: 'Ugo', email: null, phone: null, lead_stage: 'demo', status: { kind: 'lead', stage: 'demo' }, properties: [], notes: [] },
+  { id: 'c-9', user_id: null, account: false, full_name: 'Vera', email: null, phone: null, lead_stage: 'lost', status: { kind: 'lead', stage: 'lost' }, properties: [], notes: [] },
+  { id: 'c-10', user_id: null, account: false, full_name: 'Luca', email: null, phone: null, lead_stage: 'lead', status: { kind: 'lead', stage: 'lead' }, properties: [], notes: [] }] };
 const usersPayload = (() => {
   const plans = { [O1]: { state: 'trial', trial_ends_at: iso(T0 + 5 * D) }, [O2]: { state: 'prelaunch' } };
+
   const rows = U.buildRows({ users: authUsers, invites: tables.pilot_invites, admins: tables.admin_users, properties, events, checkins, plans, now: T0 });
   for (const r of rows) if (r.user_id) r.billing = { state: plans[r.user_id] || { state: 'prelaunch' }, chip: 'Prova', subscription: {}, events: [] };
   return { generated_at: iso(T0), summary: U.summarize(rows, T0), rows, plan_error: null };
@@ -114,7 +127,7 @@ async function boot(browser, width, lang) {
       if (u.pathname === '/app-config.js') return route.fulfill({ contentType: 'text/javascript', body: `window.WELCOME_BNB_CONFIG={mode:'production',projectRef:'${REF}',supabaseUrl:'${SUPA}',publicKey:'fixture-public-key',appOrigin:'${APP}',allowedOrigins:['${APP}']};` });
       if (u.pathname === '/api/admin-host-health') {
         const b = JSON.parse(req.postData() || '{}');
-        const body = b.action === 'users_overview' ? usersPayload : b.action === 'audit_list' ? { events: [{ id: 2, occurred_at: iso(T0 - 3600e3), actor_email: ADMIN.email, action: 'dsar_export', outcome: 'ok', target_table: 'data_subject', target_id: null, metadata: {} }], chain: { ok: true, checked: 2 } }
+        const body = b.action === 'users_overview' ? usersPayload : b.action === 'contacts_list' ? contactsPayload : b.action === 'audit_list' ? { events: [{ id: 2, occurred_at: iso(T0 - 3600e3), actor_email: ADMIN.email, action: 'dsar_export', outcome: 'ok', target_table: 'data_subject', target_id: null, metadata: {} }], chain: { ok: true, checked: 2 } }
           : b.action === 'billing_launch_preview' ? { ok: true, launch_at: iso(T0), already_launched: false, hosts: [{ user_id: O1, email: 'anna@example.invalid', properties: 1, all_test: false, has_row: false, suggested_last_free_day: day(T0 + 30 * D), earliest_last_free_day: day(T0 + 7 * D) }] }
           : !b.action ? health : { ok: true };
         return route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
@@ -161,15 +174,24 @@ async function tour(page) {
   const click = async sel => { const el = page.locator(sel).first(); if (await el.count()) { await el.click(); await page.waitForTimeout(250); } };
   // Every tour starts on the home tab (the previous one ended on Privacy).
   await click('[data-tab="users"]'); await page.waitForSelector('[data-users-table]');
+  await page.waitForSelector('[data-users-table] ~ * [data-recent-activity], [data-recent-activity]'); // 24 Nov: recent activity moved here from the Pilot tab
+  if (!(await page.locator('#content [data-recent-activity]').count())) throw new Error('recent activity missing from Utenti');
+  if (await page.locator('[data-tab="pilot"]').count()) throw new Error('Pilot tab still present');
   await grab();
   await click(`[data-users-billing-toggle="${O1}"]`); await grab();
   await click('[data-users-sort="activity"]'); await grab();
   try { await click('[data-launch-prepare]'); await page.waitForSelector('[data-launch-plan]', { timeout: 5000 }); }
   catch (e) { console.error('[prepare-launch]', String(e).slice(0, 300), page.url(), await page.evaluate(() => document.readyState).catch(x => 'eval failed: ' + String(x).slice(0, 120))); throw e; }
   await grab();
-  for (const tab of ['pilot', 'deepdive', 'ops', 'privacy']) {
+  for (const tab of ['contacts', 'deepdive', 'ops', 'privacy']) {
     await click(`[data-tab="${tab}"]`); await grab();
     if (tab === 'deepdive') { await page.selectOption('#userFilter', { label: 'anna' }).catch(() => {}); await page.evaluate(() => typeof renderView === 'function' && renderView()); await page.waitForTimeout(300); await grab(); await page.selectOption('#userFilter', 'all').catch(() => {}); await page.evaluate(() => renderView()); }
+    if (tab === 'contacts') {
+      await page.waitForSelector('[data-contact-card]');
+      await click('[data-contacts-filter="due"]'); await grab(); await click('[data-contacts-filter="all"]');
+      await click('[data-contact-open="c-1"]'); await grab(); await click('[data-contact-close]');
+      await click('[data-contacts-add]'); await grab(); await click('[data-contact-close]');
+    }
     if (tab === 'privacy') { await click('[data-audit-load]'); await grab(); }
   }
   return [...seen];
@@ -225,5 +247,5 @@ if (COLLECT) {
 } else {
   assert.deepEqual([...missing.it].sort(), [], 'Italian mode: no English text left');
   assert.deepEqual([...missing.en].sort(), [], 'English mode: no Italian text left');
-  console.log('PASS admin console bilingual: real admin.html signed in with fictional data, every tab (Utenti with the subscription box and launch, Pilot, Deep dive all/one host, Ops, Privacy with the audit log) at 390/1440 — Italian by default with no English left, English on the toggle with no Italian left, choice remembered across loads, names/e-mails/numbers untouched, no page errors');
+  console.log('PASS admin console bilingual: real admin.html signed in with fictional data, every tab (Utenti with the subscription box, launch and recent activity, Contatti with filters, detail and new contact, Deep dive all/one host, Ops, Privacy with the audit log) at 390/1440 — Italian by default with no English left, English on the toggle with no Italian left, choice remembered across loads, names/e-mails/numbers untouched, no page errors');
 }

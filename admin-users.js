@@ -208,7 +208,8 @@
             }).join('') || '<tr><td colspan="9">Nessun utente.</td></tr>'}</tbody>
           </table></div>
         <p style="font-size:0.72rem;color:var(--ink-soft);margin-top:6px;">Attivo = ha usato la console negli ultimi 7 giorni · In calo = 8–30 giorni · Inattivo = oltre 30 giorni. Giorni attivi = giorni distinti con attività in console. Tocca un host per il dettaglio e per aprire la console di ogni struttura · «Condizioni» = versione accettata dall’account e data, «Scarica prova» scarica le prove dell’accettazione · «Gestisci» per prova, pagamento e gratis a vita.</p>
-        ${typeof root.renderBillingSettings === 'function' ? root.renderBillingSettings() : ''}`;
+        ${typeof root.renderBillingSettings === 'function' ? root.renderBillingSettings() : ''}
+        ${typeof root.renderRecentActivity === 'function' ? root.renderRecentActivity() : ''}`;
     }
     host.innerHTML = `<div class="section-title">Utenti</div>${body}`;
   }

@@ -178,7 +178,7 @@ async function tour(page) {
   if (!(await page.locator('#content [data-recent-activity]').count())) throw new Error('recent activity missing from Utenti');
   if (await page.locator('[data-tab="pilot"]').count()) throw new Error('Pilot tab still present');
   await grab();
-  // 24 Nov 2026: contacts live in «Utenti»: filters, a host's full record (account section with the subscription box), a prospect, a new contact.
+  // 24 Nov 2026: contacts live in «Utenti»: filters, a host’s full record (account section with the subscription box), a prospect, a new contact.
   await page.waitForSelector('[data-users-row="c-6"]');
   await click('[data-users-filter="due"]'); await grab(); await click('[data-users-filter="leads"]'); await grab(); await click('[data-users-filter="all"]');
   await click(`[data-users-row="${O1}"] [data-users-open]`); await page.waitForSelector('#contactModal [data-account-section]'); await grab(); await click('[data-contact-close]');
@@ -246,5 +246,5 @@ if (COLLECT) {
 } else {
   assert.deepEqual([...missing.it].sort(), [], 'Italian mode: no English text left');
   assert.deepEqual([...missing.en].sort(), [], 'English mode: no Italian text left');
-  console.log('PASS admin console bilingual: real admin.html signed in with fictional data, every tab (Utenti with contacts: filters, a host's full record with the subscription box, a prospect, a new contact; launch and recent activity; Deep dive all/one host, Ops, Privacy with the audit log) at 390/1440 — Italian by default with no English left, English on the toggle with no Italian left, choice remembered across loads, names/e-mails/numbers untouched, no page errors');
+  console.log('PASS admin console bilingual: real admin.html signed in with fictional data, every tab (Utenti with contacts: filters, a host’s full record with the subscription box, a prospect, a new contact; launch and recent activity; Deep dive all/one host, Ops, Privacy with the audit log) at 390/1440 — Italian by default with no English left, English on the toggle with no Italian left, choice remembered across loads, names/e-mails/numbers untouched, no page errors');
 }

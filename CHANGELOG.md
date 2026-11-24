@@ -7,6 +7,22 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Round 77 — Host contacts: mini-CRM in admin (confirmed 2026-11-24)
+
+Daniele confirmed the plain-language recap on 24 November 2026 («Go ahead»). Specification: `PLAN_round77_host_contacts.md`.
+- **What:** one admin «Contatti» tab where every host and every prospect has a name, phone, e-mail, derived status, notes and a next action, with one-tap WhatsApp, call and e-mail.
+- **Out of scope:** no messages sent, no imports, no pipelines.
+- **Access:** through the service-role admin endpoint; no browser can reach the tables directly.
+- **`pilot_hosts`** (0 rows, still used by the Ops editor) is left untouched.
+
+| Phase | Status | Where / test gate |
+|---|---|---|
+| 1 — Database + backfill | in-progress — Claude Opus 5.5 | `host_contacts`, `host_contact_notes`; RLS, no policies, privileges revoked; admin-log whitelist; idempotent backfill. |
+| 2 — Server actions | pending | `contacts_*` on `/api/admin-host-health`; validation; derived status. |
+| 3 — «Contatti» tab | pending | List, search, filters, badge, one-tap actions, detail view, notes; mobile. |
+| 4 — Privacy and records | pending | ROPA activity, retention line. |
+| 5 — Tests and close | pending | New tests, full `test:all`, live smoke, schema drift. |
+
 ### Hotfix — assisted e-mail change refused with «Storico dell'account non disponibile» (Claude, 19 November 2026)
 
 **What happened.** Daniele's second attempt (Simone → Rachele, both checks ticked) stopped at the account-history step. As designed, **nothing was changed.**

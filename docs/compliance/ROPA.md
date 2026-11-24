@@ -481,6 +481,41 @@ evidence:
   - legal/CONDIZIONI_GENERALI_v1.md
 ```
 
+### 14. Host and prospect contacts (Contatti host e potenziali clienti)
+
+Round 77. The admin's own business contact list: hosts and people interested in WelcomeBnB, with name, phone, e-mail, status, notes and the next action, to call or message them. Admin-only; never shown to hosts or guests; no messages are sent from it.
+
+```yaml
+id: host-contacts
+role: controller (WelcomeBnB)
+purpose:
+  - Keep track of hosts and prospects (who they are, where things stand, what to do next) and reach them by phone, WhatsApp or e-mail from the admin console
+data_subjects:
+  - Hosts
+  - Prospects (people who contacted WelcomeBnB or were invited and have no account yet)
+personal_data:
+  - Name, e-mail, phone, where the contact came from, stage (prospects), next action and due date
+  - Notes written by the admin, with date and author (admin e-mail)
+  - Derived on display, not stored - subscription state, properties, last sign-in (from the host account)
+recipients:
+  - Sub-processors - Supabase, Vercel (no other recipient; WhatsApp and e-mail open on the admin's own device)
+international_transfers:
+  - None (stored in the EU; nothing is sent from the console)
+retention:
+  - Until the admin deletes the contact; a host account's contact stays while the account exists (re-created by the list otherwise); notes are deleted with the contact. No automatic purge yet (see owner decision 6)
+security_measures:
+  - Tables reachable only by the server (service role) - row-level security on with no policies, every privilege revoked from anon and authenticated
+  - Every read and change goes through the admin endpoint (caller JWT, is_admin) and is written to the admin log without e-mail addresses; changes are rate-limited
+  - User-entered text shown as plain text (no HTML), so notes cannot inject code
+legal_basis:
+  - Art. 6(1)(b) steps prior to and performance of the contract with the host
+  - Art. 6(1)(f) legitimate interest in following up people who contacted WelcomeBnB or were invited (prospects)
+evidence:
+  - supabase/migrations/20261124090000_round77_host_contacts.sql
+  - api/_admin-contacts.js
+  - admin-contacts.js
+```
+
 ## Owner decisions collected from this register
 
 1. ~~**Retention periods**~~ — decided 18 Nov 2026 (Round 76): Annex B of the host agreement, `docs/compliance/RETENTION_POLICY.md`, enforced by the jobs cited above. Only the iReservation comparison reports (activity 7) remain without a limit while that integration is owner-only.
@@ -488,5 +523,6 @@ evidence:
 3. **DPAs accepted** with Anthropic and Resend.
 4. **HIGH-GDPR-3:** accept the residual risk or add an 18+ confirmation to the consent card.
 5. **Controller/processor framing** above, and the legitimate-interest balancing for Q&A reuse and analytics.
+6. **Prospects who never sign up** (activity 14, Round 77): kept until the admin deletes them. A future round should set a limit for unanswered prospects (for example 24 months from the last note or change), as for the rest of the retention policy.
 
 Round 66 completion update: entry exceptions now check current authenticated owner/admin identity in the database. Admin exceptions write the existing impersonation log and immutable booking audit atomically; failed auditing blocks the mutation. Host status is projected by `api/_entry-host-state.js` without guest records or codes in the response. Existing retention decisions above remain owner decisions.

@@ -350,6 +350,7 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
   <!-- Round 35: three-tab shell. Buttons wired via inline onclick to setActiveTab. -->
   <div id="tabsBar" style="display:flex;gap:6px;margin:0 0 14px;flex-wrap:wrap;">
     <button data-tab="users"   onclick="setActiveTab('users')"   style="padding:8px 16px;border:1px solid var(--warm);background:var(--warm);color:#fff;border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Utenti</button>
+    <button data-tab="contacts" onclick="setActiveTab('contacts')" style="padding:8px 16px;border:1px solid var(--border);background:var(--white);color:var(--ink-soft);border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;"><span>Contatti</span><span data-contacts-badge data-i18n-skip style="display:none;margin-left:6px;min-width:18px;padding:0 6px;border-radius:999px;background:#B42318;color:#fff;font-size:0.72rem;font-weight:700;line-height:18px;text-align:center;"></span></button>
     <button data-tab="pilot"   onclick="setActiveTab('pilot')"   style="padding:8px 16px;border:1px solid var(--border);background:var(--white);color:var(--ink-soft);border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Pilot</button>
     <button data-tab="deepdive" onclick="setActiveTab('deepdive')" style="padding:8px 16px;border:1px solid var(--border);background:var(--white);color:var(--ink-soft);border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Deep dive</button>
     <button data-tab="ops"     onclick="setActiveTab('ops')"     style="padding:8px 16px;border:1px solid var(--border);background:var(--white);color:var(--ink-soft);border-radius:6px;cursor:pointer;font-size:0.82rem;font-family:inherit;font-weight:500;">Ops</button>
@@ -366,6 +367,7 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
 <script src="/admin-alloggiati-support.js?v=70.1"></script>
 <script src="/admin-dsar.js?v=67.6"></script>
 <script src="/admin-users.js?v=8"></script>
+<script src="/admin-contacts.js?v=77.1"></script>
 <script src="/admin-i18n-dict.js?v=1"></script>
 <script src="/admin-i18n.js?v=1"></script>
 <script src="/vendor/supabase-2.118.0.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
@@ -392,7 +394,7 @@ let apiUsageByProp = {};
 // ─── Round 35: pilot admin rebuild ────────────────────────────────────
 // The console now runs as three tabs — Pilot (default), Deep dive, Ops.
 // Presentation-only; loadData() and every Supabase query below stay put.
-let activeTab   = 'users';                 // 'users' (home, 17 Nov 2026) | 'pilot' | 'deepdive' | 'ops' | 'privacy'
+let activeTab   = 'users';                 // 'users' (home, 17 Nov 2026) | 'contacts' (Round 77) | 'pilot' | 'deepdive' | 'ops' | 'privacy'
 let showTestData = false;                  // top-bar toggle; default off
 // Round 69 — host terms acceptances (admins read all via RLS is_admin()).
 // null = not loaded/unavailable; otherwise host_id → rows (newest first).
@@ -2125,6 +2127,9 @@ function _r14BuildEngagement(events, checkins, properties, propToEmail) {
 //   stay put — this is presentation only.
 // ══════════════════════════════════════
 function renderView() {
+  // Round 77 — due/overdue count on the «Contatti» tab (loaded once in the background).
+  if (window.ContactsAdmin) window.ContactsAdmin.ensureBadge();
+  if (activeTab === 'contacts') return window.ContactsAdmin ? window.ContactsAdmin.render() : null;
   if (activeTab === 'users')    return window.UsersAdmin ? window.UsersAdmin.render() : null;
   if (activeTab === 'pilot')    return renderPilotTab();
   if (activeTab === 'ops')      return renderOpsTab();

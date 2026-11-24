@@ -17,6 +17,7 @@ import { handleBillingAction, billingChip } from './_admin-billing.js';
 import { handleDsarAction } from './_admin-dsar.js';
 import { buildUsersOverview } from './_admin-users.js';
 import { handleAccountAction } from './_admin-account.js';
+import { handleContactsAction } from './_admin-contacts.js';
 import { take } from './_rate-limit.js';
 import { auditFirst, auditAfter, recordAdminEvent, AUDIT_UNAVAILABLE } from './_admin-audit.js';
 import { sendHostEmail, hostAccountEmail } from './_notify-host.js';
@@ -170,6 +171,31 @@ function billingDeps(deps = {}) {
 }
 
 // Round 67 Phase 5 — journal writer (injectable for tests).
+// Round 77 — host contacts (service role; RLS on with no policies).
+function contactsDeps(deps = {}) {
+  if (deps.contacts) return deps.contacts;
+  const f = deps.fetch || globalThis.fetch;
+  const rest = async (method, path, body) => {
+    const r = await f(`${SUPABASE_URL}/rest/v1/${path}`, { method, headers: { ...supabaseAuthHeaders(SERVICE_KEY), 'Content-Type': 'application/json', Accept: 'application/json', Prefer: 'return=representation' },
+      body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(15000) });
+    if (r.status === 409) return { conflict: true, rows: [] };
+    if (!r.ok) throw new Error(`${method} ${path.split('?')[0]} ${r.status}`);
+    return { rows: await r.json().catch(() => []) };
+  };
+  const enc = encodeURIComponent;
+  return {
+    sync: () => rest('POST', 'rpc/host_contacts_sync', {}),
+    contacts: id => sbGetAll(`host_contacts?select=*${id ? '&id=eq.' + enc(id) : ''}&order=created_at.asc`, deps),
+    notes: () => sbGetAll('host_contact_notes?select=id,contact_id,body,created_at,created_by&order=created_at.desc,id.asc', deps),
+    properties: () => sbGetAll('properties?deleted_at=is.null&select=id,name,owner_id,is_test&order=created_at.asc', deps),
+    users: async () => (await listUsers(deps)).map(u => ({ id: u.id, email: u.email || null, last_sign_in_at: u.last_sign_in_at || null })),
+    billing: (ids, at) => readBilling(ids, at, deps),
+    insert: (table, row) => rest('POST', table, row),
+    update: (table, id, row) => rest('PATCH', `${table}?id=eq.${enc(id)}`, row),
+    remove: (table, id) => rest('DELETE', `${table}?id=eq.${enc(id)}`),
+  };
+}
+
 // 19 Nov 2026 — assisted login e-mail change (Supabase Auth admin API).
 function accountDeps(deps = {}) {
   if (deps.account) return deps.account;
@@ -283,6 +309,23 @@ export default async function handler(req, res, deps = {}) {
       await audit.after({ ...ev, outcome: outcomeOf(out.status), metadata: { status: out.status, ...detail } });
       return res.status(out.status).json(out.body);
     }
+    if (action.startsWith('contacts_')) {
+      const body = req.body || {};
+      const write = action !== 'contacts_list';
+      const ev = { ...who, action, targetTable: action.startsWith('contacts_note') ? 'host_contact_notes' : 'host_contacts',
+        targetId: /^[0-9a-f-]{36}$/i.test(String(body.id || body.contact_id || '')) ? (body.id || body.contact_id) : null };
+      if (write) {
+        const gate2 = await (deps.take || take)('admin_contacts', gate.user.id, { limit: 300 }, { fetch: deps.fetch });
+        if (gate2 && gate2.ok === false) return res.status(429).json({ error: 'Troppe modifiche in poco tempo: riprova tra qualche minuto.' });
+        if (!(await audit.first(ev))) return res.status(AUDIT_UNAVAILABLE.status).json(AUDIT_UNAVAILABLE.body);
+      }
+      let out;
+      try { out = await handleContactsAction(action, body, { actor: gate.user.email || gate.user.id, deps: contactsDeps(deps) }); }
+      catch (e) { if (write) await audit.after({ ...ev, outcome: 'error' }); throw e; }
+      const a = out.audit || {};
+      await audit.after({ ...ev, targetId: a.target || ev.targetId, outcome: outcomeOf(out.status), metadata: { status: out.status, ...(a.rows !== undefined ? { rows: a.rows } : {}), ...(a.fields ? { fields: a.fields } : {}) } });
+      return res.status(out.status).json(out.body);
+    }
     if (action === 'account_email_change') {
       const body = req.body || {};
       const real = body.dry === false;
@@ -311,7 +354,7 @@ export default async function handler(req, res, deps = {}) {
     // Never a silent empty result: the admin sees that the read failed.
     console.warn('[admin-host-health] failed:', String(e && e.message || e).slice(0, 200));
     const act = String(req.body?.action || '');
-    const failed = act.startsWith('dsar_') ? 'Privacy request failed: nothing was changed by the failed step. Retry in a moment.' : act.startsWith('account_') ? 'Cambio email non riuscito: verifica nella lista se è cambiata prima di riprovare.' : 'Host health unavailable. Retry in a moment.';
+    const failed = act.startsWith('dsar_') ? 'Privacy request failed: nothing was changed by the failed step. Retry in a moment.' : act.startsWith('account_') ? 'Cambio email non riuscito: verifica nella lista se è cambiata prima di riprovare.' : act.startsWith('contacts_') ? 'Contatti non disponibili: nessuna modifica fatta da questo passaggio. Riprova tra poco.' : 'Host health unavailable. Retry in a moment.';
     return res.status(503).json({ error: failed });
   }
 }

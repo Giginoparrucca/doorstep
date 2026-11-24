@@ -21,6 +21,7 @@ Principle (Daniele, 18 Nov 2026): keep each kind of data exactly as long as a la
 | Admin action log | 2 years | `admin_audit_purge`, daily job `welcomebnb_admin_audit_purge` |
 | Usage analytics | 180 days, then monthly aggregates | `purge_old_data` |
 | Trash (soft-deleted rows) and test rows | 30 days | `purge_old_data` |
+| Admin contact list: hosts and prospects (Round 77; WelcomeBnB as controller, not in Annex B) | until the admin deletes the contact; a host account's contact while the account exists | manual (admin «Contatti»); a limit for unanswered prospects is an open owner decision (ROPA 6) |
 
 ## How it runs
 

@@ -19,6 +19,7 @@ Newest entries at the top of each section.
   - **Result:** every row is 43 px (was up to 91 px).
 - **Narrower screens:** below 1,280 px the cards are used (the breakpoint was 1,200 px), so the one-line layout never causes horizontal scroll; phone cards are unchanged (44 px buttons).
 - **Test** `admin-users-browser`: now at 390/768/1024/**1280**/1440. It checks the icons sit on the name line to its right and that every row is ≤ 46 px on wide screens.
+- **Shipped:** PR #348 merged as `d1a6dcd`. Local `npm run test:all` **PASS 174 / FAIL 0 / SKIP 3**; CI green; live.
 
 ### Admin: «Utenti» and «Contatti» combined in one tab (Claude, 24 November 2026)
 

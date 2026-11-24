@@ -1,4 +1,7 @@
-// Round 77 — «Contatti»: host and prospect contacts (mini-CRM), admin only.
+// Round 77 — host and prospect contacts (mini-CRM), admin only. Since 24 Nov
+// 2026 the list lives in the «Utenti» table (admin-users.js: one row per
+// person); this file keeps the contacts data, the detail view (modal) and the
+// writes.
 // Data: /api/admin-host-health actions contacts_* (service role, admin check,
 // admin log). Vanilla JS. Every user-entered value (names, phones, e-mails,
 // notes, next actions) is set with textContent and marked data-i18n-skip, so
@@ -9,7 +12,6 @@
   // eslint-disable-next-line no-undef
   const adminClient = () => (typeof sb !== 'undefined' ? sb : root.sb);
   let data = null, loading = false, error = null, badgeTried = false;
-  let view = { q: '', filter: 'all' };
   let openId = null, creating = false, pendingDelete = null, msg = null;
 
   // ── Phone rules (same as api/_admin-contacts.js and host_contacts_phone()) ──
@@ -57,22 +59,6 @@
   const isOverdue = c => !!c.next_action_due && c.next_action_due < today();
   const label = c => c.full_name || c.login_email || c.email || c.phone && fmtPhone(c.phone) || '—';
 
-  // ── Filters, search, sort ──
-  const FILTERS = [['all', 'Tutti'], ['leads', 'Lead'], ['trial', 'Prova'], ['paying', 'Paganti'], ['free', 'Gratis'], ['due', 'Da fare']];
-  const inFilter = (c, f) => f === 'all' ? true : f === 'leads' ? !c.account : f === 'trial' ? c.status.kind === 'trial'
-    : f === 'paying' ? c.status.kind === 'paying' : f === 'free' ? c.status.kind === 'free' : f === 'due' ? isDue(c) : true;
-  function matches(c, q) {
-    q = q.trim().toLowerCase();
-    if (!q) return true;
-    const qd = digits(q);
-    if (qd.length >= 3 && digits(c.phone).includes(qd)) return true;
-    return [c.full_name, c.email, c.login_email, ...(c.properties || []).map(p => p.name)].some(v => String(v || '').toLowerCase().includes(q));
-  }
-  function sorted(list) {
-    const key = c => [isOverdue(c) ? 0 : 1, c.next_action_due || '9999-99-99', label(c).toLowerCase()];
-    return list.slice().sort((a, b) => { const x = key(a), y = key(b); for (let i = 0; i < 3; i++) { if (x[i] < y[i]) return -1; if (x[i] > y[i]) return 1; } return 0; });
-  }
-
   // ── Server ──
   async function call(action, payload = {}) {
     const { data: s } = await adminClient().auth.getSession();
@@ -83,13 +69,20 @@
     if (!r.ok) { const e = new Error(j.error === 'audit_unavailable' ? 'Registro amministratore non disponibile: nessuna modifica fatta. Riprova tra poco.' : (j.error || ('Errore HTTP ' + r.status))); e.status = r.status; throw e; }
     return j;
   }
-  async function load(silent) {
-    loading = true; error = null; if (!silent) render();
-    try { const j = await call('contacts_list'); if (!Array.isArray(j.contacts)) throw new Error('risposta non valida'); data = j; }
-    catch (e) { error = String(e && e.message || e); }
-    loading = false; updateBadge(); if (!silent || root.activeTab === 'contacts' || isOpen()) render();
+  let pending = null;
+  function load() {
+    if (pending) return pending;
+    loading = true; error = null;
+    pending = (async () => {
+      try { const j = await call('contacts_list'); if (!Array.isArray(j.contacts)) throw new Error('risposta non valida'); data = j; }
+      catch (e) { error = String(e && e.message || e); }
+      loading = false; pending = null; updateBadge(); notify();
+    })();
+    return pending;
   }
-  const isOpen = () => (typeof activeTab !== 'undefined' ? activeTab : root.activeTab) === 'contacts'; // eslint-disable-line no-undef
+  // The «Utenti» table re-renders when the contacts change.
+  function notify() { try { if (root.UsersAdmin && typeof root.UsersAdmin.contactsChanged === 'function') root.UsersAdmin.contactsChanged(); } catch (_) {} }
+  function ensureData() { return data ? Promise.resolve(data) : load(); }
 
   // ── Tab badge: due/overdue count ──
   function updateBadge() {
@@ -100,7 +93,7 @@
     el.style.display = n ? 'inline-block' : 'none';
     el.style.background = data && data.contacts.some(isOverdue) ? '#B42318' : '#B54708';
   }
-  function ensureBadge() { if (badgeTried || data || loading) return; badgeTried = true; load(true); }
+  function ensureBadge() { if (badgeTried || data || loading) return; badgeTried = true; load(); }
 
   // ── DOM helpers (user text only through textContent) ──
   function el(tag, attrs, ...kids) {
@@ -137,71 +130,6 @@
     }
   }
   function flash(btn, text) { if (!btn) return; const old = btn.textContent; btn.textContent = text; setTimeout(() => { btn.textContent = old; }, 1600); }
-
-  function card(c) {
-    const [bt, tone] = badge(c);
-    const due = c.next_action_due;
-    const dueTone = due && due < today() ? '#B42318' : due && due === today() ? '#B54708' : 'var(--ink-soft)';
-    const box = el('div', { 'data-contact-card': c.id, 'data-overdue': isOverdue(c) ? '1' : null, style: 'background:var(--white);border:1px solid ' + (isOverdue(c) ? '#F04438' : 'var(--border)') + ';border-radius:12px;padding:12px 14px;min-width:0;' });
-    const head = el('div', { style: 'display:flex;justify-content:space-between;gap:8px;align-items:flex-start;' },
-      el('button', { type: 'button', 'data-contact-open': c.id, onclick: () => openDetail(c.id), style: 'border:0;background:none;padding:0;text-align:left;cursor:pointer;font:inherit;min-width:0;min-height:44px;' },
-        userText('div', label(c), 'font-weight:700;font-size:0.98rem;overflow-wrap:anywhere;'),
-        c.full_name && (c.login_email || c.email) ? userText('div', c.login_email || c.email, 'font-size:0.76rem;color:var(--ink-soft);overflow-wrap:anywhere;') : null),
-      chip(bt, tone, { 'data-contact-status': true }));
-    box.append(head);
-    const meta = el('div', { style: 'font-size:0.8rem;margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 12px;color:var(--ink-soft);' });
-    if (c.phone) meta.append(userText('span', fmtPhone(c.phone), 'color:var(--ink);', { 'data-contact-phone': true }));
-    meta.append(el('span', { 'data-contact-props': true, text: c.account ? `${c.properties.length} ${c.properties.length === 1 ? 'struttura' : 'strutture'}` : 'Nessun account' }));
-    if (c.last_note_at) meta.append(el('span', {}, 'Ultima nota ', userText('span', fmtDay(romeYmd(new Date(c.last_note_at))), '')));
-    box.append(meta);
-    if (c.next_action || due) {
-      const na = el('div', { 'data-contact-next': true, style: 'margin-top:6px;font-size:0.84rem;' });
-      if (due) na.append(el('strong', { style: 'color:' + dueTone + ';', text: (due < today() ? 'Scaduto ' : due === today() ? 'Oggi ' : '') }), userText('span', fmtDay(due) + (c.next_action ? ' · ' : ''), 'color:' + dueTone + ';font-weight:600;'));
-      if (c.next_action) na.append(userText('span', c.next_action, ''));
-      box.append(na);
-    }
-    box.append(actions(c));
-    return box;
-  }
-
-  function render() {
-    const host = document.getElementById('content');
-    if (!host || !isOpen()) return;
-    if (!data && !loading && !error) { load(); return; }
-    host.textContent = '';
-    host.append(el('style', { text: '@media (max-width:480px){[data-contacts-list]{grid-template-columns:1fr !important}}' }));
-    host.append(el('div', { class: 'section-title', text: 'Contatti' }));
-    if (loading && !data) { host.append(el('div', { class: 'loading', text: 'Caricamento contatti…' })); return; }
-    if (error && !data) { host.append(el('p', { role: 'status', 'data-contacts-error': true, style: 'color:#B42318;' }, 'Contatti non disponibili: ', userText('span', error, ''), ' ', el('button', { type: 'button', style: BTN, onclick: () => load() }, 'Riprova'))); return; }
-    const bar = el('div', { style: 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;' });
-    const search = el('input', { id: 'contactsSearch', type: 'search', placeholder: 'Cerca nome, email, telefono o struttura', value: view.q, 'data-i18n-skip': null, style: INPUT + 'flex:1 1 220px;width:auto;',
-      oninput: ev => { view.q = ev.target.value; renderList(); } });
-    bar.append(el('label', { for: 'contactsSearch', style: 'position:absolute;left:-9999px;', text: 'Cerca' }), search,
-      el('button', { type: 'button', 'data-contacts-add': true, style: BTN_PRIMARY, onclick: () => { creating = true; openId = null; msg = null; renderModal(); } }, '＋ Aggiungi contatto'),
-      el('button', { type: 'button', style: BTN, onclick: () => load() }, 'Aggiorna'));
-    host.append(bar);
-    const chips = el('div', { role: 'group', 'aria-label': 'Filtri', style: 'display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;' });
-    for (const [k, t] of FILTERS) {
-      const n = data.contacts.filter(c => inFilter(c, k)).length;
-      const on = view.filter === k;
-      chips.append(el('button', { type: 'button', 'data-contacts-filter': k, 'aria-pressed': on ? 'true' : 'false', onclick: () => { view.filter = k; render(); },
-        style: BTN + 'min-height:40px;border-radius:999px;' + (on ? 'background:var(--warm,#005BFF);border-color:var(--warm,#005BFF);color:#fff;' : '') + (k === 'due' && data.contacts.some(isOverdue) && !on ? 'border-color:#F04438;color:#B42318;' : '') },
-        el('span', { text: t }), el('span', { 'data-i18n-skip': true, text: ' ' + n })));
-    }
-    host.append(chips);
-    if (data.billing_error) host.append(el('p', { role: 'status', style: 'font-size:0.78rem;color:#B54708;', text: 'Stato dell’abbonamento non disponibile per alcuni contatti.' }));
-    host.append(el('div', { 'data-contacts-list': true, style: 'display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;' }));
-    renderList();
-    if (openId || creating) renderModal();
-  }
-  function renderList() {
-    const list = document.querySelector('[data-contacts-list]');
-    if (!list || !data) return;
-    list.textContent = '';
-    const rows = sorted(data.contacts.filter(c => inFilter(c, view.filter) && matches(c, view.q)));
-    if (!rows.length) list.append(el('p', { style: 'color:var(--ink-soft);', text: 'Nessun contatto.' }));
-    for (const c of rows) list.append(card(c));
-  }
 
   // ── Detail / create modal ──
   function openDetail(id) { openId = id; creating = false; msg = null; pendingDelete = null; renderModal(); }
@@ -258,9 +186,10 @@
       if (!c.properties.length) props.append(el('div', { style: 'font-size:0.8rem;color:var(--ink-soft);', text: 'Nessuna struttura.' }));
       for (const p of c.properties) props.append(el('div', { style: 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px;' }, userText('span', p.name + (p.test ? ' (test)' : ''), 'font-size:0.86rem;'),
         typeof root.viewAsHost === 'function' ? el('button', { type: 'button', 'data-contact-console': p.id, style: BTN, onclick: () => root.viewAsHost(p.id) }, '👁 Apri console') : null));
-      props.append(el('button', { type: 'button', 'data-contact-billing': true, style: BTN + 'margin-top:8px;', onclick: () => openBilling(c) }, 'Abbonamento e prova in Utenti →'));
       if (c.last_login_at) props.append(el('div', { style: 'font-size:0.76rem;color:var(--ink-soft);margin-top:6px;' }, 'Ultimo accesso ', userText('span', fmtWhen(c.last_login_at), '')));
       panel.append(props);
+      // Account details from «Utenti»: subscription and trial, login e-mail, terms, deep dive.
+      if (root.UsersAdmin && typeof root.UsersAdmin.accountSection === 'function') { const extra = root.UsersAdmin.accountSection(c); if (extra) panel.append(extra); }
     }
     // Notes timeline.
     const notes = el('div', { style: 'margin-top:16px;' }, el('div', { style: 'font-weight:600;font-size:0.84rem;', text: 'Note' }));
@@ -304,7 +233,7 @@
       const saved = j && j.contact;
       if (!saved || !saved.id) throw new Error('Nessuna riga salvata: ricarica e riprova.');
       creating = false; openId = saved.id; msg = { text: 'Salvato.', bad: false };
-      await load(true); renderModal(); render();
+      await load(); renderModal();
     } catch (e) { msg = { text: String(e.message || e), bad: true }; renderModalKeep(f); }
   }
   // Re-render the modal keeping what was typed.
@@ -318,28 +247,26 @@
     try {
       if (withNote && c.next_action) await call('contacts_note_add', { contact_id: c.id, body: 'Fatto: ' + c.next_action });
       await call('contacts_update', { id: c.id, next_action: '', next_action_due: null });
-      msg = { text: 'Fatto.', bad: false }; await load(true); renderModal(); render();
+      msg = { text: 'Fatto.', bad: false }; await load(); renderModal();
     } catch (e) { msg = { text: String(e.message || e), bad: true }; renderModal(); }
   }
   async function addNote(c, body) {
     if (!String(body || '').trim()) { msg = { text: 'Scrivi una nota.', bad: true }; return renderModal(); }
-    try { await call('contacts_note_add', { contact_id: c.id, body }); msg = { text: 'Nota aggiunta.', bad: false }; await load(true); renderModal(); render(); }
+    try { await call('contacts_note_add', { contact_id: c.id, body }); msg = { text: 'Nota aggiunta.', bad: false }; await load(); renderModal(); }
     catch (e) { msg = { text: String(e.message || e), bad: true }; renderModal(); const ta = document.querySelector('[data-contact-note-input]'); if (ta) ta.value = body; }
   }
   async function deleteNote(id) {
-    try { await call('contacts_note_delete', { id }); pendingDelete = null; msg = { text: 'Nota eliminata.', bad: false }; await load(true); renderModal(); render(); }
+    try { await call('contacts_note_delete', { id }); pendingDelete = null; msg = { text: 'Nota eliminata.', bad: false }; await load(); renderModal(); }
     catch (e) { pendingDelete = null; msg = { text: String(e.message || e), bad: true }; renderModal(); }
   }
   async function deleteContact(id) {
-    try { await call('contacts_delete', { id }); closeModal(); await load(true); render(); }
+    try { await call('contacts_delete', { id }); closeModal(); await load(); }
     catch (e) { pendingDelete = null; msg = { text: String(e.message || e), bad: true }; renderModal(); }
   }
-  function openBilling(c) {
-    closeModal();
-    if (typeof root.setActiveTab === 'function') root.setActiveTab('users');
-    const email = c.login_email || c.email;
-    if (email && root.UsersAdmin) setTimeout(() => { try { root.UsersAdmin.search(email); if (c.user_id) root.UsersAdmin.toggleBilling(c.user_id); } catch (_) {} }, 50);
-  }
-
-  root.ContactsAdmin = { render, ensureBadge, reload: () => load(), _normPhone: normPhone, _fmtPhone: fmtPhone, _sorted: sorted, _matches: matches, _reset: () => { data = null; error = null; loading = false; badgeTried = false; view = { q: '', filter: 'all' }; closeModal(); } };
+  function openCreate() { creating = true; openId = null; msg = null; pendingDelete = null; renderModal(); }
+  // Re-render an open detail view (after «Utenti» reloads account data).
+  function refreshModal() { if ((openId || creating) && document.getElementById('contactModal')) renderModal(); }
+  root.ContactsAdmin = { ensureBadge, ensureData, reload: () => load(), data: () => data, error: () => error, openDetail, openCreate, refreshModal, closeModal,
+    badge, isDue, isOverdue, label, normPhone, fmtPhone, waUrl, digits, today, _normPhone: normPhone, _fmtPhone: fmtPhone,
+    _reset: () => { data = null; error = null; loading = false; pending = null; badgeTried = false; closeModal(); } };
 })(typeof window !== 'undefined' ? window : globalThis);

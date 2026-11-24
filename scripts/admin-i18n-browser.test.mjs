@@ -178,20 +178,19 @@ async function tour(page) {
   if (!(await page.locator('#content [data-recent-activity]').count())) throw new Error('recent activity missing from Utenti');
   if (await page.locator('[data-tab="pilot"]').count()) throw new Error('Pilot tab still present');
   await grab();
-  await click(`[data-users-billing-toggle="${O1}"]`); await grab();
-  await click('[data-users-sort="activity"]'); await grab();
+  // 24 Nov 2026: contacts live in «Utenti»: filters, a host’s full record (account section with the subscription box), a prospect, a new contact.
+  await page.waitForSelector('[data-users-row="c-6"]');
+  await click('[data-users-filter="due"]'); await grab(); await click('[data-users-filter="leads"]'); await grab(); await click('[data-users-filter="all"]');
+  await click(`[data-users-row="${O1}"] [data-users-open]`); await page.waitForSelector('#contactModal [data-account-section]'); await grab(); await click('[data-contact-close]');
+  await click('[data-users-row="c-6"] [data-users-open]'); await grab(); await click('[data-contact-close]');
+  await click('[data-contacts-add]'); await grab(); await click('[data-contact-close]');
+  await page.evaluate(() => UsersAdmin.sort('activity')); await page.waitForTimeout(250); await grab(); // headers on wide screens, «Ordina per» on narrow ones
   try { await click('[data-launch-prepare]'); await page.waitForSelector('[data-launch-plan]', { timeout: 5000 }); }
   catch (e) { console.error('[prepare-launch]', String(e).slice(0, 300), page.url(), await page.evaluate(() => document.readyState).catch(x => 'eval failed: ' + String(x).slice(0, 120))); throw e; }
   await grab();
-  for (const tab of ['contacts', 'deepdive', 'ops', 'privacy']) {
+  for (const tab of ['deepdive', 'ops', 'privacy']) {
     await click(`[data-tab="${tab}"]`); await grab();
     if (tab === 'deepdive') { await page.selectOption('#userFilter', { label: 'anna' }).catch(() => {}); await page.evaluate(() => typeof renderView === 'function' && renderView()); await page.waitForTimeout(300); await grab(); await page.selectOption('#userFilter', 'all').catch(() => {}); await page.evaluate(() => renderView()); }
-    if (tab === 'contacts') {
-      await page.waitForSelector('[data-contact-card]');
-      await click('[data-contacts-filter="due"]'); await grab(); await click('[data-contacts-filter="all"]');
-      await click('[data-contact-open="c-1"]'); await grab(); await click('[data-contact-close]');
-      await click('[data-contacts-add]'); await grab(); await click('[data-contact-close]');
-    }
     if (tab === 'privacy') { await click('[data-audit-load]'); await grab(); }
   }
   return [...seen];
@@ -247,5 +246,5 @@ if (COLLECT) {
 } else {
   assert.deepEqual([...missing.it].sort(), [], 'Italian mode: no English text left');
   assert.deepEqual([...missing.en].sort(), [], 'English mode: no Italian text left');
-  console.log('PASS admin console bilingual: real admin.html signed in with fictional data, every tab (Utenti with the subscription box, launch and recent activity, Contatti with filters, detail and new contact, Deep dive all/one host, Ops, Privacy with the audit log) at 390/1440 — Italian by default with no English left, English on the toggle with no Italian left, choice remembered across loads, names/e-mails/numbers untouched, no page errors');
+  console.log('PASS admin console bilingual: real admin.html signed in with fictional data, every tab (Utenti with contacts: filters, a host’s full record with the subscription box, a prospect, a new contact; launch and recent activity; Deep dive all/one host, Ops, Privacy with the audit log) at 390/1440 — Italian by default with no English left, English on the toggle with no Italian left, choice remembered across loads, names/e-mails/numbers untouched, no page errors');
 }

@@ -180,7 +180,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY ||= 'fictional-service-key';
   console.log('  endpoint: admin gate, audit, rate limit');
 }
 
-// 5. Browser: the real tab (admin-contacts.js) at 375 and 1440 against an in-memory backend.
+// 5. Browser: «Utenti» (admin-users.js) with the contacts (admin-contacts.js) at 375 and 1440 against an in-memory backend.
 const TODAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome' }).format(new Date());
 const shift = n => { const t = new Date(TODAY + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined, args: ['--no-sandbox'] });
@@ -194,6 +194,14 @@ try {
       { id: id(15), user_id: id(4), account: true, full_name: 'Elena', email: 'elena@example.invalid', login_email: 'elena@example.invalid', phone: null, lead_stage: 'lead', next_action: null, next_action_due: null, status: { kind: 'free' }, properties: [], notes: [] },
     ];
     let seq = 100; const calls = [];
+    // The «Utenti» side: the three accounts of the store (Anna trial 5 days, Bruno paying, Elena free).
+    const UU = await import('../api/_admin-users.js');
+    const NOWB = Date.now();
+    const uRows = UU.buildRows({ users: [{ id: A, email: 'anna@example.invalid', created_at: '2026-11-01T00:00:00Z', email_confirmed_at: '2026-11-01T00:00:00Z', last_sign_in_at: new Date(NOWB - 86400000).toISOString() },
+      { id: B, email: 'bruno@example.invalid', created_at: '2026-10-01T00:00:00Z', email_confirmed_at: '2026-10-01T00:00:00Z', last_sign_in_at: null }, { id: id(4), email: 'elena@example.invalid', created_at: '2026-09-01T00:00:00Z', email_confirmed_at: '2026-09-01T00:00:00Z', last_sign_in_at: null }],
+      invites: [], admins: [], properties: [{ id: id(21), name: 'Casa Anna', owner_id: A, is_test: false }, { id: id(22), name: 'Bruno B&B', owner_id: B, is_test: false }], events: [], checkins: [],
+      plans: { [A]: { state: 'trial', trial_ends_at: new Date(NOWB + 5 * 86400000).toISOString() }, [B]: { state: 'active', paid_until: new Date(NOWB + 200 * 86400000).toISOString() }, [id(4)]: { state: 'free' } }, now: NOWB });
+    const usersPayload = { generated_at: new Date(NOWB).toISOString(), summary: UU.summarize(uRows, NOWB), rows: uRows, plan_error: null, terms_error: null };
     const ctx = await browser.newContext({ viewport: { width, height: 900 } });
     const page = await ctx.newPage(); const errors = []; const dialogs = [];
     page.on('pageerror', e => errors.push(String(e))); page.on('dialog', d => { dialogs.push(d.type()); d.dismiss(); });
@@ -202,6 +210,7 @@ try {
       if (u.pathname === '/api/admin-host-health') {
         const b = JSON.parse(route.request().postData()); calls.push(b.action);
         const ok = body => route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
+        if (b.action === 'users_overview') return ok(usersPayload);
         if (b.action === 'contacts_list') return ok({ today: TODAY, contacts: JSON.parse(JSON.stringify(store)) });
         if (b.action === 'contacts_create') { const c = { id: id(seq++), user_id: null, account: false, lead_stage: 'lead', notes: [], properties: [], status: { kind: 'lead', stage: b.lead_stage || 'lead' }, ...b }; delete c.action; store.push(c); return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ contact: c }) }); }
         if (b.action === 'contacts_update') { const c = store.find(x => x.id === b.id); const f = { ...b }; delete f.action; delete f.id; if (f.next_action === '') f.next_action = null; Object.assign(c, f); if (!c.account) c.status = { kind: 'lead', stage: c.lead_stage }; return ok({ contact: c }); }
@@ -209,49 +218,51 @@ try {
         if (b.action === 'contacts_note_delete') { for (const c of store) c.notes = c.notes.filter(n => n.id !== b.id); return ok({ deleted: b.id }); }
         if (b.action === 'contacts_delete') { store.splice(store.findIndex(x => x.id === b.id), 1); return ok({ deleted: b.id }); }
       }
-      return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>:root{--border:#ddd;--white:#fff;--ink-soft:#555;--ink:#111}body{margin:0;font-family:sans-serif}.container{padding:16px}</style></head><body><div class="container"><div id="tabsBar"><button data-tab="contacts"><span>Contatti</span><span data-contacts-badge style="display:none"></span></button></div><div id="content"></div></div></body></html>` });
+      return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>:root{--border:#ddd;--white:#fff;--ink-soft:#555;--ink:#111}body{margin:0;font-family:sans-serif}.container{padding:16px}</style></head><body><div class="container"><div id="tabsBar"><button data-tab="users"><span>Utenti</span><span data-contacts-badge style="display:none"></span></button></div><div id="content"></div></div></body></html>` });
     });
     await page.goto('https://app.welcomebnb.it/admin.html');
     await page.addScriptTag({ content: `const sb={auth:{getSession:async()=>({data:{session:{access_token:'fictional-admin-jwt'}}})}};let activeTab='users';window.consoles=[];window.viewAsHost=p=>consoles.push(p);window.setActiveTab=t=>{activeTab=t;};` });
+    await page.addScriptTag({ content: read('admin-users.js') });
     await page.addScriptTag({ content: ui });
     // Client phone rules = server rules (same cases).
     for (const [inp, want] of cases) { const r = await page.evaluate(v => ContactsAdmin._normPhone(v), inp); if (want === false) assert.equal(r.ok, false, 'client rejects ' + inp); else assert.deepEqual(r, { ok: true, value: want }, 'client ' + inp); }
-    // Badge loads in the background, before the tab is opened.
+    // Badge (now on «Utenti») loads in the background.
     await page.evaluate(() => ContactsAdmin.ensureBadge());
     await page.waitForFunction(() => document.querySelector('[data-contacts-badge]').textContent === '2');
     assert.equal(await page.$eval('[data-contacts-badge]', e => getComputedStyle(e).backgroundColor), 'rgb(180, 35, 24)', 'red when something is overdue');
-    await page.evaluate(() => { activeTab = 'contacts'; ContactsAdmin.render(); });
-    await page.waitForSelector('[data-contact-card]');
-    const order = () => page.$$eval('[data-contact-card]', cs => cs.map(c => c.dataset.contactCard));
-    assert.deepEqual(await order(), [id(11), id(12), id(13), id(15), id(14)], 'overdue first, then due date, then name');
-    const card = sel => page.locator(`[data-contact-card="${sel}"]`);
-    assert.match(await card(id(11)).textContent(), /Anna Fittizia.*Prova · 5 gg.*\+39 333 123 4567.*1 struttura.*Scaduto .*Chiamare per il rinnovo/s);
-    assert.equal(await card(id(11)).getAttribute('data-overdue'), '1');
-    assert.match(await card(id(12)).locator('[data-contact-status]').textContent(), /Pagante/); assert.match(await card(id(15)).locator('[data-contact-status]').textContent(), /Gratis a vita/);
-    assert.match(await card(id(13)).textContent(), /dora@example\.invalid.*Invitato.*\+447700900123.*Nessun account/s);
-    assert.match(await card(id(14)).locator('[data-contact-status]').textContent(), /Perso/);
-    // One-tap links.
-    assert.equal(await card(id(11)).locator('[data-contact-wa]').getAttribute('href'), 'https://wa.me/393331234567');
-    assert.equal(await card(id(11)).locator('[data-contact-wa]').getAttribute('target'), '_blank');
-    assert.equal(await card(id(11)).locator('[data-contact-call]').getAttribute('href'), 'tel:+393331234567');
-    assert.equal(await card(id(11)).locator('[data-contact-mail]').getAttribute('href'), 'mailto:anna@example.invalid');
-    assert.equal(await card(id(12)).locator('[data-contact-wa]').count(), 0, 'no WhatsApp without a phone');
+    await page.evaluate(() => UsersAdmin.render());
+    await page.waitForFunction(() => document.querySelectorAll('[data-users-row]').length === 5);
+    const order = () => page.$$eval('[data-users-row]', trs => trs.map(tr => tr.dataset.usersRow));
+    const row = k => page.locator(`[data-users-row="${k}"]`);
+    // Sort by next action ascending: overdue first, then due date.
+    await page.evaluate(() => { UsersAdmin.sortTo('next'); }); if ((await page.evaluate(() => UsersAdmin._view().dir)) !== 'asc') await page.evaluate(() => UsersAdmin.sort('next'));
+    assert.deepEqual((await order()).slice(0, 3), [A, B, id(13)], 'overdue first, then due today, then later');
+    assert.match(await row(A).textContent(), /Anna Fittizia.*\+39 333 123 4567.*Casa Anna.*Prova · scade/s);
+    assert.match(await row(B).locator('[data-plan]').textContent(), /Pagato/); assert.match(await row(id(4)).locator('[data-plan]').textContent(), /Gratis a vita/);
+    assert.match(await row(id(13)).textContent(), /dora@example\.invalid.*\+447700900123.*Nessun account.*Invitato/s);
+    assert.match(await row(id(14)).locator('[data-plan]').textContent(), /Perso/);
+    assert.equal(await row(A).locator('[data-next] strong').evaluate(e => getComputedStyle(e).color), 'rgb(180, 35, 24)', 'overdue in red');
+    // One-tap links in the row.
+    assert.equal(await row(A).locator('[data-users-wa]').getAttribute('href'), 'https://wa.me/393331234567');
+    assert.equal(await row(A).locator('[data-users-wa]').getAttribute('target'), '_blank');
+    assert.equal(await row(A).locator('[data-users-call]').getAttribute('href'), 'tel:+393331234567');
+    assert.equal(await row(B).locator('[data-users-wa]').count(), 0, 'no WhatsApp without a phone');
     // Search: digits-only phone match, property name, e-mail.
-    const search = async q => { await page.fill('#contactsSearch', q); return order(); };
-    assert.deepEqual(await search('333 123'), [id(11)]); assert.deepEqual(await search('7700 900'), [id(13)]); assert.deepEqual(await search('bruno b&b'), [id(12)]); assert.deepEqual(await search('DORA@'), [id(13)]);
+    const search = async q => { await page.fill('#usersSearch', q); return (await order()).sort(); };
+    assert.deepEqual(await search('333 123'), [A]); assert.deepEqual(await search('7700 900'), [id(13)]); assert.deepEqual(await search('bruno b&b'), [B]); assert.deepEqual(await search('DORA@'), [id(13)]);
     await search('');
     // Filters with counts.
-    const filt = async k => { await page.click(`[data-contacts-filter="${k}"]`); return order(); };
-    assert.deepEqual(await filt('due'), [id(11), id(12)]); assert.deepEqual(await filt('leads'), [id(13), id(14)]); assert.deepEqual(await filt('trial'), [id(11)]);
-    assert.deepEqual(await filt('paying'), [id(12)]); assert.deepEqual(await filt('free'), [id(15)]); await filt('all');
-    assert.match(await page.textContent('[data-contacts-filter="due"]'), /Da fare 2/);
-    // Layout: one column at 375 px, buttons ≥ 44 px, no horizontal scroll.
+    const filt = async k => { await page.click(`[data-users-filter="${k}"]`); return (await order()).sort(); };
+    assert.deepEqual(await filt('due'), [A, B].sort()); assert.deepEqual(await filt('leads'), [id(13), id(14)].sort()); assert.deepEqual(await filt('trial'), [A]);
+    assert.deepEqual(await filt('paying'), [B]); assert.deepEqual(await filt('free'), [id(4)]); await filt('all');
+    assert.match(await page.textContent('[data-users-filter="due"]'), /Da fare\s*2/);
+    // Layout: cards at 375 px, row buttons ≥ 44 px, no horizontal scroll.
     if (width === 375) {
-      const xs = await page.$$eval('[data-contact-card]', cs => [...new Set(cs.map(c => Math.round(c.getBoundingClientRect().left)))]);
-      assert.equal(xs.length, 1, 'one column');
+      const xs = await page.$$eval('[data-users-row]', cs => [...new Set(cs.map(c => Math.round(c.getBoundingClientRect().left)))]);
+      assert.equal(xs.length, 1, 'one column of cards');
+      const small = await page.$$eval('[data-users-row] .u-act, [data-contacts-add]', bs => bs.filter(b => b.getBoundingClientRect().height < 40).map(b => b.textContent));
+      assert.deepEqual(small, [], 'tap targets');
     }
-    const small = await page.$$eval('[data-contact-card] a, [data-contact-card] button, [data-contacts-add]', bs => bs.filter(b => b.getBoundingClientRect().height < 44).map(b => b.textContent));
-    assert.deepEqual(small, [], 'tap targets at least 44 px');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, width + ': no horizontal scroll');
     // Add a prospect: name + phone, bad phone first.
     await page.click('[data-contacts-add]');
@@ -263,6 +274,7 @@ try {
     const gino = store.find(c => c.full_name === 'Gino Fittizio');
     assert.equal(gino.phone, '+393471112222', 'stored E.164');
     assert.equal(await page.inputValue('#contactModal [name="phone"]'), '+39 347 111 2222', 'shown formatted');
+    await page.waitForSelector(`[data-users-row="${gino.id}"]`);
     // Quick due dates, next action, stage; persisted.
     await page.fill('#contactModal [name="next_action"]', 'Richiamare');
     await page.click('[data-contact-due="3"]'); assert.equal(await page.inputValue('#contactModal [name="next_action_due"]'), shift(3));
@@ -289,10 +301,13 @@ try {
     await page.click('[data-contact-delete]'); await page.click('[data-contact-delete-confirm]');
     await page.waitForFunction(() => !document.getElementById('contactModal'));
     assert.equal(store.some(c => c.full_name === 'Gino Fittizio'), false);
-    // Account contact: e-mail read-only, no delete, properties and console, billing link.
-    await page.click(`[data-contact-open="${id(11)}"]`);
+    await page.waitForFunction(g => !document.querySelector(`[data-users-row="${g}"]`), gino.id);
+    // Account contact: e-mail read-only, no delete, properties and console.
+    await page.click(`[data-users-row="${A}"] [data-users-open]`);
+    await page.waitForSelector('#contactModal [data-contact-form]');
     assert.equal(await page.$eval('#contactModal [name="email"]', e => e.readOnly), true);
     assert.equal(await page.locator('[data-contact-delete]').count(), 0); assert.equal(await page.locator('#contactModal [name="lead_stage"]').count(), 0);
+    assert.equal(await page.locator('#contactModal [data-contact-mail]').getAttribute('href'), 'mailto:anna@example.invalid');
     await page.click(`[data-contact-console="${id(21)}"]`); assert.deepEqual(await page.evaluate(() => window.consoles), [id(21)]);
     assert.deepEqual(dialogs, [], 'no native dialogs');
     assert.deepEqual(errors, []);
@@ -300,10 +315,11 @@ try {
     await ctx.close();
   }
 } finally { await browser.close(); }
-// Wiring in admin.html.
+// Wiring in admin.html (24 Nov 2026: contacts live in «Utenti»; no separate tab).
 const html = read('admin.html');
-assert.ok(html.includes(`<button data-tab="contacts" onclick="setActiveTab('contacts')"`)); assert.ok(html.includes('<script src="/admin-contacts.js?v=77.1"></script>'));
-assert.match(html, /if \(window\.ContactsAdmin\) window\.ContactsAdmin\.ensureBadge\(\);\n\s+if \(activeTab === 'contacts'\) return window\.ContactsAdmin \? window\.ContactsAdmin\.render\(\) : null;/);
+assert.ok(!html.includes('data-tab="contacts"'), 'no separate Contatti tab'); assert.ok(html.includes('<script src="/admin-contacts.js?v=77.2"></script>'));
+assert.match(html, /<button data-tab="users"[^>]*><span>Utenti<\/span><span data-contacts-badge/);
+assert.match(html, /if \(window\.ContactsAdmin\) window\.ContactsAdmin\.ensureBadge\(\);/);
 assert.ok(!/innerHTML/.test(ui), 'the tab never uses innerHTML');
 for (const f of ['host-console.html', 'index.html']) assert.ok(!read(f).includes('host_contacts') && !read(f).includes('admin-contacts'), f + ': contacts never reach hosts or guests');
 console.log('PASS round77 host contacts: phone rules (server, SQL, client); backfill = accounts + pending invitations, no duplicates, prospect linked on registration; anon/authenticated cannot read or write, no policies, sync service-only; admin log accepts contacts_*; real writes persist and 0-row writes are errors; endpoint admin-only, journalled, rate-limited; tab at 375/1440: badge, sort, search by digits, filters, links, create/edit/quick dates/done/notes (XSS as text)/delete with in-page confirmations, no native dialogs, 44 px targets, one column on phones');

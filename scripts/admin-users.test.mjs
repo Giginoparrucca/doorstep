@@ -79,7 +79,7 @@ assert.deepEqual([ra.plan.state, ra.billing.subscription.user_id], ['trial', A],
 assert.equal(r3.body.rows.find(x => x.email === 'dora@example.invalid').billing, null, 'invited-only address: no box');
 // Wiring: the home tab.
 const html = fs.readFileSync(new URL('../admin.html', import.meta.url), 'utf8');
-assert.match(html, /let activeTab   = 'users';/); assert.match(html, /<button data-tab="users"[^>]*>Utenti<\/button>\s*<button data-tab="pilot"/);
+assert.match(html, /let activeTab   = 'users';/); assert.match(html, /<button data-tab="users"[^>]*>Utenti<\/button>\s*<button data-tab="contacts"[^>]*>.*?<\/button>\s*<button data-tab="pilot"/);
 assert.match(html, /if \(activeTab === 'users'\)    return window\.UsersAdmin/);
 // Pilot no longer repeats the health overview; billing settings left the overview (now in Utenti).
 assert.match(html, /document\.getElementById\('content'\)\.innerHTML = zoneA \+ zoneB \+ zoneC;/);

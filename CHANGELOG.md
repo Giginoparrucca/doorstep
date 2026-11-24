@@ -29,6 +29,7 @@ Newest entries at the top of each section.
   - `account-email-change`: the e-mail change is reached from the record.
   - `admin-i18n-browser`: tours the merged tab, records and new contact.
   - `admin-users`: tab wiring.
+- **Shipped:** PR #347 merged as `e7bdfc5`. Local `npm run test:all` **PASS 174 / FAIL 0 / SKIP 3** (the first run caught a stale script version in a test and a quote in a test summary; both fixed). CI green; live.
 
 ### Admin: Pilot tab removed, recent activity moved to «Utenti» (Claude, 24 November 2026)
 

@@ -7,6 +7,29 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Admin: «Utenti» and «Contatti» combined in one tab (Claude, 24 November 2026)
+
+**Daniele:** «Let's combine in one tab users and contacts. I want to keep the sortable columns of the user tab and have all details of each contact when clicking on a user. Also, make sure the table is fitting the screen and no horizontal scrolling. Keep the filter by status Lead, Prova, etc.»
+
+- **One row per person:** host accounts (`users_overview`) joined with their contacts (`contacts_list`), plus invitations and prospects, without duplicates (matched by account id, then e-mail).
+- **Columns** (all sortable): Contatto (name, e-mail, phone, properties, one-tap WhatsApp/call), Stato, Registrato, Ultima attività, Giorni attivi, Check-in 30 gg, Attività, Condizioni (evidence download), **Prossima azione** (overdue in red).
+- **Filters with counts:** Tutti · Lead · Prova · Paganti · Gratis · **Scaduti** · Da fare.
+- **Search:** name, e-mail, property, or digits of the phone.
+- **Due badge:** the due/overdue count is now on the «Utenti» tab.
+- **Clicking a name opens the full record:**
+  - contact fields, quick dates, «Fatto», notes, properties with «Apri console»;
+  - for accounts, an **Account** section with terms, «Approfondimento →» (deep dive), the subscription and trial box (extend, pay, free for life), and the login e-mail change;
+  - after a subscription change the list reloads and the record stays open.
+- **Removed:** the «Gestisci» column and the separate Contatti tab.
+- **No horizontal scroll:** a table from 1,200 px; below that each row is a stacked card (label, value) with a «Ordina per» menu and a direction button, and 44 px tap targets on phones.
+- **Code:** `admin-users.js` builds the merged list; `admin-contacts.js` keeps the contacts data, the record view (with an account-section hook) and the writes.
+- **Tests:**
+  - `admin-users-browser`: rewritten, at 390/768/1024/1440. It covers merging, columns, every sort with direction, filters, search, terms evidence, the record with the real subscription box (+14 days reloads the list, record stays open), a prospect without an account section, add contact, no horizontal scroll and tap targets.
+  - `round77-host-contacts`: the browser part now goes through «Utenti».
+  - `account-email-change`: the e-mail change is reached from the record.
+  - `admin-i18n-browser`: tours the merged tab, records and new contact.
+  - `admin-users`: tab wiring.
+
 ### Admin: Pilot tab removed, recent activity moved to «Utenti» (Claude, 24 November 2026)
 
 **Daniele:** «I feel like Users contacts and pilot are redundant info. Pilota is not really useful, just remove it, and keep the recent activity in the user tab.»

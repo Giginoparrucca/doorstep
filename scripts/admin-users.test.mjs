@@ -79,7 +79,7 @@ assert.deepEqual([ra.plan.state, ra.billing.subscription.user_id], ['trial', A],
 assert.equal(r3.body.rows.find(x => x.email === 'dora@example.invalid').billing, null, 'invited-only address: no box');
 // Wiring: the home tab.
 const html = fs.readFileSync(new URL('../admin.html', import.meta.url), 'utf8');
-assert.match(html, /let activeTab   = 'users';/); assert.match(html, /<button data-tab="users"[^>]*>Utenti<\/button>\s*<button data-tab="contacts"[^>]*>.*?<\/button>\s*<button data-tab="deepdive"/);
+assert.match(html, /let activeTab   = 'users';/); assert.ok(!html.includes('data-tab="contacts"'), 'Contatti merged into Utenti (24 Nov 2026)'); assert.match(html, /<button data-tab="users"[^>]*><span>Utenti<\/span><span data-contacts-badge[^>]*><\/span><\/button>\s*<button data-tab="deepdive"/);
 assert.match(html, /if \(activeTab === 'users'\)    return window\.UsersAdmin/);
 // 24 Nov 2026: the Pilot tab is gone; its recent-activity feed sits at the bottom of Utenti.
 assert.ok(!html.includes('data-tab="pilot"') && !html.includes('function renderPilotTab('), 'no Pilot tab');

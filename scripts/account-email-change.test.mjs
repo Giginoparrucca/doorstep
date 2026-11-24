@@ -206,7 +206,7 @@ try {
     assert.deepEqual(errors, []);
     await page.context().close();
   }
-  // Admin «Utenti»: the box under «Gestisci» calls the endpoint and reloads.
+  // Admin «Utenti»: the box in the person's record (24 Nov 2026: one tab with contacts) calls the endpoint and reloads.
   const ui = read('admin-users.js');
   const U = await import('../api/_admin-users.js');
   const NOW = Date.parse('2026-11-19T10:00:00Z');
@@ -219,14 +219,17 @@ try {
       const u = new URL(route.request().url());
       if (u.pathname === '/api/admin-host-health') { const b = JSON.parse(route.request().postData()); posts.push(b);
         if (b.action === 'account_email_change') return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ changed: true, user_id: U1, old_email: 'old@example.invalid', new_email: b.new_email, notices: { old: true, new: true } }) });
+        if (b.action === 'contacts_list') return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ today: '2026-11-19', contacts: [{ id: 'c-1', user_id: U1, account: true, full_name: 'Gino', email: 'old@example.invalid', login_email: 'old@example.invalid', phone: null, lead_stage: 'lead', status: { kind: 'trial', days_left: 9 }, properties: [{ id: 'p1', name: 'Casa' }], notes: [] }] }) });
         return route.fulfill({ contentType: 'application/json', body: JSON.stringify(payload) }); }
       return route.fulfill({ contentType: 'text/html', body: `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>:root{--border:#ddd;--white:#fff;--ink-soft:#555}body{margin:0;font-family:sans-serif}</style></head><body><div id="content"></div></body></html>` });
     });
     await page.goto('https://app.welcomebnb.it/admin.html');
     await page.addScriptTag({ content: `const sb={auth:{getSession:async()=>({data:{session:{access_token:'fictional-admin-jwt'}}})}};window.toasts=[];window.adminToast=(m,t)=>toasts.push([m,t]);` });
-    await page.addScriptTag({ content: ui });
+    await page.addScriptTag({ content: ui }); await page.addScriptTag({ content: read('admin-contacts.js') });
     await page.evaluate(() => UsersAdmin.render()); await page.waitForSelector('[data-users-table]');
-    await page.click(`[data-users-billing-toggle="${U1}"]`);
+    await page.waitForSelector(`[data-users-row="${U1}"] [data-users-open]`);
+    await page.waitForFunction(() => window.ContactsAdmin.data());
+    await page.click(`[data-users-row="${U1}"] [data-users-open]`);
     await page.waitForSelector(`[data-account-email="${U1}"]`);
     assert.match(await page.textContent(`[data-account-email="${U1}"]`), /Attuale: old@example\.invalid/);
     await page.fill(`#acctNew-${U1}`, 'new@example.invalid'); await page.click(`[data-account-email="${U1}"] [data-account-email-save]`);

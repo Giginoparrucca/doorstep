@@ -1,6 +1,12 @@
-// 17 Nov 2026 — admin home «Utenti»: one row per host account — who, when
-// they registered, where the free trial stands, how active they are.
-// Data: /api/admin-host-health action users_overview (admin-only, server).
+// 17 Nov 2026 — admin home «Utenti»: who registered, where the free trial
+// stands, how active they are. 24 Nov 2026 (Daniele: «combine in one tab
+// users and contacts… keep the sortable columns… all details of each contact
+// when clicking on a user… no horizontal scrolling… keep the filter by
+// status»): one row per PERSON — host accounts, invited and prospects — from
+// users_overview + contacts_list (admin-contacts.js). Clicking a person opens
+// the contact detail with the account section (subscription and trial, login
+// e-mail, terms, deep dive). Wide screens: a table; below 1200 px each row is
+// a stacked card with a «Ordina per» menu, so nothing scrolls sideways.
 // Uses the admin page's sb, escapeHtml, setActiveTab and #userFilter.
 (function (root) {
   'use strict';
@@ -10,8 +16,7 @@
   const adminClient = () => (typeof sb !== 'undefined' ? sb : root.sb);
   const DAY = 86400000;
   let data = null, loading = false, error = null;
-  let view = { sort: 'registered', dir: 'desc', search: '', showTest: false };
-  const openBilling = new Set(); // user ids whose «Abbonamento» box is open
+  let view = { sort: 'registered', dir: 'desc', search: '', showTest: false, filter: 'all' };
   const esc = s => (root.escapeHtml ? root.escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s).replace(/[<>&"']/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c])));
   const fmt = d => d ? new Date(d).toLocaleDateString('it-IT', { timeZone: 'Europe/Rome', day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
   const daysFrom = (d, now) => Math.round((new Date(d).getTime() - now) / DAY);
@@ -123,7 +128,7 @@
       if (!res.ok) { say(j.error === 'audit_unavailable' ? 'Registro amministratore non disponibile: nessuna modifica fatta. Riprova tra poco.' : (j.error || ('Errore ' + res.status)), true); if (btn) btn.disabled = false; return; }
       const n = j.notices || {};
       if (root.adminToast) root.adminToast(`Email cambiata in ${j.new_email}` + (n.old && n.new ? ' · avvisi inviati' : ' · avvisi NON tutti inviati'), n.old && n.new ? 'success' : 'error');
-      data = null; error = null; load();
+      data = null; error = null; load(); if (root.ContactsAdmin) root.ContactsAdmin.reload();
     } catch (e) { say('Cambio non verificato: ricarica la lista prima di riprovare.', true); if (btn) btn.disabled = false; }
   }
 
@@ -140,36 +145,144 @@
       data = j;
     } catch (e) { error = String(e && e.message || e); }
     loading = false; render();
+    if (root.ContactsAdmin) root.ContactsAdmin.refreshModal();
   }
 
+  // ── People: accounts (users_overview) joined with contacts (contacts_list) ──
+  const CA = () => root.ContactsAdmin || null;
+  function people() {
+    const cd = CA() && CA().data(); const contacts = cd ? cd.contacts : [];
+    const byUid = new Map(), byMail = new Map();
+    for (const c of contacts) { if (c.user_id) byUid.set(c.user_id, c); const m = String(c.login_email || c.email || '').toLowerCase(); if (m) byMail.set(m, c); }
+    const used = new Set(), out = [];
+    for (const r of data.rows) {
+      const c = (r.user_id && byUid.get(r.user_id)) || byMail.get(String(r.email || '').toLowerCase()) || null;
+      if (c) used.add(c.id);
+      out.push({ key: r.user_id || r.email, user: r, contact: c });
+    }
+    for (const c of contacts) if (!used.has(c.id)) out.push({ key: c.id, user: null, contact: c });
+    return out;
+  }
+  const isAccount = p => !!(p.user && p.user.user_id && p.user.status !== 'invited');
+  // Status family for the filter chips.
+  function kind(p, now) {
+    if (!isAccount(p)) return 'lead';
+    const k = p.contact && p.contact.account && p.contact.status && p.contact.status.kind;
+    if (k && k !== 'account') return k === 'read_only' ? 'expired' : k;
+    const st = p.user.plan && p.user.plan.state, sub = p.user.billing && p.user.billing.subscription;
+    if (st === 'free' || (sub && sub.status === 'free_forever')) return 'free';
+    if (st === 'active' || (sub && sub.status === 'active')) return 'paying';
+    if (st === 'grace' || st === 'read_only') return 'expired';
+    if (st === 'trial') return 'trial';
+    if (sub && sub.trial_ends_at) return new Date(sub.trial_ends_at).getTime() > now ? 'trial' : 'expired';
+    return 'other';
+  }
+  const STAGE = { lead: 'Lead', contacted: 'Contattato', demo: 'Demo', invited: 'Invitato', lost: 'Perso' };
+  const FILTERS = [['all', 'Tutti'], ['leads', 'Lead'], ['trial', 'Prova'], ['paying', 'Paganti'], ['free', 'Gratis'], ['expired', 'Scaduti'], ['due', 'Da fare']];
+  const isDue = p => !!(p.contact && CA() && CA().isDue(p.contact));
+  function inFilter(p, f, now) {
+    if (f === 'all') return true;
+    if (f === 'due') return isDue(p);
+    const k = kind(p, now);
+    return f === 'leads' ? k === 'lead' : k === f;
+  }
+  const nameOf = p => (p.contact && p.contact.full_name) || (p.user && p.user.email) || (p.contact && (p.contact.login_email || p.contact.email)) || (p.contact && p.contact.phone && CA() ? CA().fmtPhone(p.contact.phone) : '') || '—';
+  const mailOf = p => (p.user && p.user.email) || (p.contact && (p.contact.login_email || p.contact.email)) || '';
+  function stateCell(p, now) {
+    if (isAccount(p)) return planCell(p.user.plan, now, p.user);
+    const stage = (p.contact && p.contact.lead_stage) || (p.user && p.user.status === 'invited' ? 'invited' : 'lead');
+    return [STAGE[stage] || 'Lead', stage === 'lost' ? 'grey' : 'blue', 2e6];
+  }
+  TONE.blue = ['#EFF8FF', '#175CD3'];
+
   function rowsToShow(now) {
-    const q = view.search.trim().toLowerCase();
-    const list = (data.rows || []).filter(r => (view.showTest || (!r.is_test && !r.is_admin))
-      && (!q || String(r.email || '').toLowerCase().includes(q) || r.properties.some(p => String(p.name).toLowerCase().includes(q))));
+    const q = view.search.trim().toLowerCase(), qd = q.replace(/\D/g, '');
+    const list = people().filter(p => {
+      const u = p.user;
+      if (u && !view.showTest && (u.is_test || u.is_admin)) return false;
+      if (!inFilter(p, view.filter, now)) return false;
+      if (!q) return true;
+      if (qd.length >= 3 && p.contact && String(p.contact.phone || '').replace(/\D/g, '').includes(qd)) return true;
+      const props = [...((u && u.properties) || []), ...((p.contact && p.contact.properties) || [])].map(x => x.name);
+      return [nameOf(p), mailOf(p), ...props].some(v => String(v || '').toLowerCase().includes(q));
+    });
+    const NONE = view.dir === 'asc' ? '￿' : '';
     const key = {
-      host: r => String(r.email || ''), registered: r => String(r.registered_at || r.invited_at || ''),
-      plan: r => planCell(r.plan, now, r)[2], last: r => String(r.last_active_at || ''), days: r => r.active_days_30,
-      checkins: r => r.checkins_30, activity: r => ACTIVITY[r.activity][2],
-      terms: r => r.terms ? String(r.terms.accepted_at) : '',
-    }[view.sort] || (r => '');
+      host: p => nameOf(p).toLowerCase(), registered: p => String((p.user && (p.user.registered_at || p.user.invited_at)) || (p.contact && p.contact.created_at) || ''),
+      plan: p => stateCell(p, now)[2], last: p => String((p.user && p.user.last_active_at) || ''), days: p => p.user ? p.user.active_days_30 : -1,
+      checkins: p => p.user ? p.user.checkins_30 : -1, activity: p => p.user ? ACTIVITY[p.user.activity][2] : 9,
+      terms: p => p.user && p.user.terms ? String(p.user.terms.accepted_at) : '',
+      next: p => (p.contact && p.contact.next_action_due) || NONE,
+    }[view.sort] || (() => '');
     const sign = view.dir === 'asc' ? 1 : -1;
-    return list.map((r, i) => ({ r, i })).sort((a, b) => { const x = key(a.r), y = key(b.r); return (x < y ? -1 : x > y ? 1 : a.i - b.i) * sign; }).map(x => x.r);
+    return list.map((p, i) => ({ p, i })).sort((a, b) => { const x = key(a.p), y = key(b.p); return (x < y ? -1 : x > y ? 1 : a.i - b.i) * sign; }).map(x => x.p);
+  }
+
+  const COLS = [['host', 'Contatto'], ['plan', 'Stato'], ['registered', 'Registrato'], ['last', 'Ultima attività'], ['days', 'Giorni attivi'], ['checkins', 'Check-in 30 gg'], ['activity', 'Attività'], ['terms', 'Condizioni'], ['next', 'Prossima azione']];
+  const CSS = `.u-tbl{width:100%;border-collapse:collapse;font-size:0.8rem;table-layout:auto}
+.u-tbl th,.u-tbl td{padding:8px 6px;text-align:left;vertical-align:top;border-bottom:1px solid var(--border);overflow-wrap:anywhere}
+.u-tbl th{font-size:0.74rem}.u-lbl{display:none}.u-sortbar{display:none}
+.u-act{display:inline-flex;align-items:center;justify-content:center;min-width:32px;min-height:32px;border:1px solid var(--border);border-radius:8px;text-decoration:none;margin:4px 4px 0 0;font-size:0.9rem;background:var(--white)}
+@media (max-width:1199px){.u-tbl thead{display:none}.u-tbl,.u-tbl tbody,.u-tbl tr,.u-tbl td{display:block;width:auto}
+.u-tbl tr{border:1px solid var(--border);border-radius:10px;margin:0 0 10px;padding:6px 12px;background:var(--white)}
+.u-tbl td{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:5px 0;border:0}
+.u-tbl td.u-main{display:block;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.u-tbl td:empty,.u-tbl td.u-none{display:none}
+.u-lbl{display:inline;color:var(--ink-soft);font-size:0.74rem;flex:0 0 auto}.u-val{text-align:right;min-width:0}
+.u-sortbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.u-act{min-width:44px;min-height:44px}}`;
+
+  function cells(p, now) {
+    const u = p.user, c = p.contact, CAx = CA();
+    const td = (lbl, val, attr = '') => `<td ${attr}><span class="u-lbl">${esc(lbl)}</span><span class="u-val">${val}</span></td>`;
+    const none = '<span style="color:var(--ink-soft);">—</span>';
+    const [stText, stTone] = stateCell(p, now);
+    const props = ((u && u.properties) || []).map(x => esc(x.name) + (x.test ? ' (test)' : '')).join(', ');
+    const phone = c && c.phone;
+    const acts = phone && CAx ? `<a class="u-act" data-users-wa href="${esc(CAx.waUrl(phone))}" target="_blank" rel="noopener" title="WhatsApp" aria-label="WhatsApp">💬</a><a class="u-act" data-users-call href="tel:${esc(phone)}" title="Chiama" aria-label="Chiama">📞</a>` : '';
+    const mail = mailOf(p);
+    const main = `<td class="u-main" style="min-width:160px;">
+      <button type="button" data-users-open="${esc(p.key)}" onclick="UsersAdmin.openPerson('${esc(p.key)}')" style="border:0;background:none;padding:0;font:inherit;font-weight:700;color:var(--warm, #1849A9);cursor:pointer;text-align:left;overflow-wrap:anywhere;min-height:32px;"><span data-i18n-skip>${esc(nameOf(p))}</span></button>
+      ${u && u.is_admin ? chip('Admin', 'grey') : ''}${u && u.is_test ? ' ' + chip('Test', 'grey') : ''}
+      ${mail && mail !== nameOf(p) ? `<div data-i18n-skip style="font-size:0.74rem;color:var(--ink-soft);">${esc(mail)}</div>` : ''}
+      ${phone && CAx ? `<div data-i18n-skip style="font-size:0.74rem;">${esc(CAx.fmtPhone(phone))}</div>` : ''}
+      <div style="font-size:0.72rem;color:var(--ink-soft);">${props ? `<span data-i18n-skip>${props}</span>` : esc(u ? STATUS[u.status] || '' : 'Nessun account')}</div>
+      ${acts ? `<div>${acts}</div>` : ''}</td>`;
+    const reg = u ? (u.registered_at ? esc(fmt(u.registered_at)) : `<span style="color:var(--ink-soft);">invitato il ${esc(fmt(u.invited_at))}</span><div style="font-size:0.72rem;color:#B54708;">password non creata</div>`) : none;
+    let next = '';
+    if (c && (c.next_action || c.next_action_due)) {
+      const due = c.next_action_due, t = CAx ? CAx.today() : '';
+      const col = due && due < t ? '#B42318' : due && due === t ? '#B54708' : 'var(--ink-soft)';
+      next = `${due ? `<strong style="color:${col};white-space:nowrap;">${esc(due.slice(8, 10) + '/' + due.slice(5, 7))}</strong> ` : ''}${c.next_action ? `<span data-i18n-skip>${esc(c.next_action)}</span>` : ''}`;
+    }
+    return main
+      + td('Stato', chip(stText, stTone, 'data-plan'))
+      + td('Registrato', reg)
+      + td('Ultima attività', u ? esc(ago(u.last_active_at, now)) : none, 'data-last' + (u ? '' : ' class="u-none"'))
+      + td('Giorni attivi', u ? `${u.active_days_7} / 7 · ${u.active_days_30} / 30` : none, 'data-days' + (u ? '' : ' class="u-none"'))
+      + td('Check-in 30 gg', u ? String(u.checkins_30) : none, 'data-checkins' + (u ? '' : ' class="u-none"'))
+      + td('Attività', u ? chip(...ACTIVITY[u.activity].slice(0, 2), 'data-activity-chip') : none, u ? '' : 'class="u-none"')
+      + td('Condizioni', u ? termsCell(u) : none, 'data-terms' + (u && u.user_id ? '' : ' class="u-none"'))
+      + td('Prossima azione', next || none, 'data-next' + (next ? '' : ' class="u-none"'));
   }
 
   function render() {
     const host = document.getElementById('content');
     if (!host) return;
     if (!data && !loading && !error) { load(); return; }
+    if (CA() && !CA().data() && !CA().error()) CA().ensureData();
     const now = data ? new Date(data.generated_at).getTime() : Date.now();
     const s = data ? data.summary : null;
     const tile = (label, value, hint, attr) => `<div ${attr} style="background:var(--white);border:1px solid var(--border);border-radius:10px;padding:10px 12px;min-width:0;"><div style="font-size:0.72rem;color:var(--ink-soft);">${esc(label)}</div><div style="font-size:1.35rem;font-weight:700;">${value}</div>${hint ? `<div style="font-size:0.7rem;color:var(--ink-soft);">${esc(hint)}</div>` : ''}</div>`;
-    const th = (k, label) => `<th scope="col"><button type="button" data-users-sort="${k}" onclick="UsersAdmin.sort('${k}')" style="border:0;background:none;padding:0;font:inherit;font-weight:600;cursor:pointer;color:inherit;">${esc(label)}${view.sort === k ? (view.dir === 'asc' ? ' ▲' : ' ▼') : ''}</button></th>`;
+    const th = (k, label) => `<th scope="col"><button type="button" data-users-sort="${k}" onclick="UsersAdmin.sort('${k}')" style="border:0;background:none;padding:0;font:inherit;font-weight:600;cursor:pointer;color:inherit;text-align:left;">${esc(label)}${view.sort === k ? (view.dir === 'asc' ? ' ▲' : ' ▼') : ''}</button></th>`;
+    const btn = 'min-height:40px;padding:6px 12px;border:1px solid var(--border);background:var(--white);border-radius:8px;cursor:pointer;font:inherit;font-size:0.8rem;';
     let body = '';
     if (loading && !data) body = '<div class="loading">Caricamento utenti…</div>';
     else if (error && !data) body = `<p role="status" data-users-error style="color:#B42318;">Utenti non disponibili: ${esc(error)} <button type="button" onclick="UsersAdmin.reload()">Riprova</button></p>`;
     else {
+      const all = people().filter(p => view.showTest || !(p.user && (p.user.is_test || p.user.is_admin)));
       const rows = rowsToShow(now);
-      body = `<div data-users-summary style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:14px;">
+      const ce = CA() && CA().error();
+      body = `<style>${CSS}</style><div data-users-summary style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:14px;">
           ${tile('Host', s.hosts, `${s.registered_30} nuovi negli ultimi 30 gg`, 'data-tile="hosts"')}
           ${tile('Attivi (7 gg)', s.active_7, 'hanno usato la console', 'data-tile="active"')}
           ${tile('Inattivi', s.inactive, 'oltre 30 gg o mai usato', 'data-tile="inactive"')}
@@ -177,43 +290,57 @@
           ${tile('Condizioni accettate', s.terms_accepted, `${s.terms_pending} registrati devono ancora accettare`, 'data-tile="terms"')}
           ${tile('Prova in scadenza', s.trial_ending_7, `entro 7 gg · ${s.in_trial} in prova · ${s.trial_ended || 0} scadute · ${s.paying} paganti`, 'data-tile="trial"')}
         </div>
-        ${s.prelaunch ? '<p role="status" data-users-prelaunch style="font-size:0.78rem;color:var(--ink-soft);margin:0 0 8px;">La prova parte dalla registrazione. Prima del lancio le date sono solo indicative: nessun host vede avvisi o blocchi finché non premi «Lancia». Correggi la data di ognuno con «Gestisci».</p>' : ''}
+        ${s.prelaunch ? '<p role="status" data-users-prelaunch style="font-size:0.78rem;color:var(--ink-soft);margin:0 0 8px;">La prova parte dalla registrazione. Prima del lancio le date sono solo indicative: nessun host vede avvisi o blocchi finché non premi «Lancia». Correggi la data di ognuno aprendo la sua scheda.</p>' : ''}
         ${data.plan_error ? '<p role="status" style="font-size:0.78rem;color:#B54708;">Stato della prova non disponibile per alcuni utenti.</p>' : ''}
+        ${ce ? `<p role="status" data-users-contacts-error style="font-size:0.78rem;color:#B54708;">Contatti non disponibili: ${esc(ce)}</p>` : ''}
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">
           <label for="usersSearch" style="position:absolute;left:-9999px;">Cerca</label>
-          <input id="usersSearch" type="search" placeholder="Cerca email o struttura" value="${esc(view.search)}" oninput="UsersAdmin.search(this.value)" style="flex:1 1 200px;min-width:0;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font:inherit;">
+          <input id="usersSearch" type="search" placeholder="Cerca nome, email, telefono o struttura" value="${esc(view.search)}" oninput="UsersAdmin.search(this.value)" style="flex:1 1 220px;min-width:0;min-height:40px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font:inherit;">
+          <button type="button" data-contacts-add onclick="ContactsAdmin.openCreate()" style="${btn}background:#005BFF;border-color:#005BFF;color:#fff;font-weight:600;">＋ Aggiungi contatto</button>
+          <button type="button" onclick="UsersAdmin.reload()" style="${btn}">Aggiorna</button>
           <label style="display:flex;gap:4px;align-items:center;font-size:0.8rem;"><input type="checkbox" id="usersShowTest" ${view.showTest ? 'checked' : ''} onchange="UsersAdmin.toggleTest(this.checked)"> Mostra test e admin</label>
-          <button type="button" onclick="UsersAdmin.reload()" style="padding:6px 10px;border:1px solid var(--border);background:var(--white);border-radius:6px;cursor:pointer;font:inherit;font-size:0.8rem;">Aggiorna</button>
-          <span style="font-size:0.72rem;color:var(--ink-soft);">Aggiornato ${esc(new Date(data.generated_at).toLocaleTimeString('it-IT', { timeZone: 'Europe/Rome', hour: '2-digit', minute: '2-digit' }))}</span>
         </div>
-        <div style="overflow-x:auto;background:var(--white);border:1px solid var(--border);border-radius:10px;" tabindex="0" role="region" aria-label="Utenti">
-          <table class="data-table" data-users-table style="width:100%;font-size:0.8rem;border-collapse:collapse;">
-            <thead><tr>${th('host', 'Host')}${th('registered', 'Registrato')}${th('plan', 'Prova / piano')}${th('last', 'Ultima attività')}${th('days', 'Giorni attivi')}${th('checkins', 'Check-in 30 gg')}${th('activity', 'Attività')}${th('terms', 'Condizioni')}<th scope="col">Abbonamento</th></tr></thead>
-            <tbody>${rows.map(r => {
-              const [planText, planTone] = planCell(r.plan, now, r);
-              const [actText, actTone] = ACTIVITY[r.activity];
-              const props = r.properties.length ? r.properties.map(p => esc(p.name) + (p.test ? ' (test)' : '')).join(', ') : '';
-              const open = r.email && r.user_id ? `<button type="button" data-users-open onclick="UsersAdmin.openHost('${esc(r.email)}')" style="border:0;background:none;padding:0;font:inherit;font-weight:600;color:var(--warm, #1849A9);cursor:pointer;text-align:left;overflow-wrap:anywhere;">${esc(r.email)}</button>` : `<span style="font-weight:600;overflow-wrap:anywhere;">${esc(r.email || '—')}</span>`;
-              return `<tr data-users-row="${esc(r.user_id || r.email)}" data-activity="${r.activity}">
-                <td style="min-width:180px;">${open}${r.is_admin ? ' ' + chip('Admin', 'grey') : ''}${r.is_test ? ' ' + chip('Test', 'grey') : ''}<div style="font-size:0.72rem;color:var(--ink-soft);">${props || esc(STATUS[r.status] || '')}</div></td>
-                <td style="white-space:nowrap;">${r.registered_at ? fmt(r.registered_at) : `<span style="color:var(--ink-soft);">invitato il ${fmt(r.invited_at)}</span><div style="font-size:0.72rem;color:#B54708;">password non creata</div>`}</td>
-                <td>${chip(planText, planTone, 'data-plan')}</td>
-                <td style="white-space:nowrap;" data-last>${esc(ago(r.last_active_at, now))}</td>
-                <td style="white-space:nowrap;" data-days>${r.active_days_7} / 7 · ${r.active_days_30} / 30</td>
-                <td data-checkins>${r.checkins_30}</td>
-                <td>${chip(actText, actTone, 'data-activity-chip')}</td>
-                <td data-terms style="white-space:nowrap;">${termsCell(r)}</td>
-                <td>${r.user_id ? `<button type="button" data-users-billing-toggle="${esc(r.user_id)}" aria-expanded="${openBilling.has(r.user_id)}" onclick="UsersAdmin.toggleBilling('${esc(r.user_id)}')" style="padding:4px 10px;border:1px solid var(--border);background:var(--white);border-radius:6px;cursor:pointer;font:inherit;font-size:0.76rem;white-space:nowrap;">${openBilling.has(r.user_id) ? 'Chiudi ▴' : 'Gestisci ▾'}</button>` : ''}</td></tr>
-                ${r.user_id && openBilling.has(r.user_id) ? `<tr data-users-billing="${esc(r.user_id)}"><td colspan="9" style="background:#F9FAFB;">${r.billing && typeof root.renderBillingBox === 'function' ? root.renderBillingBox(r.billing, r.user_id) : '<p style="font-size:0.78rem;color:#B54708;margin:0;">Abbonamento non disponibile: aggiorna la pagina.</p>'}${emailBox(r)}</td></tr>` : ''}`;
-            }).join('') || '<tr><td colspan="9">Nessun utente.</td></tr>'}</tbody>
-          </table></div>
-        <p style="font-size:0.72rem;color:var(--ink-soft);margin-top:6px;">Attivo = ha usato la console negli ultimi 7 giorni · In calo = 8–30 giorni · Inattivo = oltre 30 giorni. Giorni attivi = giorni distinti con attività in console. Tocca un host per il dettaglio e per aprire la console di ogni struttura · «Condizioni» = versione accettata dall’account e data, «Scarica prova» scarica le prove dell’accettazione · «Gestisci» per prova, pagamento e gratis a vita.</p>
+        <div role="group" aria-label="Filtri" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">${FILTERS.map(([k, t]) => {
+          const n = all.filter(p => inFilter(p, k, now)).length, on = view.filter === k, red = k === 'due' && all.some(p => p.contact && CA() && CA().isOverdue(p.contact));
+          return `<button type="button" data-users-filter="${k}" aria-pressed="${on}" onclick="UsersAdmin.filter('${k}')" style="${btn}border-radius:999px;${on ? 'background:var(--warm,#005BFF);border-color:var(--warm,#005BFF);color:#fff;' : red ? 'border-color:#F04438;color:#B42318;' : ''}"><span>${esc(t)}</span> <span data-i18n-skip>${n}</span></button>`;
+        }).join('')}</div>
+        <div class="u-sortbar" style="margin-bottom:8px;font-size:0.8rem;"><label for="usersSortSel">Ordina per</label>
+          <select id="usersSortSel" onchange="UsersAdmin.sortTo(this.value)" style="min-height:40px;border:1px solid var(--border);border-radius:8px;font:inherit;padding:4px 8px;">${COLS.map(([k, l]) => `<option value="${k}" ${view.sort === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
+          <button type="button" data-users-dir onclick="UsersAdmin.sort('${view.sort}')" style="${btn}" aria-label="Inverti ordine">${view.dir === 'asc' ? '▲' : '▼'}</button></div>
+        <table class="u-tbl" data-users-table>
+          <thead><tr>${COLS.map(([k, l]) => th(k, l)).join('')}</tr></thead>
+          <tbody>${rows.map(p => `<tr data-users-row="${esc(p.key)}" data-kind="${kind(p, now)}"${p.user ? ` data-activity="${p.user.activity}"` : ''}>${cells(p, now)}</tr>`).join('') || '<tr><td>Nessun utente.</td></tr>'}</tbody>
+        </table>
+        <p style="font-size:0.72rem;color:var(--ink-soft);margin-top:6px;">Tocca un nome per la scheda completa: contatto, note, prossima azione, strutture, abbonamento e prova, email di accesso, condizioni. Attivo = ha usato la console negli ultimi 7 giorni · In calo = 8–30 giorni · Inattivo = oltre 30 giorni. Giorni attivi = giorni distinti con attività in console.</p>
         ${typeof root.renderBillingSettings === 'function' ? root.renderBillingSettings() : ''}
         ${typeof root.renderRecentActivity === 'function' ? root.renderRecentActivity() : ''}`;
     }
     host.innerHTML = `<div class="section-title">Utenti</div>${body}`;
   }
 
+  // Detail of a person: the contact view (admin-contacts.js) with the account
+  // section below. A host account without a contact row yet (the list adds it
+  // on the next load) opens the deep dive instead.
+  function openPerson(key) {
+    const p = data && people().find(x => String(x.key) === String(key));
+    if (!p) return;
+    if (p.contact && CA()) return CA().openDetail(p.contact.id);
+    if (p.user && p.user.email) return openHost(p.user.email);
+  }
+  function accountSection(c) {
+    const r = data && (data.rows || []).find(x => (c.user_id && x.user_id === c.user_id) || (!c.user_id && x.email && String(x.email).toLowerCase() === String(c.login_email || c.email || '').toLowerCase()));
+    if (!r || !r.user_id) return null;
+    const box = document.createElement('div');
+    box.setAttribute('data-account-section', r.user_id);
+    box.style.cssText = 'margin-top:16px;border-top:1px solid var(--border);padding-top:10px;';
+    const terms = r.terms ? `<div style="font-size:0.8rem;margin:6px 0;"><span>Condizioni:</span> ${termsCell(r)}</div>` : `<div style="font-size:0.8rem;margin:6px 0;"><span>Condizioni:</span> ${termsCell(r)}</div>`;
+    box.innerHTML = `<div style="font-weight:600;font-size:0.84rem;">Account</div>
+      ${terms}
+      ${r.email ? `<button type="button" data-users-deepdive onclick="ContactsAdmin.closeModal();UsersAdmin.openHost('${esc(r.email)}')" style="min-height:44px;padding:8px 12px;border:1px solid var(--border);background:var(--white);border-radius:8px;cursor:pointer;font:inherit;font-size:0.82rem;margin:4px 0 8px;">Approfondimento →</button>` : ''}
+      ${r.billing && typeof root.renderBillingBox === 'function' ? root.renderBillingBox(r.billing, r.user_id) : '<p style="font-size:0.78rem;color:#B54708;margin:0;">Abbonamento non disponibile: aggiorna la pagina.</p>'}
+      ${emailBox(r)}`;
+    return box;
+  }
   function openHost(email) {
     const sel = document.getElementById('userFilter');
     if (sel && ![...sel.options].some(o => o.value === email)) sel.add(new Option(email.split('@')[0], email));
@@ -221,10 +348,14 @@
     if (root.setActiveTab) root.setActiveTab('deepdive');
   }
   function sortBy(k) { view = { ...view, dir: view.sort === k && view.dir === 'desc' ? 'asc' : 'desc', sort: k }; render(); }
+  function sortTo(k) { view = { ...view, sort: k }; render(); }
   function search(v) {
     view = { ...view, search: v }; render();
     const el = document.getElementById('usersSearch'); if (el) { el.focus(); el.setSelectionRange(v.length, v.length); }
   }
-  function toggleBilling(uid) { if (openBilling.has(uid)) openBilling.delete(uid); else openBilling.add(uid); render(); }
-  root.UsersAdmin = { render, toggleBilling, termsEvidence, changeEmail, invalidate: () => { data = null; error = null; }, reload: () => { data = null; error = null; load(); }, sort: sortBy, search, toggleTest: on => { view = { ...view, showTest: !!on }; render(); }, openHost, _reset: () => { data = null; error = null; loading = false; openBilling.clear(); view = { sort: 'registered', dir: 'desc', search: '', showTest: false }; } };
+  const usersTabOpen = () => (typeof activeTab !== 'undefined' ? activeTab : root.activeTab) === 'users'; // eslint-disable-line no-undef
+  function contactsChanged() { if (usersTabOpen() && data) render(); }
+  root.UsersAdmin = { render, termsEvidence, changeEmail, openPerson, accountSection, contactsChanged, invalidate: () => { data = null; error = null; }, reload: () => { data = null; error = null; load(); if (CA()) CA().reload(); },
+    sort: sortBy, sortTo, search, filter: k => { view = { ...view, filter: k }; render(); }, toggleTest: on => { view = { ...view, showTest: !!on }; render(); }, openHost,
+    _view: () => ({ ...view }), _reset: () => { data = null; error = null; loading = false; view = { sort: 'registered', dir: 'desc', search: '', showTest: false, filter: 'all' }; } };
 })(typeof window !== 'undefined' ? window : globalThis);

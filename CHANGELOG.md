@@ -7,6 +7,21 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Admin: Pilot tab removed, recent activity moved to «Utenti» (Claude, 24 November 2026)
+
+**Daniele:** «I feel like Users contacts and pilot are redundant info. Pilota is not really useful, just remove it, and keep the recent activity in the user tab.»
+
+- **What the Pilot tab held:**
+  - a scoreboard (paying hosts and pilot day read the empty `pilot_hosts` ledger; links, check-ins, chats and AI cost);
+  - one card per host (overlapping Utenti and Contatti);
+  - the recent-activity feed.
+- **Removed:** the tab, plus `renderPilotTab` and `renderPilotHostCards`.
+- **Moved:** the feed (last 25 console events, with the host) is now at the bottom of **Utenti** as «Attività recente», via `renderRecentActivity()` / `renderActivityFeed()`.
+- **Left in place:** the Ops `pilot_hosts` editor (Round 77 decision).
+- **Tests:**
+  - `admin-users`: no Pilot tab; Utenti renders the activity;
+  - `admin-i18n-browser`: the tour now includes **Contatti** (filters, detail, new contact; fictional contacts with every status) in place of Pilot, and checks that the feed is in Utenti. Contatti had not been in that tour before.
+
 ### Round 77 — Host contacts: mini-CRM in admin (confirmed 2026-11-24)
 
 Daniele confirmed the plain-language recap on 24 November 2026 («Go ahead»). Specification: `PLAN_round77_host_contacts.md`.

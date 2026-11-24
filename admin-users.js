@@ -5,7 +5,7 @@
 // status»): one row per PERSON — host accounts, invited and prospects — from
 // users_overview + contacts_list (admin-contacts.js). Clicking a person opens
 // the contact detail with the account section (subscription and trial, login
-// e-mail, terms, deep dive). Wide screens: a table; below 1200 px each row is
+// e-mail, terms, deep dive). Wide screens: a table; below 1280 px each row is
 // a stacked card with a «Ordina per» menu, so nothing scrolls sideways.
 // Uses the admin page's sb, escapeHtml, setActiveTab and #userFilter.
 (function (root) {
@@ -61,7 +61,7 @@
     if (!r.user_id) return '<span style="color:var(--ink-soft);">—</span>';
     if (data && data.terms_error) return '<span title="Non disponibile">—</span>';
     if (!r.terms) return r.confirmed ? chip('Non accettate', 'amber', 'data-terms-chip') : '<span style="color:var(--ink-soft);">—</span>';
-    return `${chip('v' + Number(r.terms.version) + ' · ' + fmt(r.terms.accepted_at), 'green', 'data-terms-chip')} <button type="button" data-terms-evidence="${esc(r.user_id)}" onclick="UsersAdmin.termsEvidence('${esc(r.user_id)}')" style="border:0;background:none;padding:0;font:inherit;font-size:0.72rem;color:var(--warm, #1849A9);cursor:pointer;text-decoration:underline;">Scarica prova</button>`;
+    return `${chip('v' + Number(r.terms.version) + ' · ' + fmt(r.terms.accepted_at), 'green', 'data-terms-chip')}<button type="button" class="u-dl" data-terms-evidence="${esc(r.user_id)}" onclick="UsersAdmin.termsEvidence('${esc(r.user_id)}')" title="Scarica prova"><span aria-hidden="true">⬇</span><span class="u-sr">Scarica prova</span></button>`;
   }
   async function termsEvidence(uid) {
     try {
@@ -220,16 +220,23 @@
 
   const COLS = [['host', 'Contatto'], ['plan', 'Stato'], ['registered', 'Registrato'], ['last', 'Ultima attività'], ['days', 'Giorni attivi'], ['checkins', 'Check-in 30 gg'], ['activity', 'Attività'], ['terms', 'Condizioni'], ['next', 'Prossima azione']];
   const CSS = `.u-tbl{width:100%;border-collapse:collapse;font-size:0.8rem;table-layout:auto}
-.u-tbl th,.u-tbl td{padding:8px 6px;text-align:left;vertical-align:top;border-bottom:1px solid var(--border);overflow-wrap:anywhere}
+.u-tbl th,.u-tbl td{padding:5px 6px;text-align:left;vertical-align:middle;border-bottom:1px solid var(--border);overflow-wrap:anywhere;line-height:1.3}
 .u-tbl th{font-size:0.74rem}.u-lbl{display:none}.u-sortbar{display:none}
-.u-act{display:inline-flex;align-items:center;justify-content:center;min-width:32px;min-height:32px;border:1px solid var(--border);border-radius:8px;text-decoration:none;margin:4px 4px 0 0;font-size:0.9rem;background:var(--white)}
-@media (max-width:1199px){.u-tbl thead{display:none}.u-tbl,.u-tbl tbody,.u-tbl tr,.u-tbl td{display:block;width:auto}
+.u-mainrow{display:flex;justify-content:space-between;align-items:center;gap:8px}.u-who{min-width:0}
+.u-sub{font-size:0.72rem;color:var(--ink-soft)}.u-icons{display:flex;gap:4px;flex:0 0 auto}
+.u-dl{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border);border-radius:6px;background:var(--white);color:var(--warm,#1849A9);cursor:pointer;font:inherit;font-size:0.8rem;padding:0;margin-left:4px;vertical-align:middle}
+.u-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (min-width:1280px){.u-who{max-width:340px}.u-who .u-sub,.u-who [data-users-open]{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:340px}
+.u-tbl td[data-days] .u-val,.u-tbl td[data-terms] .u-val,.u-tbl td[data-last] .u-val,.u-tbl td[data-reg] .u-val,.u-tbl td[data-reg] .u-val div{white-space:nowrap}
+.u-tbl td[data-next] .u-val{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}}
+.u-act{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid var(--border);border-radius:7px;text-decoration:none;font-size:0.85rem;background:var(--white)}
+@media (max-width:1279px){.u-tbl thead{display:none}.u-tbl,.u-tbl tbody,.u-tbl tr,.u-tbl td{display:block;width:auto}
 .u-tbl tr{border:1px solid var(--border);border-radius:10px;margin:0 0 10px;padding:6px 12px;background:var(--white)}
 .u-tbl td{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:5px 0;border:0}
 .u-tbl td.u-main{display:block;padding-bottom:8px;border-bottom:1px solid var(--border)}
 .u-tbl td:empty,.u-tbl td.u-none{display:none}
 .u-lbl{display:inline;color:var(--ink-soft);font-size:0.74rem;flex:0 0 auto}.u-val{text-align:right;min-width:0}
-.u-sortbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.u-act{min-width:44px;min-height:44px}}`;
+.u-sortbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.u-act{width:44px;height:44px}}`;
 
   function cells(p, now) {
     const u = p.user, c = p.contact, CAx = CA();
@@ -240,23 +247,27 @@
     const phone = c && c.phone;
     const acts = phone && CAx ? `<a class="u-act" data-users-wa href="${esc(CAx.waUrl(phone))}" target="_blank" rel="noopener" title="WhatsApp" aria-label="WhatsApp">💬</a><a class="u-act" data-users-call href="tel:${esc(phone)}" title="Chiama" aria-label="Chiama">📞</a>` : '';
     const mail = mailOf(p);
-    const main = `<td class="u-main" style="min-width:160px;">
-      <button type="button" data-users-open="${esc(p.key)}" onclick="UsersAdmin.openPerson('${esc(p.key)}')" style="border:0;background:none;padding:0;font:inherit;font-weight:700;color:var(--warm, #1849A9);cursor:pointer;text-align:left;overflow-wrap:anywhere;min-height:32px;"><span data-i18n-skip>${esc(nameOf(p))}</span></button>
+    // 24 Nov 2026: name with the WhatsApp/call icons on its right, then one
+    // line «e-mail · phone · properties» (two lines per row on wide screens).
+    const subParts = [];
+    if (mail && mail !== nameOf(p)) subParts.push(`<span data-i18n-skip>${esc(mail)}</span>`);
+    if (phone && CAx) subParts.push(`<span data-i18n-skip style="color:var(--ink);">${esc(CAx.fmtPhone(phone))}</span>`);
+    subParts.push(props ? `<span data-i18n-skip>${props}</span>` : `<span>${esc(u ? STATUS[u.status] || '' : 'Nessun account')}</span>`);
+    const main = `<td class="u-main" style="min-width:200px;"><div class="u-mainrow"><div class="u-who">
+      <button type="button" data-users-open="${esc(p.key)}" onclick="UsersAdmin.openPerson('${esc(p.key)}')" style="border:0;background:none;padding:0;font:inherit;font-weight:700;color:var(--warm, #1849A9);cursor:pointer;text-align:left;overflow-wrap:anywhere;"><span data-i18n-skip>${esc(nameOf(p))}</span></button>
       ${u && u.is_admin ? chip('Admin', 'grey') : ''}${u && u.is_test ? ' ' + chip('Test', 'grey') : ''}
-      ${mail && mail !== nameOf(p) ? `<div data-i18n-skip style="font-size:0.74rem;color:var(--ink-soft);">${esc(mail)}</div>` : ''}
-      ${phone && CAx ? `<div data-i18n-skip style="font-size:0.74rem;">${esc(CAx.fmtPhone(phone))}</div>` : ''}
-      <div style="font-size:0.72rem;color:var(--ink-soft);">${props ? `<span data-i18n-skip>${props}</span>` : esc(u ? STATUS[u.status] || '' : 'Nessun account')}</div>
-      ${acts ? `<div>${acts}</div>` : ''}</td>`;
-    const reg = u ? (u.registered_at ? esc(fmt(u.registered_at)) : `<span style="color:var(--ink-soft);">invitato il ${esc(fmt(u.invited_at))}</span><div style="font-size:0.72rem;color:#B54708;">password non creata</div>`) : none;
+      <div class="u-sub">${subParts.filter(x => !/<span>\s*<\/span>/.test(x)).join(' · ')}</div></div>
+      ${acts ? `<div class="u-icons">${acts}</div>` : ''}</div></td>`;
+    const reg = u ? (u.registered_at ? esc(fmt(u.registered_at)) : `<span style="color:var(--ink-soft);">invitato il ${esc(fmt(u.invited_at))}</span><div style="font-size:0.72rem;color:#B54708;">senza password</div>`) : none;
     let next = '';
     if (c && (c.next_action || c.next_action_due)) {
       const due = c.next_action_due, t = CAx ? CAx.today() : '';
       const col = due && due < t ? '#B42318' : due && due === t ? '#B54708' : 'var(--ink-soft)';
-      next = `${due ? `<strong style="color:${col};white-space:nowrap;">${esc(due.slice(8, 10) + '/' + due.slice(5, 7))}</strong> ` : ''}${c.next_action ? `<span data-i18n-skip>${esc(c.next_action)}</span>` : ''}`;
+      next = `<span title="${esc(c.next_action || '')}">${due ? `<strong style="color:${col};white-space:nowrap;">${esc(due.slice(8, 10) + '/' + due.slice(5, 7))}</strong> ` : ''}${c.next_action ? `<span data-i18n-skip>${esc(c.next_action)}</span>` : ''}</span>`;
     }
     return main
       + td('Stato', chip(stText, stTone, 'data-plan'))
-      + td('Registrato', reg)
+      + td('Registrato', reg, 'data-reg')
       + td('Ultima attività', u ? esc(ago(u.last_active_at, now)) : none, 'data-last' + (u ? '' : ' class="u-none"'))
       + td('Giorni attivi', u ? `${u.active_days_7} / 7 · ${u.active_days_30} / 30` : none, 'data-days' + (u ? '' : ' class="u-none"'))
       + td('Check-in 30 gg', u ? String(u.checkins_30) : none, 'data-checkins' + (u ? '' : ' class="u-none"'))

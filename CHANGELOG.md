@@ -7,6 +7,19 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Admin «Utenti»: icons beside the name, thinner rows (Claude, 24 November 2026)
+
+**Daniele:** «On the browser version there's lots of space on the right of the name. Put the icons there and make each row thinner.»
+
+- **Wide screens (from 1,280 px):**
+  - WhatsApp and call icons sit to the right of the name;
+  - e-mail · phone · properties share one line under it (cut with «…» when too long);
+  - terms evidence is a small ⬇ button (label «Scarica prova» kept for screen readers);
+  - the next action is one line (full text on hover); dates and active days stay on one line; «password non creata» → «senza password».
+  - **Result:** every row is 43 px (was up to 91 px).
+- **Narrower screens:** below 1,280 px the cards are used (the breakpoint was 1,200 px), so the one-line layout never causes horizontal scroll; phone cards are unchanged (44 px buttons).
+- **Test** `admin-users-browser`: now at 390/768/1024/**1280**/1440. It checks the icons sit on the name line to its right and that every row is ≤ 46 px on wide screens.
+
 ### Admin: «Utenti» and «Contatti» combined in one tab (Claude, 24 November 2026)
 
 **Daniele:** «Let's combine in one tab users and contacts. I want to keep the sortable columns of the user tab and have all details of each contact when clicking on a user. Also, make sure the table is fitting the screen and no horizontal scrolling. Keep the filter by status Lead, Prova, etc.»

@@ -9,7 +9,7 @@
 // Server-side validation mirrors the table checks; a write that touches no
 // row is an error (the RLS/GRANT symptom the brief warns about).
 
-export const SOURCES = ['whatsapp', 'email', 'referral', 'website', 'event', 'other'];
+export const SOURCES = ['whatsapp', 'email', 'referral', 'website', 'event', 'ads', 'other'];
 export const STAGES = ['lead', 'contacted', 'demo', 'invited', 'lost'];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL = /^[^\s@<>()"',;:]+@[^\s@<>()"',;:]+\.[a-z]{2,}$/i;

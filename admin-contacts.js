@@ -159,7 +159,7 @@
     };
     if (c.account) { f.email.readOnly = true; f.email.style.background = '#F2F4F7'; }
     const sel = (name, opts, value, empty) => { const s = el('select', { name, style: INPUT + 'margin-top:4px;' }); if (empty) s.append(el('option', { value: '', text: empty })); for (const [v, t] of opts) s.append(el('option', { value: v, text: t, selected: v === value })); return s; };
-    f.source = sel('source', [['whatsapp', 'WhatsApp'], ['email', 'Email'], ['referral', 'Passaparola'], ['website', 'Sito web'], ['event', 'Evento'], ['other', 'Altro']], c.source, '—');
+    f.source = sel('source', [['whatsapp', 'WhatsApp'], ['email', 'Email'], ['referral', 'Passaparola'], ['website', 'Sito web'], ['event', 'Evento'], ['ads', 'Pubblicità'], ['other', 'Altro']], c.source, '—');
     if (!c.account) f.lead_stage = sel('lead_stage', Object.entries(STAGE), c.lead_stage || 'lead');
     const form = el('div', { 'data-contact-form': true });
     form.append(field('Nome', f.full_name), field('Telefono', f.phone, 'Es. 333 123 4567 o +44 7700 900123'), field('Email', f.email, c.account ? 'È l’email di accesso: si cambia da Utenti → Gestisci.' : null), field('Origine', f.source));

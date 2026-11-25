@@ -361,10 +361,11 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
 <script src="/app-bootstrap.js"></script>
 <script src="/lib/alloggiati-records.js?v=70.1"></script>
 <script src="/admin-ops-metrics.js?v=70.1"></script>
-<script src="/admin-ops-table.js?v=64.2"></script>
+<script src="/admin-table-ui.js?v=1"></script>
+<script src="/admin-ops-table.js?v=78"></script>
 <script src="/admin-alloggiati-support.js?v=70.1"></script>
 <script src="/admin-dsar.js?v=67.6"></script>
-<script src="/admin-users.js?v=12"></script>
+<script src="/admin-users.js?v=13"></script>
 <script src="/admin-contacts.js?v=77.3"></script>
 <script src="/admin-i18n-dict.js?v=1"></script>
 <script src="/admin-i18n.js?v=1"></script>
@@ -3703,8 +3704,19 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
   const usageAvailable = checkinsAvailable && Array.isArray(opsMetricsData?.reservations) && Array.isArray(opsMetricsData?.events);
   const attrs = row => ` data-ops-row="${escapeHtml(JSON.stringify(row))}"`;
   const timestamp = value => Number.isFinite(Date.parse(value)) ? Date.parse(value) : null;
-  const heading = (key, label) => `<th scope="col" aria-sort="none"><button type="button" data-ops-sort="${key}" style="border:0;background:transparent;color:inherit;font:inherit;text-transform:inherit;letter-spacing:inherit;cursor:pointer;padding:0;text-align:inherit;">${label}<span data-ops-arrow aria-hidden="true"> ↕</span></button></th>`;
   const unavailable = '<span title="Metric data unavailable. Refresh to retry.">—</span>';
+  // 25 Nov 2026 — same UI as «Utenti» (admin-table-ui.js): one property cell
+  // (name with the action icons beside it, host, city), labelled value cells
+  // that become a stacked card when the table does not fit, filter chips.
+  const sortBtn = (key, label, title) => `<button type="button" data-ops-sort="${key}"${title ? ` title="${escapeHtml(title)}"` : ''} style="border:0;background:none;padding:0;font:inherit;font-weight:600;cursor:pointer;color:inherit;text-align:left;">${label}<span data-ops-arrow aria-hidden="true"></span></button>`;
+  const th = (key, label, title) => `<th scope="col" aria-sort="none">${sortBtn(key, label, title)}</th>`;
+  const td = (label, value, attr = '') => `<td ${attr}><span class="u-lbl">${label}</span><span class="u-val">${value}</span></td>`;
+  const sub = (html, skip) => `<div class="u-sub"${skip ? ' data-i18n-skip' : ''}>${html}</div>`;
+  const deepDive = email => `<button type="button" class="u-act" data-ops-deepdive onclick="document.getElementById('userFilter').value='${escapeHtml(email)}';setActiveTab('deepdive');" title="Deep dive" aria-label="Deep dive">📊</button>`;
+  const btn = 'min-height:40px;padding:6px 12px;border:1px solid var(--border);background:var(--white);border-radius:8px;cursor:pointer;font:inherit;font-size:0.8rem;';
+  const FILTER_LABELS = { all: 'All', failures: 'Alloggiati failures', unconfirmed: 'Not confirmed', allog_connection: 'Alloggiati not connected', no_usage: 'No guest app usage', low_usage: 'Low guest app usage', no_bookings: 'No bookings', setup: 'Setup not ready', unavailable: 'Metrics unavailable', no_property: 'No property' };
+  const ALERT = new Set(['failures', 'unconfirmed']);
+  const COLS = [['property', 'Property'], ['host', 'Host'], ['city', 'City'], ['guests', 'Guests'], ['completed', 'Check-ins'], ['sent', 'Sent'], ['failed', 'Failed'], ['alloggiati', 'Alloggiati'], ['usage', 'App usage'], ['setup', 'Setup'], ['activity', 'Sessions'], ['lastActive', 'Last active']];
 
   const hostRowsExisting = allProperties.map(p => {
     const email = p.owner_id ? (userIdToEmail[p.owner_id] || null) : null;
@@ -3715,23 +3727,24 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
   const orphanedUsers = Object.entries(userStats).filter(([email]) => !ownedEmails.has(email));
 
   return `<section id="opsHostsProperties" aria-label="Hosts and properties">
+    ${typeof AdminTableUI !== 'undefined' ? AdminTableUI.style() : ''}
     <div class="section-title">Hosts &amp; Properties (${allProperties.length})</div>
-    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:10px;font-size:0.75rem;">
-      <label style="display:grid;gap:4px;flex:1 1 220px;">Search<input data-ops-search type="search" placeholder="Property, host, city or ID" style="font:inherit;padding:8px;min-width:0;border:1px solid var(--border);border-radius:6px;"></label>
-      <label style="display:grid;gap:4px;">City<select data-ops-city aria-label="City" style="font:inherit;padding:8px;max-width:100%;border:1px solid var(--border);border-radius:6px;"><option value="all">All cities</option></select></label>
-      <label style="display:grid;gap:4px;">Show<select data-ops-filter aria-label="Show" style="font:inherit;padding:8px;max-width:100%;border:1px solid var(--border);border-radius:6px;">
-        <option value="all">All rows</option><option value="failures">Alloggiati failures</option><option value="unconfirmed">Unconfirmed filings (not connected)</option><option value="allog_connection">Alloggiati not connected or with problems</option><option value="no_usage">No guest app usage (0%)</option><option value="low_usage">Low guest app usage (&lt;50%)</option><option value="no_bookings">No eligible bookings</option><option value="setup">Setup not ready</option><option value="unavailable">Metrics unavailable</option><option value="no_property">Accounts without properties</option>
-      </select></label>
-      <button type="button" data-ops-reset style="font:inherit;padding:8px 12px;border:1px solid var(--border);border-radius:6px;cursor:pointer;">Reset</button>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">
+      <input data-ops-search type="search" aria-label="Search" placeholder="Search property, host, city or ID" style="flex:1 1 220px;min-width:0;min-height:40px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font:inherit;">
+      <select data-ops-city aria-label="City" style="min-height:40px;max-width:100%;padding:4px 8px;border:1px solid var(--border);border-radius:8px;font:inherit;font-size:0.8rem;"><option value="all">All cities</option></select>
+      <button type="button" data-ops-reset style="${btn}">Reset</button>
     </div>
-    <p data-ops-count aria-live="polite" style="font-size:0.72rem;color:var(--ink-soft);"></p>
-    <p style="font-size:0.72rem;color:var(--ink-soft);margin-bottom:6px;">Selected period: ${opsMetricsData ? `${opsMetricsData.since.slice(0, 10)} – ${opsMetricsData.until.slice(0, 10)} (UTC)` : 'unavailable'}. Usage shows active / eligible bookings. Scroll horizontally for all metrics and actions.</p>
+    <div role="group" aria-label="Show" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">${AdminOpsTable.FILTERS.map(k => `<button type="button" data-ops-filter="${k}"${ALERT.has(k) ? ' data-ops-alert' : ''} aria-pressed="false" style="${btn}border-radius:999px;"><span>${FILTER_LABELS[k]}</span> <span data-ops-filter-count data-i18n-skip></span></button>`).join('')}</div>
+    <p data-ops-count aria-live="polite" style="font-size:0.72rem;color:var(--ink-soft);margin:0 0 4px;"></p>
+    <p style="font-size:0.72rem;color:var(--ink-soft);margin:0 0 6px;">Selected period: ${opsMetricsData ? `${opsMetricsData.since.slice(0, 10)} – ${opsMetricsData.until.slice(0, 10)} (UTC)` : 'unavailable'}. Usage shows active / eligible bookings. Icons beside the name: host console, guest app, Alloggiati support, deep dive.</p>
     <details style="font-size:0.72rem;color:var(--ink-soft);line-height:1.6;margin-bottom:12px;"><summary style="cursor:pointer;">How these metrics are counted</summary><p>New metrics use the selected time range. Check-ins completed counts submitted guest records, including companions. Alloggiati sent counts recorded filed guest records, including host manual confirmations; it does not verify a receipt. Failed counts unresolved recorded automatic filing failures. Manual portal-stage failures appear in Alloggiati support history from the support release onward, but are not included in this counter. Alloggiati shows the saved connection now (not the period): Connected (verified, key valid), Error (last check failed), Key expired, Saved · not verified, Not connected; the second line is the automatic filing mode ("Manual filing only" without credentials, whatever the mode setting). A dash means the status could not be read. Click it for the support dialog. For a property that is not connected, guests past the portal deadline and never marked as sent show as «N not confirmed» (amber) instead of failures: the host may have filed by hand without pressing «Segna inviato». Clicking opens the host console, since the connection diagnostics need saved credentials.
       Guest app usage is bookings arriving in the period through today (UTC) with recorded guest activity in the period / eligible bookings, including those without check-ins. Cancelled bookings, blocks and linked echoes are excluded. Repeated visits count once. Reservations without booking codes count as unused; untracked or expired analytics cannot be measured. Guests remains the existing all-time guest-record count.</p></details>
     ${!checkinsAvailable || !usageAvailable ? '<p role="status" style="color:var(--amber);font-size:0.75rem;">Some metric data is unavailable. A dash is shown instead of a zero; refresh to retry.</p>' : ''}
-    <div style="overflow-x:auto;margin-bottom:24px;" tabindex="0" role="region" aria-label="Hosts and properties metrics">
-    <table class="data-table" style="width:100%;">
-      <thead><tr>${[['property','Property'],['host','Host'],['city','City'],['guests','Guests'],['completed','Check-ins completed'],['sent','Alloggiati sent'],['alloggiati','Alloggiati'],['failed','Alloggiati failed'],['usage','Guest app usage'],['setup','Setup'],['activity','Activity (sessions)'],['lastActive','Last Active']].map(([key, label]) => heading(key, label)).join('')}<th scope="col">Actions</th></tr></thead>
+    <div class="u-wrap" data-table-fit data-ops-wrap style="margin-bottom:24px;">
+    <div class="u-sortbar" style="margin-bottom:8px;font-size:0.8rem;"><label>Sort by <select data-ops-sortsel style="min-height:40px;border:1px solid var(--border);border-radius:8px;font:inherit;padding:4px 8px;">${COLS.map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select></label>
+      <button type="button" data-ops-dir aria-label="Reverse order" style="${btn}">▼</button></div>
+    <table class="u-tbl" data-ops-table aria-label="Hosts and properties metrics">
+      <thead><tr><th scope="col" aria-sort="none">${sortBtn('property', 'Property')} · ${sortBtn('host', 'Host')} · ${sortBtn('city', 'City')}</th>${th('guests', 'Guests', 'All-time guest records')}${th('completed', 'Check-ins', 'Check-ins completed')}${th('sent', 'Sent', 'Alloggiati sent')}${th('failed', 'Failed', 'Alloggiati failed')}${th('alloggiati', 'Alloggiati')}${th('usage', 'App usage', 'Guest app usage')}${th('setup', 'Setup')}${th('activity', 'Sessions', 'Activity (sessions)')}${th('lastActive', 'Last active')}</tr></thead>
       <tbody>
         ${hostRowsExisting.sort((a, b) => (b._stats.lastSeen || '').localeCompare(a._stats.lastSeen || '')).map(p => {
           const s = p._stats;
@@ -3746,40 +3759,37 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
           const setupPct = Math.round(setupScore / 5 * 100);
           const setupColor = setupPct >= 80 ? 'var(--green)' : setupPct >= 40 ? 'var(--amber)' : 'var(--red)';
           const rd = readinessByProperty ? readinessByProperty.get(p.id) || null : null;
-          const rdPct = rd ? Math.round(rd.done / rd.total * 100) : null;
           const rdColor = rd ? (rd.ready ? 'var(--green)' : rd.done >= 3 ? 'var(--amber)' : 'var(--red)') : null;
+          const rdPct = rd ? Math.round(rd.done / rd.total * 100) : null;
+          const icons = `<button type="button" class="u-act" data-ops-console onclick="viewAsHost('${p.id}')" title="Open the host console" aria-label="Console">👁</button>`
+            + `<a class="u-act" data-ops-guestapp href="${APP_CONFIG.appOrigin}/?p=${encodeURIComponent(p.id)}" target="_blank" rel="noopener noreferrer" title="Open the guest app" aria-label="Guest app">📱</a>`
+            + `<button type="button" class="u-act" data-ops-support onclick="showAlloggiatiSupport('${p.id}')" title="Alloggiati support" aria-label="Alloggiati support">🛟</button>`
+            + (p._email ? deepDive(p._email) : '');
+          const hostLine = p._email ? sub(escapeHtml(p._email), true) : sub([p.host_names ? `<span data-i18n-skip>${escapeHtml(p.host_names)}</span>` : '', p.host_phone ? `<span data-i18n-skip>${escapeHtml(p.host_phone)}</span>` : 'No account'].filter(Boolean).join(' · '));
+          const placeLine = sub(`${p.city ? `<span data-i18n-skip>${escapeHtml(p.city)}${p.region ? ' · ' + escapeHtml(p.region) : ''}</span>` : 'No city'} · ${copyableId(p.id, 'Property id')}`);
+          const failedVal = !checkinsAvailable ? unavailable : `${failedReal ? `<button type="button" onclick="showAlloggiatiSupport('${p.id}')" title="${m.missed && !notConnected ? `${m.failed - m.missed} failed attempt(s) · ${m.missed} missed (portal deadline passed, unfiled)` : 'Diagnose Alloggiati failures'} — open diagnostics" style="border:0;background:transparent;color:var(--red);font-weight:600;text-decoration:underline;cursor:pointer;font:inherit;">${failedReal}</button>` : (unconfirmed ? '' : '0')}${unconfirmed ? `${failedReal ? '<br>' : ''}<button type="button" data-unconfirmed onclick="viewAsHost('${p.id}')" title="Past the portal deadline and never marked as sent. Not connected to Alloggiati, so nothing is filed automatically: the host may have filed by hand without pressing «Segna inviato», or not filed at all. Opens the host console." style="border:0;background:transparent;color:var(--amber);text-decoration:underline;cursor:pointer;font:inherit;white-space:nowrap;">${unconfirmed} not confirmed</button>` : ''}`;
+          const usageVal = usageAvailable ? (m.bookings ? `<strong>${Math.round(m.used / m.bookings * 100)}%</strong>${sub(`${m.used} / ${m.bookings} bookings`)}` : '<span title="No eligible bookings arriving in this period">—</span>') : unavailable;
+          const setupVal = readinessByProperty ? (rd ? `<span style="color:${rdColor};font-weight:600;" title="${escapeHtml(rd.steps.filter(st => !st.done).map(st => onboardingStepLabel(st.id) + (st.missing.length ? ': ' + st.missing.map(k => ONBOARDING_MISSING[k] || k).join(', ') : '')).join(' · ') || 'All steps done')}">${rd.done}/${rd.total}${rd.ready ? ' ✓' : ''}</span>${sub(`${rd.ready ? 'Ready' : escapeHtml(onboardingStepLabel(rd.first_incomplete))}${rd.first_seen_at && !rd.ready ? ' · ' + onboardingDays(rd.first_seen_at) + 'd' : ''}`)}` : '—') : `<span style="color:${setupColor};font-weight:600;">${setupPct}%</span>`;
           return `<tr class="${adminRowClass(p)}"${attrs({propertyId:p.id,property:p.name || 'Unnamed',host:p._email || p.host_names || null,city:p.city || null,guests:p._checkin_count ?? 0,completed:checkinsAvailable ? m.completed : null,sent:checkinsAvailable ? m.sent : null,failed:checkinsAvailable ? failedReal : null,unconfirmed:checkinsAvailable ? unconfirmed : null,alloggiati:(allogConnectionState(p) || {}).rank ?? null,usage:usageAvailable && m.bookings ? m.used / m.bookings : null,hasBookings:usageAvailable ? m.bookings > 0 : null,setup:readinessByProperty ? rdPct : setupPct,ready:rd ? rd.ready : null,activity:s.sessions.size || 0,lastActive:timestamp(s.lastSeen),missingMetrics:!checkinsAvailable || !usageAvailable,search:[p.name,p.id,p._email,p.host_names,p.host_phone,p.city,p.region].filter(Boolean).join(' ')})}>
-            <td><strong>${p.name || 'Unnamed'}</strong><br>${copyableId(p.id, 'Property id')}</td>
-            <td>${p._email ? `<strong>${p._email.split('@')[0]}</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">${p._email}</span>` : `${p.host_names || '—'}<br><span style="font-size:0.65rem;color:var(--ink-soft)">${p.host_phone || 'No account'}</span>`}</td>
-            <td>${p.city || '—'}${p.region ? '<br><span style="font-size:0.65rem;color:var(--ink-soft)">' + p.region + '</span>' : ''}</td>
-            <td style="text-align:center;font-weight:600;">${p._checkin_count}</td>
-            <td style="text-align:center;">${checkinsAvailable ? m.completed : unavailable}</td>
-            <td style="text-align:center;">${checkinsAvailable ? m.sent : unavailable}</td>
-            <td>${allogConnectionCell(p)}</td>
-            <td style="text-align:center;color:${failedReal ? 'var(--red)' : 'inherit'};">${!checkinsAvailable ? unavailable : `${failedReal ? `<button type="button" onclick="showAlloggiatiSupport('${p.id}')" title="${m.missed && !notConnected ? `${m.failed - m.missed} failed attempt(s) · ${m.missed} missed (portal deadline passed, unfiled)` : 'Diagnose Alloggiati failures'} — open diagnostics" style="border:0;background:transparent;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;">${failedReal}</button>` : (unconfirmed ? '' : '0')}${unconfirmed ? `${failedReal ? '<br>' : ''}<button type="button" data-unconfirmed onclick="viewAsHost('${p.id}')" title="Past the portal deadline and never marked as sent. Not connected to Alloggiati, so nothing is filed automatically: the host may have filed by hand without pressing «Segna inviato», or not filed at all. Opens the host console." style="border:0;background:transparent;color:var(--amber);text-decoration:underline;cursor:pointer;font:inherit;white-space:nowrap;">${unconfirmed} not confirmed</button>` : ''}`}</td>
-            <td style="text-align:center;white-space:nowrap;">${usageAvailable ? (m.bookings ? `<strong>${Math.round(m.used / m.bookings * 100)}%</strong><br><span style="font-size:0.65rem;color:var(--ink-soft);">${m.used} / ${m.bookings} bookings</span>` : '<span title="No eligible bookings arriving in this period">—</span>') : unavailable}</td>
-            <td style="text-align:center;white-space:nowrap;">${readinessByProperty ? (rd ? `<span style="color:${rdColor};font-weight:600;" title="${escapeHtml(rd.steps.filter(st => !st.done).map(st => onboardingStepLabel(st.id) + (st.missing.length ? ': ' + st.missing.map(k => ONBOARDING_MISSING[k] || k).join(', ') : '')).join(' · ') || 'All steps done')}">${rd.done}/${rd.total}${rd.ready ? ' ✓' : ''}</span><br><span style="font-size:0.65rem;color:var(--ink-soft);">${rd.ready ? 'Ready' : escapeHtml(onboardingStepLabel(rd.first_incomplete))}${rd.first_seen_at && !rd.ready ? ' · ' + onboardingDays(rd.first_seen_at) + 'd' : ''}</span>` : '—') : `<span style="color:${setupColor};font-weight:600;">${setupPct}%</span>`}</td>
-            <td style="font-size:0.72rem;">${s.sessions.size || 0} sess · ${s.saves || 0} saves · ${s.exports || 0} exp</td>
-            <td style="font-size:0.72rem;color:var(--ink-soft);">${s.lastSeen ? new Date(s.lastSeen).toLocaleDateString() : '—'}</td>
-            <td><div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
-              <button type="button" onclick="showAlloggiatiSupport('${p.id}')" style="padding:4px 8px;background:#fff;color:#005BFF;border:1px solid #005BFF;border-radius:4px;font-size:0.65rem;cursor:pointer;">Alloggiati support</button>
-              <button onclick="viewAsHost('${p.id}')" style="padding:4px 8px;background:#005BFF;color:#fff;border:none;border-radius:4px;font-size:0.65rem;cursor:pointer;white-space:nowrap;">👁 Console</button>
-              <a href="${APP_CONFIG.appOrigin}/?p=${encodeURIComponent(p.id)}" target="_blank" rel="noopener noreferrer" style="padding:4px 8px;background:#6B7A90;color:#fff;border-radius:4px;font-size:0.65rem;text-decoration:none;white-space:nowrap;">👁 Guest app</a>
-              ${p._email ? `<button onclick="document.getElementById('userFilter').value='${p._email}';setActiveTab('deepdive');" style="padding:4px 8px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.65rem;cursor:pointer;color:var(--warm);font-weight:500;white-space:nowrap;">📊</button>` : ''}
-              ${adminRowActions('properties', p)}
-            </div></td>
+            <td class="u-main" data-ops-col="property" style="min-width:160px;"><div class="u-who"><div class="u-nameline"><strong class="u-name" data-i18n-skip title="${escapeHtml(p.name || 'Unnamed')}">${escapeHtml(p.name || 'Unnamed')}</strong><span class="u-icons">${icons}</span></div>${hostLine}${placeLine}${adminRowActions('properties', p) ? `<div class="u-sub" data-ops-admin>${adminRowActions('properties', p)}</div>` : ''}</div></td>
+            ${td('Guests', `<strong>${p._checkin_count ?? 0}</strong>`, 'data-num data-ops-col="guests"')}
+            ${td('Check-ins completed', checkinsAvailable ? String(m.completed) : unavailable, 'data-num data-ops-col="completed"')}
+            ${td('Alloggiati sent', checkinsAvailable ? String(m.sent) : unavailable, 'data-num data-ops-col="sent"')}
+            ${td('Alloggiati failed', failedVal, 'data-num data-ops-col="failed"')}
+            ${td('Alloggiati', allogConnectionCell(p), 'data-ops-col="alloggiati"')}
+            ${td('Guest app usage', usageVal, 'data-num data-nowrap data-ops-col="usage"')}
+            ${td('Setup', setupVal, 'data-num data-nowrap data-ops-col="setup"')}
+            ${td('Sessions', `${s.sessions.size || 0}${sub(`${s.saves || 0} saves · ${s.exports || 0} exp`)}`, 'data-num data-nowrap data-ops-col="activity"')}
+            ${td('Last active', s.lastSeen ? new Date(s.lastSeen).toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' }) : '—', 'data-nowrap data-ops-col="lastActive"')}
           </tr>`;
         }).join('')}
-        ${orphanedUsers.map(([email, s]) => `<tr style="opacity:0.55;"${attrs({propertyId:null,property:'No property',host:email,city:null,guests:0,completed:null,sent:null,alloggiati:null,failed:null,unconfirmed:null,usage:null,hasBookings:null,setup:null,ready:null,activity:s.sessions.size,lastActive:timestamp(s.lastSeen),search:email+' No property'})}>
-          <td style="font-style:italic;color:var(--ink-soft);">No property</td>
-          <td><strong>${email.split('@')[0]}</strong><br><span style="font-size:0.65rem;color:var(--ink-soft)">${email}</span></td>
-          <td>—</td><td style="text-align:center;">0</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
-          <td style="font-size:0.72rem;">${s.sessions.size} sess · ${s.saves} saves</td>
-          <td style="font-size:0.72rem;color:var(--ink-soft);">${new Date(s.lastSeen).toLocaleDateString()}</td>
-          <td>—</td>
-          <td><button onclick="document.getElementById('userFilter').value='${email}';setActiveTab('deepdive');" style="padding:4px 8px;background:var(--cream-2);border:1px solid var(--border);border-radius:4px;font-size:0.65rem;cursor:pointer;color:var(--warm);">📊</button></td>
+        ${orphanedUsers.map(([email, s]) => `<tr style="opacity:0.6;"${attrs({propertyId:null,property:'No property',host:email,city:null,guests:0,completed:null,sent:null,alloggiati:null,failed:null,unconfirmed:null,usage:null,hasBookings:null,setup:null,ready:null,activity:s.sessions.size,lastActive:timestamp(s.lastSeen),search:email+' No property'})}>
+          <td class="u-main" style="min-width:160px;"><div class="u-who"><div class="u-nameline"><em class="u-name" style="color:var(--ink-soft);">No property</em><span class="u-icons">${deepDive(email)}</span></div>${sub(escapeHtml(email), true)}</div></td>
+          ${td('Guests', '0', 'data-num')}<td class="u-none"></td><td class="u-none"></td><td class="u-none"></td><td class="u-none"></td><td class="u-none"></td><td class="u-none"></td>
+          ${td('Sessions', `${s.sessions.size}${sub(`${s.saves || 0} saves`)}`, 'data-num data-nowrap')}
+          ${td('Last active', s.lastSeen ? new Date(s.lastSeen).toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' }) : '—', 'data-nowrap data-ops-col="lastActive"')}
         </tr>`).join('')}
-        <tr data-ops-empty hidden><td colspan="14" style="text-align:center;padding:20px;color:var(--ink-soft);">No hosts or properties match these filters.</td></tr>
+        <tr data-ops-empty hidden><td colspan="10" style="text-align:center;padding:20px;color:var(--ink-soft);">No hosts or properties match these filters.</td></tr>
       </tbody>
     </table></div></section>`;
 }

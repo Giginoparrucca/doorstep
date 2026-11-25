@@ -7,6 +7,16 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Contacts: «Pubblicità» (Ads) as a contact source (Claude, 25 November 2026)
+
+**Daniele:** «Add Ads as an option for trigger» (read as the record's «Origine» field).
+
+- **New source `ads`:**
+  - in the «Origine» menu as «Pubblicità» (EN «Ads»), between Evento and Altro;
+  - in the server validation (`SOURCES`);
+  - in the database list (migration `host_contacts_source_ads`, applied to production with `apply_migration` and recorded; the check now lists `ads`).
+- **Test `round77-host-contacts`:** the new migration is applied twice in PGlite; the server and the table accept `ads` (create and delete); the menu offers the option.
+
 ### Admin «Utenti»: three-line contact column, wrapping next action (Claude, 25 November 2026)
 
 **Daniele:** «If I add a next action it will switch to tiles immediately. Let's optimize the space further. Remove the phone number. If there's a message and phone icon it means we have it. Let's give it 3 rows in the contact column and put the icons near the name.»

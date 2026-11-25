@@ -25,7 +25,10 @@ Newest entries at the top of each section.
 - **Test:** new `scripts/guest-checkin-prompt-browser.test.mjs` (390×844): future / today / passed arrival, 1 of 2, complete party; checks above-the-fold, ≥ 48 px button, above host message, IT/EN, the button opens check-in, the nav highlight, hidden after completion; fictional HTTP only.
 - **Also:** `docs/compliance/ROPA.md` consent-card line citations moved to the new `index.html` lines (4604 / 4435 / 1491) — `round67-ropa` checks them.
 - **Results:** local `npm run test:all` **PASS 174 / FAIL 1 / SKIP 3** — the one failure was `round67-ropa` (shifted line citations); fixed and re-run green, so **175 pass / 0 fail / 3 skip**. Skips unchanged: `demo-e2e` (needs demo origin), `demo-schema` (private catalog), `demo-schema-parse.py` (pglast not installed).
-- **Status:** PR #350 open, CI `regression` green. **Not merged yet** — the merge was blocked by this session's permission check; waiting for Daniele to merge (or re-authorise the merge).
+- **Shipped:** PR #350 merged (squash) as `c47f08f` on 25 Nov 2026, after updating the branch with main (merge `d336ab9`; only CHANGELOG conflicted, both sides kept).
+  - **Final local `npm run test:all` on the updated branch: PASS 175 / FAIL 0 / SKIP 3.** Skips: `demo-e2e` (needs a demo origin), `demo-schema` (needs the private catalog), `demo-schema-parse` (pglast not installed). `round67-ropa` green: the ROPA citations still match. CI `regression` green.
+  - **Production:** deploy live; the served `index.html` is byte-identical to main. `npm run test:live` (origins set to production): **PASS 4 / FAIL 0 / SKIP 6**. Skips: demo origin; iReservation probe off; two service-key probes; rate-limit probe (would spend the guest-link allowance); schema drift (service key).
+  - **Guest link at phone size:** real guest links need a server-signed token, and a real check-in would create real guest data. So the PR's browser test was run against the **production `index.html`** at 390×844, with fictional server responses. The card shows for a booking without check-in (before, on and after arrival day, and «1 di 2»), disappears after check-in and for a complete party, and IT/EN switch correctly: **PASS**. No check-in was made on a real booking.
 
 ### Contacts: «Pubblicità» (Ads) as a contact source (Claude, 25 November 2026)
 
@@ -36,6 +39,7 @@ Newest entries at the top of each section.
   - in the server validation (`SOURCES`);
   - in the database list (migration `host_contacts_source_ads`, applied to production with `apply_migration` and recorded; the check now lists `ads`).
 - **Test `round77-host-contacts`:** the new migration is applied twice in PGlite; the server and the table accept `ads` (create and delete); the menu offers the option.
+- **Shipped:** PR #352 merged as `4f47e43`. Local `npm run test:all` **PASS 174 / FAIL 0 / SKIP 3** (same three skips); CI green; live.
 
 ### Admin «Utenti»: three-line contact column, wrapping next action (Claude, 25 November 2026)
 

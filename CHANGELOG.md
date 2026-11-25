@@ -27,6 +27,33 @@ Newest entries at the top of each section.
 - **Results:** local `npm run test:all` **PASS 174 / FAIL 1 / SKIP 3** — the one failure was `round67-ropa` (shifted line citations); fixed and re-run green, so **175 pass / 0 fail / 3 skip**. Skips unchanged: `demo-e2e` (needs demo origin), `demo-schema` (private catalog), `demo-schema-parse.py` (pglast not installed).
 - **Status:** PR #350 open, CI `regression` green. **Not merged yet** — the merge was blocked by this session's permission check; waiting for Daniele to merge (or re-authorise the merge).
 
+### Contacts: «Pubblicità» (Ads) as a contact source (Claude, 25 November 2026)
+
+**Daniele:** «Add Ads as an option for trigger» (read as the record's «Origine» field).
+
+- **New source `ads`:**
+  - in the «Origine» menu as «Pubblicità» (EN «Ads»), between Evento and Altro;
+  - in the server validation (`SOURCES`);
+  - in the database list (migration `host_contacts_source_ads`, applied to production with `apply_migration` and recorded; the check now lists `ads`).
+- **Test `round77-host-contacts`:** the new migration is applied twice in PGlite; the server and the table accept `ads` (create and delete); the menu offers the option.
+
+### Admin «Utenti»: three-line contact column, wrapping next action (Claude, 25 November 2026)
+
+**Daniele:** «If I add a next action it will switch to tiles immediately. Let's optimize the space further. Remove the phone number. If there's a message and phone icon it means we have it. Let's give it 3 rows in the contact column and put the icons near the name.»
+
+- **Contatto column, three lines:**
+  - name with the WhatsApp/call icons right beside it (the icons mean «we have the number»; the number is in the record);
+  - the e-mail;
+  - the properties.
+- The name uses the column width (max 200 px), so an e-mail shown as the name is no longer cut short.
+- **Next action:** wraps up to three lines (max 170 px), instead of one long line that widened the table and pushed it to cards.
+- **Tighter spacing:** smaller icons (18 px) and cell padding in the table; phone cards are unchanged.
+- **Result:** rows of at most three lines (≤ 60 px). With long next actions on several rows the table still fits from about **1,000 px** (before: about 1,150 px with short ones).
+- **Tests:**
+  - `admin-users-browser`: long next actions on three rows; table required from 1,200 px; icons right beside the name; rows ≤ 60 px; no phone number in the row.
+  - `round77-host-contacts`: the phone is shown as icons, not digits.
+- **Shipped:** PR #351 merged as `fee0197`. Local `npm run test:all` **PASS 174 / FAIL 0 / SKIP 3**; CI green; live.
+
 ### Admin «Utenti»: table or cards by measured space, not window width (Claude, 25 November 2026)
 
 **Daniele** (screenshot from his laptop): «On the laptop I see the phone view.»

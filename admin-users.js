@@ -222,15 +222,18 @@
 
   const COLS = [['host', 'Contatto'], ['plan', 'Stato'], ['registered', 'Registrato'], ['last', 'Ultima attività'], ['days', 'Giorni attivi'], ['checkins', 'Check-in 30 gg'], ['activity', 'Attività'], ['terms', 'Condizioni'], ['next', 'Prossima azione']];
   const CSS = `.u-tbl{width:100%;border-collapse:collapse;font-size:0.8rem;table-layout:auto}
-.u-tbl th,.u-tbl td{padding:5px 5px;text-align:left;vertical-align:middle;border-bottom:1px solid var(--border);overflow-wrap:anywhere;line-height:1.3}
+.u-tbl th,.u-tbl td{padding:4px 5px;text-align:left;vertical-align:middle;border-bottom:1px solid var(--border);overflow-wrap:anywhere;line-height:1.3}
 .u-tbl th{font-size:0.74rem}.u-lbl{display:none}.u-sortbar{display:none}
-.u-mainrow{display:flex;justify-content:space-between;align-items:center;gap:8px}.u-who{min-width:0}
-.u-sub{font-size:0.72rem;color:var(--ink-soft)}.u-icons{display:flex;gap:4px;flex:0 0 auto}
+.u-who{min-width:0}.u-nameline{display:flex;align-items:center;gap:6px;min-width:0}.u-nameline [data-users-open]{min-width:0}
+.u-sub{font-size:0.72rem;color:var(--ink-soft)}.u-icons{display:inline-flex;gap:3px;flex:0 0 auto}
 .u-dl{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border);border-radius:6px;background:var(--white);color:var(--warm,#1849A9);cursor:pointer;font:inherit;font-size:0.8rem;padding:0;margin-left:4px;vertical-align:middle}
 .u-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.u-wrap:not(.u-cards) .u-who{max-width:220px}.u-wrap:not(.u-cards) .u-who .u-sub,.u-wrap:not(.u-cards) .u-who [data-users-open]{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.u-wrap:not(.u-cards) .u-who{max-width:200px}.u-wrap:not(.u-cards) .u-who .u-sub,.u-wrap:not(.u-cards) .u-who [data-users-open]{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}.u-wrap:not(.u-cards) .u-nameline{max-width:200px}.u-wrap:not(.u-cards) .u-nameline [data-users-open]{flex:0 1 auto;max-width:none}
+.u-wrap:not(.u-cards) .u-act{width:18px;height:18px;font-size:0.66rem;border-radius:5px}
+.u-wrap:not(.u-cards) .u-nameline{line-height:1.2}
+.u-wrap:not(.u-cards) .u-sub{line-height:1.25}
 .u-wrap:not(.u-cards) .u-tbl td[data-days] .u-val,.u-wrap:not(.u-cards) .u-tbl td[data-terms] .u-val,.u-wrap:not(.u-cards) .u-tbl td[data-last] .u-val,.u-wrap:not(.u-cards) .u-tbl td[data-reg] .u-val,.u-wrap:not(.u-cards) .u-tbl td[data-reg] .u-val div{white-space:nowrap}
-.u-wrap:not(.u-cards) .u-tbl td[data-next] .u-val{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+.u-wrap:not(.u-cards) .u-tbl td[data-next] .u-val{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;max-width:170px;white-space:normal;font-size:0.76rem;line-height:1.25}
 .u-act{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid var(--border);border-radius:7px;text-decoration:none;font-size:0.85rem;background:var(--white)}
 .u-wrap.u-cards .u-tbl thead{display:none}
 .u-wrap.u-cards .u-tbl,.u-wrap.u-cards .u-tbl tbody,.u-wrap.u-cards .u-tbl tr,.u-wrap.u-cards .u-tbl td{display:block;width:auto}
@@ -252,17 +255,15 @@
     const phone = c && c.phone;
     const acts = phone && CAx ? `<a class="u-act" data-users-wa href="${esc(CAx.waUrl(phone))}" target="_blank" rel="noopener" title="WhatsApp" aria-label="WhatsApp">💬</a><a class="u-act" data-users-call href="tel:${esc(phone)}" title="Chiama" aria-label="Chiama">📞</a>` : '';
     const mail = mailOf(p);
-    // 24 Nov 2026: name with the WhatsApp/call icons on its right, then one
-    // line «e-mail · phone · properties» (two lines per row on wide screens).
-    const subParts = [];
-    if (mail && mail !== nameOf(p)) subParts.push(`<span data-i18n-skip>${esc(mail)}</span>`);
-    if (phone && CAx) subParts.push(`<span data-i18n-skip style="color:var(--ink);">${esc(CAx.fmtPhone(phone))}</span>`);
-    subParts.push(props ? `<span data-i18n-skip>${props}</span>` : `<span>${esc(u ? STATUS[u.status] || '' : 'Nessun account')}</span>`);
-    const main = `<td class="u-main" style="min-width:180px;"><div class="u-mainrow"><div class="u-who">
+    // 25 Nov 2026 (Daniele): three lines — name with the WhatsApp/call icons
+    // right beside it (they mean «we have the number»; the number itself is in
+    // the record), the e-mail, the properties.
+    const subMail = mail && mail !== nameOf(p) ? `<div class="u-sub" data-i18n-skip>${esc(mail)}</div>` : '';
+    const subProps = props ? `<div class="u-sub"><span data-i18n-skip>${props}</span></div>` : (u ? (STATUS[u.status] ? `<div class="u-sub">${esc(STATUS[u.status])}</div>` : '') : '<div class="u-sub">Nessun account</div>');
+    const main = `<td class="u-main" style="min-width:160px;"><div class="u-who"><div class="u-nameline">
       <button type="button" data-users-open="${esc(p.key)}" onclick="UsersAdmin.openPerson('${esc(p.key)}')" style="border:0;background:none;padding:0;font:inherit;font-weight:700;color:var(--warm, #1849A9);cursor:pointer;text-align:left;overflow-wrap:anywhere;"><span data-i18n-skip>${esc(nameOf(p))}</span></button>
-      ${u && u.is_admin ? chip('Admin', 'grey') : ''}${u && u.is_test ? ' ' + chip('Test', 'grey') : ''}
-      <div class="u-sub">${subParts.filter(x => !/<span>\s*<\/span>/.test(x)).join(' · ')}</div></div>
-      ${acts ? `<div class="u-icons">${acts}</div>` : ''}</div></td>`;
+      ${acts ? `<span class="u-icons">${acts}</span>` : ''}${u && u.is_admin ? chip('Admin', 'grey') : ''}${u && u.is_test ? chip('Test', 'grey') : ''}</div>
+      ${subMail}${subProps}</div></td>`;
     const reg = u ? (u.registered_at ? esc(fmt(u.registered_at)) : `<span style="color:var(--ink-soft);">invitato il ${esc(fmt(u.invited_at))}</span><div style="font-size:0.72rem;color:#B54708;">senza password</div>`) : none;
     let next = '';
     if (c && (c.next_action || c.next_action_due)) {

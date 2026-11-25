@@ -49,6 +49,7 @@ if (PGlite) {
     ($2,'Bruno B&B', '  ', '123', now(), null)`, [A, B]);
   await db.query(`insert into public.pilot_invites(email,status) values ('carla@example.invalid','invited'),('dora@example.invalid','invited'),('eva@example.invalid','revoked'),('anna@example.invalid','accepted')`);
   const sql = read(MIG); await db.exec(sql); await db.exec(sql);
+  { const ads = read('supabase/migrations/20261125090000_host_contacts_source_ads.sql'); await db.exec(ads); await db.exec(ads); } // 25 Nov: «Pubblicità» source
   const rows = async q => (await db.query(q)).rows;
   const contacts = await rows(`select user_id, email, full_name, phone, lead_stage from public.host_contacts order by coalesce(email,'')`);
   assert.deepEqual(contacts, [
@@ -121,6 +122,8 @@ if (db) {
   assert.equal((await act('contacts_create', {})).status, 400, 'something required');
   assert.equal((await act('contacts_create', { full_name: 'Gino', phone: 'abc' })).status, 400);
   assert.equal((await act('contacts_create', { full_name: 'Gino', source: 'fax' })).status, 400);
+  { const ad = await act('contacts_create', { full_name: 'Da pubblicità', source: 'ads' }); assert.equal(ad.status, 201, 'ads accepted by server and table'); assert.equal(ad.body.contact.source, 'ads');
+    assert.equal((await act('contacts_delete', { id: ad.body.contact.id })).status, 200); }
   const cr = await act('contacts_create', { full_name: 'Gino Fittizio', phone: '347 111 2222', source: 'whatsapp' });
   assert.equal(cr.status, 201); const gid = cr.body.contact.id;
   assert.deepEqual([cr.body.contact.phone, cr.body.contact.lead_stage], ['+393471112222', 'lead']);
@@ -237,9 +240,9 @@ try {
     // Sort by next action ascending: overdue first, then due date.
     await page.evaluate(() => { UsersAdmin.sortTo('next'); }); if ((await page.evaluate(() => UsersAdmin._view().dir)) !== 'asc') await page.evaluate(() => UsersAdmin.sort('next'));
     assert.deepEqual((await order()).slice(0, 3), [A, B, id(13)], 'overdue first, then due today, then later');
-    assert.match(await row(A).textContent(), /Anna Fittizia.*\+39 333 123 4567.*Casa Anna.*Prova · \d\d\/\d\d/s);
+    assert.match(await row(A).textContent(), /Anna Fittizia.*anna@example\.invalid.*Casa Anna.*Prova · \d\d\/\d\d/s);
     assert.match(await row(B).locator('[data-plan]').textContent(), /Pagato/); assert.match(await row(id(4)).locator('[data-plan]').textContent(), /Gratis a vita/);
-    assert.match(await row(id(13)).textContent(), /dora@example\.invalid.*\+447700900123.*Nessun account.*Invitato/s);
+    assert.match(await row(id(13)).textContent(), /dora@example\.invalid.*Nessun account.*Invitato/s); assert.equal(await row(id(13)).locator('[data-users-wa]').count(), 1, 'phone shown as icons, not as a number'); assert.ok(!/7700/.test(await row(id(13)).textContent()));
     assert.match(await row(id(14)).locator('[data-plan]').textContent(), /Perso/);
     assert.equal(await row(A).locator('[data-next] strong').evaluate(e => getComputedStyle(e).color), 'rgb(180, 35, 24)', 'overdue in red');
     // One-tap links in the row.
@@ -280,6 +283,7 @@ try {
     await page.click('[data-contact-due="3"]'); assert.equal(await page.inputValue('#contactModal [name="next_action_due"]'), shift(3));
     await page.click('[data-contact-due="clear"]'); assert.equal(await page.inputValue('#contactModal [name="next_action_due"]'), '');
     await page.click('[data-contact-due="0"]');
+    assert.deepEqual(await page.$$eval('#contactModal [name="source"] option', os => os.map(o => o.value)), ['', 'whatsapp', 'email', 'referral', 'website', 'event', 'ads', 'other'], 'Origine menu includes Pubblicità');
     await page.selectOption('#contactModal [name="lead_stage"]', 'demo');
     await page.click('[data-contact-save]'); await page.waitForFunction(() => /Salvato/.test(document.querySelector('[data-contact-msg]').textContent));
     assert.deepEqual([gino.next_action, gino.next_action_due, gino.lead_stage], ['Richiamare', TODAY, 'demo']);
@@ -317,7 +321,7 @@ try {
 } finally { await browser.close(); }
 // Wiring in admin.html (24 Nov 2026: contacts live in «Utenti»; no separate tab).
 const html = read('admin.html');
-assert.ok(!html.includes('data-tab="contacts"'), 'no separate Contatti tab'); assert.ok(html.includes('<script src="/admin-contacts.js?v=77.2"></script>'));
+assert.ok(!html.includes('data-tab="contacts"'), 'no separate Contatti tab'); assert.ok(html.includes('<script src="/admin-contacts.js?v=77.3"></script>'));
 assert.match(html, /<button data-tab="users"[^>]*><span>Utenti<\/span><span data-contacts-badge/);
 assert.match(html, /if \(window\.ContactsAdmin\) window\.ContactsAdmin\.ensureBadge\(\);/);
 assert.ok(!/innerHTML/.test(ui), 'the tab never uses innerHTML');

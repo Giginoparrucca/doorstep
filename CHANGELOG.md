@@ -30,6 +30,14 @@ Newest entries at the top of each section.
   - `admin-ops-metrics-browser` was rewritten for the new layout. It finds cells by column name, checks the chips with their counts, header sorting on wide screens and the «Sort by» menu on cards, and the icons. It checks a table at 1,440 px, cards at 390 px and no horizontal scroll.
   - `round51-admin-readiness-browser` and `admin-users-browser` now load the shared file.
   - `admin-i18n-browser`: Italian and English are complete, with 17 new dictionary pairs.
+  - **Full suite, first run:** 6 failures, all from the change.
+    - Three tests hard-code the script versions in `admin.html`. The dictionary's version is kept at v=1; the Users test now expects v=13.
+    - Two Users-tab test pages lacked the new shared file.
+    - The opener-link safety check found a different link first; the new link now puts `href` first.
+    - The Alloggiati support test page lacked the Ops sorting script; the table now has a fallback filter list.
+
+    All were fixed and the suite rerun.
+- **Shipped:** PR #354 merged (squash) as `1233458`. Local `npm run test:all` **PASS 176 / FAIL 0 / SKIP 3**. Skips: demo origin, private demo catalog, pglast not installed. CI `regression` green. Production serves files identical to main (`admin.html`, `admin-table-ui.js`, `admin-ops-table.js`, `admin-users.js`, `admin-i18n-dict.js`). `npm run test:live` **PASS 4 / FAIL 0 / SKIP 6**: demo origin, iReservation probe off, two service-key probes, rate-limit probe, schema drift.
 
 ### Host console: booking card shows only its own guest; no-show never filed (Claude, 25 November 2026)
 

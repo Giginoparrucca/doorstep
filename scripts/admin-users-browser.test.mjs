@@ -44,10 +44,10 @@ for (const r of rows) {
 }
 const usersPayload = { generated_at: iso(NOW), summary: U.summarize(rows, NOW), rows, plan_error: null, terms_error: null };
 const contactsPayload = () => ({ generated_at: iso(NOW), today: ymd(NOW), billing_error: null, contacts: [
-  { id: 'c-a', user_id: A, account: true, full_name: 'Anna Fittizia', email: 'anna@example.invalid', login_email: 'anna@example.invalid', phone: '+393331234567', source: 'whatsapp', lead_stage: 'lead', next_action: 'Chiamare per il rinnovo', next_action_due: ymd(NOW - D), status: { kind: 'trial', days_left: 5 }, properties: [{ id: 'p1', name: 'Casa Anna' }], notes: [{ id: 'n-1', contact_id: 'c-a', body: 'Prima nota', created_at: iso(NOW - D), created_by: 'admin@example.invalid' }], last_note_at: iso(NOW - D), created_at: iso(NOW - 10 * D) },
-  { id: 'c-b', user_id: B, account: true, full_name: null, email: 'bruno@example.invalid', login_email: 'bruno@example.invalid', phone: null, lead_stage: 'lead', status: { kind: 'paying' }, properties: [{ id: 'p3', name: 'Bruno B&B' }], notes: [], created_at: iso(NOW - 60 * D) },
+  { id: 'c-a', user_id: A, account: true, full_name: 'Anna Fittizia', email: 'anna@example.invalid', login_email: 'anna@example.invalid', phone: '+393331234567', source: 'whatsapp', lead_stage: 'lead', next_action: 'Chiamare per il rinnovo e chiedere se apre la seconda struttura a Bari a dicembre', next_action_due: ymd(NOW - D), status: { kind: 'trial', days_left: 5 }, properties: [{ id: 'p1', name: 'Casa Anna' }], notes: [{ id: 'n-1', contact_id: 'c-a', body: 'Prima nota', created_at: iso(NOW - D), created_by: 'admin@example.invalid' }], last_note_at: iso(NOW - D), created_at: iso(NOW - 10 * D) },
+  { id: 'c-b', user_id: B, account: true, full_name: null, email: 'bruno@example.invalid', login_email: 'bruno@example.invalid', phone: null, lead_stage: 'lead', next_action: 'Verificare il bonifico del rinnovo annuale con la banca', next_action_due: ymd(NOW + 9 * D), status: { kind: 'paying' }, properties: [{ id: 'p3', name: 'Bruno B&B' }], notes: [], created_at: iso(NOW - 60 * D) },
   { id: 'c-c', user_id: null, account: false, full_name: null, email: 'carla@example.invalid', phone: null, lead_stage: 'invited', status: { kind: 'lead', stage: 'invited' }, properties: [], notes: [], created_at: iso(NOW - D) },
-  { id: 'c-g', user_id: null, account: false, full_name: 'Gino Prospect', email: null, phone: '+393471112222', lead_stage: 'demo', next_action: 'Mandare la demo', next_action_due: ymd(NOW + 3 * D), status: { kind: 'lead', stage: 'demo' }, properties: [], notes: [], created_at: iso(NOW - 2 * D) },
+  { id: 'c-g', user_id: null, account: false, full_name: 'Gino Prospect', email: null, phone: '+393471112222', lead_stage: 'demo', next_action: 'Mandare la demo registrata e il listino aggiornato con lo sconto fiera', next_action_due: ymd(NOW + 3 * D), status: { kind: 'lead', stage: 'demo' }, properties: [], notes: [], created_at: iso(NOW - 2 * D) },
   { id: 'c-l', user_id: null, account: false, full_name: 'Luca Perso', email: null, phone: null, lead_stage: 'lost', status: { kind: 'lead', stage: 'lost' }, properties: [], notes: [], created_at: iso(NOW - 30 * D) }] });
 
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined, args: ['--no-sandbox'] });
@@ -88,25 +88,25 @@ try {
     // One row per person: three accounts (admin hidden) + two prospects; default newest first.
     assert.deepEqual((await ids()).sort(), [A, B, C, 'c-g', 'c-l'].sort(), 'accounts joined with their contacts; prospects added; admin hidden');
     assert.equal((await ids()).filter(x => x === 'c-a' || x === 'c-b' || x === 'c-c').length, 0, 'no duplicate rows for contacts of accounts or invitations');
-    assert.match(await text(A, '.u-main'), /Anna Fittizia anna@example\.invalid · \+39 333 123 4567 · Casa Anna/);
+    assert.match(await text(A, '.u-main'), /^Anna Fittizia\s*💬📞\s*anna@example\.invalid\s*Casa Anna$/, 'three lines: name with icons, e-mail, properties; no phone number');
     assert.equal(await row(A).locator('[data-users-wa]').getAttribute('href'), 'https://wa.me/393331234567');
     assert.equal(await row(A).locator('[data-users-call]').getAttribute('href'), 'tel:+393331234567');
     assert.match(await text(B, '.u-main'), /bruno@example\.invalid Bruno B&B/);
-    assert.match(await text('c-g', '.u-main'), /Gino Prospect \+39 347 111 2222 · Nessun account/);
+    assert.match(await text('c-g', '.u-main'), /^Gino Prospect\s*💬📞\s*Nessun account$/);
     assert.match(await text(A, '[data-plan]'), /^Prova · 22\/11 \(5 gg\)$/); assert.match(await text(B, '[data-plan]'), /^Pagato fino al 05\/06\/2027$/);
     assert.equal(await text(C, '[data-plan]'), 'Invitato'); assert.equal(await text('c-g', '[data-plan]'), 'Demo'); assert.equal(await text('c-l', '[data-plan]'), 'Perso');
     assert.match(await text(C, '[data-reg]'), /invitato il 16\/11\/2026\s*senza password/);
     assert.match(await text(A, '[data-days]'), /1\/7 · 1\/30/); assert.match(await text(A, '[data-checkins]'), /2/); assert.match(await text(A, '[data-activity-chip]'), /Attivo/);
-    assert.match(await text(A, '[data-next]'), /16\/11\s*Chiamare per il rinnovo/); assert.match(await text('c-g', '[data-next]'), /20\/11\s*Mandare la demo/);
+    assert.match(await text(A, '[data-next]'), /16\/11\s*Chiamare per il rinnovo e chiedere/); assert.match(await text('c-g', '[data-next]'), /20\/11\s*Mandare la demo registrata/);
     assert.equal(await row(A).locator('[data-next] strong').evaluate(e => getComputedStyle(e).color), 'rgb(180, 35, 24)', 'overdue in red');
-    // Wide screens: icons to the right of the name, thin rows (two text lines).
+    // Wide screens: icons right beside the name, three-line rows.
     if (await page.$eval('[data-users-wrap]', w => !w.classList.contains('u-cards'))) {
       const g = await page.evaluate(k => { const r = document.querySelector(`[data-users-row="${k}"]`); const n = r.querySelector('[data-users-open]').getBoundingClientRect(), i = r.querySelector('.u-icons').getBoundingClientRect();
-        return { h: Math.round(r.getBoundingClientRect().height), right: i.left >= n.right, overlap: i.top < n.bottom && i.bottom > n.top }; }, A);
-      assert.ok(g.right && g.overlap, 'icons on the name line, to its right: ' + JSON.stringify(g));
-      assert.ok(g.h <= 46, 'thin row: ' + JSON.stringify(g));
+        return { h: Math.round(r.getBoundingClientRect().height), right: i.left >= n.right, near: i.left - n.right <= 12, overlap: i.top < n.bottom && i.bottom > n.top }; }, A);
+      assert.ok(g.right && g.near && g.overlap, 'icons right beside the name: ' + JSON.stringify(g));
+      assert.ok(g.h <= 60, 'three-line row: ' + JSON.stringify(g));
       const tallest = await page.$$eval('[data-users-row]', rs => Math.max(...rs.map(r => r.getBoundingClientRect().height)));
-      assert.ok(tallest <= 46, 'every row thin: ' + tallest);
+      assert.ok(tallest <= 60, 'every row at most three lines: ' + tallest);
     }
     // Terms per account and the evidence download.
     assert.match(await text(A, '[data-terms]'), /v1 · 16\/11\/2026\s*⬇\s*Scarica prova/); assert.match(await text(B, '[data-terms]'), /Non accettate/);
@@ -167,7 +167,7 @@ try {
     await page.waitForSelector('#contactModal [data-account-section]');
     const modal = () => page.textContent('#contactModal').then(x => x.replace(/\s+/g, ' '));
     assert.match(await modal(), /Anna Fittizia[\s\S]*Prossima azione[\s\S]*Strutture[\s\S]*Casa Anna[\s\S]*Account[\s\S]*Condizioni:[\s\S]*Estendi prova[\s\S]*Email di accesso[\s\S]*Prima nota/);
-    assert.equal(await page.inputValue('#contactModal [name="next_action"]'), 'Chiamare per il rinnovo');
+    assert.equal(await page.inputValue('#contactModal [name="next_action"]'), 'Chiamare per il rinnovo e chiedere se apre la seconda struttura a Bari a dicembre');
     assert.equal(await page.locator('#contactModal [data-billing-box]').count(), 1);
     await page.fill(`#bx-reason-${A}`, 'Fiera di novembre');
     const before = calls.filter(c => c.action === 'users_overview').length;

@@ -16,7 +16,7 @@ const { translate: T, lang } = ctx.AdminI18n;
 assert.equal(lang, 'it', 'Italian by default');
 const both = (en, it) => { assert.equal(T(en, 'it'), it, en); assert.equal(T(it, 'en'), en, it); };
 both('Action needed', 'Da fare'); both('Users', 'Utenti'); both('Last activity', 'Ultima attività'); both('Extend trial', 'Estendi prova');
-both('Action needed (3)', 'Da fare (3)'); both('Trial · ends 22/11/2026 (5 days)', 'Prova · scade il 22/11/2026 (5 gg)'); both('12 days ago', '12 gg fa');
+both('Action needed (3)', 'Da fare (3)'); both('Trial · ends 22/11/2026 (5 days)', 'Prova · scade il 22/11/2026 (5 gg)'); both('Trial · until 22/11 (5 days)', 'Prova · 22/11 (5 gg)'); both('12 days ago', '12 gg fa');
 assert.equal(T('2 sessions', 'it'), '2 sessioni'); assert.equal(T('1 property · 0 links · 0 check-ins', 'it'), '1 struttura · 0 link · 0 check-in');
 assert.equal(T('across 1 property', 'it'), 'in 1 struttura', 'specific pattern before «{n} property»');
 assert.equal(T('Copy link', 'en'), 'Copy link', 'one-way entries never rewrite English'); assert.equal(T('Test check-in', 'en'), 'Test check-in');

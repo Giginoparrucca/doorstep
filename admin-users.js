@@ -5,8 +5,9 @@
 // status»): one row per PERSON — host accounts, invited and prospects — from
 // users_overview + contacts_list (admin-contacts.js). Clicking a person opens
 // the contact detail with the account section (subscription and trial, login
-// e-mail, terms, deep dive). Wide screens: a table; below 1280 px each row is
-// a stacked card with a «Ordina per» menu, so nothing scrolls sideways.
+// e-mail, terms, deep dive). A table when it fits the space (measured, see
+// fit()); otherwise each row is a stacked card with a «Ordina per» menu, so
+// nothing scrolls sideways.
 // Uses the admin page's sb, escapeHtml, setActiveTab and #userFilter.
 (function (root) {
   'use strict';
@@ -19,6 +20,7 @@
   let view = { sort: 'registered', dir: 'desc', search: '', showTest: false, filter: 'all' };
   const esc = s => (root.escapeHtml ? root.escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s).replace(/[<>&"']/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c])));
   const fmt = d => d ? new Date(d).toLocaleDateString('it-IT', { timeZone: 'Europe/Rome', day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
+  const fmtDm = d => d ? new Date(d).toLocaleDateString('it-IT', { timeZone: 'Europe/Rome', day: '2-digit', month: '2-digit' }) : '—'; // trial dates: weeks away, the year is obvious
   const daysFrom = (d, now) => Math.round((new Date(d).getTime() - now) / DAY);
   function ago(d, now) {
     if (!d) return 'mai';
@@ -36,12 +38,12 @@
       if (sub.status === 'active' && sub.paid_until) return [`Pagato fino al ${fmt(sub.paid_until)}`, 'green', 5e4 + daysFrom(sub.paid_until, now)];
       if (sub.trial_ends_at) {
         const d = daysFrom(sub.trial_ends_at, now);
-        return d <= 0 ? [`Prova scaduta il ${fmt(sub.trial_ends_at)}`, 'red', d] : [`Prova · scade il ${fmt(sub.trial_ends_at)} (${d} gg)`, d <= 7 ? 'red' : d <= 14 ? 'amber' : 'green', d];
+        return d <= 0 ? [`Prova scaduta il ${fmtDm(sub.trial_ends_at)}`, 'red', d] : [`Prova · ${fmtDm(sub.trial_ends_at)} (${d} gg)`, d <= 7 ? 'red' : d <= 14 ? 'amber' : 'green', d];
       }
     }
     switch (p.state) {
       case 'prelaunch': return [r && r.status === 'invited' ? 'Prova dalla registrazione' : 'Prova non ancora creata', 'grey', 1e5];
-      case 'trial': { const d = daysFrom(p.trial_ends_at, now); return [`Prova · scade il ${fmt(p.trial_ends_at)} (${d <= 0 ? 'oggi' : d + ' gg'})`, d <= 7 ? 'red' : d <= 14 ? 'amber' : 'green', d]; }
+      case 'trial': { const d = daysFrom(p.trial_ends_at, now); return [`Prova · ${fmtDm(p.trial_ends_at)} (${d <= 0 ? 'oggi' : d + ' gg'})`, d <= 7 ? 'red' : d <= 14 ? 'amber' : 'green', d]; }
       case 'grace': return [`Prova scaduta · periodo di grazia fino al ${fmt(p.grace_ends_at)}`, 'red', daysFrom(p.grace_ends_at, now)];
       case 'read_only': return [`Sola lettura dal ${fmt(p.since)}`, 'red', -1];
       case 'active': return [`Pagato fino al ${fmt(p.paid_until)}`, 'green', 5e4 + daysFrom(p.paid_until, now)];
@@ -220,23 +222,26 @@
 
   const COLS = [['host', 'Contatto'], ['plan', 'Stato'], ['registered', 'Registrato'], ['last', 'Ultima attività'], ['days', 'Giorni attivi'], ['checkins', 'Check-in 30 gg'], ['activity', 'Attività'], ['terms', 'Condizioni'], ['next', 'Prossima azione']];
   const CSS = `.u-tbl{width:100%;border-collapse:collapse;font-size:0.8rem;table-layout:auto}
-.u-tbl th,.u-tbl td{padding:5px 6px;text-align:left;vertical-align:middle;border-bottom:1px solid var(--border);overflow-wrap:anywhere;line-height:1.3}
+.u-tbl th,.u-tbl td{padding:5px 5px;text-align:left;vertical-align:middle;border-bottom:1px solid var(--border);overflow-wrap:anywhere;line-height:1.3}
 .u-tbl th{font-size:0.74rem}.u-lbl{display:none}.u-sortbar{display:none}
 .u-mainrow{display:flex;justify-content:space-between;align-items:center;gap:8px}.u-who{min-width:0}
 .u-sub{font-size:0.72rem;color:var(--ink-soft)}.u-icons{display:flex;gap:4px;flex:0 0 auto}
 .u-dl{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border);border-radius:6px;background:var(--white);color:var(--warm,#1849A9);cursor:pointer;font:inherit;font-size:0.8rem;padding:0;margin-left:4px;vertical-align:middle}
 .u-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-@media (min-width:1280px){.u-who{max-width:340px}.u-who .u-sub,.u-who [data-users-open]{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:340px}
-.u-tbl td[data-days] .u-val,.u-tbl td[data-terms] .u-val,.u-tbl td[data-last] .u-val,.u-tbl td[data-reg] .u-val,.u-tbl td[data-reg] .u-val div{white-space:nowrap}
-.u-tbl td[data-next] .u-val{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}}
+.u-wrap:not(.u-cards) .u-who{max-width:220px}.u-wrap:not(.u-cards) .u-who .u-sub,.u-wrap:not(.u-cards) .u-who [data-users-open]{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.u-wrap:not(.u-cards) .u-tbl td[data-days] .u-val,.u-wrap:not(.u-cards) .u-tbl td[data-terms] .u-val,.u-wrap:not(.u-cards) .u-tbl td[data-last] .u-val,.u-wrap:not(.u-cards) .u-tbl td[data-reg] .u-val,.u-wrap:not(.u-cards) .u-tbl td[data-reg] .u-val div{white-space:nowrap}
+.u-wrap:not(.u-cards) .u-tbl td[data-next] .u-val{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
 .u-act{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid var(--border);border-radius:7px;text-decoration:none;font-size:0.85rem;background:var(--white)}
-@media (max-width:1279px){.u-tbl thead{display:none}.u-tbl,.u-tbl tbody,.u-tbl tr,.u-tbl td{display:block;width:auto}
-.u-tbl tr{border:1px solid var(--border);border-radius:10px;margin:0 0 10px;padding:6px 12px;background:var(--white)}
-.u-tbl td{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:5px 0;border:0}
-.u-tbl td.u-main{display:block;padding-bottom:8px;border-bottom:1px solid var(--border)}
-.u-tbl td:empty,.u-tbl td.u-none{display:none}
-.u-lbl{display:inline;color:var(--ink-soft);font-size:0.74rem;flex:0 0 auto}.u-val{text-align:right;min-width:0}
-.u-sortbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.u-act{width:44px;height:44px}}`;
+.u-wrap.u-cards .u-tbl thead{display:none}
+.u-wrap.u-cards .u-tbl,.u-wrap.u-cards .u-tbl tbody,.u-wrap.u-cards .u-tbl tr,.u-wrap.u-cards .u-tbl td{display:block;width:auto}
+.u-wrap.u-cards .u-tbl tr{border:1px solid var(--border);border-radius:10px;margin:0 0 10px;padding:6px 12px;background:var(--white)}
+.u-wrap.u-cards .u-tbl td{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:5px 0;border:0}
+.u-wrap.u-cards .u-tbl td.u-main{display:block;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.u-wrap.u-cards .u-tbl td:empty,.u-wrap.u-cards .u-tbl td.u-none{display:none}
+.u-wrap.u-cards .u-lbl{display:inline;color:var(--ink-soft);font-size:0.74rem;flex:0 0 auto}
+.u-wrap.u-cards .u-val{text-align:right;min-width:0}
+.u-wrap.u-cards .u-sortbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.u-wrap.u-cards .u-act{width:44px;height:44px}`;
 
   function cells(p, now) {
     const u = p.user, c = p.contact, CAx = CA();
@@ -253,7 +258,7 @@
     if (mail && mail !== nameOf(p)) subParts.push(`<span data-i18n-skip>${esc(mail)}</span>`);
     if (phone && CAx) subParts.push(`<span data-i18n-skip style="color:var(--ink);">${esc(CAx.fmtPhone(phone))}</span>`);
     subParts.push(props ? `<span data-i18n-skip>${props}</span>` : `<span>${esc(u ? STATUS[u.status] || '' : 'Nessun account')}</span>`);
-    const main = `<td class="u-main" style="min-width:200px;"><div class="u-mainrow"><div class="u-who">
+    const main = `<td class="u-main" style="min-width:180px;"><div class="u-mainrow"><div class="u-who">
       <button type="button" data-users-open="${esc(p.key)}" onclick="UsersAdmin.openPerson('${esc(p.key)}')" style="border:0;background:none;padding:0;font:inherit;font-weight:700;color:var(--warm, #1849A9);cursor:pointer;text-align:left;overflow-wrap:anywhere;"><span data-i18n-skip>${esc(nameOf(p))}</span></button>
       ${u && u.is_admin ? chip('Admin', 'grey') : ''}${u && u.is_test ? ' ' + chip('Test', 'grey') : ''}
       <div class="u-sub">${subParts.filter(x => !/<span>\s*<\/span>/.test(x)).join(' · ')}</div></div>
@@ -269,7 +274,7 @@
       + td('Stato', chip(stText, stTone, 'data-plan'))
       + td('Registrato', reg, 'data-reg')
       + td('Ultima attività', u ? esc(ago(u.last_active_at, now)) : none, 'data-last' + (u ? '' : ' class="u-none"'))
-      + td('Giorni attivi', u ? `${u.active_days_7} / 7 · ${u.active_days_30} / 30` : none, 'data-days' + (u ? '' : ' class="u-none"'))
+      + td('Giorni attivi', u ? `${u.active_days_7}/7 · ${u.active_days_30}/30` : none, 'data-days' + (u ? '' : ' class="u-none"'))
       + td('Check-in 30 gg', u ? String(u.checkins_30) : none, 'data-checkins' + (u ? '' : ' class="u-none"'))
       + td('Attività', u ? chip(...ACTIVITY[u.activity].slice(0, 2), 'data-activity-chip') : none, u ? '' : 'class="u-none"')
       + td('Condizioni', u ? termsCell(u) : none, 'data-terms' + (u && u.user_id ? '' : ' class="u-none"'))
@@ -315,19 +320,35 @@
           const n = all.filter(p => inFilter(p, k, now)).length, on = view.filter === k, red = k === 'due' && all.some(p => p.contact && CA() && CA().isOverdue(p.contact));
           return `<button type="button" data-users-filter="${k}" aria-pressed="${on}" onclick="UsersAdmin.filter('${k}')" style="${btn}border-radius:999px;${on ? 'background:var(--warm,#005BFF);border-color:var(--warm,#005BFF);color:#fff;' : red ? 'border-color:#F04438;color:#B42318;' : ''}"><span>${esc(t)}</span> <span data-i18n-skip>${n}</span></button>`;
         }).join('')}</div>
+        <div class="u-wrap" data-users-wrap>
         <div class="u-sortbar" style="margin-bottom:8px;font-size:0.8rem;"><label for="usersSortSel">Ordina per</label>
           <select id="usersSortSel" onchange="UsersAdmin.sortTo(this.value)" style="min-height:40px;border:1px solid var(--border);border-radius:8px;font:inherit;padding:4px 8px;">${COLS.map(([k, l]) => `<option value="${k}" ${view.sort === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
           <button type="button" data-users-dir onclick="UsersAdmin.sort('${view.sort}')" style="${btn}" aria-label="Inverti ordine">${view.dir === 'asc' ? '▲' : '▼'}</button></div>
         <table class="u-tbl" data-users-table>
           <thead><tr>${COLS.map(([k, l]) => th(k, l)).join('')}</tr></thead>
           <tbody>${rows.map(p => `<tr data-users-row="${esc(p.key)}" data-kind="${kind(p, now)}"${p.user ? ` data-activity="${p.user.activity}"` : ''}>${cells(p, now)}</tr>`).join('') || '<tr><td>Nessun utente.</td></tr>'}</tbody>
-        </table>
+        </table></div>
         <p style="font-size:0.72rem;color:var(--ink-soft);margin-top:6px;">Tocca un nome per la scheda completa: contatto, note, prossima azione, strutture, abbonamento e prova, email di accesso, condizioni. Attivo = ha usato la console negli ultimi 7 giorni · In calo = 8–30 giorni · Inattivo = oltre 30 giorni. Giorni attivi = giorni distinti con attività in console.</p>
         ${typeof root.renderBillingSettings === 'function' ? root.renderBillingSettings() : ''}
         ${typeof root.renderRecentActivity === 'function' ? root.renderRecentActivity() : ''}`;
     }
     host.innerHTML = `<div class="section-title">Utenti</div>${body}`;
+    fit();
   }
+  // 25 Nov 2026: table or cards by MEASURING the space (Windows display
+  // scaling and zoom make the window width a poor guide): the table is kept
+  // when it fits the content area, otherwise each row becomes a card. Checked
+  // after every render and on resize.
+  function fit() {
+    const w = document.querySelector('[data-users-wrap]');
+    if (!w) return;
+    w.classList.remove('u-cards');
+    const t = w.querySelector('[data-users-table]');
+    const tooWide = (t && t.scrollWidth > w.clientWidth + 1) || document.documentElement.scrollWidth > root.innerWidth + 1;
+    if (tooWide) w.classList.add('u-cards');
+  }
+  let fitTimer = null;
+  if (typeof root.addEventListener === 'function') root.addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(fit, 120); });
 
   // Detail of a person: the contact view (admin-contacts.js) with the account
   // section below. A host account without a contact row yet (the list adds it

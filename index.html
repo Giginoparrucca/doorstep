@@ -260,6 +260,49 @@ body.has-test-banner .page { top: var(--test-banner-h, 36px); }
 .home-card-compact {
   padding: 12px 14px;
 }
+
+/* Guest check-in prompt — the most important action for the host, so it
+   sits right under the hero photo, above the host message, until the
+   whole party has checked in. Hidden until the existing-check-in lookup
+   has run, so guests who are already done never see it flash. */
+.checkin-cta {
+  position: relative; z-index: 2;
+  margin: 14px 16px 14px; padding: 16px;
+  background: var(--warm); color: var(--white);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 28px rgba(0,91,255,0.32);
+}
+.checkin-cta[hidden] { display: none; }
+.checkin-cta-title { font-size: 1.02rem; font-weight: 700; line-height: 1.3; }
+.checkin-cta-sub { font-size: 0.76rem; line-height: 1.45; opacity: 0.92; margin-top: 4px; }
+.checkin-cta-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; min-height: 52px; margin-top: 14px; padding: 12px 16px;
+  border: none; border-radius: var(--radius-s);
+  background: var(--white); color: var(--warm);
+  font-family: 'DM Sans', sans-serif; font-size: 0.95rem; font-weight: 700;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 2px 8px rgba(6,26,61,0.18);
+}
+.checkin-cta-btn:active { transform: scale(0.98); }
+.checkin-cta.urgent { background: #D9480F; box-shadow: 0 10px 28px rgba(217,72,15,0.32); }
+.checkin-cta.urgent .checkin-cta-btn { color: #D9480F; }
+/* Bottom-nav Check-in tab while check-in is still to do: filled pill. */
+.nav-item.nav-checkin-due { color: var(--warm); font-weight: 700; }
+.nav-item.nav-checkin-due svg {
+  stroke: var(--white) !important; background: var(--warm);
+  border-radius: 50%; padding: 5px; width: 32px; height: 32px; margin-top: -6px;
+  animation: checkinPulse 2.2s ease-out infinite;
+}
+.nav-item.nav-checkin-due.active svg { animation: none; }
+@keyframes checkinPulse {
+  0% { box-shadow: 0 0 0 0 rgba(0,91,255,0.45); }
+  70% { box-shadow: 0 0 0 9px rgba(0,91,255,0); }
+  100% { box-shadow: 0 0 0 0 rgba(0,91,255,0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-item.nav-checkin-due svg { animation: none; }
+}
 .home-card-compact .home-card-value {
   font-size: 0.9rem;
 }
@@ -949,6 +992,14 @@ function icon(name, cls) {
     </div>
   </div>
 
+  <!-- Check-in prompt: shown until every guest of the booking has checked
+       in (updateCheckinPrompt). -->
+  <div class="checkin-cta" id="checkinCta" hidden>
+    <div class="checkin-cta-title" id="checkinCtaTitle"></div>
+    <div class="checkin-cta-sub" id="checkinCtaSub"></div>
+    <button type="button" class="checkin-cta-btn" id="checkinCtaBtn" onclick="openCheckinFromPrompt()"></button>
+  </div>
+
   <!-- ════════════════════════════════════════════════════════
        Host welcome message — sits ABOVE the sections so the
        first thing the guest reads is the host saying hello.
@@ -1576,7 +1627,7 @@ function icon(name, cls) {
     <svg viewBox="0 0 24 24" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
     <span data-i18n="nav_home">Home</span>
   </button>
-  <button class="nav-item" onclick="goTo('checkin')" style="position:relative">
+  <button class="nav-item" id="navCheckin" onclick="goTo('checkin')" style="position:relative">
     <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
     <span>Check-in</span>
     <div class="nav-badge" id="checkinBadge"></div>
@@ -2363,6 +2414,7 @@ function setLang(l) {
     showWelcomeBackState(existingCheckins);
   }
   if (_entryLastResponse) applyGuestEntryResponse(_entryLastResponse);
+  updateCheckinPrompt();
 }
 
 /* ══════════════════════════════════════
@@ -2431,11 +2483,65 @@ function _partyMissing(guests) {
     Number.isInteger(er?.expected) ? er.expected : 0);
   return Math.max(0, total - (Array.isArray(guests) ? guests.length : 0));
 }
+/* ══════════════════════════════════════
+   CHECK-IN PROMPT (home card + nav tab)
+   States: null = not decided yet (lookup still running, stays hidden);
+   'todo' = nobody checked in; {done, total} = party incomplete;
+   'done' = complete → prompt hidden for good.
+══════════════════════════════════════ */
+let _checkinPromptState = null;
+function _romeToday() {
+  try { return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Rome' }); }
+  catch (_) { return new Date().toISOString().slice(0, 10); }
+}
+function setCheckinPromptState(st) { _checkinPromptState = st; updateCheckinPrompt(); }
+function updateCheckinPrompt() {
+  const card = document.getElementById('checkinCta');
+  const nav = document.getElementById('navCheckin');
+  if (!card) return;
+  const st = _checkinPromptState;
+  const show = st != null && st !== 'done';
+  card.hidden = !show;
+  if (nav) nav.classList.toggle('nav-checkin-due', show);
+  if (!show) return;
+  const it = lang === 'it';
+  const arr = _bookingStay && /^\d{4}-\d{2}-\d{2}$/.test(_bookingStay.arrival_date || '') ? _bookingStay.arrival_date : null;
+  const today = _romeToday();
+  const when = !arr ? 'unknown' : arr > today ? 'future' : arr === today ? 'today' : 'past';
+  const partial = st && typeof st === 'object' && st.total > st.done;
+  let title, sub, btn;
+  if (partial) {
+    const missing = st.total - st.done;
+    title = it ? `Check-in incompleto: ${st.done} di ${st.total} ospiti` : `Check-in incomplete: ${st.done} of ${st.total} guests`;
+    sub = it ? `Manca${missing === 1 ? ' 1 ospite' : `no ${missing} ospiti`}. Completalo per ricevere tutte le informazioni di arrivo.`
+             : `${missing} guest${missing === 1 ? ' is' : 's are'} still missing. Complete it to get all your arrival details.`;
+    btn = it ? 'Aggiungi gli ospiti mancanti →' : 'Add the missing guests →';
+  } else {
+    if (when === 'today') title = it ? 'Arrivi oggi: fai il check-in online ora' : 'You arrive today: check in online now';
+    else if (when === 'past') title = it ? 'Il check-in online non è ancora stato fatto' : 'Your online check-in is still to do';
+    else title = it ? 'Fai il check-in online prima di arrivare' : 'Check in online before you arrive';
+    sub = it ? 'Richiesto per legge per ogni ospite. Bastano 2 minuti e un documento d\'identità.'
+             : 'Required by Italian law for every guest. It takes 2 minutes and an ID document.';
+    btn = it ? 'Inizia il check-in →' : 'Start check-in →';
+  }
+  card.classList.toggle('urgent', when === 'today' || when === 'past');
+  document.getElementById('checkinCtaTitle').textContent = title;
+  document.getElementById('checkinCtaSub').textContent = sub;
+  document.getElementById('checkinCtaBtn').textContent = btn;
+}
+function openCheckinFromPrompt() {
+  trackGuest('guest_checkin_prompt_click', { state: typeof _checkinPromptState === 'object' ? 'partial' : String(_checkinPromptState) });
+  goTo('checkin');
+  const pg = document.getElementById('page-checkin');
+  if (pg) pg.scrollTop = 0;
+}
+
 function showReopenedBanner(alreadyCount, missing = 0) {
   const it = lang === 'it';
   const wrap = document.getElementById('checkinIntro');
   if (!wrap) return;
   const total = alreadyCount + missing;
+  setCheckinPromptState(missing > 0 ? { done: alreadyCount, total } : 'todo');
   const msg = missing > 0
     ? (it
       ? `Check-in incompleto: <strong>${alreadyCount} di ${total}</strong> ospiti registrati. Aggiungi qui ${missing === 1 ? "l'ospite mancante" : 'gli ospiti mancanti'}: il codice di accesso e il Wi-Fi saranno visibili quando tutti avranno completato il check-in.`
@@ -2606,6 +2712,8 @@ function showWelcomeBackState(checkins) {
     badge.style.borderRadius = '50%';
     badge.style.color = '#fff';
   }
+
+  setCheckinPromptState('done');
 
   // 6. Default to welcome tab (not check-in)
   goTo('welcome');
@@ -3472,6 +3580,7 @@ function applyStaySubtitle() {
 function applyBookingStay() {
   const st = _bookingStay;
   applyStaySubtitle();
+  updateCheckinPrompt();
   const arr = document.getElementById('arrivalDate'), dep = document.getElementById('departureDate');
   if (!st || !arr || !dep || !/^\d{4}-\d{2}-\d{2}$/.test(st.arrival_date || '') || !/^\d{4}-\d{2}-\d{2}$/.test(st.departure_date || '')) return;
   arr.value = st.arrival_date;
@@ -4321,6 +4430,7 @@ async function saveCurrentGuest() {
         : `${partyCount} guest(s) registered. Arrival: ${arrivalDate}, Departure: ${departureDate}.`;
       document.getElementById('reviewHintText').innerHTML = T[lang].review_hint;
       document.getElementById('checkinBadge').style.display = 'none';
+      setCheckinPromptState('done');
       renderReviewCards();
       showConsentCard();
       await refreshEntryAfterSave();
@@ -5994,6 +6104,9 @@ async function init() {
   if (IS_TEST_SESSION) {
     console.log('🧪 Test mode — skipping existing check-in lookups; blank slate.');
   }
+
+  // Nothing found on the server for this guest → prompt the check-in.
+  if (_checkinPromptState == null) setCheckinPromptState('todo');
 
   startGuestEntryRefresh();
 

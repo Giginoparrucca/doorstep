@@ -7,6 +7,26 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Guest app: very visible check-in prompt until check-in is done (Claude, 25 November 2026)
+
+**Daniele:** «I've been receiving feedback that the check-in button is not clearly visible. […] Let's update the guest app to prompt the check-in with a very obvious button until it's completed.»
+
+- **Before:** the only way into check-in was the bottom-nav tab with a small red dot.
+- **Home card:** a full-width blue card right under the hero photo, above the host message, with a large white button (52 px). Visible on the first screen of a phone.
+  - nobody checked in, arrival ahead: «Fai il check-in online prima di arrivare» / «Check in online before you arrive»;
+  - arrival today: «Arrivi oggi: fai il check-in online ora» — card turns orange;
+  - arrival passed: «Il check-in online non è ancora stato fatto» — orange;
+  - party incomplete (e.g. 1 of 2): «Check-in incompleto: 1 di 2 ospiti» with «Aggiungi gli ospiti mancanti →»;
+  - sub-line: required by law for every guest, 2 minutes and an ID document. Button opens the check-in tab at the top.
+- **Nav tab:** while check-in is due, the Check-in tab is a filled blue circle with a soft pulse (no animation with reduced-motion).
+- **Gone when complete:** after the last guest submits, or when a returning guest is already fully checked in (welcome-back state). It stays hidden while the existing-check-in lookup runs, so done guests never see it flash. Arrival day uses the Europe/Rome date; IT/EN follow the language switch.
+- **Analytics:** `guest_checkin_prompt_click` (state: todo / partial).
+- **Code:** `index.html` — `updateCheckinPrompt()` / `setCheckinPromptState()`, hooked into page start, `showReopenedBanner`, `showWelcomeBackState`, the submit success path, `applyBookingStay` and `setLang`.
+- **Test:** new `scripts/guest-checkin-prompt-browser.test.mjs` (390×844): future / today / passed arrival, 1 of 2, complete party; checks above-the-fold, ≥ 48 px button, above host message, IT/EN, the button opens check-in, the nav highlight, hidden after completion; fictional HTTP only.
+- **Also:** `docs/compliance/ROPA.md` consent-card line citations moved to the new `index.html` lines (4604 / 4435 / 1491) — `round67-ropa` checks them.
+- **Results:** local `npm run test:all` **PASS 174 / FAIL 1 / SKIP 3** — the one failure was `round67-ropa` (shifted line citations); fixed and re-run green, so **175 pass / 0 fail / 3 skip**. Skips unchanged: `demo-e2e` (needs demo origin), `demo-schema` (private catalog), `demo-schema-parse.py` (pglast not installed).
+- **Status:** PR #350 open, CI `regression` green. **Not merged yet** — the merge was blocked by this session's permission check; waiting for Daniele to merge (or re-authorise the merge).
+
 ### Contacts: «Pubblicità» (Ads) as a contact source (Claude, 25 November 2026)
 
 **Daniele:** «Add Ads as an option for trigger» (read as the record's «Origine» field).

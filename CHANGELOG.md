@@ -7,6 +7,19 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Admin «Utenti»: table or cards by measured space, not window width (Claude, 25 November 2026)
+
+**Daniele** (screenshot from his laptop): «On the laptop I see the phone view.»
+
+- **Cause:** the switch to cards used a fixed window width (1,280 px). With Windows display scaling a laptop can report about 1,280 px or less, so it got cards although the table would have fitted.
+- **Fix:** `fit()` measures after every render and on resize. The table stays while it fits the content area; only if it would scroll sideways does each row become a card. No screen-width rules remain.
+- **Narrower table**, so it fits from about **1,150 px** (was about 1,275):
+  - trial status «Prova · 22/11 (5 gg)» instead of «Prova · scade il 22/11/2026 (5 gg)» (paid-until keeps the full date);
+  - active days «1/7 · 1/30»;
+  - the name column max 220 px, the next action 150 px; slightly less cell padding.
+- **IT/EN patterns** added for the shorter trial status.
+- **Tests:** `admin-users-browser` now at 390/768/1024/**1200**/1280/1440 (table required from 1,200 px, cards at ≤ 768) plus a live resize check (shrink → cards, widen → table again). `round77-host-contacts` and `admin-i18n` updated for the shorter wording.
+
 ### Admin «Utenti»: icons beside the name, thinner rows (Claude, 24 November 2026)
 
 **Daniele:** «On the browser version there's lots of space on the right of the name. Put the icons there and make each row thinner.»

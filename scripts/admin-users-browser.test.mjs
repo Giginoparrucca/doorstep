@@ -52,7 +52,7 @@ const contactsPayload = () => ({ generated_at: iso(NOW), today: ymd(NOW), billin
 
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined, args: ['--no-sandbox'] });
 try {
-  for (const width of [390, 768, 1024, 1280, 1440]) {
+  for (const width of [390, 768, 1024, 1200, 1280, 1440]) {
     const context = await browser.newContext({ viewport: { width, height: 900 } });
     const page = await context.newPage(); const errors = [], calls = []; let usersStatus = 200;
     page.on('pageerror', e => errors.push(String(e))); page.on('dialog', d => d.accept());
@@ -93,14 +93,14 @@ try {
     assert.equal(await row(A).locator('[data-users-call]').getAttribute('href'), 'tel:+393331234567');
     assert.match(await text(B, '.u-main'), /bruno@example\.invalid Bruno B&B/);
     assert.match(await text('c-g', '.u-main'), /Gino Prospect \+39 347 111 2222 · Nessun account/);
-    assert.match(await text(A, '[data-plan]'), /^Prova · scade il 22\/11\/2026 \(5 gg\)$/); assert.match(await text(B, '[data-plan]'), /^Pagato fino al 05\/06\/2027$/);
+    assert.match(await text(A, '[data-plan]'), /^Prova · 22\/11 \(5 gg\)$/); assert.match(await text(B, '[data-plan]'), /^Pagato fino al 05\/06\/2027$/);
     assert.equal(await text(C, '[data-plan]'), 'Invitato'); assert.equal(await text('c-g', '[data-plan]'), 'Demo'); assert.equal(await text('c-l', '[data-plan]'), 'Perso');
     assert.match(await text(C, '[data-reg]'), /invitato il 16\/11\/2026\s*senza password/);
-    assert.match(await text(A, '[data-days]'), /1 \/ 7 · 1 \/ 30/); assert.match(await text(A, '[data-checkins]'), /2/); assert.match(await text(A, '[data-activity-chip]'), /Attivo/);
+    assert.match(await text(A, '[data-days]'), /1\/7 · 1\/30/); assert.match(await text(A, '[data-checkins]'), /2/); assert.match(await text(A, '[data-activity-chip]'), /Attivo/);
     assert.match(await text(A, '[data-next]'), /16\/11\s*Chiamare per il rinnovo/); assert.match(await text('c-g', '[data-next]'), /20\/11\s*Mandare la demo/);
     assert.equal(await row(A).locator('[data-next] strong').evaluate(e => getComputedStyle(e).color), 'rgb(180, 35, 24)', 'overdue in red');
     // Wide screens: icons to the right of the name, thin rows (two text lines).
-    if (width >= 1280) {
+    if (await page.$eval('[data-users-wrap]', w => !w.classList.contains('u-cards'))) {
       const g = await page.evaluate(k => { const r = document.querySelector(`[data-users-row="${k}"]`); const n = r.querySelector('[data-users-open]').getBoundingClientRect(), i = r.querySelector('.u-icons').getBoundingClientRect();
         return { h: Math.round(r.getBoundingClientRect().height), right: i.left >= n.right, overlap: i.top < n.bottom && i.bottom > n.top }; }, A);
       assert.ok(g.right && g.overlap, 'icons on the name line, to its right: ' + JSON.stringify(g));
@@ -125,7 +125,10 @@ try {
     await page.check('#usersShowTest'); assert.ok((await ids()).includes(ADM), 'admin shown on request'); assert.match(await text(ADM, '.u-main'), /Admin/);
     await page.uncheck('#usersShowTest');
     // Sorting: headers on wide screens, «Ordina per» below 1200 px.
-    const wide = width >= 1280;
+    // 25 Nov 2026: table or cards by measured fit (not by window width).
+    const wide = await page.$eval('[data-users-wrap]', w => !w.classList.contains('u-cards'));
+    if (width >= 1200) assert.equal(wide, true, width + ': the table fits, so it is shown');
+    if (width <= 768) assert.equal(wide, false, width + ': cards');
     assert.equal(await page.isVisible('[data-users-table] thead'), wide, 'header row only on wide screens');
     assert.equal(await page.isVisible('#usersSortSel'), !wide, 'sort menu on narrow screens');
     // Bring the sort to (column, direction) with the controls a person uses.
@@ -150,6 +153,12 @@ try {
     if (!wide) {
       const small = await page.$$eval('[data-users-row] .u-act', bs => bs.filter(b => b.getBoundingClientRect().height < 44).length);
       assert.equal(small, 0, 'tap targets 44 px on phones');
+    }
+    // Resizing re-measures: narrow → cards, wide again → table.
+    if (width === 1440) {
+      await page.setViewportSize({ width: 700, height: 900 }); await page.waitForFunction(() => document.querySelector('[data-users-wrap]').classList.contains('u-cards'));
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'no scroll after shrinking');
+      await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForFunction(() => !document.querySelector('[data-users-wrap]').classList.contains('u-cards'));
     }
     // Billing settings and recent activity under the table.
     assert.equal(await page.locator('[data-billing-settings]').count(), 1); assert.equal(await page.locator('#content [data-recent-activity]').count(), 1);
@@ -189,4 +198,4 @@ try {
     await context.close();
   }
 } finally { await browser.close(); }
-console.log('PASS admin users (browser) 390/768/1024/1280/1440: one row per person (accounts joined with contacts, prospects added, admin hidden), name/e-mail/phone/properties with WhatsApp and call, status chips (trial, paid, Invitato, Demo, Perso), next action (overdue red), terms evidence; filters Lead/Prova/Paganti/Gratis/Scaduti/Da fare with counts; search by name, property, e-mail, phone digits; show test/admin; headers sort on wide screens and «Ordina per» on narrow ones; no horizontal scroll; record with contact, notes, properties and the account section (real subscription box: +14 days reloads the list and keeps the record open; deep dive); prospect without account section; add contact; server error');
+console.log('PASS admin users (browser) 390/768/1024/1200/1280/1440 + live resize: one row per person (accounts joined with contacts, prospects added, admin hidden), name/e-mail/phone/properties with WhatsApp and call, status chips (trial, paid, Invitato, Demo, Perso), next action (overdue red), terms evidence; filters Lead/Prova/Paganti/Gratis/Scaduti/Da fare with counts; search by name, property, e-mail, phone digits; show test/admin; headers sort on wide screens and «Ordina per» on narrow ones; no horizontal scroll; record with contact, notes, properties and the account section (real subscription box: +14 days reloads the list and keeps the record open; deep dive); prospect without account section; add contact; server error');

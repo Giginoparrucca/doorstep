@@ -237,7 +237,7 @@ try {
     // Sort by next action ascending: overdue first, then due date.
     await page.evaluate(() => { UsersAdmin.sortTo('next'); }); if ((await page.evaluate(() => UsersAdmin._view().dir)) !== 'asc') await page.evaluate(() => UsersAdmin.sort('next'));
     assert.deepEqual((await order()).slice(0, 3), [A, B, id(13)], 'overdue first, then due today, then later');
-    assert.match(await row(A).textContent(), /Anna Fittizia.*\+39 333 123 4567.*Casa Anna.*Prova · scade/s);
+    assert.match(await row(A).textContent(), /Anna Fittizia.*\+39 333 123 4567.*Casa Anna.*Prova · \d\d\/\d\d/s);
     assert.match(await row(B).locator('[data-plan]').textContent(), /Pagato/); assert.match(await row(id(4)).locator('[data-plan]').textContent(), /Gratis a vita/);
     assert.match(await row(id(13)).textContent(), /dora@example\.invalid.*\+447700900123.*Nessun account.*Invitato/s);
     assert.match(await row(id(14)).locator('[data-plan]').textContent(), /Perso/);

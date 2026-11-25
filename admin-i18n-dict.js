@@ -42,7 +42,7 @@ window.ADMIN_I18N_DICT = [
   ['Active', 'Attivo'], ['Slowing', 'In calo'], ['Inactive', 'Inattivo', 'to-en'], ['Never used', 'Mai usato'],
   ['Invited · not registered yet', 'Invitato · non ancora registrato'], ['Registered · no property', 'Registrato · nessuna struttura'],
   ['invited on {d}', 'invitato il {d}'], ['password not created', 'password non creata'],
-  ['Trial not started · begins at launch', 'Prova non iniziata · parte al lancio'], ['Trial · ends {d} ({n} days)', 'Prova · scade il {d} ({n} gg)'], ['Trial · ends {d} (today)', 'Prova · scade il {d} (oggi)'],
+  ['Trial not started · begins at launch', 'Prova non iniziata · parte al lancio'], ['Trial · ends {d} ({n} days)', 'Prova · scade il {d} ({n} gg)'], ['Trial · ends {d} (today)', 'Prova · scade il {d} (oggi)'], ['Trial · until {d} ({n} days)', 'Prova · {d} ({n} gg)'], ['Trial · until {d} (today)', 'Prova · {d} (oggi)'],
   ['Trial expired · grace period until {d}', 'Prova scaduta · periodo di grazia fino al {d}'], ['Read-only since {d}', 'Sola lettura dal {d}'], ['Paid until {d}', 'Pagato fino al {d}'],
   ['Free for life', 'Gratis a vita'], ['No subscription', 'Nessun abbonamento'], ['Manage ▾', 'Gestisci ▾'], ['Close ▴', 'Chiudi ▴'],
   ['never', 'mai'], ['today', 'oggi'], ['yesterday', 'ieri'], ['{n} days ago', '{n} gg fa'], ['No users.', 'Nessun utente.'], ['Loading users…', 'Caricamento utenti…'],

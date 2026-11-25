@@ -237,9 +237,9 @@ try {
     // Sort by next action ascending: overdue first, then due date.
     await page.evaluate(() => { UsersAdmin.sortTo('next'); }); if ((await page.evaluate(() => UsersAdmin._view().dir)) !== 'asc') await page.evaluate(() => UsersAdmin.sort('next'));
     assert.deepEqual((await order()).slice(0, 3), [A, B, id(13)], 'overdue first, then due today, then later');
-    assert.match(await row(A).textContent(), /Anna Fittizia.*\+39 333 123 4567.*Casa Anna.*Prova · \d\d\/\d\d/s);
+    assert.match(await row(A).textContent(), /Anna Fittizia.*anna@example\.invalid.*Casa Anna.*Prova · \d\d\/\d\d/s);
     assert.match(await row(B).locator('[data-plan]').textContent(), /Pagato/); assert.match(await row(id(4)).locator('[data-plan]').textContent(), /Gratis a vita/);
-    assert.match(await row(id(13)).textContent(), /dora@example\.invalid.*\+447700900123.*Nessun account.*Invitato/s);
+    assert.match(await row(id(13)).textContent(), /dora@example\.invalid.*Nessun account.*Invitato/s); assert.equal(await row(id(13)).locator('[data-users-wa]').count(), 1, 'phone shown as icons, not as a number'); assert.ok(!/7700/.test(await row(id(13)).textContent()));
     assert.match(await row(id(14)).locator('[data-plan]').textContent(), /Perso/);
     assert.equal(await row(A).locator('[data-next] strong').evaluate(e => getComputedStyle(e).color), 'rgb(180, 35, 24)', 'overdue in red');
     // One-tap links in the row.

@@ -7,6 +7,22 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Admin «Utenti»: three-line contact column, wrapping next action (Claude, 25 November 2026)
+
+**Daniele:** «If I add a next action it will switch to tiles immediately. Let's optimize the space further. Remove the phone number. If there's a message and phone icon it means we have it. Let's give it 3 rows in the contact column and put the icons near the name.»
+
+- **Contatto column, three lines:**
+  - name with the WhatsApp/call icons right beside it (the icons mean «we have the number»; the number is in the record);
+  - the e-mail;
+  - the properties.
+- The name uses the column width (max 200 px), so an e-mail shown as the name is no longer cut short.
+- **Next action:** wraps up to three lines (max 170 px), instead of one long line that widened the table and pushed it to cards.
+- **Tighter spacing:** smaller icons (18 px) and cell padding in the table; phone cards are unchanged.
+- **Result:** rows of at most three lines (≤ 60 px). With long next actions on several rows the table still fits from about **1,000 px** (before: about 1,150 px with short ones).
+- **Tests:**
+  - `admin-users-browser`: long next actions on three rows; table required from 1,200 px; icons right beside the name; rows ≤ 60 px; no phone number in the row.
+  - `round77-host-contacts`: the phone is shown as icons, not digits.
+
 ### Admin «Utenti»: table or cards by measured space, not window width (Claude, 25 November 2026)
 
 **Daniele** (screenshot from his laptop): «On the laptop I see the phone view.»

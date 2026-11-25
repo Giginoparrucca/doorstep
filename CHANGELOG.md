@@ -7,6 +7,30 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Admin Ops: «Hosts & Properties» uses the Users-tab layout (Claude, 25 November 2026)
+
+**Daniele:** «Let's use for the Ops property table the same UI that we have on the user tab».
+
+- **Shared look.** New `admin-table-ui.js` holds the Users-tab table styling and the «table if it fits, otherwise cards» check, measured rather than guessed from the window width. «Utenti» and Ops both use it, so they stay identical.
+- **One property cell.** It holds, on separate lines:
+  - the name, with the action icons beside it: 👁 host console, 📱 guest app, 🛟 Alloggiati support, 📊 deep dive;
+  - the host's e-mail (or name and phone);
+  - the city with region and the copyable property ID;
+  - the test, delete and purge buttons.
+
+  The separate Actions column is gone.
+- **Metric columns:** Guests, Check-ins, Sent, Failed, Alloggiati, App usage, Setup, Sessions, Last active. The old long names now appear as tooltips on the headers.
+- **Filters and sorting.**
+  - The «Show» dropdown is now filter chips with counts, as in «Utenti». Chips with no rows are hidden, and the two problem filters are outlined in red.
+  - The headers sort with ▲/▼. Property, Host and City are three sort buttons in the first header.
+  - Search, city and Reset are kept.
+- **Narrow screens:** each row becomes a stacked card with a «Sort by» menu. There is no horizontal scroll at any width, and the «scroll horizontally» note is removed.
+- **Unchanged:** what each metric measures, the filters, «N not confirmed», the Alloggiati diagnostics and the deep dive. Sorting and filtering still never reload data.
+- **Tests.**
+  - `admin-ops-metrics-browser` was rewritten for the new layout. It finds cells by column name, checks the chips with their counts, header sorting on wide screens and the «Sort by» menu on cards, and the icons. It checks a table at 1,440 px, cards at 390 px and no horizontal scroll.
+  - `round51-admin-readiness-browser` and `admin-users-browser` now load the shared file.
+  - `admin-i18n-browser`: Italian and English are complete, with 17 new dictionary pairs.
+
 ### Host console: booking card shows only its own guest; no-show never filed (Claude, 25 November 2026)
 
 **Host report (a multi-room property, via Daniele):** (1) a new booking showed the name of a guest already staying in another room, with a different booking code, and the guest count appeared only in the private notes; (2) a guest marked no-show was still in the manual Alloggiati file, so the host had to edit the .txt by hand.

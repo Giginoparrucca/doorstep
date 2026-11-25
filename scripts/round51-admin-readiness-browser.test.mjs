@@ -10,6 +10,7 @@ const fn = name => { let i = html.indexOf('function ' + name + '('); assert.ok(i
 const constLine = name => { const i = html.indexOf('const ' + name + ' = '); assert.ok(i >= 0, name); return html.slice(i, html.indexOf('\n', i) + 1); };
 const styles = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m => m[1]).join('\n');
 const table = fs.readFileSync(new URL('../admin-ops-table.js', import.meta.url), 'utf8');
+const tableUi = fs.readFileSync(new URL('../admin-table-ui.js', import.meta.url), 'utf8');
 const metrics = fs.readFileSync(new URL('../admin-ops-metrics.js', import.meta.url), 'utf8');
 
 const NOW = Date.parse('2026-11-04T10:00:00Z');
@@ -34,6 +35,7 @@ try {
     await page.clock.install({ time: NOW });
     await page.setContent(`<html><head><meta charset="utf-8"><style>${styles}</style></head><body><div id="content"></div></body></html>`);
     await page.addScriptTag({ content: metrics });
+    await page.addScriptTag({ content: tableUi });
     await page.addScriptTag({ content: table });
     await page.addScriptTag({ content: `
       let allProperties = ${JSON.stringify(props)}, allEvents = ${JSON.stringify(events)};
@@ -76,10 +78,11 @@ try {
     assert.equal(await page.evaluate(() => window.consoleOpened), 'old');
 
     // Ops table Setup column = readiness, and the filter uses "not ready".
-    const setupCell = async name => (await page.locator('tbody tr').filter({ hasText: name }).first().locator('td').nth(9).textContent()).replace(/\s+/g, ' ').trim();
+    const setupCell = async name => (await page.locator('tbody tr').filter({ hasText: name }).first().locator('td[data-ops-col="setup"] .u-val').textContent()).replace(/\s+/g, ' ').trim();
     assert.match(await setupCell('Casa ready'), /^5\/5 ✓ ?Ready$/);
     assert.match(await setupCell('Casa old'), /^1\/5 ?Calendar · 25d$/);
-    await page.getByLabel('Show', { exact: true }).selectOption('setup');
+    await page.locator('[data-ops-filter="setup"]').click();
+    assert.equal(await page.locator('[data-ops-filter="setup"]').getAttribute('aria-pressed'), 'true');
     const visible = await page.locator('[data-ops-row]:visible').evaluateAll(rows => rows.map(r => JSON.parse(r.dataset.opsRow).propertyId));
     assert.deepEqual(visible.sort(), ['fresh', 'mid', 'old']);
 

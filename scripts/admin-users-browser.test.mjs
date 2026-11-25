@@ -18,6 +18,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { chromium } from 'playwright';
 const ui = fs.readFileSync(new URL('../admin-users.js', import.meta.url), 'utf8');
+const tableUi = fs.readFileSync(new URL('../admin-table-ui.js', import.meta.url), 'utf8');
 const contactsUi = fs.readFileSync(new URL('../admin-contacts.js', import.meta.url), 'utf8');
 const adminHtml = fs.readFileSync(new URL('../admin.html', import.meta.url), 'utf8');
 const billingStart = adminHtml.indexOf('// Round 72 Phase 4 — billing per host account');
@@ -78,6 +79,7 @@ try {
       function renderRecentActivity(){ return '<section data-recent-activity>Recent activity</section>'; }
       ${escapeFn}
       ${billingBlock}` });
+    await page.addScriptTag({ content: tableUi });
     await page.addScriptTag({ content: ui });
     await page.addScriptTag({ content: contactsUi });
     await page.evaluate(() => UsersAdmin.render());

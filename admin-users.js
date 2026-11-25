@@ -221,30 +221,8 @@
   }
 
   const COLS = [['host', 'Contatto'], ['plan', 'Stato'], ['registered', 'Registrato'], ['last', 'Ultima attività'], ['days', 'Giorni attivi'], ['checkins', 'Check-in 30 gg'], ['activity', 'Attività'], ['terms', 'Condizioni'], ['next', 'Prossima azione']];
-  const CSS = `.u-tbl{width:100%;border-collapse:collapse;font-size:0.8rem;table-layout:auto}
-.u-tbl th,.u-tbl td{padding:4px 5px;text-align:left;vertical-align:middle;border-bottom:1px solid var(--border);overflow-wrap:anywhere;line-height:1.3}
-.u-tbl th{font-size:0.74rem}.u-lbl{display:none}.u-sortbar{display:none}
-.u-who{min-width:0}.u-nameline{display:flex;align-items:center;gap:6px;min-width:0}.u-nameline [data-users-open]{min-width:0}
-.u-sub{font-size:0.72rem;color:var(--ink-soft)}.u-icons{display:inline-flex;gap:3px;flex:0 0 auto}
-.u-dl{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border);border-radius:6px;background:var(--white);color:var(--warm,#1849A9);cursor:pointer;font:inherit;font-size:0.8rem;padding:0;margin-left:4px;vertical-align:middle}
-.u-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.u-wrap:not(.u-cards) .u-who{max-width:200px}.u-wrap:not(.u-cards) .u-who .u-sub,.u-wrap:not(.u-cards) .u-who [data-users-open]{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}.u-wrap:not(.u-cards) .u-nameline{max-width:200px}.u-wrap:not(.u-cards) .u-nameline [data-users-open]{flex:0 1 auto;max-width:none}
-.u-wrap:not(.u-cards) .u-act{width:18px;height:18px;font-size:0.66rem;border-radius:5px}
-.u-wrap:not(.u-cards) .u-nameline{line-height:1.2}
-.u-wrap:not(.u-cards) .u-sub{line-height:1.25}
-.u-wrap:not(.u-cards) .u-tbl td[data-days] .u-val,.u-wrap:not(.u-cards) .u-tbl td[data-terms] .u-val,.u-wrap:not(.u-cards) .u-tbl td[data-last] .u-val,.u-wrap:not(.u-cards) .u-tbl td[data-reg] .u-val,.u-wrap:not(.u-cards) .u-tbl td[data-reg] .u-val div{white-space:nowrap}
-.u-wrap:not(.u-cards) .u-tbl td[data-next] .u-val{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;max-width:170px;white-space:normal;font-size:0.76rem;line-height:1.25}
-.u-act{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid var(--border);border-radius:7px;text-decoration:none;font-size:0.85rem;background:var(--white)}
-.u-wrap.u-cards .u-tbl thead{display:none}
-.u-wrap.u-cards .u-tbl,.u-wrap.u-cards .u-tbl tbody,.u-wrap.u-cards .u-tbl tr,.u-wrap.u-cards .u-tbl td{display:block;width:auto}
-.u-wrap.u-cards .u-tbl tr{border:1px solid var(--border);border-radius:10px;margin:0 0 10px;padding:6px 12px;background:var(--white)}
-.u-wrap.u-cards .u-tbl td{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:5px 0;border:0}
-.u-wrap.u-cards .u-tbl td.u-main{display:block;padding-bottom:8px;border-bottom:1px solid var(--border)}
-.u-wrap.u-cards .u-tbl td:empty,.u-wrap.u-cards .u-tbl td.u-none{display:none}
-.u-wrap.u-cards .u-lbl{display:inline;color:var(--ink-soft);font-size:0.74rem;flex:0 0 auto}
-.u-wrap.u-cards .u-val{text-align:right;min-width:0}
-.u-wrap.u-cards .u-sortbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.u-wrap.u-cards .u-act{width:44px;height:44px}`;
+  // Shared with Ops → Hosts & Properties (admin-table-ui.js).
+  const CSS = () => (root.AdminTableUI ? root.AdminTableUI.css : '');
 
   function cells(p, now) {
     const u = p.user, c = p.contact, CAx = CA();
@@ -299,7 +277,7 @@
       const all = people().filter(p => view.showTest || !(p.user && (p.user.is_test || p.user.is_admin)));
       const rows = rowsToShow(now);
       const ce = CA() && CA().error();
-      body = `<style>${CSS}</style><div data-users-summary style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:14px;">
+      body = `<style>${CSS()}</style><div data-users-summary style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:14px;">
           ${tile('Host', s.hosts, `${s.registered_30} nuovi negli ultimi 30 gg`, 'data-tile="hosts"')}
           ${tile('Attivi (7 gg)', s.active_7, 'hanno usato la console', 'data-tile="active"')}
           ${tile('Inattivi', s.inactive, 'oltre 30 gg o mai usato', 'data-tile="inactive"')}
@@ -321,7 +299,7 @@
           const n = all.filter(p => inFilter(p, k, now)).length, on = view.filter === k, red = k === 'due' && all.some(p => p.contact && CA() && CA().isOverdue(p.contact));
           return `<button type="button" data-users-filter="${k}" aria-pressed="${on}" onclick="UsersAdmin.filter('${k}')" style="${btn}border-radius:999px;${on ? 'background:var(--warm,#005BFF);border-color:var(--warm,#005BFF);color:#fff;' : red ? 'border-color:#F04438;color:#B42318;' : ''}"><span>${esc(t)}</span> <span data-i18n-skip>${n}</span></button>`;
         }).join('')}</div>
-        <div class="u-wrap" data-users-wrap>
+        <div class="u-wrap" data-users-wrap data-table-fit>
         <div class="u-sortbar" style="margin-bottom:8px;font-size:0.8rem;"><label for="usersSortSel">Ordina per</label>
           <select id="usersSortSel" onchange="UsersAdmin.sortTo(this.value)" style="min-height:40px;border:1px solid var(--border);border-radius:8px;font:inherit;padding:4px 8px;">${COLS.map(([k, l]) => `<option value="${k}" ${view.sort === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
           <button type="button" data-users-dir onclick="UsersAdmin.sort('${view.sort}')" style="${btn}" aria-label="Inverti ordine">${view.dir === 'asc' ? '▲' : '▼'}</button></div>
@@ -340,16 +318,11 @@
   // scaling and zoom make the window width a poor guide): the table is kept
   // when it fits the content area, otherwise each row becomes a card. Checked
   // after every render and on resize.
+  // The measuring lives in admin-table-ui.js (also used by Ops).
   function fit() {
     const w = document.querySelector('[data-users-wrap]');
-    if (!w) return;
-    w.classList.remove('u-cards');
-    const t = w.querySelector('[data-users-table]');
-    const tooWide = (t && t.scrollWidth > w.clientWidth + 1) || document.documentElement.scrollWidth > root.innerWidth + 1;
-    if (tooWide) w.classList.add('u-cards');
+    if (w && root.AdminTableUI) root.AdminTableUI.fit(w);
   }
-  let fitTimer = null;
-  if (typeof root.addEventListener === 'function') root.addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(fit, 120); });
 
   // Detail of a person: the contact view (admin-contacts.js) with the account
   // section below. A host account without a contact row yet (the list adds it

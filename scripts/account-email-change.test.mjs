@@ -225,7 +225,7 @@ try {
     });
     await page.goto('https://app.welcomebnb.it/admin.html');
     await page.addScriptTag({ content: `const sb={auth:{getSession:async()=>({data:{session:{access_token:'fictional-admin-jwt'}}})}};window.toasts=[];window.adminToast=(m,t)=>toasts.push([m,t]);` });
-    await page.addScriptTag({ content: ui }); await page.addScriptTag({ content: read('admin-contacts.js') });
+    await page.addScriptTag({ content: read('admin-table-ui.js') }); await page.addScriptTag({ content: ui }); await page.addScriptTag({ content: read('admin-contacts.js') });
     await page.evaluate(() => UsersAdmin.render()); await page.waitForSelector('[data-users-table]');
     await page.waitForSelector(`[data-users-row="${U1}"] [data-users-open]`);
     await page.waitForFunction(() => window.ContactsAdmin.data());

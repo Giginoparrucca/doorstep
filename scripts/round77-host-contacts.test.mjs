@@ -225,6 +225,7 @@ try {
     });
     await page.goto('https://app.welcomebnb.it/admin.html');
     await page.addScriptTag({ content: `const sb={auth:{getSession:async()=>({data:{session:{access_token:'fictional-admin-jwt'}}})}};let activeTab='users';window.consoles=[];window.viewAsHost=p=>consoles.push(p);window.setActiveTab=t=>{activeTab=t;};` });
+    await page.addScriptTag({ content: read('admin-table-ui.js') });
     await page.addScriptTag({ content: read('admin-users.js') });
     await page.addScriptTag({ content: ui });
     // Client phone rules = server rules (same cases).

@@ -7,6 +7,22 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Host console: booking card shows only its own guest; no-show never filed (Claude, 25 November 2026)
+
+**Host report (a multi-room property, via Daniele):** (1) a new booking showed the name of a guest already staying in another room, with a different booking code, and the guest count appeared only in the private notes; (2) a guest marked no-show was still in the manual Alloggiati file, so the host had to edit the .txt by hand.
+
+- **Cause 1.** The shared booking card (dashboard «Prossime prenotazioni» and the booking popup) still used the old date-only fallback. The calendar was fixed on 9 Nov (#301), but the card was not.
+  - The fallback took any check-in overlapping the dates. Its room rule only works when both sides have a room. On the reporting property, all 14 check-ins have no room.
+  - **Fix:** the card now applies the calendar rule. A check-in carrying another booking's code never names this booking. Codes are loaded for the property's current and future reservations, plus the calendar month. A walk-in (a code with no reservation) can still pair by dates.
+- **Guest count.** The number typed in the booking form was shown only in «Dettagli privati (solo host)». The card now shows the expected guests before check-in.
+- **Found while fixing.** Editing a direct booking did not load its room, so saving reset it to «non assegnata». Now fixed.
+- **Cause 2.** «Non inviare (no-show)» excluded the guest only from automatic sending. The confirmation even said «L'invio manuale continua a funzionare». The reporting property has autofile off, so it never saw the badge.
+  - **Fix:** a no-show is now left out of the manual .txt, «Invia» (console send) and the late filing group, with a notice of how many were excluded.
+  - The «⏸ No-show» badge now shows in every autofile mode, ahead of «Invio tardivo».
+  - Menu wording: «Non inviare (no-show)» / «Annulla no-show».
+- **Not changed, open question for Daniele:** the ISTAT and tourist-tax exports still count guests marked no-show. A no-show usually pays no tax and is not an arrival, but tax rules are the municipality's, so this needs his call.
+- **New test `host-booking-card-noshow`:** 13 checks that run the real functions from `host-console.html`, with fictional data. Against the old code, 11 of the 13 fail.
+
 ### Guest app: very visible check-in prompt until check-in is done (Claude, 25 November 2026)
 
 **Daniele:** «I've been receiving feedback that the check-in button is not clearly visible. […] Let's update the guest app to prompt the check-in with a very obvious button until it's completed.»

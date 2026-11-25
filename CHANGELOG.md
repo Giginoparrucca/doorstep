@@ -22,6 +22,7 @@ Newest entries at the top of each section.
   - Menu wording: «Non inviare (no-show)» / «Annulla no-show».
 - **Not changed, open question for Daniele:** the ISTAT and tourist-tax exports still count guests marked no-show. A no-show usually pays no tax and is not an arrival, but tax rules are the municipality's, so this needs his call.
 - **New test `host-booking-card-noshow`:** 13 checks that run the real functions from `host-console.html`, with fictional data. Against the old code, 11 of the 13 fail.
+- **Shipped:** PR #353 merged (squash) as `d44c9cb`. Local `npm run test:all` **PASS 176 / FAIL 0 / SKIP 3** (skips: demo origin, private demo catalog, pglast not installed); CI `regression` green. Production `host-console.html` is identical to main. `npm run test:live` **PASS 4 / FAIL 0 / SKIP 6** (demo origin, iReservation probe off, two service-key probes, rate-limit probe, schema drift needs the service key).
 
 ### Guest app: very visible check-in prompt until check-in is done (Claude, 25 November 2026)
 

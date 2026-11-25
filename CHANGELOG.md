@@ -22,6 +22,7 @@ Newest entries at the top of each section.
 - **Tests:**
   - `admin-users-browser`: long next actions on three rows; table required from 1,200 px; icons right beside the name; rows ≤ 60 px; no phone number in the row.
   - `round77-host-contacts`: the phone is shown as icons, not digits.
+- **Shipped:** PR #351 merged as `fee0197`. Local `npm run test:all` **PASS 174 / FAIL 0 / SKIP 3**; CI green; live.
 
 ### Admin «Utenti»: table or cards by measured space, not window width (Claude, 25 November 2026)
 

@@ -367,7 +367,7 @@ tr.row-test.row-deleted td:first-child::before { content: '🗑 TEST + DELETED';
 <script src="/admin-dsar.js?v=67.6"></script>
 <script src="/admin-users.js?v=13"></script>
 <script src="/admin-contacts.js?v=77.3"></script>
-<script src="/admin-i18n-dict.js?v=78"></script>
+<script src="/admin-i18n-dict.js?v=1"></script>
 <script src="/admin-i18n.js?v=1"></script>
 <script src="/vendor/supabase-2.118.0.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -3734,7 +3734,7 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
       <select data-ops-city aria-label="City" style="min-height:40px;max-width:100%;padding:4px 8px;border:1px solid var(--border);border-radius:8px;font:inherit;font-size:0.8rem;"><option value="all">All cities</option></select>
       <button type="button" data-ops-reset style="${btn}">Reset</button>
     </div>
-    <div role="group" aria-label="Show" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">${AdminOpsTable.FILTERS.map(k => `<button type="button" data-ops-filter="${k}"${ALERT.has(k) ? ' data-ops-alert' : ''} aria-pressed="false" style="${btn}border-radius:999px;"><span>${FILTER_LABELS[k]}</span> <span data-ops-filter-count data-i18n-skip></span></button>`).join('')}</div>
+    <div role="group" aria-label="Show" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">${(typeof AdminOpsTable !== 'undefined' && AdminOpsTable.FILTERS ? AdminOpsTable.FILTERS : Object.keys(FILTER_LABELS)).map(k => `<button type="button" data-ops-filter="${k}"${ALERT.has(k) ? ' data-ops-alert' : ''} aria-pressed="false" style="${btn}border-radius:999px;"><span>${FILTER_LABELS[k]}</span> <span data-ops-filter-count data-i18n-skip></span></button>`).join('')}</div>
     <p data-ops-count aria-live="polite" style="font-size:0.72rem;color:var(--ink-soft);margin:0 0 4px;"></p>
     <p style="font-size:0.72rem;color:var(--ink-soft);margin:0 0 6px;">Selected period: ${opsMetricsData ? `${opsMetricsData.since.slice(0, 10)} – ${opsMetricsData.until.slice(0, 10)} (UTC)` : 'unavailable'}. Usage shows active / eligible bookings. Icons beside the name: host console, guest app, Alloggiati support, deep dive.</p>
     <details style="font-size:0.72rem;color:var(--ink-soft);line-height:1.6;margin-bottom:12px;"><summary style="cursor:pointer;">How these metrics are counted</summary><p>New metrics use the selected time range. Check-ins completed counts submitted guest records, including companions. Alloggiati sent counts recorded filed guest records, including host manual confirmations; it does not verify a receipt. Failed counts unresolved recorded automatic filing failures. Manual portal-stage failures appear in Alloggiati support history from the support release onward, but are not included in this counter. Alloggiati shows the saved connection now (not the period): Connected (verified, key valid), Error (last check failed), Key expired, Saved · not verified, Not connected; the second line is the automatic filing mode ("Manual filing only" without credentials, whatever the mode setting). A dash means the status could not be read. Click it for the support dialog. For a property that is not connected, guests past the portal deadline and never marked as sent show as «N not confirmed» (amber) instead of failures: the host may have filed by hand without pressing «Segna inviato». Clicking opens the host console, since the connection diagnostics need saved credentials.
@@ -3762,7 +3762,7 @@ function renderHostsPropertiesTable(userStats, userIdToEmail) {
           const rdColor = rd ? (rd.ready ? 'var(--green)' : rd.done >= 3 ? 'var(--amber)' : 'var(--red)') : null;
           const rdPct = rd ? Math.round(rd.done / rd.total * 100) : null;
           const icons = `<button type="button" class="u-act" data-ops-console onclick="viewAsHost('${p.id}')" title="Open the host console" aria-label="Console">👁</button>`
-            + `<a class="u-act" data-ops-guestapp href="${APP_CONFIG.appOrigin}/?p=${encodeURIComponent(p.id)}" target="_blank" rel="noopener noreferrer" title="Open the guest app" aria-label="Guest app">📱</a>`
+            + `<a href="${APP_CONFIG.appOrigin}/?p=${encodeURIComponent(p.id)}" class="u-act" data-ops-guestapp target="_blank" rel="noopener noreferrer" title="Open the guest app" aria-label="Guest app">📱</a>`
             + `<button type="button" class="u-act" data-ops-support onclick="showAlloggiatiSupport('${p.id}')" title="Alloggiati support" aria-label="Alloggiati support">🛟</button>`
             + (p._email ? deepDive(p._email) : '');
           const hostLine = p._email ? sub(escapeHtml(p._email), true) : sub([p.host_names ? `<span data-i18n-skip>${escapeHtml(p.host_names)}</span>` : '', p.host_phone ? `<span data-i18n-skip>${escapeHtml(p.host_phone)}</span>` : 'No account'].filter(Boolean).join(' · '));

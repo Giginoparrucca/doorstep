@@ -4538,8 +4538,8 @@ const HT = {
     alloggiati_filed: '✓ Filed', alloggiati_pending: 'Pending',
     btn_view: 'View', btn_delete_single: 'Delete', btn_edit_single: 'Edit',
     // Round 49 Phase 4 — per-row autofile toggle (shown in the row ⋯ menu).
-    btn_autofile_exclude: 'Do not autofile (no-show)',
-    btn_autofile_include: 'Include in autofile',
+    btn_autofile_exclude: 'Do not file (no-show)',
+    btn_autofile_include: 'Undo no-show',
     btn_edit_list: 'Edit', btn_done_editing: 'Done', btn_cancel_edit: 'Cancel',
     prop_readonly_hint: 'View mode — click Edit to change these details.',
     // Round 30 — edit check-in modal (single-line values; applyLang collapses newlines)
@@ -5163,7 +5163,7 @@ const HT = {
     btn_view: 'Vedi', btn_delete_single: 'Elimina', btn_edit_single: 'Modifica',
     // Round 49 Fase 4 — toggle per-riga invio automatico (menu ⋯).
     btn_autofile_exclude: 'Non inviare (no-show)',
-    btn_autofile_include: 'Includi nell\'invio automatico',
+    btn_autofile_include: 'Annulla no-show',
     btn_edit_list: 'Modifica', btn_done_editing: 'Fatto', btn_cancel_edit: 'Annulla',
     prop_readonly_hint: 'Modalità visualizzazione — clicca Modifica per aggiornare i dettagli.',
     // Round 30 — modifica check-in
@@ -6513,6 +6513,8 @@ async function renderUpcomingReservationsPanel() {
   // Generate a booking_code for any row that doesn't have one yet and
   // PATCH it back so the link is stable across future syncs.
   rows = await ensureReservationBookingCodes(rows);
+  await _loadKnownReservationCodes(todayISO);
+  for (const x of rows) if (x.booking_code) _knownReservationCodes.add(x.booking_code);
 
   const title = h('dash_upcoming_title');
   const lastSyncedISO = propertyData?.ical_last_synced_at;
@@ -6646,6 +6648,17 @@ async function renderCalendarPanel() {
    still shows it — the guest is in the visible month).
 ────────────────────────────────────────────────────────────────────── */
 let _upcomingRowsById = {};
+// Booking codes of the property's current and future reservations (any
+// status), so the card's date fallback skips check-ins of other bookings.
+let _knownReservationCodes = new Set();
+async function _loadKnownReservationCodes(fromISO) {
+  try {
+    const { data, error } = await sb.from('ota_reservations')
+      .select('booking_code').eq('property_id', propertyId)
+      .not('booking_code', 'is', null).gte('checkout_date', fromISO);
+    if (!error && Array.isArray(data)) _knownReservationCodes = new Set(data.map(x => x.booking_code).filter(Boolean));
+  } catch (_) { /* card falls back to the room rule only */ }
+}
 
 function _renderReservationCard(r, todayISO) {
   const safe = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])).replace(/['`\/]/g, c => ({"'":'&#39;','`':'&#96;','/':'&#47;'}[c]));
@@ -6682,10 +6695,15 @@ function _renderReservationCard(r, todayISO) {
     // reservation has a room_id, require the check-in group to be in
     // the same room (NULL/NULL still matches so no-rooms properties
     // keep the original behaviour exactly).
+    // 25 Nov 2026 — same rule as the calendar (#301): a check-in tied to
+    // another booking's code never names this one. A new direct booking
+    // showed the guest already staying in another room (Casa Flora).
+    const known = new Set([..._knownReservationCodes, ..._calAllReservationCodes]);
     matched = dated.filter(c => {
       if (c.arrival_date >= r.checkout_date) return false;
       if (c.departure_date && c.departure_date <= r.checkin_date) return false;
       if (r.room_id && c.room_id && c.room_id !== r.room_id) return false;
+      if (c.booking_code && c.booking_code !== r.booking_code && known.has(c.booking_code)) return false;
       return true;
     });
   }
@@ -6715,6 +6733,9 @@ function _renderReservationCard(r, todayISO) {
     checkedIn = true;
   } else {
     name = _cleanOtaGuestName(r.guest_name, r.room_id);
+    // Before check-in, show the expected guests typed in the booking form
+    // (it was only visible in the private box).
+    if (Number.isInteger(r.guest_count) && r.guest_count > 0) count = r.guest_count;
   }
 
   const n = nightsOf(r.checkin_date, r.checkout_date);
@@ -6968,7 +6989,7 @@ async function editDirectReservation(id) {
   const it = hostLang === 'it';
   try {
     const { data, error } = await sb.from('ota_reservations')
-      .select('id, entry_type, channel, guest_name, guest_count, contact_phone, contact_email, notes, checkin_date, checkout_date').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
+      .select('id, entry_type, channel, guest_name, guest_count, contact_phone, contact_email, notes, checkin_date, checkout_date, room_id').or(APP_CONFIG.mode === 'demo' ? 'is_test.eq.false,and(is_test.eq.true,booking_code.like.DEMO-*)' : 'is_test.eq.false')
       .eq('id', id).maybeSingle();
     if (error || !data) {
       toast(it ? 'Caricamento fallito.' : 'Load failed.');
@@ -6987,6 +7008,7 @@ async function editDirectReservation(id) {
         notes:         data.notes,
         checkin_date:  data.checkin_date,
         checkout_date: data.checkout_date,
+        room_id:       data.room_id, // without it, saving an edit cleared the room
       },
     });
   } catch (e) {
@@ -8020,7 +8042,7 @@ function _isLateRow(c, now) { return !!(window.AllogRecords && window.AllogRecor
 function _lateGroupKey(c) { return c.booking_code ? 'b:' + c.booking_code : 'r:' + c.id; }
 // Every still-unfiled guest of the booking (a group is always filed together).
 function _lateGroupRows(key) {
-  const live = allCheckins.filter(c => c.is_test === false && !c.deleted_at && !['filed', 'filing'].includes(c.alloggiati_status));
+  const live = allCheckins.filter(c => c.is_test === false && !c.deleted_at && !c.autofile_excluded && !['filed', 'filing'].includes(c.alloggiati_status));
   return key.startsWith('b:') ? live.filter(c => c.booking_code === key.slice(2)) : live.filter(c => c.id === key.slice(2));
 }
 const _fmtDateItShort = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || '')); return m ? `${m[3]}/${m[2]}/${m[1]}` : ''; };
@@ -8225,19 +8247,21 @@ function _lateFiledLabel(c) {
 
 // Round 49 Phase 4 — the per-row autofile chip. Returns HTML.
 // • filed/correction: hidden (the main rowPill already covers it).
-// • autofile_excluded: amber "⏸ Escluso" pill.
+// • autofile_excluded (no-show): amber "⏸ No-show" pill, any mode, before the late button.
 // • past_portal_window / group_already_filed / builder_warning / group_member_invalid: red "⚠ Non inviabile".
 // • dry_run / live with a computable due time: muted "⏱ <ora>".
 function _renderAutofileRowChip(c, it) {
   // Round 70 — late rows (from the dates, any autofile mode) get the
   // «Invio tardivo» button instead of a dead-end chip.
+  // No-show first: shown in every mode (it also blocks the manual file and
+  // the late filing), unless the guest was already filed.
+  if (c.autofile_excluded && !['filed','correction'].includes(c.alloggiati_status)) {
+    return ` <span data-no-show style="display:inline-block;font-size:0.56rem;padding:1px 6px;background:rgba(154,107,0,0.12);color:#9a6b00;border-radius:8px;font-weight:500;letter-spacing:0.04em;margin-left:6px;vertical-align:middle;" title="${it ? 'No-show: non viene inviato ad Alloggiati' : 'No-show: not filed with Alloggiati'}">⏸ No-show</span>`;
+  }
   if (_isLateRow(c)) return ' ' + _lateFilingButton(c, it);
   const mode = propertyData?.alloggiati_autofile_mode;
-  if (!mode || mode === 'off') return '';
   if (['filed','correction'].includes(c.alloggiati_status)) return '';
-  if (c.autofile_excluded) {
-    return ` <span style="display:inline-block;font-size:0.56rem;padding:1px 6px;background:rgba(154,107,0,0.12);color:#9a6b00;border-radius:8px;font-weight:500;letter-spacing:0.04em;margin-left:6px;vertical-align:middle;" title="${it ? 'Escluso dall&apos;invio automatico' : 'Excluded from autofile'}">${it ? '⏸ Escluso' : '⏸ Excluded'}</span>`;
-  }
+  if (!mode || mode === 'off') return '';
   const err = c.autofile_last_error;
   if (err === 'past_portal_window' || err === 'group_already_filed' || err === 'builder_warning' || err === 'group_member_invalid') {
     const label = it
@@ -8274,8 +8298,8 @@ async function _toggleAutofileExcluded(id) {
   if (!row) { toast(it ? 'Riga non trovata' : 'Row not found'); return; }
   const next = !row.autofile_excluded;
   if (next && !confirm(it
-      ? 'Escludere questo ospite dall’invio automatico? L’invio manuale continua a funzionare.'
-      : 'Exclude this guest from automatic filing? Manual send still works.')) return;
+      ? 'Segnare questo ospite come no-show? Non verrà inviato ad Alloggiati: né in automatico, né nel file .txt, né con «Invia». Puoi annullare dallo stesso menu.'
+      : 'Mark this guest as a no-show? They will not be filed with Alloggiati: not automatically, not in the .txt file, not with «Send». You can undo it from the same menu.')) return;
   try {
     const { data, error } = await sb.from('checkins')
       .update({ autofile_excluded: next })
@@ -8290,8 +8314,8 @@ async function _toggleAutofileExcluded(id) {
     if (idx > -1) allCheckins[idx] = { ...allCheckins[idx], ...data[0] };
     renderCheckins();
     toast(next
-      ? (it ? '⏸ Escluso dall’invio automatico' : '⏸ Excluded from autofile')
-      : (it ? '▶ Reincluso nell’invio automatico' : '▶ Included in autofile'));
+      ? (it ? '⏸ No-show: non verrà inviato' : '⏸ No-show: will not be filed')
+      : (it ? '▶ No-show annullato' : '▶ No-show undone'));
     track('autofile_excluded_toggle', { excluded: next });
   } catch (e) {
     console.error('autofile_excluded toggle failed:', e);
@@ -11284,7 +11308,14 @@ function _numOrNull(v) {
 // (rowMeta[i] carries { idx, checkin_id, name, surname, booking_code }
 //  so the results modal can display which row a portal error refers to.)
 function _prepareAlloggiatiExport(opts = {}) {
-  const exportCheckins = allCheckins.filter(c => c.is_test === false && !c.deleted_at);
+  // 25 Nov 2026 — «Non inviare (no-show)» now also keeps the guest out of
+  // the manual .txt and the console send: a no-show never stayed, so it
+  // must not be reported (Casa Flora had to edit the file by hand).
+  const noShowCount = allCheckins.filter(c => c.is_test === false && !c.deleted_at && c.autofile_excluded).length;
+  const exportCheckins = allCheckins.filter(c => c.is_test === false && !c.deleted_at && !c.autofile_excluded);
+  if (noShowCount > 0) toast(hostLang === 'it'
+    ? `${noShowCount} ospiti segnati «Non inviare (no-show)» esclusi dal file.`
+    : `${noShowCount} guest(s) marked «Do not file (no-show)» left out of the file.`);
   // opts.excludeFiled — drop rows whose alloggiati_status is already
   // 'filed'. Used by sendToAlloggiati() so we don't re-file the same
   // guest twice (the portal rejects duplicates and would abort the

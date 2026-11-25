@@ -19,6 +19,7 @@ Newest entries at the top of each section.
   - the name column max 220 px, the next action 150 px; slightly less cell padding.
 - **IT/EN patterns** added for the shorter trial status.
 - **Tests:** `admin-users-browser` now at 390/768/1024/**1200**/1280/1440 (table required from 1,200 px, cards at ≤ 768) plus a live resize check (shrink → cards, widen → table again). `round77-host-contacts` and `admin-i18n` updated for the shorter wording.
+- **Shipped:** PR #349 merged as `7238d8a`. Local `npm run test:all` **PASS 174 / FAIL 0 / SKIP 3**; CI green; live (the script is revalidated on every load, so a normal reload picks it up).
 
 ### Admin «Utenti»: icons beside the name, thinner rows (Claude, 24 November 2026)
 

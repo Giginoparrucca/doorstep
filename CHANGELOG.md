@@ -25,6 +25,7 @@ Newest entries at the top of each section.
 - **Test:** new `scripts/guest-checkin-prompt-browser.test.mjs` (390×844): future / today / passed arrival, 1 of 2, complete party; checks above-the-fold, ≥ 48 px button, above host message, IT/EN, the button opens check-in, the nav highlight, hidden after completion; fictional HTTP only.
 - **Also:** `docs/compliance/ROPA.md` consent-card line citations moved to the new `index.html` lines (4604 / 4435 / 1491) — `round67-ropa` checks them.
 - **Results:** local `npm run test:all` **PASS 174 / FAIL 1 / SKIP 3** — the one failure was `round67-ropa` (shifted line citations); fixed and re-run green, so **175 pass / 0 fail / 3 skip**. Skips unchanged: `demo-e2e` (needs demo origin), `demo-schema` (private catalog), `demo-schema-parse.py` (pglast not installed).
+- **Status:** PR #350 open, CI `regression` green. **Not merged yet** — the merge was blocked by this session's permission check; waiting for Daniele to merge (or re-authorise the merge).
 
 ### Admin «Utenti»: table or cards by measured space, not window width (Claude, 25 November 2026)
 

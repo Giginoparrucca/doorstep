@@ -38,6 +38,7 @@ Newest entries at the top of each section.
 - **`npm run test:live` after deploy: PASS 3 / FAIL 1 / SKIP 6.**
   - The failure was `tax-date-rates.test.live.mjs`: like its offline twin, it loaded `exportCityTax` from the production page without `_withoutNoShows`. A test fixture, not a site fault.
   - Fixed in the follow-up PR below. The test, rerun against production, passes: both IT/EN declaration goldens and the annual goldens are reproduced.
+- **Follow-up:** PR #357 merged as `0251b3d` (CI green). `npm run test:live` from main **PASS 4 / FAIL 0 / SKIP 6**. Skips: demo origin, iReservation probe off, two service-key probes, rate-limit probe, schema drift (service key).
 
 ### Alloggiati: guests already marked as sent never go into the .txt or «Valida» again (Claude, 26 November 2026)
 

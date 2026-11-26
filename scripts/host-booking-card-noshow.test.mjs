@@ -3,7 +3,8 @@
 //      staying in another room (different booking code) and the expected
 //      guest count only in the private box;
 //   2. a guest marked «Non inviare (no-show)» still ended up in the manual
-//      Alloggiati .txt and in «Invia».
+//      Alloggiati .txt and in «Invia»;
+//   3. (26 Nov) guests already marked as sent were in the .txt and «Valida».
 // Also: editing a direct booking must keep its room.
 // Runs the REAL functions sliced out of host-console.html in a VM.
 import assert from 'node:assert/strict';
@@ -116,6 +117,28 @@ await test('«Invia» (excludeFiled) leaves out the no-show too', () => {
 await test('only no-shows → no file', () => {
   const { ctx } = exportCtx([g('b', 'Noshow', { autofile_excluded: true })]);
   assert.equal(ctx._prepareAlloggiatiExport(), null);
+});
+// 26 Nov 2026 — guests marked as sent (filed by hand on the portal, then
+// «Segna inviato») were still in the manual .txt and in «Valida».
+await test('manual .txt and «Valida» leave out guests already marked as sent', () => {
+  const y = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const rows = [g('a', 'Oggi1'), g('b', 'Oggi2'), g('c', 'IeriInviato', { arrival_date: y, alloggiati_status: 'filed' }), g('d', 'IeriInviato2', { arrival_date: y, alloggiati_status: 'filed' })];
+  const { ctx, toasts } = exportCtx(rows);
+  assert.deepEqual([...ctx._prepareAlloggiatiExport().lines], ['Oggi1', 'Oggi2']);
+  assert.ok(toasts.some(t => /2 ospiti già segnati come inviati esclusi/.test(t)), toasts.join(' | '));
+  const send = exportCtx(rows);
+  assert.deepEqual([...send.ctx._prepareAlloggiatiExport({ excludeFiled: true }).lines], ['Oggi1', 'Oggi2']);
+  assert.ok(!send.toasts.some(t => /già segnati/.test(t)), '«Invia» keeps its own note, no double notice');
+});
+await test('everyone already sent → no file, clear notice', () => {
+  const { ctx, toasts } = exportCtx([g('c', 'Inviato', { alloggiati_status: 'filed' })]);
+  assert.equal(ctx._prepareAlloggiatiExport(), null);
+  assert.ok(toasts.some(t => /Tutti gli ospiti risultano già inviati/.test(t)));
+});
+await test('«Valida» and the .txt use the default (filed excluded)', () => {
+  assert.match(slice('validateAlloggiati'), /_prepareAlloggiatiExport\(\)/);
+  assert.match(slice('exportAlloggiati'), /_prepareAlloggiatiExport\(\)/);
+  assert.match(slice('_prepareAlloggiatiExport'), /const excludeFiled = opts\.excludeFiled !== false;/);
 });
 await test('late filing group leaves out the no-show companion', () => {
   const ctx = vm.createContext({ allCheckins: [g('a', 'Uno', { booking_code: 'WB-G1' }), g('b', 'Due', { booking_code: 'WB-G1', autofile_excluded: true })] });

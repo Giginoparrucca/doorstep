@@ -11340,9 +11340,23 @@ function _prepareAlloggiatiExport(opts = {}) {
   // Round 44 Phase 3 — the Send flow drops already-filed rows so a
   // second click doesn't try to re-file them (portal rejects
   // duplicates, and the whole batch would abort during Test).
-  const isFiled = c => c.alloggiati_status === 'filed';
-  const baseSet = opts.excludeFiled ? exportCheckins.filter(c => !isFiled(c)) : exportCheckins;
-  const skippedFiledCount = opts.excludeFiled ? (exportCheckins.length - baseSet.length) : 0;
+  // 26 Nov 2026 — the manual .txt and «Valida» drop them too: a guest marked
+  // as sent (by hand or by the portal) must never be filed again; the portal
+  // flags the duplicates as errors (Casa Flora: yesterday's two guests, filed
+  // by hand and marked sent, were in today's file and validation).
+  const isFiled = c => c.alloggiati_status === 'filed' || c.alloggiati_status === 'filing';
+  const excludeFiled = opts.excludeFiled !== false;
+  const baseSet = excludeFiled ? exportCheckins.filter(c => !isFiled(c)) : exportCheckins;
+  const skippedFiledCount = excludeFiled ? (exportCheckins.length - baseSet.length) : 0;
+  // Only those the 48 h window would otherwise have picked up are worth a notice.
+  const skippedRecent = exportCheckins.filter(c => isFiled(c) && hasArrived(c) && (c.arrival_date || c.submitted_at?.split('T')[0] || '') >= cutoff48h).length;
+  if (excludeFiled && opts.excludeFiled === undefined && skippedRecent > 0) toast(hostLang === 'it'
+    ? `${skippedRecent} ospiti già segnati come inviati esclusi dal file.`
+    : `${skippedRecent} guest(s) already marked as sent left out of the file.`);
+  if (baseSet.length === 0 && skippedFiledCount > 0) {
+    toast(hostLang === 'it' ? 'Tutti gli ospiti risultano già inviati: niente da esportare.' : 'Every guest is already marked as sent: nothing to export.');
+    return null;
+  }
   const recentGuests = baseSet.filter(c => {
     if (!hasArrived(c)) return false;
     const arr = c.arrival_date || c.submitted_at?.split('T')[0] || '';

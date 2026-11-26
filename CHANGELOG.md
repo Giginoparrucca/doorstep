@@ -7,6 +7,18 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### Alloggiati: guests already marked as sent never go into the .txt or «Valida» again (Claude, 26 November 2026)
+
+**Host report (same multi-room property as 25 Nov):** «I filed yesterday's two guests by hand on Alloggiati Web and marked them as sent. Today I have to send four guests, but validation also includes yesterday's two and marks them as errors, and the .txt has 4 + 2».
+
+- **Data checked, without reading guest details:** the two guests are `filed` (marked on 26 Nov), and today's four are `pending`. The marking worked.
+- **Cause:** only «Invia» (`sendToAlloggiati`) left out guests already marked as sent. The manual .txt (`exportAlloggiati`) and «Valida» (`validateAlloggiati`) did not. Their arrival (24 Nov) was still inside the 48-hour window, so they went back into the file, and the portal flagged them as duplicates.
+- **Fix:** every Alloggiati export from the console now leaves out guests marked as sent (`filed`, or `filing` while a send is in progress).
+  - A notice says how many were left out («N ospiti già segnati come inviati esclusi dal file»).
+  - If everyone is already sent, there is no file, and a clear notice says so.
+  - «Invia» keeps its own note, with no double notice.
+- **Tests:** `host-booking-card-noshow` gains 3 checks (now 16). Against the old code, the 3 new checks fail.
+
 ### Admin Ops: «Hosts & Properties» uses the Users-tab layout (Claude, 25 November 2026)
 
 **Daniele:** «Let's use for the Ops property table the same UI that we have on the user tab».

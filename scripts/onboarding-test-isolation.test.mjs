@@ -31,7 +31,7 @@ const context=vm.createContext({supabaseAuthHeaders,console,Date,Map,Set,allChec
 // Round 58 moved ROSS1000 behind exportRegionalFile; see regional-exports.test.mjs
 // for its own is_test isolation gate. The thin exportRoss1000 forwarder is no
 // longer tested here (would need the whole regional-export pipeline to run).
-for(const name of ['_prepareAlloggiatiExport','exportAlloggiati','exportCSV','exportISTAT','exportCityTax','exportPayTourist']) vm.runInContext(fn(name),context);
+for(const name of ['_withoutNoShows','_prepareAlloggiatiExport','exportAlloggiati','exportCSV','exportISTAT','exportCityTax','exportPayTourist']) vm.runInContext(fn(name),context);
 for(const name of ['exportAlloggiati','exportCSV','exportISTAT','exportCityTax','exportPayTourist']) {
   const before=downloads.length;
   try { context[name](); } catch(e) { throw new Error(name+': '+e.message); }

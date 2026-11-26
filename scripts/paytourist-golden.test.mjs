@@ -85,6 +85,7 @@ const context = vm.createContext({
   lookupPoliceCode: Allog.lookupPoliceCode,
   isItalianCitizenshipCode: Allog.isItalianCitizenshipCode,
 });
+vm.runInContext(slice('_withoutNoShows'), context);
 vm.runInContext(slice('exportPayTourist'), context);
 context.exportPayTourist();
 

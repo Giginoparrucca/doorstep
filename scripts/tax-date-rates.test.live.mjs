@@ -27,7 +27,7 @@ for(const file of ['host-console.html','lib/tax-date-rates.js','host-guides.js']
  if(strict&&byteMatch.has(file))assert.equal(remote[file],fs.readFileSync(new URL('../'+file,import.meta.url),'utf8'),file+' matches tested source');
 }
 const ctx=vm.createContext({console});vm.runInContext(remote['lib/tax-date-rates.js'],ctx);
-for(const name of ['_ageAtArrival','_normalizeTaxCfg','computeGuestTax','_seasonMatches','_nightsInsideQuarter','_groupSizeFor','_ruleLabel','exportCityTax']){
+for(const name of ['_ageAtArrival','_normalizeTaxCfg','computeGuestTax','_seasonMatches','_nightsInsideQuarter','_groupSizeFor','_ruleLabel','_withoutNoShows','exportCityTax']){
  const s=remote['host-console.html'],start=s.indexOf('function '+name+'(');assert.ok(start>=0);vm.runInContext(s.slice(start,s.indexOf('\n}\n',start)+2),ctx);
 }
 ctx.propertyData={id:'SYNTHETIC',name:'Fictional tax property',tax_rate_eur:2,tax_rules:[{id:'fixture_period',when:{night_from:'2026-07-01',night_to:'2026-08-31'},effect:{type:'rate_period',value:4}}]};

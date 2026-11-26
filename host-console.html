@@ -2586,8 +2586,8 @@ observePageToolbarHeader();
 <script src="/lib/cover-layout.js?v=57.1"></script>
 <script src="/host-unsaved-changes.js?v=59.1"></script>
 <script src="/host-property-editor.js?v=59.1"></script>
-<script src="/lib/regional-exports.js?v=61.2"></script>
-<script src="/host-regional-exports.js?v=61.3"></script>
+<script src="/lib/regional-exports.js?v=79"></script>
+<script src="/host-regional-exports.js?v=79"></script>
 <script>
 /* ══════════════════════════════════════
    SUPABASE CONNECTION
@@ -8298,8 +8298,8 @@ async function _toggleAutofileExcluded(id) {
   if (!row) { toast(it ? 'Riga non trovata' : 'Row not found'); return; }
   const next = !row.autofile_excluded;
   if (next && !confirm(it
-      ? 'Segnare questo ospite come no-show? Non verrà inviato ad Alloggiati: né in automatico, né nel file .txt, né con «Invia». Puoi annullare dallo stesso menu.'
-      : 'Mark this guest as a no-show? They will not be filed with Alloggiati: not automatically, not in the .txt file, not with «Send». You can undo it from the same menu.')) return;
+      ? 'Segnare questo ospite come no-show? Non verrà inviato ad Alloggiati: né in automatico, né nel file .txt, né con «Invia», e non conta per ISTAT, statistiche regionali e imposta di soggiorno. Puoi annullare dallo stesso menu.'
+      : 'Mark this guest as a no-show? They will not be filed with Alloggiati: not automatically, not in the .txt file, not with «Send», and it does not count for ISTAT, regional statistics or tourist tax. You can undo it from the same menu.')) return;
   try {
     const { data, error } = await sb.from('checkins')
       .update({ autofile_excluded: next })
@@ -11800,8 +11800,20 @@ function exportCSV() {
 /* ══════════════════════════════════════
    ISTAT C/59 — Monthly statistical summary
 ══════════════════════════════════════ */
+// 26 Nov 2026 — a guest marked «No-show» never arrived: no ISTAT arrival or
+// night, no tourist tax (it is due per overnight stay, D.Lgs. 23/2011 art. 4;
+// municipal FAQs such as Rapallo's say so for no-shows). Every statistics
+// and tax export leaves them out and says how many.
+function _withoutNoShows(list) {
+  const kept = list.filter(c => !c.autofile_excluded);
+  const n = list.length - kept.length;
+  if (n > 0) toast(hostLang === 'it'
+    ? `${n} ospiti segnati come no-show esclusi (non hanno soggiornato).`
+    : `${n} guest(s) marked as no-show left out (they did not stay).`);
+  return kept;
+}
 function exportISTAT() {
-  const exportCheckins = allCheckins.filter(c => c.is_test === false && !c.deleted_at);
+  const exportCheckins = _withoutNoShows(allCheckins.filter(c => c.is_test === false && !c.deleted_at));
   if (exportCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato!' : 'No data!'); return; }
   const propName = propertyData?.name || 'Property';
   const byNat = {};
@@ -12153,8 +12165,8 @@ function _groupSizeFor(c) {
   if (!Array.isArray(allCheckins)) return 1;
   if (c.booking_code) {
     const n = allCheckins.filter(x =>
-      x.is_test === false && !x.deleted_at && x.property_id === c.property_id && x.booking_code === c.booking_code
-    ).length;
+      x.is_test === false && !x.deleted_at && !x.autofile_excluded && x.property_id === c.property_id && x.booking_code === c.booking_code
+    ).length; // no-shows are not part of the staying group
     return Math.max(1, n);
   }
   return 1;
@@ -12927,7 +12939,7 @@ function applyTaxDeliberaDraft(payload) {
 }
 
 function exportCityTax() {
-  const exportCheckins = allCheckins.filter(c => c.is_test === false && !c.deleted_at);
+  const exportCheckins = _withoutNoShows(allCheckins.filter(c => c.is_test === false && !c.deleted_at));
   if (exportCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato' : 'No data!'); return; }
   const cfg = _normalizeTaxCfg(propertyData);
   if (cfg.ratePeriods.length && TaxDateRates.validate(cfg.ratePeriods)) { toast(hostLang === 'it' ? 'Correggi i periodi della tassa in Impostazioni.' : 'Correct the tax periods in Settings.'); return; }
@@ -13635,7 +13647,7 @@ function refreshPayTouristLink() {
 }
 
 function exportPayTourist() {
-  const exportCheckins = allCheckins.filter(c => c.is_test === false && !c.deleted_at);
+  const exportCheckins = _withoutNoShows(allCheckins.filter(c => c.is_test === false && !c.deleted_at));
   if (exportCheckins.length === 0) { toast(hostLang === 'it' ? 'Nessun dato check-in da esportare!' : 'No check-in data to export!'); return; }
 
   const cirCode = (propertyData?.cir_code || '').trim();

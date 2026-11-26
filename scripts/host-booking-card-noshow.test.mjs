@@ -160,5 +160,29 @@ await test('menu wording: no-show, not «autofile only»', () => {
   assert.ok(!html.includes('L’invio manuale continua a funzionare'));
 });
 
+// ── 4. no-shows: no ISTAT arrival or night, no tourist tax (26 Nov 2026) ──
+await test('statistics and tax exports drop no-shows and say how many', () => {
+  const toasts = [];
+  const ctx = vm.createContext({ hostLang: 'it', toast: m => toasts.push(m) });
+  vm.runInContext(slice('_withoutNoShows'), ctx);
+  const kept = ctx._withoutNoShows([g('a', 'Presente'), g('b', 'Noshow', { autofile_excluded: true })]);
+  assert.deepEqual(kept.map(c => c.id), ['a']);
+  assert.ok(toasts.some(t => /1 ospiti segnati come no-show esclusi/.test(t)));
+  for (const fn of ['exportISTAT', 'exportCityTax', 'exportPayTourist']) assert.match(slice(fn), /_withoutNoShows\(allCheckins\.filter/, fn);
+});
+await test('tax group size counts only the guests who stayed', () => {
+  const ctx = vm.createContext({ allCheckins: [
+    g('a', 'A', { property_id: 'p', booking_code: 'WB-G2' }), g('b', 'B', { property_id: 'p', booking_code: 'WB-G2' }),
+    g('c', 'C', { property_id: 'p', booking_code: 'WB-G2', autofile_excluded: true }) ] });
+  vm.runInContext(slice('_groupSizeFor'), ctx);
+  assert.equal(ctx._groupSizeFor({ property_id: 'p', booking_code: 'WB-G2' }), 2);
+});
+await test('regional statistics (SPOT, ROSS1000, …) leave out no-shows', async () => {
+  const R = (await import('../lib/regional-exports.js')).default;
+  const row = (id, extra = {}) => ({ id, property_id: 'p', is_test: false, deleted_at: null, submitted_at: '2026-11-20T10:00:00Z', ...extra });
+  assert.deepEqual(R.scope([row('a'), row('b', { autofile_excluded: true }), row('c', { autofile_excluded: false })], 'p').map(r => r.id), ['a', 'c']);
+  assert.match(fs.readFileSync(new URL('../host-regional-exports.js', import.meta.url), 'utf8'), /statistics_erased_at,autofile_excluded'/, 'the regional loader reads the flag');
+});
+
 console.log(`\nhost-booking-card-noshow: ${passes} passed, ${failures} failed`);
 if (failures) process.exit(1);

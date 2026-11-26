@@ -27,6 +27,17 @@ Newest entries at the top of each section.
 - **Left as is:** the CSV guest list (a full register) still includes no-shows.
 - **Version pins:** `lib/regional-exports.js` and `host-regional-exports.js` are pinned to v=79, and the pins in `regional-exports.test.mjs` are updated.
 - **Tests:** `host-booking-card-noshow` gains 3 checks (now 19): exports and notice, tax group size, regional scope with the loader reading the flag. `regional-exports` (synthetic golden files) is unchanged and green.
+- **First full run (on both changes together): 5 failures, all fixtures.**
+  - Three tests loaded the exports without the new `_withoutNoShows` helper: `paytourist-golden`, `tax-date-rates`, `onboarding-test-isolation`.
+  - Two tests check the regional loader's column list word for word: `rooms-regional-prefill`, `round76-police-minimisation`.
+
+  All fixed. The tax and PayTourist golden files are byte-identical.
+- **Shipped:** PR #356 merged as `10a15fa`. It was rebuilt on main after #355; its code is identical to the tested version.
+  - Local `npm run test:all` **PASS 176 / FAIL 0 / SKIP 3** (demo origin, private demo catalog, pglast). CI `regression` green.
+  - Production `host-console.html`, `lib/regional-exports.js` and `host-regional-exports.js` are identical to main.
+- **`npm run test:live` after deploy: PASS 3 / FAIL 1 / SKIP 6.**
+  - The failure was `tax-date-rates.test.live.mjs`: like its offline twin, it loaded `exportCityTax` from the production page without `_withoutNoShows`. A test fixture, not a site fault.
+  - Fixed in the follow-up PR below. The test, rerun against production, passes: both IT/EN declaration goldens and the annual goldens are reproduced.
 
 ### Alloggiati: guests already marked as sent never go into the .txt or «Valida» again (Claude, 26 November 2026)
 
@@ -39,6 +50,9 @@ Newest entries at the top of each section.
   - If everyone is already sent, there is no file, and a clear notice says so.
   - «Invia» keeps its own note, with no double notice.
 - **Tests:** `host-booking-card-noshow` gains 3 checks (now 16). Against the old code, the 3 new checks fail.
+- **Shipped:** PR #355 merged as `9f6a74c` after green CI.
+  - The local full suite for #355 alone was stopped, because the working folder had already changed for #356. It was replaced by a full run on #355 + #356 together: **PASS 176 / FAIL 0 / SKIP 3**.
+  - Live on production (the new `excludeFiled` default is served).
 
 ### Admin Ops: «Hosts & Properties» uses the Users-tab layout (Claude, 25 November 2026)
 

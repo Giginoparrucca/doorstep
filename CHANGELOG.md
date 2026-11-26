@@ -7,6 +7,27 @@ Newest entries at the top of each section.
 
 > **Multi-model handoff (Claude ↔ GPT):** before starting a phase, change `pending` to `in-progress — <model>` and commit. Each implementation phase must pass its specified tests before the next starts. After merge, use `shipped — PR #N — <model>` only when the phase specification is fully covered. Commit prefix: `Round R Phase N · `. Label partial deliveries explicitly; a completed plan is not an operational environment. GPT or Claude performs all authorized technical work; involve Daniele only for a strictly necessary action the agent cannot perform.
 
+### No-shows left out of ISTAT, regional statistics and tourist tax (Claude, 26 November 2026)
+
+**Daniele:** «can you check online if no shows are required?», then «Yes, build it».
+
+- **Research.**
+  - **ISTAT** counts arrivals (guests actually registered) and presences (nights actually spent), so a guest who never arrived counts in neither.
+  - **Tourist tax** is due for an overnight stay (D.Lgs. 23/2011 art. 4, repeated in municipal regulations). Rapallo's FAQ says outright that no-shows don't pay.
+  - **Caveat:** some municipalities want exempt stays declared, e.g. Cesenatico, so a host there declares the no-show to the municipality.
+  - **Not found:** Taranto's own regulation was not found online.
+- **Change.** A guest marked «No-show» is now left out of:
+  - ISTAT C/59 (`exportISTAT`);
+  - the tourist-tax export (`exportCityTax`);
+  - PayTourist (`exportPayTourist`);
+  - the group size used by tax rules (`_groupSizeFor`);
+  - every regional statistics file: SPOT, ROSS1000 and the others, via `RegionalExports.scope`. The loader now reads `autofile_excluded`.
+
+  Each export says how many were left out. The no-show confirmation now says this too.
+- **Left as is:** the CSV guest list (a full register) still includes no-shows.
+- **Version pins:** `lib/regional-exports.js` and `host-regional-exports.js` are pinned to v=79, and the pins in `regional-exports.test.mjs` are updated.
+- **Tests:** `host-booking-card-noshow` gains 3 checks (now 19): exports and notice, tax group size, regional scope with the loader reading the flag. `regional-exports` (synthetic golden files) is unchanged and green.
+
 ### Alloggiati: guests already marked as sent never go into the .txt or «Valida» again (Claude, 26 November 2026)
 
 **Host report (same multi-room property as 25 Nov):** «I filed yesterday's two guests by hand on Alloggiati Web and marked them as sent. Today I have to send four guests, but validation also includes yesterday's two and marks them as errors, and the .txt has 4 + 2».

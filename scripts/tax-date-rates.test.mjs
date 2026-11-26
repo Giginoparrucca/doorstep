@@ -5,7 +5,7 @@ const html=fs.readFileSync(new URL('../host-console.html',import.meta.url),'utf8
 function fn(name){const start=html.indexOf('function '+name+'(');assert.ok(start>=0,name);return html.slice(start,html.indexOf('\n}\n',start)+2);}
 const ctx=vm.createContext({console});
 vm.runInContext(fs.readFileSync(new URL('../lib/tax-date-rates.js',import.meta.url),'utf8'),ctx);
-for(const name of ['_ageAtArrival','_normalizeTaxCfg','computeGuestTax','_seasonMatches','_nightsInsideQuarter','_groupSizeFor','_ruleLabel','exportCityTax'])vm.runInContext(fn(name),ctx);
+for(const name of ['_ageAtArrival','_normalizeTaxCfg','computeGuestTax','_seasonMatches','_nightsInsideQuarter','_groupSizeFor','_ruleLabel','_withoutNoShows','exportCityTax'])vm.runInContext(fn(name),ctx);
 const rule=(from,to,rate,main=false)=>({id:main?'_rate_period_base':'fixture_period',when:{night_from:from,night_to:to},effect:{type:'rate_period',value:rate}});
 const guest={id:'SYNTHETIC',property_id:'SYNTHETIC',surname:'Fixture',name:'Adult',date_of_birth:'1980-01-01',arrival_date:'2026-06-29',departure_date:'2026-07-04',is_test:false};
 const property={id:'SYNTHETIC',name:'Fictional tax property',tax_rate_eur:2,tax_rules:[rule('2026-07-01','2026-08-31',4)]};
